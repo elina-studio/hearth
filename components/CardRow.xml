@@ -18,6 +18,8 @@
     <field id="active" type="boolean" value="false" onChange="paint" />
     <field id="rowHeight" type="integer" />
     <field id="viewWidth" type="integer" value="1728" />
+    <!-- optional image laid over each picture, e.g. a round cut-out for artist photos; set before cards -->
+    <field id="maskUri" type="string" />
     <function name="move" />
     <function name="current" />
     <function name="count" />

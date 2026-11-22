@@ -143,7 +143,9 @@ sub handle(r as object)
         pushScreen(s)
         s.callFunc("load", invalid)
     else if a = "musicView" and r.mode = "request"
-        pushScreen(CreateObject("roSGNode", "LidarrScreen"))
+        s = CreateObject("roSGNode", "LidarrScreen")
+        pushScreen(s)
+        if r.term <> invalid then s.term = r.term
     else if a = "musicView"
         s = CreateObject("roSGNode", "MusicView")
         pushScreen(s)

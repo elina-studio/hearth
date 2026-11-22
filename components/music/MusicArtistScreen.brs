@@ -12,7 +12,7 @@ sub init()
     m.toastTimer = m.top.findNode("toastTimer")
     m.toastTimer.observeField("fire", "hideToast")
     m.buttons = m.top.findNode("buttons")
-    m.btnDefs = [["Play all", "play"], ["Shuffle", "shuffle"], ["Show all songs", "toggleAll"]]
+    m.btnDefs = [["Play all", "play"], ["Shuffle", "shuffle"], ["Show all songs", "toggleAll"], ["Get missing albums", "lidarr"]]
     for each b in m.btnDefs
         p = m.buttons.createChild("HearthPill")
         p.button = true
@@ -53,15 +53,23 @@ end sub
 
 sub onAlbums(event as object)
     t = hTaskFrom(event)
-    m.albums = []
+    ' albums first, then EPs and singles, each newest first
+    full = []
+    small = []
     for each md in pxItems(t)
         if md.type = "album"
             open = (pxStr(md.ratingKey) = m.top.openAlbumId)
-            m.albums.push({ md: md, tracks: invalid, open: open, loading: false })
+            al = { md: md, tracks: invalid, open: open, loading: false, group: albumGroup(md) }
+            if al.group = "Albums" then full.push(al) else small.push(al)
         end if
     end for
+    m.albums = newestFirst(full)
+    m.albums.append(newestFirst(small))
     n = m.albums.Count()
-    if n = 1 then m.sub.text = "1 album" else m.sub.text = n.toStr() + " albums"
+    bits = []
+    if full.Count() = 1 then bits.push("1 album") else if full.Count() > 1 then bits.push(full.Count().toStr() + " albums")
+    if small.Count() = 1 then bits.push("1 EP or single") else if small.Count() > 1 then bits.push(small.Count().toStr() + " EPs and singles")
+    m.sub.text = bits.join("  ·  ")
     if n = 0
         if t.status <= 0 then say("Can't reach Plex.") else say("No albums for this artist.")
     end if
@@ -107,9 +115,14 @@ sub drawList()
     curId = ""
     if cur <> invalid and cur.id <> invalid then curId = cur.id
     y = 0
+    group = ""
     for i = 0 to m.albums.Count() - 1
         al = m.albums[i]
         md = al.md
+        if al.group <> group
+            group = al.group
+            y = y + addHeading(y, group)
+        end if
         g = m.list.createChild("Group")
         g.translation = [0, y]
         hl = g.createChild("Rectangle")
@@ -141,6 +154,7 @@ sub drawList()
         sub2.color = "0xB5AF8CFF"
         bits = []
         if md.year <> invalid then bits.push(md.year.toStr())
+        if al.group <> "Albums" and md.leafCount <> invalid and md.leafCount <= 3 then bits.push("Single") else if al.group <> "Albums" then bits.push("EP")
         if md.leafCount <> invalid then bits.push(md.leafCount.toStr() + " songs")
         sub2.text = bits.join("  ·  ")
         state = g.createChild("Label")
@@ -219,7 +233,11 @@ function addTrack(y as integer, i as integer, k as integer, md as object, curId 
     title.font = hFont("regular", 30)
     if playing then title.color = "0xE0B34AFF" else title.color = "0xEDE6CAFF"
     title.text = pxStr(md.title)
-    if playing then title.text = title.text + "   (playing)"
+    ' the playing song: gold, with a dot before its number
+    if playing
+        num.text = Chr(8226) + " " + num.text
+        num.color = "0xE0B34AFF"
+    end if
     dur = g.createChild("Label")
     dur.translation = [1500, 12]
     dur.width = 210
@@ -298,6 +316,10 @@ end sub
 sub button(a as string)
     if a = "toggleAll"
         toggleAll()
+    else if a = "lidarr"
+        name = ""
+        if m.artist <> invalid then name = pxStr(m.artist.title)
+        m.top.request = { action: "musicView", mode: "request", term: name }
     else if m.artist <> invalid
         muSend("playContainer", { kind: "artist", id: m.top.artistId, shuffle: (a = "shuffle"), label: pxStr(m.artist.title) })
     end if
@@ -305,10 +327,25 @@ end sub
 
 sub albumOptions(i as integer)
     m.optAlbum = i
+    m.optTrack = -1
     d = CreateObject("roSGNode", "StandardMessageDialog")
     d.title = pxStr(m.albums[i].md.title)
     d.message = [pxStr(m.albums[i].md.parentTitle)]
-    d.buttons = ["Play album", "Shuffle album", "Close"]
+    d.buttons = ["Play album", "Shuffle album", "Play next", "Add to queue", "Close"]
+    d.observeField("buttonSelected", "onAlbumOption")
+    d.observeField("wasClosed", "onShown")
+    m.dialog = d
+    m.top.getScene().dialog = d
+end sub
+
+sub trackOptions(i as integer, k as integer)
+    m.optAlbum = i
+    m.optTrack = k
+    md = m.albums[i].tracks[k]
+    d = CreateObject("roSGNode", "StandardMessageDialog")
+    d.title = pxStr(md.title)
+    d.message = [pxStr(m.albums[i].md.title)]
+    d.buttons = ["Play from here", "Play next", "Add to queue", "More like this", "Close"]
     d.observeField("buttonSelected", "onAlbumOption")
     d.observeField("wasClosed", "onShown")
     m.dialog = d
@@ -318,7 +355,21 @@ end sub
 sub onAlbumOption()
     b = m.dialog.buttonSelected
     m.dialog.close = true
-    if b < 2 then playAlbum(m.optAlbum, b = 1)
+    al = m.albums[m.optAlbum]
+    name = pxStr(al.md.title)
+    if m.optTrack < 0
+        if b < 2 then playAlbum(m.optAlbum, b = 1)
+        if b = 2 or b = 3 then muSend("queueContainer", { kind: "album", id: pxStr(al.md.ratingKey), next: (b = 2), label: name })
+    else
+        md = al.tracks[m.optTrack]
+        if b = 0 then playTrack(m.optAlbum, m.optTrack)
+        if b = 1 or b = 2 then muSend("queueTracks", { tracks: [pxTrack(md)], next: (b = 1), label: pxStr(md.title) })
+        if b = 3
+            ' start this song, then ask Plex for songs that sound like it
+            muSend("load", { tracks: [pxTrack(md)], start: 0, label: pxStr(md.title) })
+            muSend("moreLikeThis")
+        end if
+    end if
 end sub
 
 sub muRestoreFocus()
@@ -373,8 +424,57 @@ function onKeyEvent(key as string, press as boolean) as boolean
         if row.kind = "album" then toggle(row.a)
         if row.kind = "track" then playTrack(row.a, row.t)
     else if key = "options"
-        albumOptions(row.a)
+        if row.kind = "track" then trackOptions(row.a, row.t) else albumOptions(row.a)
     end if
     paint()
     return true
+end function
+
+' Plex tags some albums with a format (EP, Single...). Without one, six songs or fewer counts as an EP or single.
+function albumGroup(md as object) as string
+    for each field in ["Format", "Subformat"]
+        tags = md[field]
+        if tags <> invalid
+            for each tg in tags
+                t = LCase(pxStr(tg.tag))
+                if Instr(1, t, "single") > 0 or Instr(1, t, "ep") = 1 then return "EPs and singles"
+                if Instr(1, t, "album") > 0 then return "Albums"
+            end for
+        end if
+    end for
+    if md.leafCount <> invalid and md.leafCount <= 6 then return "EPs and singles"
+    return "Albums"
+end function
+
+function newestFirst(list as object) as object
+    out = []
+    for each al in list
+        y = 0
+        if al.md.year <> invalid then y = al.md.year
+        ' insertion sort: lists are short
+        k = 0
+        while k < out.Count() and out[k].y >= y
+            k = k + 1
+        end while
+        al.y = y
+        tail = []
+        for j = k to out.Count() - 1
+            tail.push(out[j])
+        end for
+        while out.Count() > k
+            out.pop()
+        end while
+        out.push(al)
+        out.append(tail)
+    end for
+    return out
+end function
+
+function addHeading(y as integer, text as string) as integer
+    l = m.list.createChild("Label")
+    l.translation = [0, y + 14]
+    l.font = hFont("caps", 28)
+    l.color = "0xD9A066FF"
+    l.text = UCase(text)
+    return 56
 end function

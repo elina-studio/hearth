@@ -58,6 +58,12 @@ sub makeSlot(w as integer, h as integer)
     fb.vertAlign = "center"
     fb.horizAlign = "center"
     fb.font = hFont("caps", 34)
+    if m.top.maskUri <> ""
+        mask = g.createChild("Poster")
+        mask.uri = m.top.maskUri
+        mask.width = w
+        mask.height = h
+    end if
     fb.color = "0xEDE6CAFF"
     track = g.createChild("Rectangle")
     track.width = w

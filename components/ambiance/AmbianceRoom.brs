@@ -7,7 +7,12 @@ sub init()
     m.items = ambMoods()
     m.n = m.items.count()
     m.narrow = (1920 - m.WIDE - (m.n - 1) * m.RULE) / (m.n - 1)
+    ' open on the mood used last
     m.index = 0
+    last = CreateObject("roRegistrySection", "hearth").Read("ambLast")
+    for i = 0 to m.items.count() - 1
+        if m.items[i].mood = last then m.index = i
+    end for
     m.active = false
     m.cols = []
     holder = m.top.findNode("cols")

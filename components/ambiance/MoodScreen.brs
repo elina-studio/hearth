@@ -6,6 +6,20 @@ sub init()
     m.credit = m.top.findNode("credit")
     m.credit.font = hFont("regular", 20)
     m.useVideo = false
+    m.still = m.top.findNode("still")
+    m.dim = m.top.findNode("dim")
+    m.dimLevels = [0, 0.25, 0.5, 0.7]
+    m.dimIndex = 0
+    v = CreateObject("roRegistrySection", "hearth").Read("ambDim")
+    if v <> "" then m.dimIndex = Val(v)
+    if m.dimIndex < 0 or m.dimIndex > 3 then m.dimIndex = 0
+    m.dim.opacity = m.dimLevels[m.dimIndex]
+    m.cornerClock = m.top.findNode("cornerClock")
+    m.cornerClock.font = hFont("bold", 36)
+    m.cornerClock.visible = (CreateObject("roRegistrySection", "hearth").Read("ambClock") = "1")
+    ct = m.top.findNode("clockTick")
+    ct.observeField("fire", "paintClock")
+    ct.control = "start"
     m.scene = m.top.findNode("scene")
     m.sound = m.top.findNode("sound")
     m.hud = m.top.findNode("hud")
@@ -14,7 +28,7 @@ sub init()
     m.state.font = hFont("bold", 28)
     m.hint = m.top.findNode("hint")
     m.hint.font = hFont("regular", 24)
-    m.hint.text = "OK sound   ·   Left/Right mood   ·   * timer   ·   Back leaves"
+    m.hint.text = "OK sound   ·   Left/Right mood   ·   Up/Down dim   ·   * options   ·   Back leaves"
     m.clock = m.top.findNode("clock")
     m.clock.font = hFont("bold", 40)
     m.hudIn = m.top.findNode("hudIn")
@@ -45,6 +59,9 @@ sub onMood()
         c.url = it.video
         c.streamFormat = "mp4"
         m.video.content = c
+        ' the still covers the screen until the first frame is up
+        m.still.uri = "pkg:/images/amb/full-" + md + ".jpg"
+        m.still.visible = true
         m.video.visible = true
         m.video.mute = not soundPref(md)
         m.video.control = "play"
@@ -53,6 +70,7 @@ sub onMood()
         ' no footage in this build: the drawn scene and its generated sound
         m.video.control = "stop"
         m.video.visible = false
+        m.still.visible = false
         m.scene.visible = true
         m.scene.mood = md
         m.scene.running = true
@@ -63,6 +81,9 @@ sub onMood()
     end if
     ' lights out means "stop in 30 min" unless a timer is already set
     if md = "lightsout" and m.sleepMin = 0 then setSleep(30)
+    m.reg.Write("ambLast", md)
+    m.reg.Flush()
+    paintClock()
     m.top.findNode("name").text = UCase(m.titles[md])
     paintState()
     showHud()
@@ -71,6 +92,7 @@ end sub
 sub onVideoState()
     print "[ambiance] video state "; m.video.state
     if m.video.state = "error" then print "[ambiance] video error: "; m.video.errorMsg
+    if m.video.state = "playing" then m.still.visible = false
 end sub
 
 function soundOn() as boolean
@@ -89,11 +111,18 @@ end function
 
 sub paintState()
     if soundOn() then s = "Sound on" else s = "Sound off"
+    if m.dimIndex > 0 then s = s + "   ·   Dimmed " + Int(m.dimLevels[m.dimIndex] * 100).toStr() + "%"
     if m.sleepMin > 0 and m.sleepAt <> invalid then s = s + "   ·   Stops at " + clockText(m.sleepAt)
     m.state.text = s
     now = CreateObject("roDateTime")
     now.ToLocalTime()
     m.clock.text = clockText(now)
+end sub
+
+sub paintClock()
+    now = CreateObject("roDateTime")
+    now.ToLocalTime()
+    m.cornerClock.text = clockText(now)
 end sub
 
 function clockText(dt as object) as string
@@ -156,13 +185,14 @@ sub sleepMenu()
     d.title = m.titles[m.top.mood]
     d.message = ["Sound and sleep timer"]
     if soundOn() then snd = "Turn sound off" else snd = "Turn sound on"
-    m.menuMins = [-1, 0, 30, 60, 90]
+    m.menuMins = [-1, 0, 30, 60, 90, -2]
     labels = [snd]
     for each mins in [0, 30, 60, 90]
         if mins = 0 then t = "No timer" else t = "Stop in " + mins.toStr() + " min"
         if mins = m.sleepMin then t = t + "  (now)"
         labels.push(t)
     end for
+    if m.cornerClock.visible then labels.push("Hide the clock") else labels.push("Show the clock")
     d.buttons = labels
     d.observeField("buttonSelected", "onMenu")
     d.observeField("wasClosed", "onMenuClosed")
@@ -175,6 +205,11 @@ sub onMenu()
     m.dialog.close = true
     if i = 0
         toggleSound()
+    else if m.menuMins[i] = -2
+        m.cornerClock.visible = not m.cornerClock.visible
+        if m.cornerClock.visible then v = "1" else v = "0"
+        m.reg.Write("ambClock", v)
+        m.reg.Flush()
     else
         setSleep(m.menuMins[i])
     end if
@@ -240,6 +275,14 @@ function onKeyEvent(key as string, press as boolean) as boolean
         nextMood(-1)
     else if key = "right"
         nextMood(1)
+    else if key = "up" or key = "down"
+        if key = "down" then m.dimIndex = m.dimIndex + 1 else m.dimIndex = m.dimIndex - 1
+        if m.dimIndex < 0 then m.dimIndex = 0
+        if m.dimIndex > 3 then m.dimIndex = 3
+        m.dim.opacity = m.dimLevels[m.dimIndex]
+        m.reg.Write("ambDim", m.dimIndex.toStr())
+        m.reg.Flush()
+        showHud()
     else if key = "options"
         sleepMenu()
     else
