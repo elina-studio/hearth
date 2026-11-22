@@ -282,7 +282,12 @@ function norm(md as object) as object
     else
         it.Type = t
         it.ArtistName = md.grandparentTitle
-        if t = "album" then it.ArtistName = md.parentTitle
+        it.ArtistId = md.grandparentRatingKey
+        if t = "album"
+            it.ArtistName = md.parentTitle
+            it.ArtistId = md.parentRatingKey
+        end if
+        if t = "track" then it.AlbumId = md.parentRatingKey
     end if
     if md.Genre <> invalid
         g = []

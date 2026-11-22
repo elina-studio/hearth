@@ -29,6 +29,11 @@ sub init()
     start()
 end sub
 
+' Search hands over what was typed ("Ask Lidarr for ...")
+sub onTerm()
+    m.kb.text = m.top.term
+end sub
+
 sub onShown(unused as dynamic)
     m.top.setFocus(true)
 end sub

@@ -88,16 +88,37 @@ function makeKey(x as integer, y as integer, w as integer) as object
     lab.height = m.keyH
     lab.horizAlign = "center"
     lab.vertAlign = "center"
+    icon = g.createChild("Poster")
+    icon.width = 32
+    icon.height = 32
+    icon.translation = [26, 19]
+    icon.visible = false
     return g
 end function
 
 sub setKeyLabel(g as object, text as string)
     lab = g.getChild(2)
+    icon = g.getChild(3)
     size = 34
     if Len(text) > 1 then size = 26
     if Len(text) > 5 then size = 19
     lab.font = hFont("bold", size)
     lab.text = text
+    icons = { Space: "space", Delete: "backspace", Clear: "clear" }
+    w = g.getChild(1).width
+    if icons[text] <> invalid
+        ' icon on the left, word beside it
+        icon.uri = "pkg:/images/icons/" + icons[text] + ".png"
+        icon.visible = true
+        lab.horizAlign = "left"
+        lab.translation = [68, 0]
+        lab.width = w - 76
+    else
+        icon.visible = false
+        lab.horizAlign = "center"
+        lab.translation = [0, 0]
+        lab.width = w
+    end if
 end sub
 
 sub labelKeys()
@@ -190,21 +211,24 @@ sub predict()
                 ch = Mid(n, hit + Len(qn), 1)
                 if ch = " " then nextSet["space"] = true else if ch <> "" then nextSet[ch] = true
                 if n <> whole and not seen.doesExist(n)
+                    ' keep a pool, then show the shortest: the closest fit to what's typed
                     if hit = 1
-                        if starts.count() < 3 then starts.push(m.vocab[i])
-                    else if inside.count() < 3
-                        inside.push(m.vocab[i])
+                        if starts.count() < 40 then starts.push({ s: m.vocab[i], n: Len(n) })
+                    else if inside.count() < 40
+                        inside.push({ s: m.vocab[i], n: Len(n) })
                     end if
                     seen[n] = true
                 end if
             end if
         end for
         if found and nextSet.count() > 0 then m.nextSet = nextSet
-        for each s in starts
-            chips.push(s)
+        starts.SortBy("n")
+        inside.SortBy("n")
+        for each c in starts
+            if chips.count() < 3 then chips.push(c.s)
         end for
-        for each s in inside
-            chips.push(s)
+        for each c in inside
+            if chips.count() < 3 then chips.push(c.s)
         end for
     end if
     buildChips(chips)
@@ -280,6 +304,7 @@ sub paintKey(g as object, focused as boolean, lit as boolean)
     glow = g.getChild(0)
     base = g.getChild(1)
     lab = g.getChild(2)
+    icon = g.getChild(3)
     glow.visible = focused
     if focused
         base.blendColor = "0xE0B34AFF"
@@ -291,6 +316,7 @@ sub paintKey(g as object, focused as boolean, lit as boolean)
         base.blendColor = "0x12160FFF"
         lab.color = "0xEDE6CA44"
     end if
+    icon.blendColor = lab.color
 end sub
 
 ' ---------- typing ----------
