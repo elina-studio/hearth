@@ -4,7 +4,8 @@
     <Poster id="backdrop" loadDisplayMode="scaleToZoom" width="1920" height="1200" />
 
     <!-- Hearth: room pills. Up from the dashboard reaches them; Left/Right wrap; OK or Down enters the room. -->
-    <LayoutGroup id="buttons" translation="[96, 70]" layoutDirection="horiz" horizAlignment="left" itemSpacings="[8]">
+    <Poster id="lantern" uri="pkg:/images/hearth/lantern.png" translation="[100, 63]" width="40" height="72" />
+    <LayoutGroup id="buttons" translation="[164, 70]" layoutDirection="horiz" horizAlignment="left" itemSpacings="[8]">
       <HearthPill id="pillHome" text="Home" width="130" />
       <HearthPill id="pillMovies" text="Movies" width="160" />
       <HearthPill id="pillShows" text="Shows" width="150" />
@@ -57,7 +58,7 @@
 
     <Animation id="toggleButtonsAnimation" duration=".7" repeat="false" easeFunction="linear">
       <FloatFieldInterpolator id="buttonsFade" key="[0.0, .6]" keyValue="[1.00, 0.00]" fieldToInterp="buttons.opacity" />
-      <Vector2DFieldInterpolator id="buttonsMove" key="[0.1, .9]" keyValue="[[96, 70], [96, 0]]" fieldToInterp="buttons.translation" />
+      <Vector2DFieldInterpolator id="buttonsMove" key="[0.1, .9]" keyValue="[[164, 70], [164, 0]]" fieldToInterp="buttons.translation" />
     </Animation>
 
   </children>
