@@ -11,7 +11,7 @@ end sub
 
 sub setFont()
     if not isValidAndNotEmpty(m.global.fallbackFont) then return
-    if not chainLookupReturn(m.global.session, "user.settings.useFallbackFont", false) then return
+    if not chainLookupReturn(m.global.session, "user.settings.useFallbackFont", false) and not isValid(m.global.fallbackFont.hearth) then return
 
     m.top.font.uri = m.global.fallbackFont.regular
 end sub
