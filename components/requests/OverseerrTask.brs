@@ -49,6 +49,10 @@ sub loadRequests()
                 info.overview = d.data.overview
                 info.releaseDate = d.data.releaseDate
                 info.firstAirDate = d.data.firstAirDate
+                info.backdropPath = d.data.backdropPath
+                info.voteAverage = d.data.voteAverage
+                info.runtime = d.data.runtime
+                info.numberOfSeasons = d.data.numberOfSeasons
             end if
             out.push({ request: q, info: info })
         end if

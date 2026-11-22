@@ -1,0 +1,192 @@
+' Requests room data helpers: turn Overseerr JSON into card data. No nodes here, so any layout can use them.
+' Card: { kind: "media"|"search"|"music", title, image, chip: { text, icon, tone }, progress (0-100 or -1), data }
+' tone: "out" (not requested), "gold" (on its way), "olive" (here), "ember" (problem)
+
+function rqNum(v as dynamic) as integer
+    if v = invalid then return -1
+    return v
+end function
+
+function rqYear(r as object) as string
+    d = r.releaseDate
+    if d = invalid or d = "" then d = r.firstAirDate
+    if d = invalid or Len(d) < 4 then return ""
+    return Left(d, 4)
+end function
+
+' TMDB image; w185 posters suit 200 x 300 cards on a 720p UI
+function rqImage(path as dynamic, size as string) as string
+    if path = invalid or path = "" then return ""
+    return "https://image.tmdb.org/t/p/" + size + path
+end function
+
+function rqChip(text as string, icon as string, tone as string) as object
+    return { text: text, icon: icon, tone: tone }
+end function
+
+' Overseerr media status: 1 unknown, 2 pending, 3 processing, 4 partly available, 5 available
+function rqMediaChip(status as integer) as object
+    if status = 2 then return rqChip("Requested", "clock", "gold")
+    if status = 3 then return rqChip("Approved", "stamp", "gold")
+    if status = 4 then return rqChip("Partly here", "check", "olive")
+    if status = 5 then return rqChip("In library", "check", "olive")
+    return rqChip("Request", "plus", "out")
+end function
+
+' Percent downloaded from Overseerr's downloadStatus list (Sonarr/Radarr queue), or -1
+function rqProgress(media as dynamic) as integer
+    if media = invalid or media.downloadStatus = invalid or media.downloadStatus.count() = 0 then return -1
+    size = 0.0
+    left = 0.0
+    for each d in media.downloadStatus
+        if d.size <> invalid then size = size + d.size
+        if d.sizeLeft <> invalid then left = left + d.sizeLeft
+    end for
+    if size <= 0 then return 0
+    return Int((size - left) * 100 / size)
+end function
+
+function rqTitle(r as object) as string
+    t = r.title
+    if t = invalid then t = r.name
+    if t = invalid then t = ""
+    return t
+end function
+
+' A discover or search result
+function rqMediaCard(r as object) as object
+    status = -1
+    if r.mediaInfo <> invalid then status = rqNum(r.mediaInfo.status)
+    title = rqTitle(r)
+    data = { id: r.id, mediaType: r.mediaType, title: title, year: rqYear(r), overview: r.overview, backdrop: r.backdropPath, poster: r.posterPath, rating: r.voteAverage, mediaStatus: status }
+    return { kind: "media", title: title, image: rqImage(r.posterPath, "w185"), chip: rqMediaChip(status), progress: -1, data: data }
+end function
+
+' One of your requests (q) with its title details (info) from OverseerrTask mode "requests".
+' Request status: 1 waiting for approval, 2 approved, 3 declined, 4 failed
+function rqRequestCard(q as object, info as object) as object
+    media = q.media
+    ms = -1
+    if media <> invalid then ms = rqNum(media.status)
+    rs = rqNum(q.status)
+    pct = rqProgress(media)
+    if rs = 1
+        chip = rqChip("Waiting approval", "clock", "out")
+        note = "Waiting for approval in Overseerr."
+    else if rs = 3
+        chip = rqChip("Declined", "warn", "ember")
+        note = "This request was declined in Overseerr."
+    else if rs = 4
+        chip = rqChip("Failed", "warn", "ember")
+        note = "Overseerr couldn't send this to Radarr or Sonarr. Check Overseerr's Requests page."
+    else if ms = 5
+        chip = rqChip("Ready", "play", "olive")
+        note = "Ready to watch. Press OK to open it."
+    else if ms = 4
+        chip = rqChip("Partly ready", "play", "olive")
+        note = "Some of it is ready to watch; the rest is on the way."
+    else if pct >= 0
+        chip = rqChip(pct.toStr() + "% downloaded", "down", "gold")
+        note = "Downloading now."
+    else
+        chip = rqChip("Approved", "stamp", "gold")
+        note = "Approved. Waiting for a download to start."
+    end if
+    when = rqWhen(q.createdAt)
+    if when <> "" then note = "Requested " + when + ". " + note
+    title = info.title
+    if title = invalid or title = "" then title = "Untitled"
+    if info.title = "" and info.detailStatus <> invalid
+        note = note + " (Overseerr couldn't load this title: error " + info.detailStatus.toStr() + ".)"
+    end if
+    data = { id: info.id, mediaType: info.mediaType, title: title, year: rqYear(info), overview: info.overview, backdrop: info.backdropPath, poster: info.posterPath, rating: info.voteAverage, mediaStatus: ms, requestId: q.id, requestStatus: rs, note: note, runtime: info.runtime, seasons: info.numberOfSeasons }
+    return { kind: "media", title: title, image: rqImage(info.posterPath, "w185"), chip: chip, progress: pct, data: data }
+end function
+
+' "today at 3:52 PM", "Nov 20"
+function rqWhen(iso as dynamic) as string
+    if iso = invalid or iso = "" then return ""
+    dt = CreateObject("roDateTime")
+    dt.FromISO8601String(iso)
+    dt.ToLocalTime()
+    now = CreateObject("roDateTime")
+    now.ToLocalTime()
+    if dt.GetYear() = now.GetYear() and dt.GetMonth() = now.GetMonth() and dt.GetDayOfMonth() = now.GetDayOfMonth()
+        h = dt.GetHours()
+        mi = dt.GetMinutes()
+        ap = "AM"
+        if h >= 12 then ap = "PM"
+        h = h mod 12
+        if h = 0 then h = 12
+        mm = mi.toStr()
+        if mi < 10 then mm = "0" + mm
+        return "today at " + h.toStr() + ":" + mm + " " + ap
+    end if
+    months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    return months[dt.GetMonth() - 1] + " " + dt.GetDayOfMonth().toStr()
+end function
+
+' Eyebrow: "MOVIE · 2024 · 2H 46M" (+ rating shown with a star icon by the room)
+function rqEyebrow(d as object) as string
+    if d.mediaType = "tv" then e = "SHOW" else e = "MOVIE"
+    if d.year <> invalid and d.year <> "" then e = e + " · " + d.year
+    if d.runtime <> invalid and d.runtime > 0
+        h = Int(d.runtime / 60)
+        mi = d.runtime mod 60
+        if h > 0 then e = e + " · " + h.toStr() + "H " + mi.toStr() + "M" else e = e + " · " + mi.toStr() + "M"
+    end if
+    if d.seasons <> invalid and d.seasons > 0
+        s = d.seasons.toStr() + " SEASON"
+        if d.seasons > 1 then s = s + "S"
+        e = e + " · " + s
+    end if
+    return e
+end function
+
+' "8.2", or "" when TMDB has no votes
+function rqRating(v as dynamic) as string
+    if v = invalid or v <= 0 then return ""
+    x = Int(v * 10 + 0.5)
+    return Int(x / 10).toStr() + "." + (x mod 10).toStr()
+end function
+
+' Seasons of a show for the picker: [{ number, label, sub, have }] from /api/v1/tv/{id}
+function rqSeasons(tv as object) as object
+    have = {}
+    if tv.mediaInfo <> invalid and tv.mediaInfo.seasons <> invalid
+        for each s in tv.mediaInfo.seasons
+            st = rqNum(s.status)
+            if s.seasonNumber <> invalid and (st = 5 or st = 2 or st = 3) then have[s.seasonNumber.toStr()] = st
+        end for
+    end if
+    out = []
+    if tv.seasons = invalid then return out
+    for each s in tv.seasons
+        n = rqNum(s.seasonNumber)
+        if n > 0
+            info = ""
+            if s.episodeCount <> invalid then info = s.episodeCount.toStr() + " episodes"
+            if s.airDate <> invalid and Len(s.airDate) >= 4
+                info = info + " · " + Left(s.airDate, 4)
+            else
+                info = "announced"
+            end if
+            st = have[n.toStr()]
+            tag = ""
+            if st <> invalid
+                if st = 5 then tag = "In library" else tag = "Requested"
+            end if
+            out.push({ number: n, label: "Season " + n.toStr(), sub: info, tag: tag, aired: (s.airDate <> invalid and s.airDate <> "") })
+        end if
+    end for
+    return out
+end function
+
+' Latest aired season not already here or requested, or -1
+function rqLatestSeason(list as object) as integer
+    best = -1
+    for each s in list
+        if s.aired and s.tag = "" and s.number > best then best = s.number
+    end for
+    return best
+end function
