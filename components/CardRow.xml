@@ -17,6 +17,7 @@
     <field id="index" type="integer" value="0" />
     <field id="active" type="boolean" value="false" onChange="paint" />
     <field id="rowHeight" type="integer" />
+    <field id="viewWidth" type="integer" value="1728" />
     <function name="move" />
     <function name="current" />
     <function name="count" />

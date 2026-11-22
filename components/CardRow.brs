@@ -4,14 +4,13 @@ sub init()
     m.rule = m.top.findNode("rule")
     m.strip = m.top.findNode("strip")
     m.gap = 30
-    m.viewWidth = 1728
 end sub
 
 sub onTitle()
     m.title.text = m.top.title
     bounds = m.title.boundingRect()
     m.rule.translation = [bounds.width + 20, 20]
-    m.rule.width = m.viewWidth - bounds.width - 20
+    m.rule.width = m.top.viewWidth - bounds.width - 20
 end sub
 
 sub build()
@@ -96,7 +95,7 @@ sub paint()
     w = m.top.cardWidth + m.gap
     right = (m.top.index + 1) * w - m.gap
     shift = 0
-    if right > m.viewWidth then shift = right - m.viewWidth
+    if right > m.top.viewWidth then shift = right - m.top.viewWidth
     m.strip.translation = [-shift, 0]
 end sub
 
