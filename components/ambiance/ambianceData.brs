@@ -56,6 +56,8 @@ function ambMerge(clips as object) as object
             for each it in items
                 if it.mood = md
                     it.clip = c
+                    ' the clip's own name says what it is ("Fire in the woods")
+                    if c.Name <> invalid and c.Name <> "" then it.sub = c.Name
                     if c.thumb <> invalid then it.plexStill = c.thumb
                 end if
             end for
