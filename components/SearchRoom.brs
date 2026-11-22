@@ -1,5 +1,5 @@
 ' Search room. Left: the Hearth keyboard (suggests titles, dims dead keys). Right: matches from
-' Jellyfin (movies, shows, music, and episodes once you've typed 3 letters),
+' Plex /hubs/search (movies, shows, episodes, artists, albums, songs),
 ' updating as you type. Right from the grid's last column jumps to the results.
 
 sub init()
@@ -34,12 +34,23 @@ sub init()
     paint()
 end sub
 
-' Every title and artist name, so the keyboard can suggest and dim keys.
+' Every movie, show and artist name from Plex, so the keyboard can suggest titles and dim keys.
+' Needs the library ids, so it runs (once) when the hub has loaded them and calls refresh.
 sub loadVocabulary()
+    if m.vocabStarted = true then return
+    libs = m.global.libraries
+    if libs = invalid then return
+    sections = []
+    for each kind in ["movies", "tvshows", "music"]
+        if libs[kind] <> invalid then sections.push(libs[kind])
+    end for
+    if sections.count() = 0 then return
+    m.vocabStarted = true
     m.vocabParts = []
-    m.vocabPending = 2
-    hApi("GET", "/Items", { userId: hUser(), Recursive: "true", IncludeItemTypes: "Movie,Series,MusicAlbum", EnableImages: "false", EnableUserData: "false", Limit: 8000 }, invalid, "onVocabulary")
-    hApi("GET", "/Artists", { userId: hUser(), EnableImages: "false", EnableUserData: "false", Limit: 4000 }, invalid, "onVocabulary")
+    m.vocabPending = sections.count()
+    for each id in sections
+        hPlex("list", { section: id, limit: 5000 }, "onVocabulary")
+    end for
 end sub
 
 sub onVocabulary(event as object)
@@ -75,33 +86,20 @@ sub runSearch()
         return
     end if
     m.term = term
-    m.found = []
-    m.failures = 0
-    m.pending = 2
     if m.results.count() = 0 then m.hint.text = "Looking..."
-    tag = m.seq.toStr()
-    types = "Movie,Series,MusicAlbum,Audio"
-    if Len(term) >= 3 then types = types + ",Episode"
-    hApi("GET", "/Items", { userId: hUser(), searchTerm: term, Recursive: "true", IncludeItemTypes: types, Limit: 40, Fields: hFields(), EnableImageTypes: "Primary,Backdrop,Thumb", ImageTypeLimit: 1 }, invalid, "onFound", tag)
-    hApi("GET", "/Artists", { userId: hUser(), searchTerm: term, Limit: 10, Fields: hFields(), EnableImageTypes: "Primary", ImageTypeLimit: 1 }, invalid, "onFound", tag)
+    hPlex("search", { query: term, limit: 20 }, "onFound", m.seq.toStr())
 end sub
 
 sub onFound(event as object)
     t = hTaskFrom(event)
     if t.tag <> m.seq.toStr() then return ' an older search finished late
-    m.pending = m.pending - 1
-    if t.ok and t.response <> invalid and t.response.Items <> invalid
-        for each it in t.response.Items
-            m.found.push(it)
-        end for
-    else
-        m.failures = m.failures + 1
-    end if
-    if m.pending > 0 then return
+    m.found = []
+    failed = not t.ok
+    if t.response <> invalid and t.response.Items <> invalid then m.found = t.response.Items
 
     ' titles that start with what you typed come first, then movies and shows, music, songs, episodes
     q = LCase(m.term)
-    ranks = { Movie: 0, Series: 0, MusicArtist: 1, MusicAlbum: 1, Audio: 2, Episode: 3 }
+    ranks = { Movie: 0, Series: 0, artist: 1, album: 1, track: 2, Episode: 3 }
     keyed = []
     i = 0
     for each it in m.found
@@ -122,15 +120,15 @@ sub onFound(event as object)
     end for
     matches = list.count()
     ' last row: hand the term to the Requests room (Overseerr)
-    if m.failures < 2 then list.push({ Type: "HearthRequest", Name: "Ask for " + Chr(34) + m.term + Chr(34) })
+    if not failed then list.push({ Type: "HearthRequest", Name: "Ask for " + Chr(34) + m.term + Chr(34) })
     setResults(list)
 
     m.hint.text = ""
     if matches > 0
         if matches = 1 then m.resultsLabel.text = "1 MATCH" else m.resultsLabel.text = matches.toStr() + " MATCHES"
-    else if m.failures >= 2
+    else if failed
         m.resultsLabel.text = ""
-        m.hint.text = "Couldn't reach Jellyfin. Check that the NAS is on, then type again."
+        m.hint.text = "Couldn't reach Plex. Check that the server is on, then type again."
     else
         m.resultsLabel.text = "NOTHING IN YOUR LIBRARY YET"
     end if
@@ -233,20 +231,17 @@ function rowSubtitle(it as object) as string
         parts.push("Episode")
         if it.SeriesName <> invalid then parts.push(it.SeriesName)
         parts.push("S" + hNum(it.ParentIndexNumber) + " E" + hNum(it.IndexNumber))
-    else if t = "MusicAlbum"
+    else if t = "album"
         parts.push("Album")
-        if it.AlbumArtist <> invalid and it.AlbumArtist <> "" then parts.push(it.AlbumArtist)
+        if it.ArtistName <> invalid and it.ArtistName <> "" then parts.push(it.ArtistName)
         if it.ProductionYear <> invalid then parts.push(it.ProductionYear.toStr())
-    else if t = "MusicArtist"
+    else if t = "artist"
         parts.push("Artist")
+    else if t = "track"
+        parts.push("Song")
+        if it.ArtistName <> invalid and it.ArtistName <> "" then parts.push(it.ArtistName)
     else if t = "HearthRequest"
         parts.push("Search Overseerr and request it")
-    else if t = "Audio"
-        parts.push("Song")
-        artist = it.AlbumArtist
-        if it.Artists <> invalid and it.Artists.count() > 0 then artist = it.Artists[0]
-        if artist <> invalid and artist <> "" then parts.push(artist)
-        if it.Album <> invalid and it.Album <> "" then parts.push(it.Album)
     else
         parts.push(t)
     end if
@@ -259,17 +254,15 @@ function artFor(it as object) as object
     if t = "Movie" or t = "Series"
         return { uri: hImageAny(it, ["Thumb", "Backdrop", "Primary"], 400), square: false }
     else if t = "Episode"
-        return { uri: hImageAny(it, ["Primary", "Thumb", "Backdrop"], 400), square: false }
+        return { uri: hImageAny(it, ["Thumb", "Backdrop", "Primary"], 400), square: false }
     end if
-    uri = hImage(it, "Primary", 240)
-    if uri = "" and it.AlbumId <> invalid and it.AlbumPrimaryImageTag <> invalid
-        uri = m.global.server + "/Items/" + it.AlbumId + "/Images/Primary?maxWidth=240&quality=90&tag=" + it.AlbumPrimaryImageTag
-    end if
+    uri = ""
+    if it._img <> invalid and it._img.Primary <> invalid and it._img.Primary <> "" then uri = hPlexImage(it._img.Primary, 240, "Thumb")
     return { uri: uri, square: true }
 end function
 
 function isMusic(it as object) as boolean
-    return it.Type = "MusicAlbum" or it.Type = "MusicArtist" or it.Type = "Audio"
+    return it.Type = "album" or it.Type = "artist" or it.Type = "track"
 end function
 
 sub openResult()
@@ -278,22 +271,10 @@ sub openResult()
     if it.Type = "HearthRequest"
         m.top.request = { action: "room", name: "Requests", search: m.term }
     else if isMusic(it)
-        ' the Music room plays from Plex, so it gets names rather than Jellyfin ids
-        r = { action: "playMusic", title: rowTitle(it), artist: "" }
-        if it.Type = "MusicAlbum"
-            r.kind = "album"
-            if it.AlbumArtist <> invalid then r.artist = it.AlbumArtist
-        else if it.Type = "MusicArtist"
-            r.kind = "artist"
-            r.artist = rowTitle(it)
-        else
-            r.kind = "track"
-            if it.Artists <> invalid and it.Artists.count() > 0
-                r.artist = it.Artists[0]
-            else if it.AlbumArtist <> invalid
-                r.artist = it.AlbumArtist
-            end if
-        end if
+        ' the Music room plays from Plex, by kind, title and artist
+        r = { action: "playMusic", kind: it.Type, title: rowTitle(it), artist: "" }
+        if it.ArtistName <> invalid then r.artist = it.ArtistName
+        if it.Type = "artist" then r.artist = rowTitle(it)
         m.top.request = r
     else
         m.top.request = { action: "details", item: it }
@@ -323,6 +304,7 @@ sub focusIn(unused as dynamic)
 end sub
 
 sub refresh(unused as dynamic)
+    loadVocabulary()
 end sub
 
 sub toPills()
