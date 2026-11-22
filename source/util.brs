@@ -1,5 +1,10 @@
 ' Shared helpers. Included by components with <script uri="pkg:/source/util.brs" />.
 
+' Keys that always belong to the music outside video. Rooms return false for them so they reach the scene.
+function hMediaKey(key as string) as boolean
+    return key = "play" or key = "rewind" or key = "fastforward" or key = "replay"
+end function
+
 function hFont(kind as string, size as integer) as object
     f = CreateObject("roSGNode", "Font")
     if kind = "bold"

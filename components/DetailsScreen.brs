@@ -178,6 +178,7 @@ end sub
 
 function onKeyEvent(key as string, press as boolean) as boolean
     if not press then return false
+    if hMediaKey(key) then return false
     if key = "back"
         m.top.request = { action: "back" }
         return true

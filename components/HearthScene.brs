@@ -16,6 +16,10 @@ sub init()
     m.global.addFields({ server: server, token: m.reg.Read("token"), userId: m.reg.Read("userId"), deviceId: deviceId, libraries: {} })
     ' Plex: plexToken is the plex.tv account token; plexServer/plexServerToken reach the chosen Plex Media Server
     m.global.addFields({ plexToken: m.reg.Read("plexToken"), plexServer: m.reg.Read("plexServer"), plexServerToken: m.reg.Read("plexServerToken"), plexServerName: m.reg.Read("plexServerName") })
+    ' one music player for the whole app, so music carries on from room to room
+    m.music = CreateObject("roSGNode", "MusicPlayer")
+    m.top.appendChild(m.music)
+    m.global.addFields({ music: m.music })
 
     ' the lantern intro plays while the saved login is checked
     m.introDone = false
@@ -50,6 +54,7 @@ sub showHub()
 end sub
 
 sub signOut()
+    if m.music <> invalid then m.music.command = { cmd: "stop" }
     for each k in ["plexToken", "plexServer", "plexServerToken", "plexServerName"]
         m.reg.Delete(k)
         m.global[k] = ""
@@ -113,12 +118,20 @@ sub handle(r as object)
         s.item = r.item
         pushScreen(s)
     else if a = "play"
+        ' the TV plays one stream at a time: music pauses for video
+        m.music.command = { cmd: "pause" }
         s = CreateObject("roSGNode", "PlayerScreen")
         s.resume = (r.resume = true)
         s.item = r.item
         pushScreen(s)
     else if a = "back"
         popScreen()
+    else if a = "musicView"
+        s = CreateObject("roSGNode", "MusicView")
+        pushScreen(s)
+        s.mode = r.mode
+    else if a = "playMusic"
+        m.music.command = { cmd: "search", kind: r.kind, title: r.title, artist: r.artist }
     else if a = "introDone"
         m.introDone = true
         goNext()
@@ -126,3 +139,20 @@ sub handle(r as object)
         m.top.exitApp = true
     end if
 end sub
+
+' Outside video, Play, Rewind, Fast forward and Replay always control the music.
+function onKeyEvent(key as string, press as boolean) as boolean
+    if not press or not hMediaKey(key) then return false
+    top = topScreen()
+    if top <> invalid and top.subtype() = "PlayerScreen" then return false
+    if key = "play"
+        m.music.command = { cmd: "toggle" }
+    else if key = "fastforward"
+        m.music.command = { cmd: "next" }
+    else if key = "rewind"
+        m.music.command = { cmd: "prev" }
+    else
+        m.music.command = { cmd: "restart" }
+    end if
+    return true
+end function

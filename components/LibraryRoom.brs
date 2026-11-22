@@ -138,6 +138,7 @@ end sub
 
 function onKeyEvent(key as string, press as boolean) as boolean
     if not press then return false
+    if hMediaKey(key) then return false
     if key = "back" or (key = "up" and m.row = 0)
         m.focused = false
         paint()
