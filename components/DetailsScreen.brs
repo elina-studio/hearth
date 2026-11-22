@@ -31,19 +31,18 @@ sub load()
     it = m.top.item
     if it = invalid then return
     show(it)
-    hApi("GET", "/Items/" + it.Id, { userId: hUser(), Fields: hFields() + ",Genres,People" }, invalid, "onItem")
+    hPlex("item", { id: it.Id }, "onItem")
 end sub
 
 sub onItem(event as object)
     t = hTaskFrom(event)
-    if not t.ok then return
+    if not t.ok or t.response.Id = invalid then return
     m.full = t.response
     show(m.full)
     if m.full.Type = "Series"
-        hApi("GET", "/Shows/" + m.full.Id + "/Episodes", { userId: hUser(), Fields: "Overview" }, invalid, "onEpisodes")
-        hApi("GET", "/Shows/NextUp", { userId: hUser(), SeriesId: m.full.Id, Limit: 1 }, invalid, "onSeriesNext")
-    else
-        hApi("GET", "/Items/" + m.full.Id + "/Similar", { userId: hUser(), Limit: 12 }, invalid, "onSimilar")
+        hPlex("episodes", { id: m.full.Id }, "onEpisodes")
+    else if m.full.Type = "Movie"
+        hPlex("similar", { id: m.full.Id }, "onSimilar")
     end if
 end sub
 
@@ -72,7 +71,6 @@ end sub
 sub buildButtons(it as object)
     list = []
     played = (it.UserData <> invalid and it.UserData.Played = true)
-    favorite = (it.UserData <> invalid and it.UserData.IsFavorite = true)
     if it.Type = "Series"
         if m.nextEpisode <> invalid
             list.push({ label: "Play S" + hNum(m.nextEpisode.ParentIndexNumber) + " E" + hNum(m.nextEpisode.IndexNumber), action: "playNext" })
@@ -87,7 +85,6 @@ sub buildButtons(it as object)
         end if
     end if
     if played then list.push({ label: "Watched", action: "unplayed" }) else list.push({ label: "Mark watched", action: "played" })
-    if favorite then list.push({ label: "Favorite", action: "unfav" }) else list.push({ label: "Add to favorites", action: "fav" })
 
     m.buttons.removeChildrenIndex(m.buttons.getChildCount(), 0)
     m.actions = []
@@ -115,19 +112,15 @@ sub onEpisodes(event as object)
         if first = -1 and (ep.UserData = invalid or ep.UserData.Played <> true) then first = i
         i = i + 1
     end for
+    m.nextEpisode = invalid
+    if first >= 0 then m.nextEpisode = t.response.Items[first]
+    buildButtons(m.full)
     m.below.title = "Episodes"
     m.below.cards = cards
     if first >= 0 then m.below.index = first
     m.below.callFunc("move", 0)
 end sub
 
-sub onSeriesNext(event as object)
-    t = hTaskFrom(event)
-    if t.ok and t.response.Items <> invalid and t.response.Items.count() > 0
-        m.nextEpisode = t.response.Items[0]
-        buildButtons(m.full)
-    end if
-end sub
 
 sub onSimilar(event as object)
     t = hTaskFrom(event)
@@ -161,14 +154,8 @@ sub runAction(a as string)
         m.top.request = { action: "play", item: it, resume: false }
     else if a = "playNext" and m.nextEpisode <> invalid
         m.top.request = { action: "play", item: m.nextEpisode, resume: true }
-    else if a = "played"
-        hApi("POST", "/UserPlayedItems/" + it.Id, { userId: hUser() }, invalid, "onChanged")
-    else if a = "unplayed"
-        hApi("DELETE", "/UserPlayedItems/" + it.Id, { userId: hUser() }, invalid, "onChanged")
-    else if a = "fav"
-        hApi("POST", "/UserFavoriteItems/" + it.Id, { userId: hUser() }, invalid, "onChanged")
-    else if a = "unfav"
-        hApi("DELETE", "/UserFavoriteItems/" + it.Id, { userId: hUser() }, invalid, "onChanged")
+    else if a = "played" or a = "unplayed"
+        hPlex(a, { id: it.Id }, "onChanged")
     end if
 end sub
 

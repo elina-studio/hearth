@@ -14,6 +14,8 @@ sub init()
     server = m.reg.Read("server")
     if server = "" or server = invalid then server = "http://192.168.254.41:8096"
     m.global.addFields({ server: server, token: m.reg.Read("token"), userId: m.reg.Read("userId"), deviceId: deviceId, libraries: {} })
+    ' Plex: plexToken is the plex.tv account token; plexServer/plexServerToken reach the chosen Plex Media Server
+    m.global.addFields({ plexToken: m.reg.Read("plexToken"), plexServer: m.reg.Read("plexServer"), plexServerToken: m.reg.Read("plexServerToken"), plexServerName: m.reg.Read("plexServerName") })
 
     ' the lantern intro plays while the saved login is checked
     m.introDone = false
@@ -21,8 +23,8 @@ sub init()
     intro = CreateObject("roSGNode", "IntroScreen")
     intro.mode = "intro"
     pushScreen(intro)
-    if m.global.token <> "" and m.global.userId <> ""
-        hApi("GET", "/Users/" + m.global.userId, {}, invalid, "onUserChecked")
+    if m.global.plexServer <> "" and m.global.plexServerToken <> ""
+        hPlex("check", {}, "onUserChecked")
     else
         m.next = "setup"
     end if
@@ -48,11 +50,11 @@ sub showHub()
 end sub
 
 sub signOut()
-    m.reg.Delete("token")
-    m.reg.Delete("userId")
+    for each k in ["plexToken", "plexServer", "plexServerToken", "plexServerName"]
+        m.reg.Delete(k)
+        m.global[k] = ""
+    end for
     m.reg.Flush()
-    m.global.token = ""
-    m.global.userId = ""
     while m.stack.getChildCount() > 0
         m.stack.removeChildIndex(m.stack.getChildCount() - 1)
     end while
@@ -98,9 +100,10 @@ sub handle(r as object)
     if r = invalid then return
     a = r.action
     if a = "loggedIn"
-        m.reg.Write("server", m.global.server)
-        m.reg.Write("token", m.global.token)
-        m.reg.Write("userId", m.global.userId)
+        m.reg.Write("plexToken", m.global.plexToken)
+        m.reg.Write("plexServer", m.global.plexServer)
+        m.reg.Write("plexServerToken", m.global.plexServerToken)
+        m.reg.Write("plexServerName", m.global.plexServerName)
         m.reg.Flush()
         showHub()
     else if a = "signOut"

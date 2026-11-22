@@ -35,10 +35,9 @@ sub init()
 end sub
 
 sub refresh(unused as dynamic)
-    q = { userId: hUser(), Limit: 12, MediaTypes: "Video", Fields: hFields(), EnableImageTypes: "Primary,Backdrop,Thumb" }
-    hApi("GET", "/UserItems/Resume", q, invalid, "onResume")
-    hApi("GET", "/Shows/NextUp", { userId: hUser(), Limit: 12, Fields: hFields() }, invalid, "onNextUp")
-    hApi("GET", "/Items/Latest", { userId: hUser(), Limit: 16, Fields: hFields() }, invalid, "onLatest")
+    hPlex("resume", { limit: 12 }, "onResume")
+    hPlex("nextup", { limit: 12 }, "onNextUp")
+    hPlex("latest", { limit: 16 }, "onLatest")
 end sub
 
 sub onResume(event as object)

@@ -29,16 +29,12 @@ sub refresh(unused as dynamic)
     m.types = types
     m.pending = {}
     m.results = {}
-    base = { userId: hUser(), ParentId: m.parent, Recursive: "true", IncludeItemTypes: types, Fields: hFields(), EnableImageTypes: "Primary,Backdrop,Thumb" }
     if types = "Movie"
-        hApi("GET", "/UserItems/Resume", { userId: hUser(), ParentId: m.parent, Limit: 12, MediaTypes: "Video", Fields: hFields() }, invalid, "onRow", "Continue")
+        hPlex("resume", { section: m.parent, limit: 12 }, "onRow", "Continue")
     end if
-    q = {} : q.Append(base) : q.SortBy = "DateCreated" : q.SortOrder = "Descending" : q.Limit = 24
-    hApi("GET", "/Items", q, invalid, "onRow", "Recently added")
-    q2 = {} : q2.Append(base) : q2.Filters = "IsUnplayed" : q2.SortBy = "Random" : q2.Limit = 24
-    if types = "Movie" then hApi("GET", "/Items", q2, invalid, "onRow", "Unwatched")
-    q3 = {} : q3.Append(base) : q3.SortBy = "SortName" : q3.SortOrder = "Ascending" : q3.Limit = 300
-    hApi("GET", "/Items", q3, invalid, "onRow", "A to Z")
+    hPlex("latest", { section: m.parent, limit: 24 }, "onRow", "Recently added")
+    if types = "Movie" then hPlex("list", { section: m.parent, unwatched: true, sort: "random", limit: 24 }, "onRow", "Unwatched")
+    hPlex("list", { section: m.parent, sort: "titleSort", limit: 300 }, "onRow", "A to Z")
 end sub
 
 sub onRow(event as object)

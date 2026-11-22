@@ -1,3 +1,5 @@
+' Plays a Plex movie or episode. Direct play when the TV can handle the file, otherwise a Plex HLS transcode.
+' Captions: Plex sidecar files (including Bazarr's) plus anything embedded; * opens the captions picker.
 sub init()
     m.video = m.top.findNode("video")
     m.status = m.top.findNode("status")
@@ -5,132 +7,103 @@ sub init()
     m.tick = m.top.findNode("tick")
     m.tick.observeField("fire", "onTick")
     m.video.observeField("state", "onState")
-    m.session = invalid
     m.leaving = false
     m.started = false
+    m.ready = false
+    m.offset = 0
 end sub
 
 sub onShown(unused as dynamic)
     m.video.setFocus(true)
 end sub
 
-function ticksFromSeconds(sec as dynamic) as longinteger
-    t& = Int(sec)
-    return t& * 10000000
-end function
-
-function deviceProfile() as object
-    di = CreateObject("roDeviceInfo")
-    video = "h264"
-    if di.CanDecodeVideo({ Codec: "hevc" }).result = true then video = video + ",hevc"
-    if di.CanDecodeVideo({ Codec: "vp9" }).result = true then video = video + ",vp9"
-    audio = "aac,mp3,ac3,eac3,flac,opus"
-    return {
-        MaxStreamingBitrate: 40000000,
-        MaxStaticBitrate: 100000000,
-        MusicStreamingTranscodingBitrate: 192000,
-        DirectPlayProfiles: [
-            { Container: "mp4,m4v,mov", Type: "Video", VideoCodec: video, AudioCodec: audio },
-            { Container: "mkv,webm", Type: "Video", VideoCodec: video, AudioCodec: audio }
-        ],
-        TranscodingProfiles: [
-            { Container: "ts", Type: "Video", VideoCodec: "h264", AudioCodec: "aac,ac3", Context: "Streaming", Protocol: "hls", MaxAudioChannels: "6", MinSegments: 1, BreakOnNonKeyFrames: true }
-        ],
-        ContainerProfiles: [],
-        CodecProfiles: [],
-        SubtitleProfiles: [
-            { Format: "srt", Method: "External" },
-            { Format: "vtt", Method: "External" },
-            { Format: "subrip", Method: "External" }
-        ]
-    }
-end function
-
 sub start()
     it = m.top.item
     if it = invalid or it.Id = invalid then return
-    m.startSec = 0
-    if m.top.resume and it.UserData <> invalid and it.UserData.PlaybackPositionTicks <> invalid
-        m.startSec = it.UserData.PlaybackPositionTicks / 10000000
-    end if
-    body = { UserId: hUser(), StartTimeTicks: ticksFromSeconds(m.startSec), AutoOpenLiveStream: true, EnableDirectPlay: true, EnableDirectStream: true, EnableTranscoding: true, AllowVideoStreamCopy: true, AllowAudioStreamCopy: true, DeviceProfile: deviceProfile() }
-    hApi("POST", "/Items/" + it.Id + "/PlaybackInfo", { userId: hUser() }, body, "onPlaybackInfo")
+    hPlex("item", { id: it.Id }, "onItem")
 end sub
 
-sub onPlaybackInfo(event as object)
+function canPlay(media as object) as boolean
+    di = CreateObject("roDeviceInfo")
+    c = LCase(toStr(media.container))
+    v = LCase(toStr(media.videoCodec))
+    a = LCase(toStr(media.audioCodec))
+    okC = (c = "mp4" or c = "m4v" or c = "mov" or c = "mkv")
+    okV = (v = "h264")
+    if v = "hevc" or v = "h265" then okV = (di.CanDecodeVideo({ Codec: "hevc" }).result = true)
+    if v = "vp9" then okV = (di.CanDecodeVideo({ Codec: "vp9" }).result = true)
+    okA = (a = "aac" or a = "mp3" or a = "ac3" or a = "eac3" or a = "flac" or a = "opus" or a = "")
+    return okC and okV and okA
+end function
+
+function toStr(v as dynamic) as string
+    if v = invalid then return ""
+    return v.toStr()
+end function
+
+sub onItem(event as object)
     t = hTaskFrom(event)
-    r = t.response
-    if not t.ok or r = invalid or r.MediaSources = invalid or r.MediaSources.count() = 0
-        reason = "The server didn't send a playable version."
-        if r <> invalid and r.ErrorCode <> invalid then reason = "Jellyfin said: " + r.ErrorCode
-        if t.status <= 0 then reason = "Couldn't reach Jellyfin."
-        fail(reason)
+    it = t.response
+    if not t.ok or it = invalid or it._media = invalid or it._media.count() = 0
+        if t.status <= 0 then fail("Couldn't reach Plex.") else fail("Plex didn't send a playable version.")
         return
     end if
-    src = r.MediaSources[0]
-    it = m.top.item
-    server = m.global.server
-    token = m.global.token
+    m.item = it
+    media = it._media[0]
+    part = media.Part[0]
+    server = m.global.plexServer
+    token = m.global.plexServerToken
+    m.startSec = 0
+    if m.top.resume and it.UserData.PlaybackPositionTicks <> invalid then m.startSec = it.UserData.PlaybackPositionTicks / 10000000
+    m.durationMs = 0
+    if media.duration <> invalid then m.durationMs = media.duration
+
     content = CreateObject("roSGNode", "ContentNode")
     content.title = hTitle(it)
     if it.Type = "Episode" then content.secondaryTitle = hSubtitle(it)
-
-    if src.SupportsDirectPlay = true or (src.SupportsDirectStream = true and src.TranscodingUrl = invalid)
-        m.playMethod = "DirectPlay"
-        if src.SupportsDirectPlay <> true then m.playMethod = "DirectStream"
-        content.url = server + "/Videos/" + it.Id + "/stream?static=true&MediaSourceId=" + src.Id + "&PlaySessionId=" + r.PlaySessionId + "&api_key=" + token
-        c = LCase(src.Container)
-        if c = "mkv" or c = "webm" or Instr(1, c, "mkv") > 0
-            content.streamFormat = "mkv"
-        else
-            content.streamFormat = "mp4"
-        end if
-    else if src.TranscodingUrl <> invalid
-        m.playMethod = "Transcode"
-        url = server + src.TranscodingUrl
-        if Instr(1, LCase(url), "api_key=") = 0 then url = url + "&api_key=" + token
-        content.url = url
-        content.streamFormat = "hls"
+    x = CreateObject("roUrlTransfer")
+    if canPlay(media)
+        content.url = server + part.key + "?X-Plex-Token=" + token
+        if LCase(toStr(media.container)) = "mkv" then content.streamFormat = "mkv" else content.streamFormat = "mp4"
+        content.playStart = m.startSec
+        m.offset = 0
     else
-        fail("This file needs a format the TV can't play.")
-        return
+        q = "path=" + x.Escape("/library/metadata/" + it.Id) + "&mediaIndex=0&partIndex=0&protocol=hls&fastSeek=1"
+        q = q + "&directPlay=0&directStream=1&directStreamAudio=1&videoResolution=1920x1080&maxVideoBitrate=20000"
+        q = q + "&offset=" + Int(m.startSec).toStr() + "&subtitles=none&session=" + m.global.deviceId + "-" + Rnd(100000).toStr()
+        q = q + "&X-Plex-Client-Identifier=" + x.Escape(m.global.deviceId) + "&X-Plex-Product=Hearth&X-Plex-Platform=Roku&X-Plex-Token=" + token
+        q = q + "&X-Plex-Client-Profile-Extra=" + x.Escape("add-transcode-target(type=videoProfile&context=streaming&protocol=hls&container=mpegts&videoCodec=h264&audioCodec=aac,ac3)")
+        content.url = server + "/video/:/transcode/universal/start.m3u8?" + q
+        content.streamFormat = "hls"
+        content.playStart = 0
+        m.offset = m.startSec
     end if
 
-    ' outside subtitle files
+    ' sidecar caption files Plex knows about (Bazarr's downloads show up here)
     subs = []
-    if src.MediaStreams <> invalid
-        for each s in src.MediaStreams
-            if s.Type = "Subtitle" and s.DeliveryMethod = "External" and s.DeliveryUrl <> invalid
-                u = s.DeliveryUrl
-                if Left(u, 4) <> "http" then u = server + u
-                if Instr(1, LCase(u), "api_key=") = 0
-                    sep = "?"
-                    if Instr(1, u, "?") > 0 then sep = "&"
-                    u = u + sep + "api_key=" + token
+    m.wantSub = invalid
+    if part.Stream <> invalid
+        for each s in part.Stream
+            if s.streamType = 3 and s.key <> invalid
+                codec = LCase(toStr(s.codec))
+                if codec = "srt" or codec = "subrip" or codec = "vtt" or codec = "webvtt"
+                    lang = "und"
+                    if s.languageCode <> invalid then lang = s.languageCode
+                    name = lang
+                    if s.displayTitle <> invalid then name = s.displayTitle
+                    url = server + s.key + "?X-Plex-Token=" + token
+                    subs.push({ Language: lang, TrackName: url, Description: name })
+                    if s.selected = true then m.wantSub = url
                 end if
-                lang = "und"
-                if s.Language <> invalid then lang = s.Language
-                name = lang
-                if s.DisplayTitle <> invalid then name = s.DisplayTitle
-                subs.push({ Language: lang, TrackName: u, Description: name })
             end if
         end for
     end if
     if subs.count() > 0 then content.subtitleTracks = subs
 
-    ' transcodes already start at the resume point on the server
-    if m.playMethod = "Transcode"
-        content.playStart = 0
-        m.offset = m.startSec
-    else
-        content.playStart = m.startSec
-        m.offset = 0
-    end if
-
-    m.session = { ItemId: it.Id, MediaSourceId: src.Id, PlaySessionId: r.PlaySessionId, PlayMethod: m.playMethod }
     m.video.content = content
     m.video.control = "play"
     m.video.setFocus(true)
+    m.ready = true
 end sub
 
 function position() as dynamic
@@ -139,14 +112,11 @@ function position() as dynamic
     return p + m.offset
 end function
 
-function report(extra as object) as object
-    b = {}
-    b.append(m.session)
-    b.PositionTicks = ticksFromSeconds(position())
-    b.CanSeek = true
-    b.append(extra)
-    return b
-end function
+sub report(state as string)
+    if not m.ready then return
+    ms = Int(position() * 1000)
+    hPlex("timeline", { id: m.item.Id, state: state, time: ms.toStr(), duration: m.durationMs.toStr() }, "onReported")
+end sub
 
 sub onState()
     s = m.video.state
@@ -154,13 +124,15 @@ sub onState()
         m.status.visible = false
         if not m.started
             m.started = true
-            hApi("POST", "/Sessions/Playing", {}, report({ IsPaused: false }), "onReported")
             m.tick.control = "start"
-        else
-            hApi("POST", "/Sessions/Playing/Progress", {}, report({ IsPaused: false, EventName: "unpause" }), "onReported")
+            if m.wantSub <> invalid
+                m.video.globalCaptionMode = "On"
+                m.video.subtitleTrack = m.wantSub
+            end if
         end if
+        report("playing")
     else if s = "paused" and m.started
-        hApi("POST", "/Sessions/Playing/Progress", {}, report({ IsPaused: true, EventName: "pause" }), "onReported")
+        report("paused")
     else if s = "finished"
         leave()
     else if s = "error"
@@ -171,8 +143,8 @@ sub onState()
 end sub
 
 sub onTick()
-    if m.session = invalid or m.leaving then return
-    hApi("POST", "/Sessions/Playing/Progress", {}, report({ IsPaused: (m.video.state = "paused"), EventName: "timeupdate" }), "onReported")
+    if m.leaving then return
+    if m.video.state = "paused" then report("paused") else report("playing")
 end sub
 
 sub onReported(event as object)
@@ -183,9 +155,10 @@ sub leave()
     if m.leaving then return
     m.leaving = true
     m.tick.control = "stop"
-    if m.session <> invalid and m.started
-        ' wait for the server to save the position so the next screen shows it
-        hApi("POST", "/Sessions/Playing/Stopped", {}, report({}), "onStopped")
+    if m.started
+        ' wait for Plex to save the spot so the next screen shows it
+        ms = Int(position() * 1000)
+        hPlex("timeline", { id: m.item.Id, state: "stopped", time: ms.toStr(), duration: m.durationMs.toStr() }, "onStopped")
     else
         m.top.request = { action: "back" }
     end if
@@ -205,21 +178,61 @@ sub fail(reason as string)
     hMessage("Can't play this", reason)
 end sub
 
+' ---------- captions picker (the * key) ----------
+sub showCaptions()
+    tracks = m.video.availableSubtitleTracks
+    labels = ["Captions off"]
+    m.capTracks = [""]
+    if tracks <> invalid
+        for each tr in tracks
+            name = tr.Description
+            if name = invalid or name = "" then name = tr.Language
+            if name = invalid or name = "" then name = "Track " + (m.capTracks.count()).toStr()
+            labels.push(name)
+            m.capTracks.push(tr.TrackName)
+        end for
+    end if
+    if labels.count() = 1 then labels = ["No captions for this one"] : m.capTracks = [""]
+    d = CreateObject("roSGNode", "StandardMessageDialog")
+    d.title = "Captions"
+    d.buttons = labels
+    d.observeField("buttonSelected", "onCaptionPicked")
+    m.capDialog = d
+    m.top.getScene().dialog = d
+end sub
+
+sub onCaptionPicked()
+    i = m.capDialog.buttonSelected
+    m.capDialog.close = true
+    track = m.capTracks[i]
+    if track = ""
+        m.video.globalCaptionMode = "Off"
+    else
+        m.video.globalCaptionMode = "On"
+        m.video.subtitleTrack = track
+    end if
+    m.video.setFocus(true)
+end sub
+
 sub afterOptions()
 end sub
 
 sub onOptions()
 end sub
 
-' called when the message closes
+' called when the error message closes
 sub restoreFocus()
-    if m.failed = true then leave()
+    if m.failed = true then leave() else m.video.setFocus(true)
 end sub
 
 function onKeyEvent(key as string, press as boolean) as boolean
     if not press then return false
     if key = "back"
         leave()
+        return true
+    end if
+    if key = "options" and m.ready
+        showCaptions()
         return true
     end if
     return false

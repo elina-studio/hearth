@@ -14,11 +14,6 @@ sub hOptions(item as object)
     else
         labels.push("Mark watched") : m.optActions.push("played")
     end if
-    if favorite
-        labels.push("Remove from favorites") : m.optActions.push("unfav")
-    else
-        labels.push("Add to favorites") : m.optActions.push("fav")
-    end if
     labels.push("Open details") : m.optActions.push("details")
     labels.push("Close") : m.optActions.push("close")
     d = CreateObject("roSGNode", "StandardMessageDialog")
@@ -34,14 +29,8 @@ sub hOptionsChosen()
     a = m.optActions[m.optDialog.buttonSelected]
     m.optDialog.close = true
     item = m.optItem
-    if a = "played"
-        hApi("POST", "/UserPlayedItems/" + item.Id, { userId: hUser() }, invalid, "onOptionDone")
-    else if a = "unplayed"
-        hApi("DELETE", "/UserPlayedItems/" + item.Id, { userId: hUser() }, invalid, "onOptionDone")
-    else if a = "fav"
-        hApi("POST", "/UserFavoriteItems/" + item.Id, { userId: hUser() }, invalid, "onOptionDone")
-    else if a = "unfav"
-        hApi("DELETE", "/UserFavoriteItems/" + item.Id, { userId: hUser() }, invalid, "onOptionDone")
+    if a = "played" or a = "unplayed"
+        hPlex(a, { id: item.Id }, "onOptionDone")
     else if a = "details"
         m.top.request = { action: "details", item: item }
     end if

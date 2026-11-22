@@ -22,6 +22,11 @@ end function
 ' Image URL for an item, or "" when the item has no image of that kind
 function hImage(item as object, kind as string, width as integer) as string
     if item = invalid then return ""
+    if item._img <> invalid
+        path = item._img[kind]
+        if path = invalid or path = "" then return ""
+        return hPlexImage(path, width, kind)
+    end if
     server = m.global.server
     id = invalid
     tag = invalid
@@ -50,6 +55,29 @@ function hImage(item as object, kind as string, width as integer) as string
     url = server + "/Items/" + id + "/Images/" + kind + "?maxWidth=" + width.toStr() + "&quality=90"
     if tag <> invalid then url = url + "&tag=" + tag
     return url
+end function
+
+' Plex photo transcoder URL for a server image path
+function hPlexImage(path as string, width as integer, kind as string) as string
+    h = Int(width * 9 / 16)
+    if kind = "Primary" then h = Int(width * 3 / 2)
+    x = CreateObject("roUrlTransfer")
+    return m.global.plexServer + "/photo/:/transcode?width=" + width.toStr() + "&height=" + h.toStr() + "&minSize=1&upscale=1&url=" + x.Escape(path) + "&X-Plex-Token=" + m.global.plexServerToken
+end function
+
+' Start a Plex request (see PlexTask). cb is the callback name taking the event.
+function hPlex(op as string, args as object, cb as string, tag = "" as string) as object
+    t = CreateObject("roSGNode", "PlexTask")
+    t.op = op
+    t.args = args
+    t.tag = tag
+    t.observeField("done", cb)
+    if m.hTasks = invalid then m.hTasks = {}
+    key = "p" + Rnd(1000000).toStr()
+    m.hTasks[key] = t
+    t.key = key
+    t.control = "RUN"
+    return t
 end function
 
 ' First image found among kinds

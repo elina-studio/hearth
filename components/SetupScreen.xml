@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- First launch: server address, then Quick Connect (or password). -->
+<!-- First launch: sign in with a plex.tv/link code, then Hearth finds your server. -->
 <component name="SetupScreen" extends="Group">
   <children>
     <Poster uri="pkg:/images/lantern.png" translation="[96, 80]" width="41" height="72" />

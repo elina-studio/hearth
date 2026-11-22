@@ -10,7 +10,7 @@ sub init()
     m.clock.font = hFont("bold", 40)
     m.weather = m.top.findNode("weather")
     m.weather.font = hFont("regular", 22)
-    m.weather.text = "build 7"
+    m.weather.text = "build 8"
     m.clockTimer = m.top.findNode("clockTimer")
     m.clockTimer.observeField("fire", "tick")
     m.clockTimer.control = "start"
@@ -49,7 +49,7 @@ sub tick()
 end sub
 
 sub loadLibraries()
-    hApi("GET", "/UserViews", { userId: hUser() }, invalid, "onLibraries")
+    hPlex("libraries", {}, "onLibraries")
 end sub
 
 sub onLibraries(event as object)
