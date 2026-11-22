@@ -1,0 +1,18 @@
+# Hearth phone remote. Lives at /volume1/docker/hearth-remote/compose.yaml
+services:
+  hearth-remote:
+    build: .
+    image: hearth-remote:local
+    container_name: hearth-remote
+    network_mode: host          # reaches the TV (ECP :8060) and whisper (:10300) directly
+    environment:
+      TV_IP: 192.168.254.9
+      HTTP_PORT: "8765"
+      HTTPS_PORT: "8766"
+      WHISPER_HOST: 127.0.0.1   # whisper runs on this NAS
+      WHISPER_PORT: "10300"
+      WHISPER_LANG: en
+      CERT_SAN: IP:192.168.254.41,DNS:localhost
+    volumes:
+      - ./data:/data            # the self-made HTTPS certificate
+    restart: unless-stopped

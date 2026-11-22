@@ -141,6 +141,22 @@ sub onPreview()
     if m.zone = "pills" then showRoom(m.names[m.pillIndex], false)
 end sub
 
+'' Phone remote: { go: "search" | "request", text }
+sub remoteGo(r as object)
+    if r.go = "request"
+        showRoom("Requests", true)
+        m.pillIndex = indexOf("Requests")
+        paintPills()
+        if r.text <> "" then m.rooms["Requests"].searchTerm = r.text
+    else
+        showRoom("Search", true)
+        m.pillIndex = indexOf("Search")
+        paintPills()
+        kb = m.rooms["Search"].findNode("kb")
+        if kb <> invalid then kb.text = r.text
+    end if
+end sub
+
 sub onRoomRequest(event as object)
     r = event.getData()
     if r = invalid then return
