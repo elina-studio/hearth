@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The lantern intro: sway, breathing glow, flickering flame, sparks, fireflies and a rotating Rumi line.
+     Art is pre-rendered from the approved motion preview. mode "intro" leaves on any key; mode "saver" runs as the screensaver. -->
+<component name="IntroScreen" extends="Group">
+  <children>
+    <Poster uri="pkg:/images/intro-bg.jpg" width="1920" height="1080" />
+    <Group id="sway" scaleRotateCenter="[960, 0]">
+      <Poster id="glow" uri="pkg:/images/intro-glow.png" translation="[753, 346]" opacity="0.8" />
+      <Poster uri="pkg:/images/intro-lantern.png" translation="[878, 0]" />
+      <Group id="flameClip" translation="[901, 454]" clippingRect="[0, 0, 119, 177]">
+        <Poster id="flame" uri="pkg:/images/intro-flame.png" />
+      </Group>
+      <Group id="sparks" />
+    </Group>
+    <Group id="flies" />
+    <Group id="quoteGroup" opacity="0">
+      <Poster id="qL" uri="pkg:/images/intro-qL.png" opacity="0.55" />
+      <Poster id="qR" uri="pkg:/images/intro-qR.png" opacity="0.55" />
+      <Label id="quote" color="0xB5AF8CFF" />
+    </Group>
+    <Animation id="swayAnim" duration="16" repeat="true" easeFunction="linear">
+      <FloatFieldInterpolator id="swayInterp" fieldToInterp="sway.rotation" />
+    </Animation>
+    <Animation id="glowAnim" duration="5.2" repeat="true" easeFunction="linear">
+      <FloatFieldInterpolator key="[0.0, 0.2, 0.35, 0.5, 0.65, 0.8, 1.0]" keyValue="[0.8, 1.0, 0.93, 1.0, 0.93, 1.0, 0.8]" fieldToInterp="glow.opacity" />
+    </Animation>
+    <Animation id="fadeIn" duration="1.6" easeFunction="inOutQuad">
+      <FloatFieldInterpolator key="[0.0, 1.0]" keyValue="[0.0, 0.9]" fieldToInterp="quoteGroup.opacity" />
+    </Animation>
+    <Animation id="fadeOut" duration="1.6" easeFunction="inOutQuad">
+      <FloatFieldInterpolator key="[0.0, 1.0]" keyValue="[0.9, 0.0]" fieldToInterp="quoteGroup.opacity" />
+    </Animation>
+    <Timer id="flameTimer" duration="0.083" repeat="true" />
+    <Timer id="quoteTimer" duration="9" repeat="true" />
+    <Timer id="leaveTimer" duration="8" repeat="false" />
+  </children>
+  <interface>
+    <field id="mode" type="string" onChange="onMode" />
+    <field id="request" type="assocarray" alwaysNotify="true" />
+    <function name="onShown" />
+  </interface>
+  <script type="text/brightscript" uri="pkg:/source/util.brs" />
+  <script type="text/brightscript" uri="pkg:/components/IntroScreen.brs" />
+</component>

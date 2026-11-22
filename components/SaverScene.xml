@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Screensaver: the lantern intro with nothing to press. -->
+<component name="SaverScene" extends="Scene">
+  <children>
+    <IntroScreen id="intro" mode="saver" />
+  </children>
+</component>

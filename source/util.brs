@@ -4,6 +4,8 @@ function hFont(kind as string, size as integer) as object
     f = CreateObject("roSGNode", "Font")
     if kind = "bold"
         f.uri = "pkg:/fonts/AtkinsonHyperlegible-Bold.ttf"
+    else if kind = "fell"
+        f.uri = "pkg:/fonts/IMFellEnglish-Italic.ttf"
     else if kind = "caps"
         f.uri = "pkg:/fonts/BarlowCondensed-Bold.ttf"
     else

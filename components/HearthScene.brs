@@ -15,24 +15,29 @@ sub init()
     if server = "" or server = invalid then server = "http://192.168.254.41:8096"
     m.global.addFields({ server: server, token: m.reg.Read("token"), userId: m.reg.Read("userId"), deviceId: deviceId, libraries: {} })
 
+    ' the lantern intro plays while the saved login is checked
+    m.introDone = false
+    m.next = ""
+    intro = CreateObject("roSGNode", "IntroScreen")
+    intro.mode = "intro"
+    pushScreen(intro)
     if m.global.token <> "" and m.global.userId <> ""
-        ' check the saved login still works
         hApi("GET", "/Users/" + m.global.userId, {}, invalid, "onUserChecked")
     else
-        pushScreen(CreateObject("roSGNode", "SetupScreen"))
+        m.next = "setup"
     end if
+end sub
+
+sub goNext()
+    if not m.introDone or m.next = "" then return
+    if m.next = "hub" then showHub() else signOut()
 end sub
 
 sub onUserChecked(event as object)
     t = hTaskFrom(event)
-    if t.ok
-        showHub()
-    else if t.status = 401
-        signOut()
-    else
-        ' server offline or slow: open the hub anyway, it shows the offline banner
-        showHub()
-    end if
+    ' a 401 means the login is gone; offline or slow still opens the hub, which shows the offline banner
+    if t.status = 401 then m.next = "setup" else m.next = "hub"
+    goNext()
 end sub
 
 sub showHub()
@@ -111,6 +116,9 @@ sub handle(r as object)
         pushScreen(s)
     else if a = "back"
         popScreen()
+    else if a = "introDone"
+        m.introDone = true
+        goNext()
     else if a = "exit"
         m.top.exitApp = true
     end if

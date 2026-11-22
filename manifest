@@ -9,3 +9,4 @@ splash_screen_hd=pkg:/images/splash_hd.png
 splash_color=#090B07
 splash_min_time=800
 ui_resolutions=fhd
+screensaver_title=Hearth
