@@ -31,10 +31,79 @@ sub init()
     m.resume = []
     m.next = []
     m.new = []
+    m.tasks = {}
+    mp = m.global.music
+    if mp <> invalid
+        for each f in ["track", "state", "queue", "index"]
+            mp.observeField(f, "showMusic")
+        end for
+    end if
+    showMusic()
     refresh(invalid)
 end sub
 
+' ---------- side tiles: what's playing, and how many requests are on the way ----------
+sub showMusic()
+    mp = m.global.music
+    eb = m.top.findNode("nowEyebrow")
+    ti = m.top.findNode("nowTitle")
+    su = m.top.findNode("nowSub")
+    if mp = invalid or mp.track = invalid or mp.queue = invalid or mp.queue.count() = 0
+        eb.text = "MUSIC"
+        ti.text = "Shuffle my music"
+        su.text = "Press Play for a random mix, or OK to open Music"
+        return
+    end if
+    tr = mp.track
+    if mp.state = "playing" then eb.text = "NOW PLAYING" else if mp.state = "buffering" then eb.text = "LOADING" else eb.text = "PAUSED"
+    ti.text = tr.title
+    line = tr.artist
+    if tr.album <> invalid and tr.album <> "" then line = line + "  ·  " + tr.album
+    su.text = line
+end sub
+
+sub loadRequestCount()
+    reg = CreateObject("roRegistrySection", "hearth")
+    if reg.Read("overseerrKey") = ""
+        m.top.findNode("reqBig").text = "Set up"
+        m.top.findNode("reqSub").text = "Open Requests to link Overseerr"
+        return
+    end if
+    t = CreateObject("roSGNode", "OverseerrTask")
+    t.method = "GET"
+    t.path = "/api/v1/request/count"
+    t.key = "reqCount"
+    m.tasks.reqCount = t
+    t.observeField("done", "onRequestCount")
+    t.control = "RUN"
+end sub
+
+sub onRequestCount(event as object)
+    t = event.getRoSGNode()
+    m.tasks.delete("reqCount")
+    big = m.top.findNode("reqBig")
+    su = m.top.findNode("reqSub")
+    r = t.response
+    if not t.ok or r = invalid
+        big.text = "—"
+        su.text = "Couldn't reach Overseerr"
+        return
+    end if
+    coming = cnt(r.pending) + cnt(r.processing)
+    avail = cnt(r.available)
+    big.text = coming.toStr()
+    line = "on the way"
+    if avail > 0 then line = line + "  ·  " + avail.toStr() + " ready to watch"
+    su.text = line
+end sub
+
+function cnt(v as dynamic) as integer
+    if v = invalid then return 0
+    return v
+end function
+
 sub refresh(unused as dynamic)
+    loadRequestCount()
     hPlex("resume", { limit: 12 }, "onResume")
     hPlex("nextup", { limit: 12 }, "onNextUp")
     hPlex("latest", { limit: 16 }, "onLatest")

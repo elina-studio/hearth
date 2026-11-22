@@ -16,15 +16,15 @@
       <Group id="nowTile" translation="[1186, 20]">
         <Poster uri="pkg:/images/tile.9.png" blendColor="0x141A11FF" width="638" height="225" />
         <Label id="nowEyebrow" translation="[34, 34]" width="570" color="0xD9A066FF" text="MUSIC" />
-        <Label id="nowTitle" translation="[34, 72]" width="570" color="0xEDE6CAFF" text="Music room is next" />
-        <Label id="nowSub" translation="[34, 130]" width="570" wrap="true" color="0xB5AF8CFF" text="Music Assistant connects in the music build." />
+        <Label id="nowTitle" translation="[34, 72]" width="570" color="0xEDE6CAFF" text="Shuffle my music" />
+        <Label id="nowSub" translation="[34, 130]" width="570" wrap="true" color="0xB5AF8CFF" text="Press OK to open Music" />
         <Poster id="nowRing" uri="pkg:/images/ring.9.png" blendColor="0xE0B34AFF" translation="[-10, -10]" width="658" height="245" visible="false" />
       </Group>
       <Group id="reqTile" translation="[1186, 265]">
         <Poster uri="pkg:/images/tile.9.png" blendColor="0x141A11FF" width="638" height="225" />
         <Label id="reqEyebrow" translation="[34, 34]" width="570" color="0xB5AF8CFF" text="REQUESTS" />
-        <Label id="reqBig" translation="[34, 72]" width="570" color="0xE0B34AFF" text="Soon" />
-        <Label id="reqSub" translation="[34, 160]" width="570" color="0xB5AF8CFF" text="Overseerr connects in a later build" />
+        <Label id="reqBig" translation="[34, 72]" width="570" color="0xE0B34AFF" text="" />
+        <Label id="reqSub" translation="[34, 160]" width="570" color="0xB5AF8CFF" text="Asking Overseerr…" />
         <Poster id="reqRing" uri="pkg:/images/ring.9.png" blendColor="0xE0B34AFF" translation="[-10, -10]" width="658" height="245" visible="false" />
       </Group>
       <CardRow id="nextUp" translation="[96, 540]" title="Next up" />

@@ -64,6 +64,12 @@ end function
 
 ' Plex photo transcoder URL for a server image path
 function hPlexImage(path as string, width as integer, kind as string) as string
+    ' widths are in 1080p units; on an HD (720p) TV ask Plex for 2/3 the pixels so posters arrive faster
+    if m.hImgScale = invalid
+        m.hImgScale = 1.0
+        if CreateObject("roDeviceInfo").GetUIResolution().name = "HD" then m.hImgScale = 0.6667
+    end if
+    width = Int(width * m.hImgScale)
     h = Int(width * 9 / 16)
     if kind = "Primary" then h = Int(width * 3 / 2)
     return m.global.plexServer + "/photo/:/transcode?width=" + width.toStr() + "&height=" + h.toStr() + "&minSize=1&upscale=1&url=" + hEscape(path) + "&X-Plex-Token=" + m.global.plexServerToken
