@@ -1,36 +1,57 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Requests: browse Overseerr (trending, popular), search, request, and follow your requests. -->
+<!-- Requests: a rail of lists on the left (Search first), a poster grid on the right, and a request popup.
+     Overseerr does the work; the API key lives only on the TV (registry "hearth" / "overseerrKey"). -->
 <component name="RequestsRoom" extends="Group">
   <children>
-    <Poster id="backdrop" translation="[620, -150]" width="1300" height="640" loadDisplayMode="scaleToZoom" />
-    <Poster uri="pkg:/images/shade.png" translation="[620, -150]" width="1300" height="640" />
-    <Group translation="[96, 10]">
-      <Label id="eyebrow" color="0xD9A066FF" />
-      <Label id="title" translation="[0, 36]" width="1100" wrap="true" maxLines="1" color="0xEDE6CAFF" />
-      <Label id="overview" translation="[0, 124]" width="900" height="80" wrap="true" maxLines="2" color="0xB5AF8CFF" />
+    <Group id="main">
+      <Group id="rail" translation="[96, 20]" />
+      <Group id="header" translation="[540, 6]">
+        <Label id="eyebrow" color="0xD9A066FF" />
+        <Poster id="star" uri="pkg:/images/requests/star.png" width="22" height="22" blendColor="0xD9A066FF" visible="false" />
+        <Label id="rating" color="0xD9A066FF" />
+        <Label id="title" translation="[0, 34]" width="1280" maxLines="1" color="0xEDE6CAFF" />
+      </Group>
+      <Group id="gridClip" translation="[540, 140]" clippingRect="[-14, -14, 1310, 800]">
+        <Group id="grid" />
+      </Group>
+      <Label id="empty" translation="[540, 160]" width="1200" wrap="true" color="0xB5AF8CFF" />
+      <Group id="musicPanel" translation="[540, 140]" visible="false">
+        <Poster uri="pkg:/images/tile.9.png" blendColor="0xFFFFFF0F" width="700" height="330" />
+        <Poster uri="pkg:/images/requests/note.png" translation="[50, 50]" width="80" height="80" blendColor="0xE0B34AFF" />
+        <Label id="musicTitle" translation="[50, 160]" text="ASK LIDARR FOR AN ARTIST" color="0xE0B34AFF" />
+        <Label id="musicSub" translation="[50, 214]" width="600" wrap="true" color="0xB5AF8CFF" text="Press OK to type an artist. Lidarr adds them and looks for their albums." />
+      </Group>
+      <Group id="searchPanel" translation="[540, 20]" visible="false">
+        <HearthKeyboard id="kb" placeholder="Type a title" />
+        <Label id="resultsHead" translation="[600, 0]" width="690" color="0xB5AF8CFF" />
+        <Group id="results" translation="[600, 56]" />
+      </Group>
     </Group>
-    <Group id="setup" visible="false" translation="[96, 260]">
-      <Label id="setupText" width="1500" wrap="true" color="0xB5AF8CFF" />
-      <HearthPill id="setupButton" translation="[0, 400]" text="Type the key on the TV" button="true" focused="true" />
+    <Group id="setup" visible="false" translation="[96, 20]">
+      <Label id="setupText" width="1000" wrap="true" color="0xB5AF8CFF" />
+      <HearthKeyboard id="keyKb" translation="[1174, 0]" mode="full" placeholder="Paste or type the key" />
+      <HearthPill id="saveKey" translation="[1174, 740]" width="554" text="Save key" button="true" />
     </Group>
-    <Label id="empty" translation="[96, 300]" width="1500" wrap="true" color="0xB5AF8CFF" />
-    <!-- clip so rows scrolled past the top never cover the title area -->
-    <Group translation="[0, 240]" clippingRect="[0, -14, 1920, 720]">
-      <Group id="content" />
+    <Group id="toast" translation="[96, 840]" visible="false">
+      <Poster id="toastBg" uri="pkg:/images/tile.9.png" blendColor="0x141A11FF" height="76" />
+      <Poster id="toastIcon" translation="[26, 23]" width="30" height="30" blendColor="0xE0B34AFF" />
+      <Label id="toastText" translation="[72, 0]" height="76" vertAlign="center" color="0xEDE6CAFF" />
+      <Label id="toastHint" height="76" vertAlign="center" color="0xB5AF8CFF" />
     </Group>
-    <Label id="toast" translation="[96, 870]" width="1500" color="0xE0B34AFF" />
-    <Timer id="toastTimer" duration="3" />
-    <Animation id="scroll" duration="0.22" easeFunction="outQuad">
-      <Vector2DFieldInterpolator id="scrollTo" key="[0.0, 1.0]" fieldToInterp="content.translation" />
-    </Animation>
+    <Group id="popupHolder" />
+    <Timer id="toastTimer" duration="4" />
+    <Timer id="undoTimer" duration="1" repeat="true" />
+    <Timer id="detailTimer" duration="0.4" />
+    <Timer id="searchTimer" duration="0.5" />
   </children>
   <interface>
     <field id="request" type="assocarray" alwaysNotify="true" />
-    <!-- set by the hub (e.g. from Search) to run an Overseerr search right away -->
+    <!-- set by the hub (from Search) to run an Overseerr search right away -->
     <field id="searchTerm" type="string" alwaysNotify="true" onChange="onSearchTerm" />
     <function name="focusIn" />
     <function name="refresh" />
   </interface>
   <script type="text/brightscript" uri="pkg:/source/util.brs" />
+  <script type="text/brightscript" uri="pkg:/components/requests/reqdata.brs" />
   <script type="text/brightscript" uri="pkg:/components/requests/RequestsRoom.brs" />
 </component>

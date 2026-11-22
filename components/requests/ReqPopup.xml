@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Request popup (P1 poster card): poster, details, and a stacked list of choices with icons.
+     The room forwards keys: handled = popup.callFunc("handleKey", key). OK and Back set "picked" (an item tag, or "back").
+     Items with check = true/false are tick boxes (seasons); OK toggles them and sets picked = "toggle". -->
+<component name="ReqPopup" extends="Group">
+  <children>
+    <Rectangle width="1920" height="1080" translation="[0, -150]" color="0x05060499" />
+    <Group id="panel" translation="[400, 40]">
+      <Poster id="panelBg" uri="pkg:/images/tile.9.png" blendColor="0x141A11FF" width="1120" height="550" />
+      <Rectangle id="posterBg" translation="[50, 50]" width="300" height="450" color="0x1D2418FF" />
+      <Poster id="poster" translation="[50, 50]" width="300" height="450" loadDisplayMode="scaleToZoom" />
+      <Group translation="[400, 50]">
+        <Label id="eyebrow" color="0xD9A066FF" />
+        <Poster id="star" uri="pkg:/images/requests/star.png" width="22" height="22" blendColor="0xD9A066FF" visible="false" />
+        <Label id="rating" color="0xD9A066FF" />
+        <Label id="title" translation="[0, 34]" width="660" wrap="true" maxLines="2" color="0xEDE6CAFF" />
+        <Label id="overview" translation="[0, 124]" width="660" wrap="true" maxLines="3" color="0xB5AF8CFF" />
+        <Group id="items" translation="[0, 250]" />
+        <Group id="hints" />
+      </Group>
+    </Group>
+  </children>
+  <interface>
+    <field id="model" type="assocarray" onChange="build" />
+    <field id="picked" type="string" alwaysNotify="true" />
+    <function name="handleKey" />
+    <function name="checked" />
+    <function name="setLabel" />
+  </interface>
+  <script type="text/brightscript" uri="pkg:/source/util.brs" />
+  <script type="text/brightscript" uri="pkg:/components/requests/ReqPopup.brs" />
+</component>
