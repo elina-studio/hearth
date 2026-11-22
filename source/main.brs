@@ -32,6 +32,17 @@ sub saveInput(screen as object, info as object)
         reg.Flush()
         g.overseerrKey = info.overseerrKey
     end if
+    ' Lidarr (music requests): lidarrUrl, lidarrKey
+    if not g.hasField("lidarrKey") then g.addFields({ lidarrKey: "" })
+    if info.lidarrUrl <> invalid and info.lidarrUrl <> ""
+        reg.Write("lidarrUrl", info.lidarrUrl)
+        reg.Flush()
+    end if
+    if info.lidarrKey <> invalid and info.lidarrKey <> ""
+        reg.Write("lidarrKey", info.lidarrKey)
+        reg.Flush()
+        g.lidarrKey = info.lidarrKey
+    end if
     ' Photos weather: haUrl, haToken, haEntity (source/photos.brs)
     pSaveSettings(info)
 end sub

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Ask Lidarr for music: type an artist, pick one, and Lidarr adds it and starts looking for its albums. -->
+<component name="LidarrScreen" extends="Group">
+  <children>
+    <Rectangle width="1920" height="1080" color="0x0B0E09FF" />
+    <Label id="eyebrow" translation="[96, 60]" color="0xD9A066FF" text="REQUEST MUSIC  ·  LIDARR" />
+    <Label id="hint" translation="[96, 100]" width="1700" color="0xB5AF8CFF" />
+    <HearthKeyboard id="kb" translation="[96, 170]" placeholder="Type an artist" />
+    <Group id="list" translation="[760, 170]" />
+    <Label id="empty" translation="[760, 190]" width="1060" wrap="true" color="0xB5AF8CFF" />
+    <Group id="setup" visible="false" translation="[96, 170]">
+      <Label id="setupText" width="1700" wrap="true" color="0xB5AF8CFF" />
+    </Group>
+    <Label id="toast" translation="[96, 990]" width="1728" color="0xE0B34AFF" />
+    <Timer id="debounce" duration="0.6" repeat="false" />
+    <Timer id="toastTimer" duration="5" repeat="false" />
+  </children>
+  <interface>
+    <field id="request" type="assocarray" alwaysNotify="true" />
+    <function name="onShown" />
+  </interface>
+  <script type="text/brightscript" uri="pkg:/source/util.brs" />
+  <script type="text/brightscript" uri="pkg:/components/music/LidarrScreen.brs" />
+</component>

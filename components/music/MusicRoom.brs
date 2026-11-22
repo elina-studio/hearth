@@ -22,10 +22,11 @@ sub init()
     m.scrollTo = m.top.findNode("scrollTo")
 
     ' chips: [label, action]
-    m.chipDefs = [["Play", "toggle"], ["Shuffle", "shuffle"], ["Repeat", "repeat"], ["More like this", "more"], ["Cover", "cover"], ["Visualizer", "milk"], ["Hearth fire", "hearth"]]
+    m.chipDefs = [["Play", "toggle"], ["Shuffle", "shuffle"], ["Repeat", "repeat"], ["More like this", "more"], ["Cover", "cover"], ["Visualizer", "milk"], ["Hearth fire", "hearth"], ["Request", "request"]]
     for each c in m.chipDefs
         p = m.chips.createChild("HearthPill")
         p.button = true
+        p.width = chipWidth(c[0])
         p.text = c[0]
     end for
 
@@ -76,7 +77,10 @@ sub showNow()
     labels.repeat = muRepeatLabel()
     for i = 0 to m.chipDefs.count() - 1
         l = labels[m.chipDefs[i][1]]
-        if l <> invalid then m.chips.getChild(i).text = l
+        if l <> invalid
+            m.chips.getChild(i).width = chipWidth(l)
+            m.chips.getChild(i).text = l
+        end if
     end for
     showTime()
 end sub
@@ -229,7 +233,7 @@ end sub
 sub activate()
     if m.row = 0
         a = m.chipDefs[m.chip][1]
-        if not pxReady() and a <> "cover" and a <> "milk" and a <> "hearth"
+        if not pxReady() and a <> "cover" and a <> "milk" and a <> "hearth" and a <> "request"
             onMessageText("Sign in to Plex first.")
             return
         end if
@@ -312,4 +316,9 @@ function onKeyEvent(key as string, press as boolean) as boolean
         return true
     end if
     return true
+end function
+
+' snug pills so all eight fit on one line (about 14 px a letter at this size)
+function chipWidth(t as string) as integer
+    return Len(t) * 14 + 56
 end function

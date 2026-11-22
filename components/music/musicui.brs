@@ -100,7 +100,7 @@ sub muDo(a as string)
         muSend("moreLikeThis")
     else if a = "library"
         muSend("nextLibrary")
-    else if a = "cover" or a = "milk" or a = "hearth"
+    else if a = "cover" or a = "milk" or a = "hearth" or a = "request"
         m.top.request = { action: "musicView", mode: a }
     end if
 end sub

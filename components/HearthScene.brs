@@ -135,6 +135,8 @@ sub handle(r as object)
         pushScreen(s)
     else if a = "back"
         popScreen()
+    else if a = "musicView" and r.mode = "request"
+        pushScreen(CreateObject("roSGNode", "LidarrScreen"))
     else if a = "musicView"
         s = CreateObject("roSGNode", "MusicView")
         pushScreen(s)
