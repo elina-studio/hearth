@@ -8,7 +8,8 @@ sub runTask()
     xfer.setMessagePort(port)
     url = m.top.url
     q = m.top.query
-    if q <> invalid and q.count() > 0
+    ' Keys(): a query key named "count" would hide the AA's count() method
+    if q <> invalid and q.Keys().Count() > 0
         parts = []
         for each k in q
             v = q[k]

@@ -122,7 +122,7 @@ sub refresh(unused = invalid as dynamic)
     m.loadedFor = s
     m.results = {}
     m.hubOrder = []
-    pxApi("/hubs/sections/" + s, { count: "20" }, "onHubs", "hubs")
+    pxApi("/hubs/sections/" + s + "?count=20", {}, "onHubs", "hubs")
     pxApi("/playlists", { playlistType: "audio" }, "onShelf", "Playlists")
     pxApi("/library/sections/" + s + "/all", { type: "8", sort: "titleSort", "X-Plex-Container-Start": "0", "X-Plex-Container-Size": "120" }, "onShelf", "Artists")
     pxApi("/library/sections/" + s + "/all", { type: "9", sort: "titleSort", "X-Plex-Container-Start": "0", "X-Plex-Container-Size": "120" }, "onShelf", "Albums A to Z")
