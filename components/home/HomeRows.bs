@@ -1287,3 +1287,13 @@ function filterNodeArray(nodeArray as object, nodeKey as string, excludeArray as
     end for
     return newNodeArray
 end function
+
+' Hearth: find the first library of a collection type (movies, tvshows, music) for the room pills
+function findLibrary(collectionType as string) as object
+    if not isValidAndNotEmpty(m.libraryData) then return invalid
+    for each lib in m.libraryData
+        if isStringEqual(lib.collectionType, collectionType) then return lib
+        if isStringEqual(chainLookupReturn(lib, "json.CollectionType", ""), collectionType) then return lib
+    end for
+    return invalid
+end function

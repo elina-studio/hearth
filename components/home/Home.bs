@@ -34,6 +34,14 @@ sub init()
     m.buttonsFade = m.top.findNode("buttonsFade")
     m.buttonsMove = m.top.findNode("buttonsMove")
 
+    ' Hearth room pills, in order
+    m.pillIds = ["pillHome", "pillMovies", "pillShows", "pillMusic", "pillRequests", "pillAmbiance", "pillPhotos", "pillSearch"]
+    m.pills = []
+    for each pillId in m.pillIds
+        m.pills.push(m.top.findNode(pillId))
+    end for
+    m.pillIndex = 0
+
     setButtonColors()
 end sub
 
@@ -43,17 +51,65 @@ sub refresh()
 end sub
 
 sub setButtonColors()
-    m.searchButton = m.top.findNode("searchButton")
-    m.searchButton.textColor = ColorPalette.WHITE
-    m.searchButton.background = ColorPalette.DARKGREY
-    m.searchButton.focusTextColor = ColorPalette.WHITE
-    m.searchButton.focusBackground = chainLookupReturn(m.global.session, "user.settings.colorCursor", ColorPalette.HIGHLIGHT)
+    cursor = chainLookupReturn(m.global.session, "user.settings.colorCursor", ColorPalette.HIGHLIGHT)
+    for each pill in m.pills
+        pill.textColor = ColorPalette.LIGHTGREY
+        pill.background = ColorPalette.TRANSPARENT
+        pill.focusTextColor = "#1F1606"
+        pill.focusBackground = cursor
+    end for
+    ' Home is the current room on this screen
+    m.pills[0].textColor = ColorPalette.OFFWHITE
+    m.pills[0].background = ColorPalette.SMOKE
+end sub
 
-    m.settingsButton = m.top.findNode("settingsButton")
-    m.settingsButton.textColor = ColorPalette.WHITE
-    m.settingsButton.background = ColorPalette.DARKGREY
-    m.settingsButton.focusTextColor = ColorPalette.WHITE
-    m.settingsButton.focusBackground = chainLookupReturn(m.global.session, "user.settings.colorCursor", ColorPalette.HIGHLIGHT)
+' Hearth: move focus to pill i (wraps around)
+sub focusPill(i as integer)
+    count = m.pills.count()
+    i = ((i mod count) + count) mod count
+    for each pill in m.pills
+        pill.focus = false
+    end for
+    m.pillIndex = i
+    m.pills[i].focus = true
+    m.pills[i].setfocus(true)
+    setLastFocus(m.pills[i])
+end sub
+
+sub unfocusPills()
+    for each pill in m.pills
+        pill.focus = false
+    end for
+end sub
+
+' Hearth: open the room behind the focused pill
+sub enterPill()
+    pillId = m.pillIds[m.pillIndex]
+
+    if isStringEqual(pillId, "pillHome")
+        unfocusPills()
+        m.homeRows.setfocus(true)
+        setLastFocus(m.homeRows)
+        return
+    end if
+
+    if isStringEqual(pillId, "pillSearch")
+        m.top.getScene().jumpTo = { selectionType: "search" }
+        return
+    end if
+
+    collectionTypes = { pillMovies: "movies", pillShows: "tvshows", pillMusic: "music" }
+    if collectionTypes.doesExist(pillId)
+        lib = m.homeRows.callFunc("findLibrary", collectionTypes[pillId])
+        if isValid(lib)
+            m.homeRows.selectedItem = lib
+        else
+            m.global.sceneManager.callFunc("userMessage", m.pills[m.pillIndex].text, tr("No library of this kind was found on your server."))
+        end if
+        return
+    end if
+
+    m.global.sceneManager.callFunc("userMessage", m.pills[m.pillIndex].text, "This room arrives in a later Hearth build.")
 end sub
 
 sub loadLibraries()
@@ -256,67 +312,27 @@ function onKeyEvent(key as string, press as boolean) as boolean
     if m.buttons.isInFocusChain()
         if isStringEqual(key, KeyCode.REPLAY)
             if not audioMiniPlayerIsVisibleInScene() then return true
-            m.searchButton.focus = false
-            m.settingsButton.focus = false
+            unfocusPills()
         end if
 
-        if isStringEqual(key, KeyCode.OK)
-            if m.searchButton.hasFocus()
-                m.top.getScene().jumpTo = {
-                    selectionType: "search"
-                }
-                return true
-            end if
-
-            if m.settingsButton.hasFocus()
-                m.top.getScene().jumpTo = {
-                    selectionType: "settings"
-                }
-                return true
-            end if
-        end if
-
-        if isStringEqual(key, KeyCode.DOWN)
-            m.searchButton.focus = false
-            m.settingsButton.focus = false
-            m.homeRows.setfocus(true)
-            setLastFocus(m.homeRows)
+        if isStringEqual(key, KeyCode.OK) or isStringEqual(key, KeyCode.DOWN)
+            enterPill()
             return true
         end if
 
         if isStringEqual(key, KeyCode.RIGHT)
-            if m.searchButton.hasFocus()
-                m.searchButton.focus = false
-                m.settingsButton.focus = true
-                m.settingsButton.setfocus(true)
-                setLastFocus(m.settingsButton)
-                return true
-            end if
-
-            if m.settingsButton.hasFocus()
-                m.settingsButton.focus = false
-                scene = m.top.getScene()
-                if not isValid(scene) then return false
-
-                overhang = scene.findNode("overhang")
-                if not isValid(overhang) then return false
-
-                overhang.callFunc("highlightUser")
-                overhang.setfocus(true)
-                setLastFocus(overhang)
-                return true
-
-            end if
+            focusPill(m.pillIndex + 1)
+            return true
         end if
 
         if isStringEqual(key, KeyCode.LEFT)
-            if m.settingsButton.hasFocus()
-                m.searchButton.focus = true
-                m.settingsButton.focus = false
-                m.searchButton.setfocus(true)
-                setLastFocus(m.searchButton)
-                return true
-            end if
+            focusPill(m.pillIndex - 1)
+            return true
+        end if
+
+        if isStringEqual(key, KeyCode.OPTIONS)
+            m.top.getScene().jumpTo = { selectionType: "settings" }
+            return true
         end if
 
         return false
@@ -368,9 +384,7 @@ function onKeyEvent(key as string, press as boolean) as boolean
             toggleButtonsVisibility(true)
         end if
 
-        m.searchButton.focus = true
-        m.searchButton.setfocus(true)
-        setLastFocus(m.searchButton)
+        focusPill(0)
         return true
     end if
 

@@ -7,5 +7,6 @@
     <function name="isFocusOnFavoriteRow" />
     <function name="reloadFavorites" />
     <function name="loadLibraries" />
+    <function name="findLibrary" />
   </interface>
 </component>

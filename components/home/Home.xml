@@ -3,27 +3,16 @@
   <children>
     <Poster id="backdrop" loadDisplayMode="scaleToZoom" width="1920" height="1200" />
 
-    <LayoutGroup id="buttons" translation="[100, 100]" layoutDirection="horiz" horizAlignment="left" itemSpacings="[25]">
-      <TextButton
-        id="searchButton"
-        iconSide="left"
-        fontSize="25"
-        padding="20"
-        icon="pkg:/images/icons/search-light.png"
-        focusIcon="pkg:/images/icons/search-light.png"
-        text="Search"
-        height="50"
-        width="200" />
-      <TextButton
-        id="settingsButton"
-        iconSide="left"
-        fontSize="25"
-        padding="20"
-        icon="pkg:/images/icons/settings.png"
-        focusIcon="pkg:/images/icons/settings.png"
-        text="Settings"
-        height="50"
-        width="200" />
+    <!-- Hearth: room pills. Up from the rows reaches them; Left/Right wrap; OK or Down enters the room. -->
+    <LayoutGroup id="buttons" translation="[100, 100]" layoutDirection="horiz" horizAlignment="left" itemSpacings="[12]">
+      <TextButton id="pillHome" text="Home" fontSize="28" padding="24" height="56" width="130" />
+      <TextButton id="pillMovies" text="Movies" fontSize="28" padding="24" height="56" width="160" />
+      <TextButton id="pillShows" text="Shows" fontSize="28" padding="24" height="56" width="150" />
+      <TextButton id="pillMusic" text="Music" fontSize="28" padding="24" height="56" width="140" />
+      <TextButton id="pillRequests" text="Requests" fontSize="28" padding="24" height="56" width="190" />
+      <TextButton id="pillAmbiance" text="Ambiance" fontSize="28" padding="24" height="56" width="200" />
+      <TextButton id="pillPhotos" text="Photos" fontSize="28" padding="24" height="56" width="160" />
+      <TextButton id="pillSearch" text="Search" fontSize="28" padding="24" height="56" width="190" icon="pkg:/images/icons/search-light.png" focusIcon="pkg:/images/icons/search-light.png" iconSide="left" />
     </LayoutGroup>
 
     <HomeRows
