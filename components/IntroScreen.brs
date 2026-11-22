@@ -11,14 +11,20 @@ sub init()
     m.dir = 1
 
     ' sway: +-0.9 degrees about the top centre, 8 s each way, sine eased
-    keys = [] : vals = []
+    keys = [] : vals = [] : follow = []
     for i = 0 to 32
+        a = 0.0157 * Sin(i / 32 * 6.2832)
         keys.push(i / 32)
-        vals.push(0.0157 * Sin(i / 32 * 6.2832))
+        vals.push(a)
+        ' where the flame's centre (960, 540) lands when the lantern turns by a about (960, 0)
+        follow.push([901 + 540 * Sin(a), 454 + 540 * (Cos(a) - 1)])
     end for
     si = m.top.findNode("swayInterp")
     si.key = keys
     si.keyValue = vals
+    ff = m.top.findNode("flameFollow")
+    ff.key = keys
+    ff.keyValue = follow
     m.top.findNode("swayAnim").control = "start"
     m.top.findNode("glowAnim").control = "start"
 
