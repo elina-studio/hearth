@@ -9,15 +9,15 @@ sub init()
     m.scrollTo = m.top.findNode("scrollTo")
     m.heroArt = m.top.findNode("heroArt")
     m.greeting = m.top.findNode("greeting")
-    m.greeting.font = hFont("fell", 40)
+    m.greeting.font = hFont("fell", 38)
     m.heroEyebrow = m.top.findNode("heroEyebrow")
-    m.heroEyebrow.font = hFont("caps", 36)
+    m.heroEyebrow.font = hFont("caps", 26)
     m.heroTitle = m.top.findNode("heroTitle")
-    m.heroTitle.font = hFont("caps", 124)
+    m.heroTitle.font = hFont("caps", 76)
     m.heroProgress = m.top.findNode("heroProgress")
     m.heroBar = m.top.findNode("heroBar")
     m.heroLeft = m.top.findNode("heroLeft")
-    m.heroLeft.font = hFont("regular", 28)
+    m.heroLeft.font = hFont("regular", 24)
     m.pager = m.top.findNode("pager")
     m.dots = m.top.findNode("dots")
     m.pgText = m.top.findNode("pgText")
@@ -36,7 +36,7 @@ sub init()
     m.nextUp = m.top.findNode("nextUp")
     m.latest = m.top.findNode("latest")
     m.rows = [m.nextUp, m.latest]
-    m.rowY = [724, 1064]
+    m.rowY = [590, 930]
 
     buildButtons()
     buildMoods()
@@ -79,14 +79,14 @@ sub buildButtons()
         b.ring.blendColor = "0xEDE6CAFF"
         b.ring.translation = [-7, -7]
         icon = b.createChild("Poster")
-        icon.width = 26
-        icon.height = 26
-        icon.translation = [30, 20]
+        icon.width = 24
+        icon.height = 24
+        icon.translation = [26, 16]
         label = b.createChild("Label")
-        label.font = hFont("bold", 30)
-        label.height = 66
+        label.font = hFont("bold", 26)
+        label.height = 56
         label.vertAlign = "center"
-        label.translation = [68, 0]
+        label.translation = [60, 0]
         b.addFields({ icon: icon, label: label, act: "" })
         m.buttons.push(b)
     end for
@@ -102,16 +102,16 @@ sub setButtons(kinds as object)
             b.act = k[0]
             b.label.text = k[1]
             b.icon.uri = "pkg:/images/icons/" + k[2] + ".png"
-            w = Int(b.label.localBoundingRect().width) + 98
+            w = Int(b.label.localBoundingRect().width) + 86
             for each p in [b.idle, b.fill]
                 p.width = w
-                p.height = 66
+                p.height = 56
             end for
             b.ring.width = w + 14
-            b.ring.height = 80
+            b.ring.height = 70
             b.translation = [x, 0]
             b.visible = true
-            x = x + w + 14
+            x = x + w + 12
         else
             b.visible = false
             b.act = ""
@@ -391,7 +391,7 @@ end sub
 
 ' stack the rows under the cards with no gaps for hidden ones
 sub layoutRows()
-    y = 724
+    y = 590
     for r = 0 to 1
         row = m.rows[r]
         if row.visible
@@ -458,7 +458,7 @@ sub showHero()
     m.heroArt.uri = hImageAny(item, ["Backdrop", "Thumb", "Primary"], 1920)
     pct = hPercent(item)
     m.heroProgress.visible = pct > 0
-    m.heroBar.width = Int(420 * pct / 100)
+    m.heroBar.width = Int(300 * pct / 100)
     m.heroLeft.text = hMinutesLeft(item)
     if item.Type = "Series"
         setButtons([["details", "Open", "home-info"]])
@@ -496,7 +496,7 @@ sub showPager()
     m.pgText.text = (m.heroIndex + 1).toStr() + " of " + n.toStr() + " · next: " + hTitle(nxt)
     ' lay out right to left so the line ends at the right margin
     tw = Int(m.pgText.localBoundingRect().width)
-    right = 1824
+    right = 1794
     m.pgText.translation = [right - tw, 0]
     m.top.findNode("pgRight").translation = [right - tw - 44, 0]
     dw = x - 12
