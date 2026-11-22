@@ -8,6 +8,7 @@ python3 tools/ambiance/sounds.py "$T" 60 44100
 python3 tools/ambiance/sounds.py "$T" 16 22050 -short
 python3 tools/ambiance/fire.py "$T/fire.jpg"
 python3 tools/ambiance/art.py "$T/svg"
+python3 tools/ambiance/weave.py "$T/svg/weave.svg"
 NODE_PATH=${NODE_PATH:-$(npm root -g)} node tools/ambiance/shot.js "$T/svg" "$T/png"
 python3 tools/ambiance/finish.py "$T" images/amb sounds
 rm -rf "$T"

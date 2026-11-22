@@ -1,6 +1,11 @@
 sub init()
     m.moods = ["hearth", "rain", "fireflies", "lightsout"]
-    m.titles = { hearth: "Hearth", rain: "Rain on the roof", fireflies: "Fireflies", lightsout: "Lights out" }
+    m.titles = { hearth: "Hearth", rain: "Rain", fireflies: "Fireflies", lightsout: "Lights out" }
+    m.video = m.top.findNode("video")
+    m.video.observeField("state", "onVideoState")
+    m.credit = m.top.findNode("credit")
+    m.credit.font = hFont("regular", 20)
+    m.useVideo = false
     m.scene = m.top.findNode("scene")
     m.sound = m.top.findNode("sound")
     m.hud = m.top.findNode("hud")
@@ -29,16 +34,49 @@ end sub
 
 sub onMood()
     md = m.top.mood
-    m.scene.mood = md
-    m.sound.mood = md
-    m.sound.on = soundPref(md)
-    m.sound.active = true
+    it = ambMood(md)
+    m.useVideo = ambHasVideo(it)
+    if m.useVideo
+        ' real footage: the video carries its own sound, muted on request
+        m.scene.running = false
+        m.scene.visible = false
+        m.sound.active = false
+        c = CreateObject("roSGNode", "ContentNode")
+        c.url = it.video
+        c.streamFormat = "mp4"
+        m.video.content = c
+        m.video.visible = true
+        m.video.mute = not soundPref(md)
+        m.video.control = "play"
+        m.credit.text = it.credit
+    else
+        ' no footage in this build: the drawn scene and its generated sound
+        m.video.control = "stop"
+        m.video.visible = false
+        m.scene.visible = true
+        m.scene.mood = md
+        m.scene.running = true
+        m.sound.mood = md
+        m.sound.on = soundPref(md)
+        m.sound.active = true
+        m.credit.text = ""
+    end if
     ' lights out means "stop in 30 min" unless a timer is already set
     if md = "lightsout" and m.sleepMin = 0 then setSleep(30)
     m.top.findNode("name").text = UCase(m.titles[md])
     paintState()
     showHud()
 end sub
+
+sub onVideoState()
+    print "[ambiance] video state "; m.video.state
+    if m.video.state = "error" then print "[ambiance] video error: "; m.video.errorMsg
+end sub
+
+function soundOn() as boolean
+    if m.useVideo then return not m.video.mute
+    return m.sound.on
+end function
 
 sub onShown(unused as dynamic)
     m.top.setFocus(true)
@@ -50,7 +88,7 @@ function soundPref(md as string) as boolean
 end function
 
 sub paintState()
-    if m.sound.on then s = "Sound on" else s = "Sound off"
+    if soundOn() then s = "Sound on" else s = "Sound off"
     if m.sleepMin > 0 and m.sleepAt <> invalid then s = s + "   ·   Stops at " + clockText(m.sleepAt)
     m.state.text = s
     now = CreateObject("roDateTime")
@@ -81,8 +119,9 @@ end sub
 
 sub toggleSound()
     md = m.top.mood
-    m.sound.on = not m.sound.on
-    if m.sound.on then v = "1" else v = "0"
+    on = not soundOn()
+    if m.useVideo then m.video.mute = not on else m.sound.on = on
+    if on then v = "1" else v = "0"
     m.reg.Write("ambSound_" + md, v)
     m.reg.Flush()
 end sub
@@ -116,7 +155,7 @@ sub sleepMenu()
     d = CreateObject("roSGNode", "StandardMessageDialog")
     d.title = m.titles[m.top.mood]
     d.message = ["Sound and sleep timer"]
-    if m.sound.on then snd = "Turn sound off" else snd = "Turn sound on"
+    if soundOn() then snd = "Turn sound off" else snd = "Turn sound on"
     m.menuMins = [-1, 0, 30, 60, 90]
     labels = [snd]
     for each mins in [0, 30, 60, 90]
@@ -157,6 +196,7 @@ sub onSleepFaded()
     m.asleep = true
     m.sound.active = false
     m.scene.running = false
+    if m.useVideo then m.video.control = "pause"
     m.sleepMin = 0
     m.sleepAt = invalid
 end sub
@@ -165,8 +205,12 @@ sub wake()
     m.asleep = false
     m.sleepFade.control = "stop"
     m.night.opacity = 0
-    m.scene.running = true
-    m.sound.active = true
+    if m.useVideo
+        m.video.control = "resume"
+    else
+        m.scene.running = true
+        m.sound.active = true
+    end if
     showHud()
 end sub
 
@@ -174,6 +218,7 @@ sub leave()
     m.sleepTimer.control = "stop"
     m.sound.active = false
     m.scene.running = false
+    m.video.control = "stop"
     m.top.request = { action: "back" }
 end sub
 
