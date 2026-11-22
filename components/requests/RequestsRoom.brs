@@ -230,6 +230,9 @@ function requestCard(q as object, info as object) as object
     end if
     title = info.title
     if title = invalid then title = ""
+    if title = "" and info.detailStatus <> invalid
+        note = note + " (Overseerr couldn't load this title's details: error " + info.detailStatus.toStr() + ", TMDB id " + info.id.toStr() + ".)"
+    end if
     data = { id: info.id, mediaType: info.mediaType, title: title, year: yearOf(info), overview: info.overview, backdrop: invalid, mediaStatus: mediaStatus, note: note }
     return { kind: "media", title: title, image: posterUrl(info.posterPath, "w300"), chip: chip, lit: (rs <> 3), data: data }
 end function

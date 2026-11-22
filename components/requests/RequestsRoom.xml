@@ -14,7 +14,8 @@
       <HearthPill id="setupButton" translation="[0, 400]" text="Type the key on the TV" button="true" focused="true" />
     </Group>
     <Label id="empty" translation="[96, 300]" width="1500" wrap="true" color="0xB5AF8CFF" />
-    <Group translation="[0, 240]">
+    <!-- clip so rows scrolled past the top never cover the title area -->
+    <Group translation="[0, 240]" clippingRect="[0, -14, 1920, 720]">
       <Group id="content" />
     </Group>
     <Label id="toast" translation="[96, 870]" width="1500" color="0xE0B34AFF" />

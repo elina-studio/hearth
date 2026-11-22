@@ -43,24 +43,24 @@ sub build()
             lab.color = "0xE0B34AFF"
             lab.text = "SEARCH" + Chr(10) + "TO REQUEST"
         else
+            ' title sits under the poster, so it shows whenever the poster is missing or fails to load
+            lab = g.createChild("Label")
+            lab.width = m.w - 30
+            lab.height = m.h - 20
+            lab.translation = [15, 10]
+            lab.wrap = true
+            lab.horizAlign = "center"
+            lab.vertAlign = "center"
+            lab.font = hFont("caps", 32)
+            lab.color = "0xEDE6CAFF"
+            t = c.title
+            if t = invalid or t = "" then t = "Untitled"
+            lab.text = UCase(t)
             p = g.createChild("Poster")
             p.width = m.w
             p.height = m.h
             p.loadDisplayMode = "scaleToZoom"
-            if c.image <> invalid and c.image <> ""
-                p.uri = c.image
-            else
-                lab = g.createChild("Label")
-                lab.width = m.w - 30
-                lab.height = m.h - 20
-                lab.translation = [15, 10]
-                lab.wrap = true
-                lab.horizAlign = "center"
-                lab.vertAlign = "center"
-                lab.font = hFont("caps", 32)
-                lab.color = "0xEDE6CAFF"
-                lab.text = UCase(c.title)
-            end if
+            if c.image <> invalid and c.image <> "" then p.uri = c.image
         end if
         ' status chip (an empty Group keeps child positions fixed for setChip)
         chip = g.createChild("Group")

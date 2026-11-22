@@ -40,10 +40,11 @@ sub loadRequests()
             kind = media.mediaType
             if kind = invalid then kind = q.type
             d = fetch("GET", "/api/v1/" + kind + "/" + media.tmdbId.toStr(), invalid, invalid)
-            info = { id: media.tmdbId, mediaType: kind }
+            info = { id: media.tmdbId, mediaType: kind, title: "", detailStatus: d.status }
             if d.data <> invalid
-                info.title = d.data.title
-                if info.title = invalid then info.title = d.data.name
+                t = d.data.title
+                if t = invalid then t = d.data.name
+                if t <> invalid then info.title = t
                 info.posterPath = d.data.posterPath
                 info.overview = d.data.overview
                 info.releaseDate = d.data.releaseDate
