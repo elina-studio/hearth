@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A scrolling grid of cards (artists, albums, playlists). Only the rows on screen (plus one either side) exist as
+     nodes and are reused while scrolling, so a 2,000-artist library costs the same as 20.
+     The parent owns focus: move(dx, dy) returns false at an edge; jumpTo(i) moves straight to card i. -->
+<component name="MusicGrid" extends="Group">
+  <children>
+    <Group id="strip" />
+  </children>
+  <interface>
+    <field id="cards" type="array" onChange="build" />
+    <field id="cols" type="integer" value="5" />
+    <field id="colWidth" type="integer" value="230" />
+    <field id="cardSize" type="integer" value="180" />
+    <field id="round" type="boolean" value="false" />
+    <field id="viewHeight" type="integer" value="700" />
+    <field id="index" type="integer" value="0" />
+    <field id="active" type="boolean" value="false" onChange="paint" />
+    <function name="move" />
+    <function name="jumpTo" />
+    <function name="current" />
+  </interface>
+  <script type="text/brightscript" uri="pkg:/source/util.brs" />
+  <script type="text/brightscript" uri="pkg:/components/music/MusicGrid.brs" />
+</component>

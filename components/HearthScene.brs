@@ -146,6 +146,8 @@ sub handle(r as object)
         s = CreateObject("roSGNode", "LidarrScreen")
         pushScreen(s)
         if r.term <> invalid then s.term = r.term
+    else if a = "musicView" and r.mode = "big"
+        pushScreen(CreateObject("roSGNode", "MusicBigView"))
     else if a = "musicView"
         s = CreateObject("roSGNode", "MusicView")
         pushScreen(s)
