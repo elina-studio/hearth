@@ -102,6 +102,7 @@ sub onSections(event as object)
     for each d in pxItems(t)
         if d.type = "artist" and m.top.section = "" then m.top.section = pxStr(d.key)
     end for
+    print "[hearth music] sections status "; t.status; ", music section: "; m.top.section
     if m.top.section = ""
         if t.status <= 0 then say("Can't reach Plex.") else say("Plex has no music library.")
         m.top.busy = false

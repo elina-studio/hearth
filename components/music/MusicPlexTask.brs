@@ -58,6 +58,11 @@ sub runTask()
         parsed = ParseJson(text)
         if parsed <> invalid and type(parsed) = "roAssociativeArray" then resp = parsed
     end if
+    ' shows in the TV's debug log (nc <TV IP> 8085); the token stays out of it
+    shown = url
+    cut = Instr(1, shown, "X-Plex-Token=")
+    if cut > 0 then shown = Left(shown, cut - 1)
+    print "[hearth music] "; method; " "; shown; " -> "; status; " ("; Len(text); " bytes)"
     m.top.status = status
     m.top.ok = (status >= 200 and status < 300)
     m.top.response = resp

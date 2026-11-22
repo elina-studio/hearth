@@ -12,6 +12,8 @@ sub init()
     m.time.font = hFont("regular", 24)
     m.chips = m.top.findNode("chips")
     m.shelves = m.top.findNode("shelves")
+    m.empty = m.top.findNode("empty")
+    m.empty.font = hFont("regular", 30)
     m.toast = m.top.findNode("toast")
     m.toast.font = hFont("bold", 28)
     m.toastTimer = m.top.findNode("toastTimer")
@@ -92,6 +94,8 @@ sub showTime()
 end sub
 
 sub onMessage()
+    ' while the shelves are empty, keep the latest word from the player in their place
+    if m.rows.count() = 0 then m.empty.text = muPlayer().message
     m.toast.text = muPlayer().message
     m.toastTimer.control = "stop"
     m.toastTimer.control = "start"
@@ -109,9 +113,11 @@ sub refresh(unused = invalid as dynamic)
     end if
     s = muPlayer().section
     if s = ""
+        if m.rows.count() = 0 then m.empty.text = "Looking for your music library in Plex" + Chr(8230)
         muSend("findLibrary")
         return
     end if
+    if m.rows.count() = 0 then m.empty.text = "Loading your music" + Chr(8230)
     if m.loadedFor = s and m.rows.count() > 0 then return
     m.loadedFor = s
     m.results = {}
@@ -142,7 +148,10 @@ end sub
 sub onShelf(event as object)
     t = hTaskFrom(event)
     m.results[t.tag] = pxItems(t)
-    if not t.ok then onMessageText("Couldn't load " + t.tag + " from Plex (" + t.status.toStr() + ").")
+    if not t.ok
+        m.failed = "Couldn't load " + t.tag + " from Plex (error " + t.status.toStr() + ")."
+        onMessageText(m.failed)
+    end if
     build()
 end sub
 
@@ -179,6 +188,11 @@ sub build()
             y = y + r.rowHeight + 20
         end if
     end for
+    if m.rows.count() > 0
+        m.empty.text = ""
+    else if m.failed <> invalid
+        m.empty.text = m.failed
+    end if
     if keepTitle <> invalid
         m.row = 0
         for i = 0 to m.rows.count() - 1
