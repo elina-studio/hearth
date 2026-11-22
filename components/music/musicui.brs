@@ -96,6 +96,8 @@ sub muDo(a as string)
         muSend("setShuffle", { value: not p.shuffle })
     else if a = "repeat"
         muSend("cycleRepeat")
+    else if a = "prev" or a = "next"
+        muSend(a)
     else if a = "more"
         muSend("moreLikeThis")
     else if a = "library"

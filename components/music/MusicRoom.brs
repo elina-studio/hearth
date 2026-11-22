@@ -23,31 +23,34 @@ sub init()
     m.buildTimer.observeField("fire", "onBuildTimer")
     m.scrollTo = m.top.findNode("scrollTo")
 
-    ' chips: [label, action]
-    ' playback controls, a divider, then the views. Shuffle and Repeat light up gold when on.
-    m.chipDefs = [["Play", "toggle"], ["Shuffle", "shuffle"], ["Repeat", "repeat"], ["", "sep"], ["Cover", "cover"], ["Visualizer", "milk"], ["Hearth fire", "hearth"], ["Request", "request"]]
+    ' chips: [icon, word, action]. Transport is icon-only (its name shows under the row when focused),
+    ' then a divider, then the views with a word each. Shuffle and Repeat light up gold when on.
+    m.chipDefs = [["prev", "", "prev"], ["play", "", "toggle"], ["next", "", "next"], ["shuffle", "", "shuffle"], ["repeat", "", "repeat"], ["", "", "sep"], ["cover", "Cover", "cover"], ["viz", "Visualizer", "milk"], ["fire", "Fire", "hearth"], ["request", "Request", "request"]]
+    m.chipNames = { prev: "Previous", toggle: "Play", next: "Next", shuffle: "Shuffle", repeat: "Repeat" }
+    m.chipName = m.top.findNode("chipName")
+    m.chipName.font = hFont("regular", 22)
     for each c in m.chipDefs
-        if c[1] = "sep"
+        if c[2] = "sep"
             g = m.chips.createChild("Group")
             spacer = g.createChild("Rectangle")
             spacer.width = 26
-            spacer.height = 58
+            spacer.height = 64
             spacer.color = "0x00000000"
             line = g.createChild("Rectangle")
-            line.translation = [12, 9]
+            line.translation = [12, 12]
             line.width = 2
             line.height = 40
             line.color = "0xD9A06655"
         else
-            p = m.chips.createChild("HearthPill")
-            p.button = true
-            p.width = chipWidth(c[0])
-            p.text = c[0]
+            p = m.chips.createChild("MusicChip")
+            p.icon = c[0]
+            p.text = c[1]
+            p.big = (c[2] = "toggle")
         end if
     end for
 
     m.row = 0
-    m.chip = 0
+    m.chip = 1
     m.focused = false
     m.rows = []
     m.results = {}
@@ -91,20 +94,22 @@ sub showNow()
         m.title.text = "Sign in to Plex"
         m.sub.text = "Hearth's setup links Plex with a short code at plex.tv/link."
     end if
-    ' chip labels follow the player
-    labels = {}
-    if p.state = "playing" or p.state = "buffering" then labels.toggle = "Pause" else labels.toggle = "Play"
-    labels.shuffle = "Shuffle"
-    if p.repeat = "one" then labels.repeat = "Repeat one" else labels.repeat = "Repeat"
-    lit = { shuffle: p.shuffle, repeat: (p.repeat <> "off") }
+    ' chip icons and names follow the player
+    playing = (p.state = "playing" or p.state = "buffering")
+    if playing then m.chipNames.toggle = "Pause" else m.chipNames.toggle = "Play"
+    if p.repeat = "one" then m.chipNames.repeat = "Repeat one" else if p.repeat = "all" then m.chipNames.repeat = "Repeat all" else m.chipNames.repeat = "Repeat"
+    if p.shuffle then m.chipNames.shuffle = "Shuffle on" else m.chipNames.shuffle = "Shuffle"
     for i = 0 to m.chipDefs.count() - 1
-        l = labels[m.chipDefs[i][1]]
-        if l <> invalid
-            m.chips.getChild(i).width = chipWidth(l)
-            m.chips.getChild(i).text = l
+        a = m.chipDefs[i][2]
+        c = m.chips.getChild(i)
+        if a = "toggle"
+            if playing then c.icon = "pause" else c.icon = "play"
+        else if a = "shuffle"
+            c.on = p.shuffle
+        else if a = "repeat"
+            c.on = (p.repeat <> "off")
+            if p.repeat = "one" then c.badge = "1" else c.badge = ""
         end if
-        on = lit[m.chipDefs[i][1]]
-        if on <> invalid then m.chips.getChild(i).current = on
     end for
     showTime()
 end sub
@@ -254,8 +259,15 @@ end sub
 ' ---------- focus ----------
 sub paint()
     for i = 0 to m.chips.getChildCount() - 1
-        if m.chipDefs[i][1] <> "sep" then m.chips.getChild(i).focused = (m.focused and m.row = 0 and i = m.chip)
+        if m.chipDefs[i][2] <> "sep" then m.chips.getChild(i).focused = (m.focused and m.row = 0 and i = m.chip)
     end for
+    ' name the focused icon-only button, so nothing is a mystery
+    name = ""
+    if m.focused and m.row = 0
+        n = m.chipNames[m.chipDefs[m.chip][2]]
+        if n <> invalid then name = n
+    end if
+    m.chipName.text = name
     for i = 0 to m.rows.count() - 1
         m.rows[i].active = (m.focused and m.row = i + 1)
     end for
@@ -277,7 +289,7 @@ end sub
 
 sub activate()
     if m.row = 0
-        a = m.chipDefs[m.chip][1]
+        a = m.chipDefs[m.chip][2]
         if not pxReady() and a <> "cover" and a <> "milk" and a <> "hearth" and a <> "request"
             onMessageText("Sign in to Plex first.")
             return
@@ -350,7 +362,7 @@ function onKeyEvent(key as string, press as boolean) as boolean
         if key = "left" then d = -1 else d = 1
         if m.row = 0
             i = m.chip + d
-            if i >= 0 and i < m.chipDefs.count() and m.chipDefs[i][1] = "sep" then i = i + d
+            if i >= 0 and i < m.chipDefs.count() and m.chipDefs[i][2] = "sep" then i = i + d
             if i >= 0 and i < m.chipDefs.count() then m.chip = i
         else
             m.rows[m.row - 1].callFunc("move", d)
@@ -371,10 +383,6 @@ function onKeyEvent(key as string, press as boolean) as boolean
     return true
 end function
 
-' snug pills so all eight fit on one line (about 14 px a letter at this size)
-function chipWidth(t as string) as integer
-    return Len(t) * 14 + 56
-end function
 
 function albumCoverFor(artistId as string) as string
     albums = m.results["Albums A to Z"]
