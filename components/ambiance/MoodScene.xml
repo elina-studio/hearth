@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The picture for one mood, full screen. No keys, no sound: AmbientSound plays the audio.
+     mood: "hearth" | "rain" | "fireflies" | "lightsout". running: start or pause the motion.
+     Shared with MusicView (mode "hearth"). -->
+<component name="MoodScene" extends="Group">
+  <children>
+    <Rectangle id="base" width="1920" height="1080" color="0x050705FF" />
+    <Group id="layers" />
+  </children>
+  <interface>
+    <field id="mood" type="string" onChange="build" />
+    <field id="running" type="boolean" value="true" onChange="onRunning" />
+  </interface>
+  <script type="text/brightscript" uri="pkg:/components/ambiance/MoodScene.brs" />
+</component>

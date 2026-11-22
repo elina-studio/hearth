@@ -1,6 +1,6 @@
 {
   "rootDir": "./",
-  "files": ["manifest", "source/**/*", "components/**/*", "images/**/*", "fonts/**/*", "data/**/*", "LICENSE"],
+  "files": ["manifest", "source/**/*", "components/**/*", "images/**/*", "fonts/**/*", "data/**/*", "sounds/**/*", "LICENSE"],
   "stagingDir": "out/staging",
   "outFile": "out/hearth.zip",
   "createPackage": true,

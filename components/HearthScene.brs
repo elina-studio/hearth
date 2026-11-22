@@ -114,6 +114,10 @@ sub handle(r as object)
         s.resume = (r.resume = true)
         s.item = r.item
         pushScreen(s)
+    else if a = "mood"
+        s = CreateObject("roSGNode", "MoodScreen")
+        s.mood = r.mood
+        pushScreen(s)
     else if a = "back"
         popScreen()
     else if a = "introDone"

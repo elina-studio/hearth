@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The sound for one mood, looping. on = the sound's own mute, separate from any music.
+     When the shared music player (m.global.music) is playing, the loop moves to a SoundEffect
+     so the two can play together; otherwise it uses an Audio node, which loops more cleanly.
+     Shared with MusicView (mode "hearth"). -->
+<component name="AmbientSound" extends="Group">
+  <children>
+    <Audio id="audio" />
+    <SoundEffect id="sfx" volume="80" />
+  </children>
+  <interface>
+    <field id="mood" type="string" onChange="update" />
+    <field id="on" type="boolean" value="true" onChange="update" />
+    <field id="active" type="boolean" value="false" onChange="update" />
+    <!-- read-only: "audio", "sfx" or "off" -->
+    <field id="backend" type="string" value="off" />
+  </interface>
+  <script type="text/brightscript" uri="pkg:/components/ambiance/AmbientSound.brs" />
+</component>
