@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Requests: browse Overseerr (trending, popular), search, request, and follow your requests. -->
+<component name="RequestsRoom" extends="Group">
+  <children>
+    <Poster id="backdrop" translation="[620, -150]" width="1300" height="640" loadDisplayMode="scaleToZoom" />
+    <Poster uri="pkg:/images/shade.png" translation="[620, -150]" width="1300" height="640" />
+    <Group translation="[96, 10]">
+      <Label id="eyebrow" color="0xD9A066FF" />
+      <Label id="title" translation="[0, 36]" width="1100" wrap="true" maxLines="1" color="0xEDE6CAFF" />
+      <Label id="overview" translation="[0, 124]" width="900" height="80" wrap="true" maxLines="2" color="0xB5AF8CFF" />
+    </Group>
+    <Group id="setup" visible="false" translation="[96, 260]">
+      <Label id="setupText" width="1500" wrap="true" color="0xB5AF8CFF" />
+      <HearthPill id="setupButton" translation="[0, 400]" text="Type the key on the TV" button="true" focused="true" />
+    </Group>
+    <Label id="empty" translation="[96, 300]" width="1500" wrap="true" color="0xB5AF8CFF" />
+    <Group translation="[0, 240]">
+      <Group id="content" />
+    </Group>
+    <Label id="toast" translation="[96, 870]" width="1500" color="0xE0B34AFF" />
+    <Timer id="toastTimer" duration="3" />
+    <Animation id="scroll" duration="0.22" easeFunction="outQuad">
+      <Vector2DFieldInterpolator id="scrollTo" key="[0.0, 1.0]" fieldToInterp="content.translation" />
+    </Animation>
+  </children>
+  <interface>
+    <field id="request" type="assocarray" alwaysNotify="true" />
+    <!-- set by the hub (e.g. from Search) to run an Overseerr search right away -->
+    <field id="searchTerm" type="string" alwaysNotify="true" onChange="onSearchTerm" />
+    <function name="focusIn" />
+    <function name="refresh" />
+  </interface>
+  <script type="text/brightscript" uri="pkg:/source/util.brs" />
+  <script type="text/brightscript" uri="pkg:/components/requests/RequestsRoom.brs" />
+</component>

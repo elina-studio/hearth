@@ -10,7 +10,7 @@ sub init()
     m.clock.font = hFont("bold", 40)
     m.weather = m.top.findNode("weather")
     m.weather.font = hFont("regular", 22)
-    m.weather.text = "build 6"
+    m.weather.text = "build 7"
     m.clockTimer = m.top.findNode("clockTimer")
     m.clockTimer.observeField("fire", "tick")
     m.clockTimer.control = "start"
@@ -77,6 +77,8 @@ sub showRoom(name as string, focus as boolean)
             if name = "Movies" then room.kind = "movies" else room.kind = "tvshows"
         else if name = "Search"
             room = CreateObject("roSGNode", "SearchRoom")
+        else if name = "Requests"
+            room = CreateObject("roSGNode", "RequestsRoom")
         else
             room = CreateObject("roSGNode", "PlaceholderRoom")
             room.name = name
@@ -134,6 +136,7 @@ sub onRoomRequest(event as object)
     else if r.action = "room"
         m.pillIndex = indexOf(r.name)
         showRoom(r.name, true)
+        if r.search <> invalid and r.name = "Requests" then m.rooms["Requests"].searchTerm = r.search
     else
         m.top.request = r
     end if

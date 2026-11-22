@@ -1,0 +1,108 @@
+' Talks to Overseerr with the API key saved on the TV (registry section "hearth").
+sub init()
+    m.top.functionName = "runTask"
+end sub
+
+sub runTask()
+    reg = CreateObject("roRegistrySection", "hearth")
+    m.base = reg.Read("overseerrUrl")
+    if m.base = "" then m.base = "http://192.168.254.41:5055"
+    if Right(m.base, 1) = "/" then m.base = Left(m.base, Len(m.base) - 1)
+    m.apiKey = reg.Read("overseerrKey")
+
+    if m.top.mode = "requests"
+        loadRequests()
+    else
+        r = fetch(m.top.method, m.top.path, m.top.query, m.top.body)
+        finish(r.status, r.data)
+    end if
+end sub
+
+sub finish(status as integer, data as object)
+    if data = invalid then data = {}
+    m.top.status = status
+    m.top.ok = (status >= 200 and status < 300)
+    m.top.response = data
+    m.top.done = true
+end sub
+
+' Your requests, newest first, each with its title and poster filled in.
+sub loadRequests()
+    r = fetch("GET", "/api/v1/request", { take: "20", skip: "0", sort: "added", filter: "all" }, invalid)
+    if r.status < 200 or r.status >= 300 or r.data = invalid or r.data.results = invalid
+        finish(r.status, r.data)
+        return
+    end if
+    out = []
+    for each q in r.data.results
+        media = q.media
+        if media <> invalid and media.tmdbId <> invalid
+            kind = media.mediaType
+            if kind = invalid then kind = q.type
+            d = fetch("GET", "/api/v1/" + kind + "/" + media.tmdbId.toStr(), invalid, invalid)
+            info = { id: media.tmdbId, mediaType: kind }
+            if d.data <> invalid
+                info.title = d.data.title
+                if info.title = invalid then info.title = d.data.name
+                info.posterPath = d.data.posterPath
+                info.overview = d.data.overview
+                info.releaseDate = d.data.releaseDate
+                info.firstAirDate = d.data.firstAirDate
+            end if
+            out.push({ request: q, info: info })
+        end if
+    end for
+    finish(200, { results: out })
+end sub
+
+function fetch(method as string, path as string, query as dynamic, body as dynamic) as object
+    xfer = CreateObject("roUrlTransfer")
+    port = CreateObject("roMessagePort")
+    xfer.setMessagePort(port)
+    url = m.base + path
+    if query <> invalid and query.count() > 0
+        parts = []
+        for each k in query
+            v = query[k]
+            if type(v) <> "roString" and type(v) <> "String" then v = v.toStr()
+            parts.push(k + "=" + xfer.Escape(v))
+        end for
+        url = url + "?" + parts.join("&")
+    end if
+    xfer.setUrl(url)
+    xfer.addHeader("X-Api-Key", m.apiKey)
+    xfer.addHeader("Accept", "application/json")
+    xfer.RetainBodyOnError(true)
+    if Left(url, 8) = "https://"
+        xfer.SetCertificatesFile("common:/certs/ca-bundle.crt")
+        xfer.InitClientCertificates()
+    end if
+    started = false
+    if UCase(method) = "GET"
+        started = xfer.AsyncGetToString()
+    else
+        xfer.setRequest(UCase(method))
+        xfer.addHeader("Content-Type", "application/json")
+        text = "{}"
+        if body <> invalid then text = FormatJson(body)
+        started = xfer.AsyncPostFromString(text)
+    end if
+    status = 0
+    resp = ""
+    if started
+        msg = wait(15000, port)
+        if type(msg) = "roUrlEvent"
+            status = msg.GetResponseCode()
+            resp = msg.GetString()
+        else
+            xfer.AsyncCancel()
+            status = -1
+        end if
+    end if
+    data = invalid
+    if resp <> invalid and resp <> ""
+        data = ParseJson(resp)
+        if type(data) = "roArray" then data = { results: data }
+    end if
+    return { status: status, data: data }
+end function
