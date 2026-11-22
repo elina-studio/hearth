@@ -18,7 +18,8 @@ end sub
 ' ---------- commands ----------
 sub onCommand()
     c = m.top.command
-    if c = invalid or c.cmd = invalid then return
+    if c = invalid then return
+    if c.cmd = invalid then return
     cmd = c.cmd
     if cmd = "toggle"
         if m.top.queue = invalid or m.top.queue.count() = 0
@@ -90,7 +91,11 @@ sub withSection(p as object)
     end if
     ' a lookup is already on its way: keep the real request it will run
     if m.pending <> invalid and p.tag = "none" then return
-    if m.pending = invalid or m.pending.tag = "none" then m.pending = p
+    if m.pending = invalid
+        m.pending = p
+    else if m.pending.tag = "none"
+        m.pending = p
+    end if
     if m.looking = true then return
     m.looking = true
     pxApi("/library/sections", {}, "onSections")
