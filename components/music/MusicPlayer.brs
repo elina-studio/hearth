@@ -88,12 +88,17 @@ sub withSection(p as object)
         say("Sign in to Plex first (Settings on the Home pill).")
         return
     end if
-    m.pending = p
+    ' a lookup is already on its way: keep the real request it will run
+    if m.pending <> invalid and p.tag = "none" then return
+    if m.pending = invalid or m.pending.tag = "none" then m.pending = p
+    if m.looking = true then return
+    m.looking = true
     pxApi("/library/sections", {}, "onSections")
 end sub
 
 sub onSections(event as object)
     t = hTaskFrom(event)
+    m.looking = false
     for each d in pxItems(t)
         if d.type = "artist" and m.top.section = "" then m.top.section = pxStr(d.key)
     end for

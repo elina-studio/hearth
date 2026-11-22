@@ -43,9 +43,12 @@ sub init()
     p.observeField("section", "refresh")
     showNow()
     paint()
+    ' load the shelves as soon as the room exists (the hub only refreshes rooms it already had)
+    refresh()
 end sub
 
 sub focusIn(unused as dynamic)
+    if m.rows.count() = 0 then refresh()
     m.focused = true
     m.top.setFocus(true)
     paint()
@@ -109,12 +112,13 @@ sub refresh(unused = invalid as dynamic)
         muSend("findLibrary")
         return
     end if
-    if m.loadedFor = s then return
+    if m.loadedFor = s and m.rows.count() > 0 then return
     m.loadedFor = s
     m.results = {}
     m.hubOrder = []
     pxApi("/hubs/sections/" + s, { count: "20" }, "onHubs", "hubs")
     pxApi("/playlists", { playlistType: "audio" }, "onShelf", "Playlists")
+    pxApi("/library/sections/" + s + "/all", { type: "8", sort: "titleSort", "X-Plex-Container-Start": "0", "X-Plex-Container-Size": "120" }, "onShelf", "Artists")
     pxApi("/library/sections/" + s + "/all", { type: "9", sort: "titleSort", "X-Plex-Container-Start": "0", "X-Plex-Container-Size": "120" }, "onShelf", "Albums A to Z")
 end sub
 
@@ -138,14 +142,16 @@ end sub
 sub onShelf(event as object)
     t = hTaskFrom(event)
     m.results[t.tag] = pxItems(t)
+    if not t.ok then onMessageText("Couldn't load " + t.tag + " from Plex (" + t.status.toStr() + ").")
     build()
 end sub
 
 sub build()
     order = []
     if m.hubOrder <> invalid then order.append(m.hubOrder)
-    order.push("Playlists")
+    order.push("Artists")
     order.push("Albums A to Z")
+    order.push("Playlists")
     keepTitle = invalid
     keepIndex = 0
     if m.row > 0 and m.row - 1 < m.rows.count()
