@@ -5,7 +5,7 @@
   <children>
     <Poster uri="pkg:/images/intro-bg.jpg" width="1920" height="1080" />
     <Group id="sway" scaleRotateCenter="[960, 0]">
-      <Poster id="glow" uri="pkg:/images/intro-glow.png" width="414" height="414" translation="[753, 346]" opacity="0.8" />
+      <Poster id="glow" uri="pkg:/images/intro-glow.png" width="432" height="432" translation="[744, 337]" opacity="0.8" />
       <Poster uri="pkg:/images/intro-lantern.png" width="163" height="688" translation="[878, 0]" />
       <Group id="sparks" />
     </Group>
