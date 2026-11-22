@@ -316,7 +316,7 @@ sub showInfo()
     ov = d.overview
     if ov = invalid then ov = ""
     m.overview.text = ov
-    m.backdrop.uri = posterUrl(d.backdrop, "w1280")
+    m.backdrop.uri = posterUrl(d.backdrop, "w780")
 end sub
 
 function currentCard() as object
