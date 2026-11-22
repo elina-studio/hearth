@@ -5,6 +5,8 @@ import "pkg:/source/enums/AnimationState.bs"
 import "pkg:/source/enums/ColorPalette.bs"
 import "pkg:/source/enums/ItemType.bs"
 import "pkg:/source/enums/KeyCode.bs"
+import "pkg:/source/enums/MediaPlaybackState.bs"
+import "pkg:/source/enums/VideoControl.bs"
 import "pkg:/source/enums/TaskControl.bs"
 import "pkg:/source/utils/config.bs"
 import "pkg:/source/utils/deviceCapabilities.bs"
@@ -42,6 +44,25 @@ sub init()
     end for
     m.pillIndex = 0
 
+    ' Hearth dashboard
+    m.dash = m.top.findNode("dash")
+    m.dashRings = [m.top.findNode("heroRing"), m.top.findNode("nowRing"), m.top.findNode("reqRing")]
+    m.dashIndex = 0
+    m.heroItem = invalid
+    m.heroArt = m.top.findNode("heroArt")
+    m.heroEyebrow = m.top.findNode("heroEyebrow")
+    m.heroTitle = m.top.findNode("heroTitle")
+    m.heroBar = m.top.findNode("heroBar")
+    m.nowArt = m.top.findNode("nowArt")
+    m.nowEyebrow = m.top.findNode("nowEyebrow")
+    m.nowTitle = m.top.findNode("nowTitle")
+    m.nowSub = m.top.findNode("nowSub")
+    setDashFonts()
+    m.dashTimer = m.top.findNode("dashTimer")
+    m.dashTimer.observeField("fire", "updateDash")
+    m.dashTimer.control = "start"
+    showDash(true)
+
     setButtonColors()
 end sub
 
@@ -51,34 +72,146 @@ sub refresh()
 end sub
 
 sub setButtonColors()
-    cursor = chainLookupReturn(m.global.session, "user.settings.colorCursor", ColorPalette.HIGHLIGHT)
-    for each pill in m.pills
-        pill.textColor = ColorPalette.LIGHTGREY
-        pill.background = ColorPalette.TRANSPARENT
-        pill.focusTextColor = "#1F1606"
-        pill.focusBackground = cursor
-    end for
     ' Home is the current room on this screen
-    m.pills[0].textColor = ColorPalette.OFFWHITE
-    m.pills[0].background = ColorPalette.SMOKE
+    for each pill in m.pills
+        pill.current = false
+        pill.focused = false
+    end for
+    m.pills[0].current = true
+end sub
+
+function hearthFont(bold as boolean, size as integer) as object
+    font = CreateObject("roSGNode", "Font")
+    font.uri = bold ? "pkg:/fonts/AtkinsonHyperlegible-Bold.ttf" : "pkg:/fonts/AtkinsonHyperlegible-Regular.ttf"
+    font.size = size
+    return font
+end function
+
+sub setDashFonts()
+    m.heroEyebrow.font = hearthFont(true, 24)
+    m.heroTitle.font = hearthFont(true, 58)
+    m.nowEyebrow.font = hearthFont(true, 22)
+    m.nowTitle.font = hearthFont(true, 34)
+    m.nowSub.font = hearthFont(false, 24)
+    m.top.findNode("reqEyebrow").font = hearthFont(true, 22)
+    m.top.findNode("reqBig").font = hearthFont(true, 64)
+    m.top.findNode("reqSub").font = hearthFont(false, 24)
+end sub
+
+' Hearth: show the dashboard (rows pushed down) or hide it (rows move up to the top)
+sub showDash(visible as boolean)
+    m.dash.visible = visible
+    if visible
+        m.homeRows.translation = [111, 690]
+    else
+        m.homeRows.translation = [111, 180]
+    end if
+end sub
+
+' Hearth: find the first item of a home row by its title
+function firstItemOfRow(title as string) as object
+    content = m.homeRows.content
+    if not isValid(content) then return invalid
+    for each row in content.getChildren(-1, 0)
+        if isStringEqual(row.title, title) and row.getChildCount() > 0 then return row.getChild(0)
+    end for
+    return invalid
+end function
+
+' Hearth: refresh the Continue hero and the Now playing tile
+sub updateDash()
+    item = firstItemOfRow(tr("Continue Watching"))
+    eyebrow = "CONTINUE"
+    if not isValid(item)
+        item = firstItemOfRow(tr("Next Up"))
+        eyebrow = "NEXT UP"
+    end if
+    m.heroItem = item
+
+    if isValid(item)
+        json = item.json
+        title = chainLookupReturn(json, "SeriesName", invalid) ?? chainLookupReturn(json, "Name", "")
+        if isValid(chainLookup(json, "SeriesName"))
+            eyebrow = `${eyebrow} · S${chainLookupReturn(json, "ParentIndexNumber", 0)} E${chainLookupReturn(json, "IndexNumber", 0)}`
+        end if
+        m.heroEyebrow.text = eyebrow
+        m.heroTitle.text = title
+        m.heroArt.uri = FirstItemImageURL(json, ["Backdrop", "Thumb", "Primary"], { maxWidth: 1060 })
+        pct = chainLookupReturn(json, "UserData.PlayedPercentage", 0)
+        if not isNumber(pct) then pct = 0
+        m.heroBar.width = 520 * pct / 100
+    else
+        m.heroEyebrow.text = "WELCOME HOME"
+        m.heroTitle.text = "Nothing to continue"
+        m.heroArt.uri = ""
+        m.heroBar.width = 0
+    end if
+
+    state = chainLookupReturn(m.global, "audioPlayer.state", "")
+    current = invalid
+    if isStringEqual(state, MediaPlaybackState.PLAYING) or isStringEqual(state, MediaPlaybackState.PAUSED) or isStringEqual(state, MediaPlaybackState.BUFFERING)
+        current = m.global.queueManager.callFunc("getCurrentItem")
+    end if
+    if isValid(current) and isValid(current.json)
+        m.nowEyebrow.text = isStringEqual(state, MediaPlaybackState.PAUSED) ? "PAUSED · PLAY RESUMES" : "NOW PLAYING · PLAY PAUSES"
+        m.nowTitle.text = chainLookupReturn(current.json, "Name", "")
+        m.nowSub.text = chainLookupReturn(current.json, "AlbumArtist", "") ?? ""
+        m.nowArt.uri = FirstItemImageURL(current.json, ["Primary"], { maxWidth: 180 })
+    else
+        m.nowEyebrow.text = "MUSIC"
+        m.nowTitle.text = "Nothing playing"
+        m.nowSub.text = "OK opens your music"
+        m.nowArt.uri = ""
+    end if
+end sub
+
+' Hearth: focus a dashboard tile (0 hero, 1 now playing, 2 requests)
+sub focusDash(i as integer)
+    if i < 0 then i = 0
+    if i > 2 then i = 2
+    m.dashIndex = i
+    unfocusPills()
+    showDash(true)
+    for k = 0 to 2
+        m.dashRings[k].visible = (k = i)
+    end for
+    m.dash.setfocus(true)
+    setLastFocus(m.dash)
+end sub
+
+sub unfocusDash()
+    for each ring in m.dashRings
+        ring.visible = false
+    end for
+end sub
+
+sub toggleMusic()
+    state = chainLookupReturn(m.global, "audioPlayer.state", "")
+    if isStringEqual(state, MediaPlaybackState.PLAYING)
+        m.global.audioPlayer.control = VideoControl.PAUSE
+    else if isStringEqual(state, MediaPlaybackState.PAUSED)
+        m.global.audioPlayer.control = VideoControl.RESUME
+    end if
+    updateDash()
 end sub
 
 ' Hearth: move focus to pill i (wraps around)
 sub focusPill(i as integer)
     count = m.pills.count()
     i = ((i mod count) + count) mod count
+    unfocusDash()
     for each pill in m.pills
-        pill.focus = false
+        pill.focused = false
     end for
     m.pillIndex = i
-    m.pills[i].focus = true
+    m.pills[i].focused = true
     m.pills[i].setfocus(true)
     setLastFocus(m.pills[i])
 end sub
 
 sub unfocusPills()
     for each pill in m.pills
-        pill.focus = false
+        pill.focused = false
     end for
 end sub
 
@@ -87,9 +220,7 @@ sub enterPill()
     pillId = m.pillIds[m.pillIndex]
 
     if isStringEqual(pillId, "pillHome")
-        unfocusPills()
-        m.homeRows.setfocus(true)
-        setLastFocus(m.homeRows)
+        focusDash(0)
         return
     end if
 
@@ -104,12 +235,12 @@ sub enterPill()
         if isValid(lib)
             m.homeRows.selectedItem = lib
         else
-            m.global.sceneManager.callFunc("userMessage", m.pills[m.pillIndex].text, tr("No library of this kind was found on your server."))
+            m.global.sceneManager.callFunc("userMessage", m.pills[m.pillIndex].text ?? "", tr("No library of this kind was found on your server."))
         end if
         return
     end if
 
-    m.global.sceneManager.callFunc("userMessage", m.pills[m.pillIndex].text, "This room arrives in a later Hearth build.")
+    m.global.sceneManager.callFunc("userMessage", m.pills[m.pillIndex].text ?? "", "This room arrives in a later Hearth build.")
 end sub
 
 sub loadLibraries()
@@ -141,10 +272,10 @@ sub OnScreenShown()
         end if
         m.top.lastFocus.setFocus(true)
     else
-        m.top.setFocus(true)
-        group = m.global.sceneManager.callFunc("getActiveScene")
-        group.lastFocus = m.top
+        ' Hearth: launch focus is the Continue hero
+        focusDash(0)
     end if
+    updateDash()
 
     if not m.isFirstRun
         if m.homeRows.callFunc("isFocusOnFavoriteRow")
@@ -309,6 +440,44 @@ end function
 function onKeyEvent(key as string, press as boolean) as boolean
     if not press then return false
 
+    if m.dash.isInFocusChain()
+        if isStringEqual(key, KeyCode.LEFT)
+            focusDash(m.dashIndex - 1)
+            return true
+        end if
+        if isStringEqual(key, KeyCode.RIGHT)
+            focusDash(m.dashIndex + 1)
+            return true
+        end if
+        if isStringEqual(key, KeyCode.UP) or isStringEqual(key, KeyCode.BACK)
+            focusPill(0)
+            return true
+        end if
+        if isStringEqual(key, KeyCode.DOWN)
+            unfocusDash()
+            showDash(false)
+            m.homeRows.setfocus(true)
+            setLastFocus(m.homeRows)
+            return true
+        end if
+        if isStringEqual(key, KeyCode.PLAY)
+            toggleMusic()
+            return true
+        end if
+        if isStringEqual(key, KeyCode.OK)
+            if m.dashIndex = 0
+                if isValid(m.heroItem) then m.homeRows.quickPlayNode = m.heroItem
+            else if m.dashIndex = 1
+                m.pillIndex = 3
+                enterPill()
+            else
+                m.global.sceneManager.callFunc("userMessage", "Requests", "Requests connect to Overseerr in a later Hearth build.")
+            end if
+            return true
+        end if
+        return false
+    end if
+
     if m.buttons.isInFocusChain()
         if isStringEqual(key, KeyCode.REPLAY)
             if not audioMiniPlayerIsVisibleInScene() then return true
@@ -351,6 +520,12 @@ function onKeyEvent(key as string, press as boolean) as boolean
         end if
     end if
 
+    ' Hearth: Back from the rows climbs to the pills (Back there leaves the app)
+    if isStringEqual(key, KeyCode.BACK) and m.homeRows.isInFocusChain()
+        focusPill(0)
+        return true
+    end if
+
     if isStringEqual(key, KeyCode.OPTIONS)
         if m.homeRows.hasFocus()
             focusedItem = m.homeRows.content.getChild(m.homeRows.rowItemFocused[0]).getChild(m.homeRows.rowItemFocused[1])
@@ -384,7 +559,7 @@ function onKeyEvent(key as string, press as boolean) as boolean
             toggleButtonsVisibility(true)
         end if
 
-        focusPill(0)
+        focusDash(0)
         return true
     end if
 

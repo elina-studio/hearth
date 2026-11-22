@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Hearth room pill: dim text when idle, gold outline for the current room, gold fill when focused. -->
+<component name="HearthPill" extends="Group">
+  <children>
+    <Poster id="fill" uri="pkg:/images/hearth/pill.9.png" blendColor="#E0B34A" visible="false" />
+    <Poster id="ring" uri="pkg:/images/hearth/pill-ring.9.png" blendColor="#E0B34A" visible="false" />
+    <Label id="label" horizAlign="center" vertAlign="center" color="#B5AF8C" />
+  </children>
+  <interface>
+    <field id="text" type="string" onChange="update" />
+    <field id="width" type="integer" value="160" onChange="update" />
+    <field id="height" type="integer" value="58" onChange="update" />
+    <field id="focused" type="boolean" value="false" onChange="update" />
+    <field id="current" type="boolean" value="false" onChange="update" />
+  </interface>
+</component>

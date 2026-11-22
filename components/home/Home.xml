@@ -3,17 +3,47 @@
   <children>
     <Poster id="backdrop" loadDisplayMode="scaleToZoom" width="1920" height="1200" />
 
-    <!-- Hearth: room pills. Up from the rows reaches them; Left/Right wrap; OK or Down enters the room. -->
-    <LayoutGroup id="buttons" translation="[100, 100]" layoutDirection="horiz" horizAlignment="left" itemSpacings="[12]">
-      <TextButton id="pillHome" text="Home" fontSize="28" padding="24" height="56" width="130" />
-      <TextButton id="pillMovies" text="Movies" fontSize="28" padding="24" height="56" width="160" />
-      <TextButton id="pillShows" text="Shows" fontSize="28" padding="24" height="56" width="150" />
-      <TextButton id="pillMusic" text="Music" fontSize="28" padding="24" height="56" width="140" />
-      <TextButton id="pillRequests" text="Requests" fontSize="28" padding="24" height="56" width="190" />
-      <TextButton id="pillAmbiance" text="Ambiance" fontSize="28" padding="24" height="56" width="200" />
-      <TextButton id="pillPhotos" text="Photos" fontSize="28" padding="24" height="56" width="160" />
-      <TextButton id="pillSearch" text="Search" fontSize="28" padding="24" height="56" width="190" icon="pkg:/images/icons/search-light.png" focusIcon="pkg:/images/icons/search-light.png" iconSide="left" />
+    <!-- Hearth: room pills. Up from the dashboard reaches them; Left/Right wrap; OK or Down enters the room. -->
+    <LayoutGroup id="buttons" translation="[96, 70]" layoutDirection="horiz" horizAlignment="left" itemSpacings="[8]">
+      <HearthPill id="pillHome" text="Home" width="130" />
+      <HearthPill id="pillMovies" text="Movies" width="160" />
+      <HearthPill id="pillShows" text="Shows" width="150" />
+      <HearthPill id="pillMusic" text="Music" width="140" />
+      <HearthPill id="pillRequests" text="Requests" width="185" />
+      <HearthPill id="pillAmbiance" text="Ambiance" width="195" />
+      <HearthPill id="pillPhotos" text="Photos" width="155" />
+      <HearthPill id="pillSearch" text="Search" width="155" />
     </LayoutGroup>
+
+    <!-- Hearth dashboard: Continue hero, Now playing tile, Requests tile. Sits above the rows; hides when the rows have focus. -->
+    <Group id="dash" translation="[111, 170]">
+      <Group id="hero">
+        <Rectangle width="1060" height="470" color="#141a11" />
+        <Poster id="heroArt" width="1060" height="470" loadDisplayMode="scaleToZoom" />
+        <Poster uri="pkg:/images/hearth/shade.png" width="1060" height="470" />
+        <Label id="heroEyebrow" translation="[40, 318]" width="980" color="#E0B34A" />
+        <Label id="heroTitle" translation="[40, 352]" width="980" color="#EDE6CA" />
+        <Rectangle id="heroBarBg" translation="[40, 428]" width="520" height="8" color="#FFFFFF22" />
+        <Rectangle id="heroBar" translation="[40, 428]" width="0" height="8" color="#E0B34A" />
+        <Poster id="heroRing" uri="pkg:/images/hearth/ring.9.png" blendColor="#E0B34A" translation="[-10, -10]" width="1080" height="490" visible="false" />
+      </Group>
+      <Group id="nowTile" translation="[1090, 0]">
+        <Poster uri="pkg:/images/hearth/tile.9.png" blendColor="#141a11" width="610" height="225" />
+        <Poster id="nowArt" translation="[22, 22]" width="180" height="180" loadDisplayMode="scaleToFit" />
+        <Label id="nowEyebrow" translation="[225, 34]" width="360" color="#D9A066" />
+        <Label id="nowTitle" translation="[225, 70]" width="360" height="90" wrap="true" maxLines="2" color="#EDE6CA" />
+        <Label id="nowSub" translation="[225, 160]" width="360" color="#B5AF8C" />
+        <Poster id="nowRing" uri="pkg:/images/hearth/ring.9.png" blendColor="#E0B34A" translation="[-10, -10]" width="630" height="245" visible="false" />
+      </Group>
+      <Group id="reqTile" translation="[1090, 245]">
+        <Poster uri="pkg:/images/hearth/tile.9.png" blendColor="#141a11" width="610" height="225" />
+        <Label id="reqEyebrow" translation="[30, 30]" width="550" color="#B5AF8C" text="REQUESTS" />
+        <Label id="reqBig" translation="[30, 70]" width="550" color="#E0B34A" text="Soon" />
+        <Label id="reqSub" translation="[30, 160]" width="550" color="#B5AF8C" text="Overseerr connects in a later build" />
+        <Poster id="reqRing" uri="pkg:/images/hearth/ring.9.png" blendColor="#E0B34A" translation="[-10, -10]" width="630" height="245" visible="false" />
+      </Group>
+      <Timer id="dashTimer" duration="1" repeat="true" />
+    </Group>
 
     <HomeRows
       id="homeRows"
@@ -27,7 +57,7 @@
 
     <Animation id="toggleButtonsAnimation" duration=".7" repeat="false" easeFunction="linear">
       <FloatFieldInterpolator id="buttonsFade" key="[0.0, .6]" keyValue="[1.00, 0.00]" fieldToInterp="buttons.opacity" />
-      <Vector2DFieldInterpolator id="buttonsMove" key="[0.1, .9]" keyValue="[[100, 100], [100, 0]]" fieldToInterp="buttons.translation" />
+      <Vector2DFieldInterpolator id="buttonsMove" key="[0.1, .9]" keyValue="[[96, 70], [96, 0]]" fieldToInterp="buttons.translation" />
     </Animation>
 
   </children>

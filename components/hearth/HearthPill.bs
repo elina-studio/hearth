@@ -1,0 +1,32 @@
+sub init()
+    m.fill = m.top.findNode("fill")
+    m.ring = m.top.findNode("ring")
+    m.label = m.top.findNode("label")
+    font = CreateObject("roSGNode", "Font")
+    font.uri = "pkg:/fonts/AtkinsonHyperlegible-Bold.ttf"
+    font.size = 30
+    m.label.font = font
+    update()
+end sub
+
+sub update()
+    w = m.top.width
+    h = m.top.height
+    for each p in [m.fill, m.ring]
+        p.width = w
+        p.height = h
+    end for
+    m.label.width = w
+    m.label.height = h
+    m.label.text = m.top.text
+
+    m.fill.visible = m.top.focused
+    m.ring.visible = m.top.current and not m.top.focused
+    if m.top.focused
+        m.label.color = "#1F1606"
+    else if m.top.current
+        m.label.color = "#EDE6CA"
+    else
+        m.label.color = "#B5AF8C"
+    end if
+end sub
