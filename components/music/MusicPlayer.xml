@@ -18,6 +18,8 @@
     <field id="repeat" type="string" value="off" />
     <field id="busy" type="boolean" value="false" />
     <field id="section" type="string" />
+    <field id="sectionName" type="string" />
+    <field id="libraries" type="array" />
     <field id="message" type="string" alwaysNotify="true" />
   </interface>
   <script type="text/brightscript" uri="pkg:/source/util.brs" />

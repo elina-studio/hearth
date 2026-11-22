@@ -50,6 +50,8 @@ sub onCommand()
         if m.top.position > 4 then restart() else skip(-1)
     else if cmd = "restart"
         restart()
+    else if cmd = "nextLibrary"
+        nextLibrary()
     else if cmd = "findLibrary"
         withSection({ tag: "none" })
     else if cmd = "shuffleAll"
@@ -104,9 +106,34 @@ end sub
 sub onSections(event as object)
     t = hTaskFrom(event)
     m.looking = false
+    ' Plex uses the music type for audiobooks and podcasts too: prefer the one that's really music,
+    ' unless the person picked one (the * menu in the Music room)
+    libs = []
+    best = invalid
+    bestScore = -99
+    saved = CreateObject("roRegistrySection", "hearth").Read("musicSection")
     for each d in pxItems(t)
-        if d.type = "artist" and m.top.section = "" then m.top.section = pxStr(d.key)
+        if d.type = "artist"
+            lib = { key: pxStr(d.key), title: pxStr(d.title) }
+            libs.push(lib)
+            name = LCase(lib.title)
+            score = 0
+            if Instr(1, name, "music") > 0 then score = score + 2
+            for each word in ["book", "podcast", "spoken", "lesson", "course", "language"]
+                if Instr(1, name, word) > 0 then score = score - 5
+            end for
+            if lib.key = saved then score = score + 100
+            if score > bestScore
+                best = lib
+                bestScore = score
+            end if
+        end if
     end for
+    m.top.libraries = libs
+    if best <> invalid and m.top.section = ""
+        m.top.sectionName = best.title
+        m.top.section = best.key
+    end if
     print "[hearth music] sections status "; t.status; ", music section: "; m.top.section
     if m.top.section = ""
         if t.status <= 0 then say("Can't reach Plex.") else say("Plex has no music library.")
@@ -115,6 +142,23 @@ sub onSections(event as object)
     end if
     if m.pending <> invalid then runPending(m.pending)
     m.pending = invalid
+end sub
+
+' Switch to the next music-type library and remember the choice
+sub nextLibrary()
+    libs = m.top.libraries
+    if libs = invalid or libs.Count() < 2 then return
+    i = 0
+    for k = 0 to libs.Count() - 1
+        if libs[k].key = m.top.section then i = k
+    end for
+    lib = libs[(i + 1) mod libs.Count()]
+    reg = CreateObject("roRegistrySection", "hearth")
+    reg.Write("musicSection", lib.key)
+    reg.Flush()
+    m.top.sectionName = lib.title
+    m.top.section = lib.key
+    say("Library: " + lib.title)
 end sub
 
 sub runPending(p as object)

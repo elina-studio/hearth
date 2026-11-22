@@ -57,6 +57,10 @@ sub muOptions(views as boolean)
     m.muActions.push("shuffle")
     labels.push(muRepeatLabel()) : m.muActions.push("repeat")
     labels.push("More like this song") : m.muActions.push("more")
+    libs = p.libraries
+    if libs <> invalid and libs.Count() > 1
+        labels.push("Library: " + p.sectionName + " (switch)") : m.muActions.push("library")
+    end if
     if views
         labels.push("Cover") : m.muActions.push("cover")
         labels.push("Visualizer") : m.muActions.push("milk")
@@ -94,6 +98,8 @@ sub muDo(a as string)
         muSend("cycleRepeat")
     else if a = "more"
         muSend("moreLikeThis")
+    else if a = "library"
+        muSend("nextLibrary")
     else if a = "cover" or a = "milk" or a = "hearth"
         m.top.request = { action: "musicView", mode: a }
     end if
