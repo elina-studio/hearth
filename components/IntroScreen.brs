@@ -25,8 +25,7 @@ sub init()
     ff = m.top.findNode("flameFollow")
     ff.key = keys
     ff.keyValue = follow
-    m.top.findNode("swayAnim").control = "start"
-    m.top.findNode("glowAnim").control = "start"
+    m.toStart = [m.top.findNode("swayAnim"), m.top.findNode("glowAnim")]
 
     ft = m.top.findNode("flameTimer")
     ft.observeField("fire", "onFlame")
@@ -42,6 +41,22 @@ sub init()
     qt.observeField("fire", "onQuoteTimer")
     qt.control = "start"
     m.fadeOut.observeField("state", "onFadedOut")
+
+    ' start the animations a moment after the screen is on, so they're attached when they begin
+    kick = CreateObject("roSGNode", "Timer")
+    kick.duration = 0.3
+    kick.observeField("fire", "startMotion")
+    m.kick = kick
+    kick.control = "start"
+end sub
+
+sub startMotion()
+    for each a in m.toStart
+        a.control = "start"
+    end for
+    for i = 0 to m.flyData.count() - 1
+        planFly(i)
+    end for
 end sub
 
 sub onMode()
@@ -94,7 +109,7 @@ sub makeSparks()
         o.key = [0.0, 0.15, 1.0]
         o.keyValue = [0.0, 1.0, 0.0]
         o.fieldToInterp = p.id + ".opacity"
-        a.control = "start"
+        m.toStart.push(a)
     end for
 end sub
 
@@ -122,9 +137,6 @@ sub makeFlies()
             if f.x < 960 then hx = 110 else hx = 1810
             f.home = { x: hx, y: f.y, r: 200 }
         end if
-    end for
-    for i = 0 to m.flyData.count() - 1
-        planFly(i)
     end for
 end sub
 
@@ -171,7 +183,7 @@ sub addFly(x as float, y as float, r as float, fast as boolean, home as dynamic)
     gi.key = ks
     gi.keyValue = vs
     p.opacity = f.lo
-    ga.control = "start"
+    m.toStart.push(ga)
     m.flyData.push(f)
 end sub
 
@@ -275,8 +287,8 @@ sub leave()
     m.top.request = { action: "introDone" }
 end sub
 
+' the intro always runs its full 10 seconds; buttons are swallowed until then
 function onKeyEvent(key as string, press as boolean) as boolean
     if m.top.mode <> "intro" then return false
-    if press then leave()
     return true
 end function

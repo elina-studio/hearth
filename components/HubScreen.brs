@@ -10,7 +10,7 @@ sub init()
     m.clock.font = hFont("bold", 40)
     m.weather = m.top.findNode("weather")
     m.weather.font = hFont("regular", 22)
-    m.weather.text = "build 4"
+    m.weather.text = "build 5"
     m.clockTimer = m.top.findNode("clockTimer")
     m.clockTimer.observeField("fire", "tick")
     m.clockTimer.control = "start"

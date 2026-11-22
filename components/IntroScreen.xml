@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- The lantern intro: sway, breathing glow, flickering flame, sparks, fireflies and a rotating Rumi line.
-     Art is pre-rendered from the approved motion preview. mode "intro" leaves on any key; mode "saver" runs as the screensaver. -->
+     Art is pre-rendered from the approved motion preview. mode "intro" runs 10 s then hands off; mode "saver" runs as the screensaver. -->
 <component name="IntroScreen" extends="Group">
   <children>
     <Poster uri="pkg:/images/intro-bg.jpg" width="1920" height="1080" />
@@ -35,7 +35,7 @@
     </Animation>
     <Timer id="flameTimer" duration="0.083" repeat="true" />
     <Timer id="quoteTimer" duration="9" repeat="true" />
-    <Timer id="leaveTimer" duration="8" repeat="false" />
+    <Timer id="leaveTimer" duration="10" repeat="false" />
   </children>
   <interface>
     <field id="mode" type="string" onChange="onMode" />
