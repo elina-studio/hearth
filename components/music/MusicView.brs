@@ -164,6 +164,7 @@ sub startHearth()
     if m.sound <> invalid
         m.sound.mood = "hearth"
         holder.appendChild(m.sound)
+        m.sound.active = true
     end if
     setMix("both")
 end sub
@@ -223,7 +224,10 @@ sub muRestoreFocus()
 end sub
 
 sub leave()
-    if m.sound <> invalid then m.sound.on = false
+    if m.sound <> invalid
+        m.sound.on = false
+        m.sound.active = false
+    end if
     for each id in ["vSpin", "vTint", "vBreath"]
         m.top.findNode(id).control = "stop"
     end for
