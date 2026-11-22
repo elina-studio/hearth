@@ -26,7 +26,7 @@ sub onCommand()
         else if m.top.state = "playing" or m.top.state = "buffering"
             m.audio.control = "pause"
         else if m.top.state = "paused"
-            m.audio.control = "resume"
+            resume()
         else
             playIndex(m.top.index)
         end if
@@ -34,7 +34,7 @@ sub onCommand()
         if m.top.queue = invalid or m.top.queue.count() = 0
             shuffleAll()
         else if m.top.state = "paused"
-            m.audio.control = "resume"
+            resume()
         else if m.top.state <> "playing" and m.top.state <> "buffering"
             playIndex(m.top.index)
         end if
@@ -272,7 +272,7 @@ sub setShuffle(on as boolean)
 end sub
 
 ' ---------- playback ----------
-sub playIndex(i as integer)
+sub playIndex(i as integer, startAt = 0 as float)
     q = m.top.queue
     if q = invalid or q.count() = 0 then return
     if i < 0 then i = 0
@@ -281,9 +281,10 @@ sub playIndex(i as integer)
     timeline("stopped")
     m.top.index = i
     m.top.track = tr
-    m.top.position = 0
+    m.top.position = startAt
     m.top.duration = tr.duration
     c = CreateObject("roSGNode", "ContentNode")
+    if startAt > 0 then c.playStart = startAt
     c.url = tr.url
     c.streamFormat = tr.format
     c.title = tr.title
@@ -292,6 +293,15 @@ sub playIndex(i as integer)
     m.audio.content = c
     m.audio.control = "play"
     m.scrobbled = false
+end sub
+
+' The TV plays one Audio node at a time; if another one took over while we were paused, start again where we were
+sub resume()
+    if m.audio.state = "paused"
+        m.audio.control = "resume"
+    else
+        playIndex(m.top.index, m.top.position)
+    end if
 end sub
 
 sub skip(d as integer)
@@ -358,7 +368,7 @@ sub onAudioState()
             if m.top.index + 1 < m.top.queue.count() then playIndex(m.top.index + 1) else m.top.state = "stopped"
         end if
     else if s = "stopped"
-        if m.top.state <> "buffering" then m.top.state = "stopped"
+        if m.top.state <> "buffering" and m.top.state <> "paused" then m.top.state = "stopped"
     end if
 end sub
 
