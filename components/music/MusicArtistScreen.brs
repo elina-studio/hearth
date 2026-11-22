@@ -341,11 +341,11 @@ sub paint()
         g.getChild(4).color = sub2
     end for
     ' keep the chosen album in view (6 rows fit)
-    top = (m.sel - 2) * 120
-    maxTop = (m.albums.Count() - 6) * 120
-    if top > maxTop then top = maxTop
-    if top < 0 then top = 0
-    m.albumList.translation = [96, 230 - top]
+    scrollY = (m.sel - 2) * 120
+    maxY = (m.albums.Count() - 6) * 120
+    if scrollY > maxY then scrollY = maxY
+    if scrollY < 0 then scrollY = 0
+    m.albumList.translation = [96, 230 - scrollY]
     for j = 0 to m.songNodes.Count() - 1
         if m.zone = "songs" and j = m.song then c = "0xE0B34A2E" else c = "0xE0B34A00"
         m.songNodes[j].getChild(0).color = c
