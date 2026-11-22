@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The Window: full-screen photo slideshow of the NAS photos folder (via Plex) with the clock, date and weather. -->
+<component name="SlideshowScreen" extends="Group">
+  <children>
+    <Rectangle width="1920" height="1080" color="0x060805FF" />
+    <Group id="layerA" opacity="0">
+      <Poster id="backA" width="1920" height="1080" loadWidth="384" loadHeight="216" loadDisplayMode="scaleToZoom" opacity="0.28" />
+      <Poster id="photoA" width="1920" height="1080" loadWidth="1920" loadHeight="1080" loadDisplayMode="scaleToFit" />
+    </Group>
+    <Group id="layerB" opacity="0">
+      <Poster id="backB" width="1920" height="1080" loadWidth="384" loadHeight="216" loadDisplayMode="scaleToZoom" opacity="0.28" />
+      <Poster id="photoB" width="1920" height="1080" loadWidth="1920" loadHeight="1080" loadDisplayMode="scaleToFit" />
+    </Group>
+
+    <Poster uri="pkg:/images/photo-shade-tr.png" translation="[960, 0]" width="960" height="600" />
+    <Poster uri="pkg:/images/photo-shade-bl.png" translation="[0, 680]" width="960" height="400" />
+    <Label id="clock" translation="[1024, 70]" width="800" horizAlign="right" color="0xEDE6CAFF" />
+    <Label id="date" translation="[1024, 216]" width="800" horizAlign="right" color="0xEDE6CAFF" />
+    <Label id="weather" translation="[1024, 278]" width="800" horizAlign="right" color="0xB5AF8CFF" />
+    <Label id="album" translation="[96, 930]" width="1200" color="0xE0B34AFF" />
+    <Label id="caption" translation="[96, 968]" width="1200" color="0xEDE6CAFF" />
+    <Label id="status" translation="[96, 500]" width="1728" horizAlign="center" wrap="true" color="0xB5AF8CFF" />
+    <Group id="hint" translation="[1824, 1000]">
+      <Label id="hintText" translation="[-1000, 0]" width="1000" horizAlign="right" color="0xB5AF8CFF" />
+    </Group>
+
+    <Animation id="fade" duration="1.2" easeFunction="inOutQuad">
+      <FloatFieldInterpolator id="fadeIn" key="[0.0, 1.0]" keyValue="[0.0, 1.0]" fieldToInterp="layerA.opacity" />
+      <FloatFieldInterpolator id="fadeOut" key="[0.0, 1.0]" keyValue="[1.0, 0.0]" fieldToInterp="layerB.opacity" />
+    </Animation>
+    <Animation id="hintFade" duration="0.6" delay="5">
+      <FloatFieldInterpolator key="[0.0, 1.0]" keyValue="[1.0, 0.0]" fieldToInterp="hint.opacity" />
+    </Animation>
+    <Timer id="advance" duration="12" repeat="false" />
+    <Timer id="clockTimer" duration="15" repeat="true" />
+    <Timer id="weatherTimer" duration="900" repeat="true" />
+  </children>
+  <interface>
+    <field id="albumId" type="string" />
+    <field id="albumName" type="string" />
+    <field id="request" type="assocarray" alwaysNotify="true" />
+    <function name="onShown" />
+  </interface>
+  <script type="text/brightscript" uri="pkg:/source/util.brs" />
+  <script type="text/brightscript" uri="pkg:/source/photos.brs" />
+  <script type="text/brightscript" uri="pkg:/components/SlideshowScreen.brs" />
+</component>

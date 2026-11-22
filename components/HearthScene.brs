@@ -117,6 +117,11 @@ sub handle(r as object)
         s.resume = (r.resume = true)
         s.item = r.item
         pushScreen(s)
+    else if a = "slideshow"
+        s = CreateObject("roSGNode", "SlideshowScreen")
+        s.albumId = r.albumId
+        s.albumName = r.albumName
+        pushScreen(s)
     else if a = "back"
         popScreen()
     else if a = "introDone"

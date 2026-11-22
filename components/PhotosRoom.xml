@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Photos room ("The Window"): start a slideshow of everything, or pick an album. -->
+<component name="PhotosRoom" extends="Group">
+  <children>
+    <Group id="hero" translation="[96, 20]">
+      <Rectangle width="1180" height="620" color="0x141A11FF" />
+      <Poster id="heroArt" width="1180" height="620" loadWidth="1180" loadHeight="620" loadDisplayMode="scaleToZoom" />
+      <Poster uri="pkg:/images/shade.png" width="1180" height="620" />
+      <Label id="heroEyebrow" translation="[44, 430]" width="1090" color="0xE0B34AFF" />
+      <Label id="heroTitle" translation="[44, 466]" width="1090" color="0xEDE6CAFF" />
+      <Label id="heroSub" translation="[44, 560]" width="1090" color="0xB5AF8CFF" />
+      <Poster id="heroRing" uri="pkg:/images/ring.9.png" blendColor="0xE0B34AFF" translation="[-10, -10]" width="1200" height="640" visible="false" />
+    </Group>
+    <Label id="albumsLabel" translation="[1316, 20]" width="508" color="0xB5AF8CFF" text="ALBUMS" />
+    <Group id="albumClip" translation="[1306, 60]" clippingRect="[0, 0, 528, 600]">
+      <Group id="albums" translation="[10, 10]" />
+    </Group>
+    <Label id="note" translation="[96, 680]" width="1728" wrap="true" maxLines="5" color="0xB5AF8CFF" />
+    <Animation id="scroll" duration="0.18" easeFunction="outQuad">
+      <Vector2DFieldInterpolator id="scrollTo" key="[0.0, 1.0]" fieldToInterp="albums.translation" />
+    </Animation>
+  </children>
+  <interface>
+    <field id="request" type="assocarray" alwaysNotify="true" />
+    <function name="focusIn" />
+    <function name="refresh" />
+  </interface>
+  <script type="text/brightscript" uri="pkg:/source/util.brs" />
+  <script type="text/brightscript" uri="pkg:/source/photos.brs" />
+  <script type="text/brightscript" uri="pkg:/components/PhotosRoom.brs" />
+</component>

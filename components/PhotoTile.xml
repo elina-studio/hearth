@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- An album in the Photos room: cover, name, photo count, gold ring when focused. -->
+<component name="PhotoTile" extends="Group">
+  <children>
+    <Poster uri="pkg:/images/tile.9.png" blendColor="0x141A11FF" width="508" height="130" />
+    <Rectangle translation="[0, 0]" width="130" height="130" color="0x1C2418FF" />
+    <Poster id="cover" width="130" height="130" loadWidth="260" loadHeight="260" loadDisplayMode="scaleToZoom" />
+    <Label id="name" translation="[156, 26]" width="330" height="44" color="0xEDE6CAFF" />
+    <Label id="sub" translation="[156, 76]" width="330" color="0xB5AF8CFF" />
+    <Poster id="ring" uri="pkg:/images/ring.9.png" blendColor="0xE0B34AFF" translation="[-10, -10]" width="528" height="150" visible="false" />
+  </children>
+  <interface>
+    <field id="title" type="string" alias="name.text" />
+    <field id="sub" type="string" alias="sub.text" />
+    <field id="image" type="string" alias="cover.uri" />
+    <field id="focused" type="boolean" alias="ring.visible" />
+  </interface>
+  <script type="text/brightscript" uri="pkg:/source/util.brs" />
+  <script type="text/brightscript">
+    <![CDATA[
+    sub init()
+        m.top.findNode("name").font = hFont("bold", 32)
+        m.top.findNode("sub").font = hFont("regular", 24)
+    end sub
+    ]]>
+  </script>
+</component>
