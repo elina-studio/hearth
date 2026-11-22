@@ -46,7 +46,7 @@ sub init()
     kick = CreateObject("roSGNode", "Timer")
     kick.duration = 0.3
     kick.observeField("fire", "startMotion")
-    m.kick = kick
+    m.top.appendChild(kick)
     kick.control = "start"
 end sub
 
