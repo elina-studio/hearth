@@ -9,8 +9,9 @@ png = os.path.join(tmp, "png")
 os.makedirs(img, exist_ok=True); os.makedirs(snd, exist_ok=True)
 
 
+# The TV's UI runs at 1280 x 720, so full-screen layers ship at 2/3 size; posters keep their 1920-space sizes and Roku scales.
 def jpg(name, out, q=86):
-    Image.open(os.path.join(png, name)).convert("RGB").save(os.path.join(img, out), quality=q, optimize=True, progressive=False)
+    Image.open(os.path.join(png, name)).convert("RGB").resize((1280, 720), Image.LANCZOS).save(os.path.join(img, out), quality=q, optimize=True, progressive=False)
 
 
 def keep(name, out, size=None):
@@ -22,11 +23,11 @@ def keep(name, out, size=None):
 jpg("hearth-bg.png", "hearth-bg.jpg")
 jpg("rain-bg.png", "rain-bg.jpg")
 jpg("night-bg.png", "night-bg.jpg")
-keep("hearth-logs.png", "hearth-logs.png")
+keep("hearth-logs.png", "hearth-logs.png", (507, 113))
 keep("hearth-glow.png", "hearth-glow.png", (480, 270))
-keep("rain-window.png", "rain-window.png")
-keep("rain-far.png", "rain-far.png")
-keep("rain-near.png", "rain-near.png")
+keep("rain-window.png", "rain-window.png", (560, 560))
+keep("rain-far.png", "rain-far.png", (560, 560))
+keep("rain-near.png", "rain-near.png", (560, 560))
 Image.open(os.path.join(tmp, "fire.jpg")).save(os.path.join(img, "fire.jpg"), quality=86)
 
 # room tiles, 300 x 420, cut from the composed scenes
