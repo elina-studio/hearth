@@ -4,7 +4,7 @@
   <children>
     <Poster uri="pkg:/images/tile.9.png" blendColor="0x141A11FF" width="508" height="130" />
     <Rectangle translation="[0, 0]" width="130" height="130" color="0x1C2418FF" />
-    <Poster id="cover" width="130" height="130" loadWidth="260" loadHeight="260" loadDisplayMode="scaleToZoom" />
+    <Poster id="cover" width="130" height="130" loadWidth="180" loadHeight="180" loadDisplayMode="scaleToZoom" />
     <Label id="name" translation="[156, 26]" width="330" height="44" color="0xEDE6CAFF" />
     <Label id="sub" translation="[156, 76]" width="330" color="0xB5AF8CFF" />
     <Poster id="ring" uri="pkg:/images/ring.9.png" blendColor="0xE0B34AFF" translation="[-10, -10]" width="528" height="150" visible="false" />

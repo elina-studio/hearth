@@ -5,11 +5,11 @@
     <Rectangle width="1920" height="1080" color="0x060805FF" />
     <Group id="layerA" opacity="0">
       <Poster id="backA" width="1920" height="1080" loadWidth="384" loadHeight="216" loadDisplayMode="scaleToZoom" opacity="0.28" />
-      <Poster id="photoA" width="1920" height="1080" loadWidth="1920" loadHeight="1080" loadDisplayMode="scaleToFit" />
+      <Poster id="photoA" width="1920" height="1080" loadWidth="1280" loadHeight="720" loadDisplayMode="scaleToFit" />
     </Group>
     <Group id="layerB" opacity="0">
       <Poster id="backB" width="1920" height="1080" loadWidth="384" loadHeight="216" loadDisplayMode="scaleToZoom" opacity="0.28" />
-      <Poster id="photoB" width="1920" height="1080" loadWidth="1920" loadHeight="1080" loadDisplayMode="scaleToFit" />
+      <Poster id="photoB" width="1920" height="1080" loadWidth="1280" loadHeight="720" loadDisplayMode="scaleToFit" />
     </Group>
 
     <Poster uri="pkg:/images/photo-shade-tr.png" translation="[960, 0]" width="960" height="600" />
