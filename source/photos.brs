@@ -122,3 +122,17 @@ function pWeatherWord(s as string) as string
     if v = invalid then return s
     return v
 end function
+
+' Slideshow preferences, remembered on the TV: photoSeconds, photoOrder (shuffle/order),
+' photoPan (on/off), photoSaver (album id, "all", or "" for the lantern)
+function pPref(k as string, fallback as string) as string
+    v = CreateObject("roRegistrySection", "hearth").Read(k)
+    if v = invalid or v = "" then return fallback
+    return v
+end function
+
+sub pSetPref(k as string, v as string)
+    reg = CreateObject("roRegistrySection", "hearth")
+    reg.Write(k, v)
+    reg.Flush()
+end sub

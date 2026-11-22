@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A round button with an icon: gold when focused (or when primary), soft otherwise. Sizes itself to its text. -->
+<component name="PhotoButton" extends="Group">
+  <children>
+    <Poster id="bg" uri="pkg:/images/pill.9.png" height="72" />
+    <Poster id="ring" uri="pkg:/images/pill-ring.9.png" blendColor="0xE0B34AFF" height="72" visible="false" />
+    <Poster id="icon" translation="[30, 20]" width="32" height="32" />
+    <Label id="label" translation="[76, 0]" height="72" vertAlign="center" />
+  </children>
+  <interface>
+    <field id="text" type="string" onChange="paint" />
+    <field id="iconName" type="string" onChange="paint" />
+    <field id="primary" type="boolean" value="false" onChange="paint" />
+    <field id="focused" type="boolean" value="false" onChange="paint" />
+    <field id="buttonWidth" type="integer" />
+  </interface>
+  <script type="text/brightscript" uri="pkg:/source/util.brs" />
+  <script type="text/brightscript" uri="pkg:/components/PhotoButton.brs" />
+</component>
