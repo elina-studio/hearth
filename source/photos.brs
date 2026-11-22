@@ -51,8 +51,7 @@ end function
 ' A photo (or album cover) sized for the TV, through Plex's photo transcoder
 function pPhotoUrl(item as object, w as integer, h as integer) as string
     if item = invalid or item.path = invalid or item.path = "" then return ""
-    x = CreateObject("roUrlTransfer")
-    return m.global.plexServer + "/photo/:/transcode?width=" + w.toStr() + "&height=" + h.toStr() + "&minSize=0&upscale=0&url=" + x.Escape(item.path) + "&X-Plex-Token=" + m.global.plexServerToken
+    return m.global.plexServer + "/photo/:/transcode?width=" + w.toStr() + "&height=" + h.toStr() + "&minSize=0&upscale=0&url=" + hEscape(item.path) + "&X-Plex-Token=" + m.global.plexServerToken
 end function
 
 ' Start a PhotoTask (see PhotoTask.brs). cb takes the event.

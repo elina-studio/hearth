@@ -84,6 +84,14 @@ sub runTask()
         if a.unwatched = true then q.unwatched = "1"
         res = req("GET", m.server + "/library/sections/" + a.section + "/all", q, m.token)
         out = { Items: normAll(metas(res.body)) }
+    else if op = "titles"
+        ' just the names in a library, for the search keyboard's predictions
+        res = req("GET", m.server + "/library/sections/" + a.section + "/all", { "X-Plex-Container-Start": "0", "X-Plex-Container-Size": toS(a.limit, "5000") }, m.token)
+        names = []
+        for each md in metas(res.body)
+            if md.title <> invalid then names.push(md.title)
+        end for
+        out = { Names: names }
     else if op = "item"
         res = req("GET", m.server + "/library/metadata/" + a.id, {}, m.token)
         list = metas(res.body)
@@ -125,6 +133,12 @@ sub runTask()
     else if op = "timeline"
         q = { ratingKey: a.id, key: "/library/metadata/" + a.id, state: a.state, time: a.time, duration: a.duration, identifier: "com.plexapp.plugins.library" }
         res = req("GET", m.server + "/:/timeline", q, m.token)
+    end if
+    ' lists don't need the file details; keeping them out saves copying big arrays to the screens
+    if out <> invalid and op <> "item" and out.Items <> invalid and type(out.Items) = "roArray"
+        for each it in out.Items
+            if type(it) = "roAssociativeArray" then it.delete("_media")
+        end for
     end if
     m.top.status = res.status
     m.top.ok = (res.status >= 200 and res.status < 300)

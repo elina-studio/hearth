@@ -66,8 +66,7 @@ end function
 function hPlexImage(path as string, width as integer, kind as string) as string
     h = Int(width * 9 / 16)
     if kind = "Primary" then h = Int(width * 3 / 2)
-    x = CreateObject("roUrlTransfer")
-    return m.global.plexServer + "/photo/:/transcode?width=" + width.toStr() + "&height=" + h.toStr() + "&minSize=1&upscale=1&url=" + x.Escape(path) + "&X-Plex-Token=" + m.global.plexServerToken
+    return m.global.plexServer + "/photo/:/transcode?width=" + width.toStr() + "&height=" + h.toStr() + "&minSize=1&upscale=1&url=" + hEscape(path) + "&X-Plex-Token=" + m.global.plexServerToken
 end function
 
 ' Start a Plex request (see PlexTask). cb is the callback name taking the event.
@@ -174,4 +173,22 @@ end function
 ' Common item query fields
 function hFields() as string
     return "Overview,PrimaryImageAspectRatio,ProductionYear,ParentId"
+end function
+
+' Percent-encode for URLs. roUrlTransfer can't be created on the render thread (it fails and the
+' next call crashes the app), so screens must use this instead of roUrlTransfer.Escape.
+function hEscape(s as string) as string
+    b = CreateObject("roByteArray")
+    b.FromAsciiString(s)
+    hex = "0123456789ABCDEF"
+    out = ""
+    for i = 0 to b.count() - 1
+        c = b[i]
+        if (c >= 48 and c <= 57) or (c >= 65 and c <= 90) or (c >= 97 and c <= 122) or c = 45 or c = 46 or c = 95 or c = 126
+            out = out + Chr(c)
+        else
+            out = out + "%" + Mid(hex, (c >> 4) + 1, 1) + Mid(hex, (c and 15) + 1, 1)
+        end if
+    end for
+    return out
 end function

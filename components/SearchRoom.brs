@@ -49,18 +49,14 @@ sub loadVocabulary()
     m.vocabParts = []
     m.vocabPending = sections.count()
     for each id in sections
-        hPlex("list", { section: id, limit: 5000 }, "onVocabulary")
+        hPlex("titles", { section: id, limit: 5000 }, "onVocabulary")
     end for
 end sub
 
 sub onVocabulary(event as object)
     t = hTaskFrom(event)
     m.vocabPending = m.vocabPending - 1
-    if t.ok and t.response <> invalid and t.response.Items <> invalid
-        for each it in t.response.Items
-            if it.Name <> invalid then m.vocabParts.push(it.Name)
-        end for
-    end if
+    if t.ok and t.response <> invalid and t.response.Names <> invalid then m.vocabParts.append(t.response.Names)
     if m.vocabPending = 0
         m.kb.words = m.vocabParts
         m.vocabParts = invalid

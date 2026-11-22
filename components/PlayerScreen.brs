@@ -61,18 +61,17 @@ sub onItem(event as object)
     content = CreateObject("roSGNode", "ContentNode")
     content.title = hTitle(it)
     if it.Type = "Episode" then content.secondaryTitle = hSubtitle(it)
-    x = CreateObject("roUrlTransfer")
     if canPlay(media)
         content.url = server + part.key + "?X-Plex-Token=" + token
         if LCase(toStr(media.container)) = "mkv" then content.streamFormat = "mkv" else content.streamFormat = "mp4"
         content.playStart = m.startSec
         m.offset = 0
     else
-        q = "path=" + x.Escape("/library/metadata/" + it.Id) + "&mediaIndex=0&partIndex=0&protocol=hls&fastSeek=1"
+        q = "path=" + hEscape("/library/metadata/" + it.Id) + "&mediaIndex=0&partIndex=0&protocol=hls&fastSeek=1"
         q = q + "&directPlay=0&directStream=1&directStreamAudio=1&videoResolution=1920x1080&maxVideoBitrate=20000"
         q = q + "&offset=" + Int(m.startSec).toStr() + "&subtitles=none&session=" + m.global.deviceId + "-" + Rnd(100000).toStr()
-        q = q + "&X-Plex-Client-Identifier=" + x.Escape(m.global.deviceId) + "&X-Plex-Product=Hearth&X-Plex-Platform=Roku&X-Plex-Token=" + token
-        q = q + "&X-Plex-Client-Profile-Extra=" + x.Escape("add-transcode-target(type=videoProfile&context=streaming&protocol=hls&container=mpegts&videoCodec=h264&audioCodec=aac,ac3)")
+        q = q + "&X-Plex-Client-Identifier=" + hEscape(m.global.deviceId) + "&X-Plex-Product=Hearth&X-Plex-Platform=Roku&X-Plex-Token=" + token
+        q = q + "&X-Plex-Client-Profile-Extra=" + hEscape("add-transcode-target(type=videoProfile&context=streaming&protocol=hls&container=mpegts&videoCodec=h264&audioCodec=aac,ac3)")
         content.url = server + "/video/:/transcode/universal/start.m3u8?" + q
         content.streamFormat = "hls"
         content.playStart = 0

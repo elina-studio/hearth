@@ -18,8 +18,7 @@ function pxToken() as string
 end function
 
 function pxEscape(s as string) as string
-    if m.pxX = invalid then m.pxX = CreateObject("roUrlTransfer")
-    return m.pxX.Escape(s)
+    return hEscape(s)
 end function
 
 ' Start a Plex call. path is a server path such as /library/sections. cb takes the event.

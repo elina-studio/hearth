@@ -10,22 +10,12 @@ sub init()
     m.frame = 0
     m.dir = 1
 
-    ' sway: +-2.5 degrees about the top centre, 6 s each way, sine eased
-    keys = [] : vals = [] : follow = []
-    for i = 0 to 32
-        a = 0.0436 * Sin(i / 32 * 6.2832)
-        keys.push(i / 32)
-        vals.push(a)
-        ' where the flame's centre (960, 540) lands when the lantern turns by a about (960, 0)
-        follow.push([901 + 540 * Sin(a), 454 + 540 * (Cos(a) - 1)])
-    end for
-    si = m.top.findNode("swayInterp")
-    si.key = keys
-    si.keyValue = vals
-    ff = m.top.findNode("flameFollow")
-    ff.key = keys
-    ff.keyValue = follow
-    m.toStart = [m.top.findNode("swayAnim"), m.top.findNode("glowAnim")]
+    ' sway: the lantern and rope swing about the top centre, set every frame from a clock
+    m.flameClip = m.top.findNode("flameClip")
+    m.clock = CreateObject("roTimespan")
+    st = m.top.findNode("swayTimer")
+    st.observeField("fire", "onSway")
+    m.toStart = [m.top.findNode("glowAnim")]
 
     ft = m.top.findNode("flameTimer")
     ft.observeField("fire", "onFlame")
@@ -51,6 +41,8 @@ sub init()
 end sub
 
 sub startMotion()
+    m.clock.Mark()
+    m.top.findNode("swayTimer").control = "start"
     for each a in m.toStart
         a.control = "start"
     end for
@@ -69,6 +61,14 @@ end sub
 
 sub onShown(unused as dynamic)
     m.top.setFocus(true)
+end sub
+
+'  +-3 degrees, 7 s per full swing; the flame sits outside the rotated group (clipping) and follows by translation
+sub onSway()
+    t = m.clock.TotalMilliseconds() / 1000.0
+    a = 0.0524 * Sin(t * 6.2832 / 7.0)
+    m.sway.rotation = a
+    m.flameClip.translation = [901 + 540 * Sin(a), 454 + 540 * (Cos(a) - 1)]
 end sub
 
 ' ---------- flame: 96 pre-rendered frames in a 12 x 8 sheet, played back and forth ----------
