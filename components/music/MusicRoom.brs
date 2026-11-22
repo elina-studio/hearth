@@ -207,7 +207,10 @@ sub build()
             r.cardHeight = 220
             cards = []
             for each md in items
-                cards.push(pxCard(md, 220))
+                c = pxCard(md, 220)
+                ' artists without a picture borrow their first album's cover
+                if c.image = "" and md.type = "artist" then c.image = albumCoverFor(pxStr(md.ratingKey))
+                cards.push(c)
             end for
             r.cards = cards
             if name = keepTitle then r.index = keepIndex
@@ -351,4 +354,13 @@ end function
 ' snug pills so all eight fit on one line (about 14 px a letter at this size)
 function chipWidth(t as string) as integer
     return Len(t) * 14 + 56
+end function
+
+function albumCoverFor(artistId as string) as string
+    albums = m.results["Albums A to Z"]
+    if albums = invalid then return ""
+    for each al in albums
+        if pxStr(al.parentRatingKey) = artistId and al.thumb <> invalid then return pxImage(al.thumb, 220, 220)
+    end for
+    return ""
 end function

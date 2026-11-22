@@ -158,8 +158,19 @@ sub drawList()
             else if al.tracks.Count() = 0
                 y = y + addNote(y, i, "No songs found.")
             else
+                ' disc headings when the album has more than one disc
+                discs = 0
+                for each tr in al.tracks
+                    if tr.parentIndex <> invalid and tr.parentIndex > discs then discs = tr.parentIndex
+                end for
+                disc = -1
                 for k = 0 to al.tracks.Count() - 1
-                    y = y + addTrack(y, i, k, al.tracks[k], curId)
+                    tr = al.tracks[k]
+                    if discs > 1 and tr.parentIndex <> invalid and tr.parentIndex <> disc
+                        disc = tr.parentIndex
+                        y = y + addNote(y, i, "Disc " + disc.toStr())
+                    end if
+                    y = y + addTrack(y, i, k, tr, curId)
                 end for
                 y = y + 12
             end if
