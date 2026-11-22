@@ -1,6 +1,7 @@
 ' Plays a Plex movie or episode. Direct play when the TV can handle the file, otherwise a Plex HLS transcode.
 ' Captions: Plex sidecar files (including Bazarr's) plus anything embedded; * opens the captions picker.
 sub init()
+    m.capsPref = ""
     m.video = m.top.findNode("video")
     m.status = m.top.findNode("status")
     m.status.font = hFont("regular", 28)
@@ -98,6 +99,19 @@ sub onItem(event as object)
         end for
     end if
     if subs.count() > 0 then content.subtitleTracks = subs
+    ' the CC button's choice wins over Plex's pick: off hides captions, on shows English (or the first) when Plex chose none
+    m.capsPref = hCaptions()
+    if m.capsPref = "off"
+        m.wantSub = invalid
+    else if m.capsPref = "on" and m.wantSub = invalid and subs.count() > 0
+        m.wantSub = subs[0].TrackName
+        for each sb in subs
+            if Left(LCase(sb.Language), 2) = "en"
+                m.wantSub = sb.TrackName
+                exit for
+            end if
+        end for
+    end if
 
     m.video.content = content
     m.video.control = "play"
@@ -127,6 +141,10 @@ sub onState()
             if m.wantSub <> invalid
                 m.video.globalCaptionMode = "On"
                 m.video.subtitleTrack = m.wantSub
+            else if m.capsPref = "on"
+                m.video.globalCaptionMode = "On"
+            else if m.capsPref = "off"
+                m.video.globalCaptionMode = "Off"
             end if
         end if
         report("playing")
@@ -204,6 +222,10 @@ sub onCaptionPicked()
     i = m.capDialog.buttonSelected
     m.capDialog.close = true
     track = m.capTracks[i]
+    ' remember the choice for the CC buttons and the next video
+    reg = CreateObject("roRegistrySection", "hearth")
+    if track = "" then reg.Write("captions", "off") else reg.Write("captions", "on")
+    reg.Flush()
     if track = ""
         m.video.globalCaptionMode = "Off"
     else

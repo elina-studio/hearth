@@ -1,23 +1,26 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Movies or Shows: a hero for the focused title, then shelves. -->
+<!-- Movies or Shows (layout "3"): a slim strip about the focused title with Play / Captions / Details
+     and its art on the right, then tabs (Continue, New, Unwatched, A to Z, Genres) over a poster grid. -->
 <component name="LibraryRoom" extends="Group">
   <children>
-    <!-- backdrop sits top right and stops above the shelves; fades into the background on its left and bottom edges -->
-    <Poster id="backdrop" translation="[720, -150]" width="1200" height="490" loadDisplayMode="scaleToZoom" />
-    <Poster uri="pkg:/images/fade-left.png" translation="[720, -150]" width="560" height="490" />
-    <Poster uri="pkg:/images/fade-down.png" translation="[720, 180]" width="1200" height="160" />
-    <Group id="info" translation="[96, 10]">
-      <Label id="eyebrow" color="0xD9A066FF" />
-      <Label id="title" translation="[0, 36]" width="1000" wrap="true" maxLines="2" color="0xEDE6CAFF" />
-      <Label id="overview" translation="[0, 140]" width="900" wrap="true" maxLines="3" color="0xB5AF8CFF" />
+    <!-- info strip -->
+    <Label id="eyebrow" translation="[96, 0]" width="1200" color="0xD9A066FF" />
+    <Label id="title" translation="[96, 30]" width="1240" maxLines="1" color="0xEDE6CAFF" />
+    <Label id="overview" translation="[96, 104]" width="1240" wrap="true" maxLines="2" color="0xB5AF8CFF" />
+    <Group id="buttons" translation="[96, 178]" />
+    <Rectangle translation="[1468, 0]" width="356" height="200" color="0x141A11FF" />
+    <Poster id="art" translation="[1468, 0]" width="356" height="200" loadDisplayMode="scaleToZoom" />
+    <Poster uri="pkg:/images/fade-left.png" translation="[1468, 0]" width="150" height="200" />
+
+    <!-- tabs -->
+    <Group id="tabs" translation="[96, 270]" />
+
+    <!-- poster grid: 9 across, slots are reused as you scroll -->
+    <Group id="gridClip" translation="[0, 330]" clippingRect="[0, -16, 1920, 620]">
+      <Group id="grid" translation="[96, 0]" />
     </Group>
-    <Label id="empty" translation="[96, 420]" width="1500" color="0xB5AF8CFF" />
-    <Group id="shelves" translation="[0, 360]" clippingRect="[0, -16, 1920, 586]">
-      <Group id="content" />
-    </Group>
-    <Animation id="scroll" duration="0.22" easeFunction="outQuad">
-      <Vector2DFieldInterpolator id="scrollTo" key="[0.0, 1.0]" fieldToInterp="content.translation" />
-    </Animation>
+    <Label id="empty" translation="[96, 360]" width="1500" color="0xB5AF8CFF" />
+    <Label id="count" translation="[1424, 270]" width="400" horizAlign="right" color="0xB5AF8CFF" />
   </children>
   <interface>
     <field id="kind" type="string" onChange="refresh" />

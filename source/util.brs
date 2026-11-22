@@ -198,3 +198,18 @@ function hEscape(s as string) as string
     end for
     return out
 end function
+
+' Captions preference shared by the CC buttons and the player: "on", "off", or "" (follow Plex's pick)
+function hCaptions() as string
+    return CreateObject("roRegistrySection", "hearth").Read("captions")
+end function
+
+function hCaptionsOn() as boolean
+    return hCaptions() = "on"
+end function
+
+sub hToggleCaptions()
+    reg = CreateObject("roRegistrySection", "hearth")
+    if reg.Read("captions") = "on" then reg.Write("captions", "off") else reg.Write("captions", "on")
+    reg.Flush()
+end sub

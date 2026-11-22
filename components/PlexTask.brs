@@ -84,8 +84,16 @@ sub runTask()
         q = { "X-Plex-Container-Start": "0", "X-Plex-Container-Size": toS(a.limit, "300") }
         if a.sort <> invalid then q.sort = a.sort
         if a.unwatched = true then q.unwatched = "1"
+        if a.genre <> invalid and a.genre <> "" then q.genre = a.genre.toStr()
         res = req("GET", m.server + "/library/sections/" + a.section + "/all", q, m.token)
-        out = { Items: normAll(metas(res.body)) }
+        out = { Items: normAll(metas(res.body)), Total: total(res.body) }
+    else if op = "genres"
+        res = req("GET", m.server + "/library/sections/" + a.section + "/genre", {}, m.token)
+        gs = []
+        for each d in dirs(res.body)
+            if d.title <> invalid and d.key <> invalid then gs.push({ name: d.title, key: d.key.toStr() })
+        end for
+        out = { Genres: gs }
     else if op = "clips"
         ' the Ambiance library: each clip with what the mood screen needs to stream it
         res = req("GET", m.server + "/library/sections/" + a.section + "/all", { "X-Plex-Container-Start": "0", "X-Plex-Container-Size": "60" }, m.token)
@@ -237,6 +245,14 @@ function metas(body as dynamic) as object
     if mc.Metadata <> invalid then return mc.Metadata
     if mc.Hub <> invalid and mc.Hub.count() > 0 and mc.Hub[0].Metadata <> invalid then return mc.Hub[0].Metadata
     return []
+end function
+
+function total(body as dynamic) as integer
+    if body = invalid or body.MediaContainer = invalid then return 0
+    mc = body.MediaContainer
+    if mc.totalSize <> invalid then return mc.totalSize
+    if mc.size <> invalid then return mc.size
+    return 0
 end function
 
 function dirs(body as dynamic) as object

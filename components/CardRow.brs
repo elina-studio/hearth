@@ -46,10 +46,6 @@ sub makeSlot(w as integer, h as integer)
     bg.width = w
     bg.height = h
     bg.color = "0x1D2418FF"
-    p = g.createChild("Poster")
-    p.width = w
-    p.height = h
-    p.loadDisplayMode = "scaleToZoom"
     fb = g.createChild("Label")
     fb.width = w - 30
     fb.height = h - 20
@@ -58,6 +54,17 @@ sub makeSlot(w as integer, h as integer)
     fb.vertAlign = "center"
     fb.horizAlign = "center"
     fb.font = hFont("caps", 34)
+    ' the framed title sits under the picture: it shows while the poster loads, and stays when there is none
+    frame = g.createChild("Poster")
+    frame.uri = "pkg:/images/ring.9.png"
+    frame.blendColor = "0xD9A06655"
+    frame.translation = [0, 0]
+    frame.width = w
+    frame.height = h
+    p = g.createChild("Poster")
+    p.width = w
+    p.height = h
+    p.loadDisplayMode = "scaleToZoom"
     if m.top.maskUri <> ""
         mask = g.createChild("Poster")
         mask.uri = m.top.maskUri
@@ -98,7 +105,6 @@ sub fillSlot(g as object, c as object, w as integer)
     img = c.image
     if img = invalid then img = ""
     g.poster.uri = img
-    g.fb.visible = (img = "")
     title = c.title
     if title = invalid then title = ""
     g.fb.text = UCase(title)
