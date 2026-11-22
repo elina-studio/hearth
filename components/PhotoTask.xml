@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Photos from the Plex photo library (the NAS photos folder). op: albums, random, album. -->
+<component name="PhotoTask" extends="Task">
+  <interface>
+    <field id="op" type="string" />
+    <field id="args" type="assocarray" />
+    <field id="tag" type="string" />
+    <field id="key" type="string" />
+    <field id="status" type="integer" />
+    <field id="ok" type="boolean" />
+    <field id="response" type="assocarray" />
+    <field id="done" type="boolean" alwaysNotify="true" />
+  </interface>
+  <script type="text/brightscript" uri="pkg:/components/PhotoTask.brs" />
+</component>

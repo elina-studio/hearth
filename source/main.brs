@@ -32,6 +32,8 @@ sub saveInput(screen as object, info as object)
         reg.Flush()
         g.overseerrKey = info.overseerrKey
     end if
+    ' Photos weather: haUrl, haToken, haEntity (source/photos.brs)
+    pSaveSettings(info)
 end sub
 
 ' Screensaver entry: the lantern, fireflies and quotes. Roku ends it on any key.

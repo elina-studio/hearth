@@ -11,7 +11,7 @@ sub onName()
         Music: "Your music through Music Assistant, with the cover wall and the visualizer. Coming in the music build.",
         Requests: "Ask Overseerr for movies and shows, and see what's on the way. Coming in the requests build.",
         Ambiance: "Hearth fire, rain on the roof, fireflies and lights out, with music underneath. Coming in the ambiance build.",
-        Photos: "The Window: a slideshow from Immich with the clock and weather. Coming in the photos build.",
+        Photos: "The Window: a slideshow of your NAS photos with the clock and weather. Coming in the photos build.",
         Search: "Type a few letters, see matches as you type. Coming in the next build."
     }
     t = notes[m.top.name]
