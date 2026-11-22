@@ -1,6 +1,13 @@
 sub init()
-    m.moods = ["hearth", "rain", "fireflies", "lightsout"]
-    m.titles = { hearth: "Hearth", rain: "Rain", fireflies: "Fireflies", lightsout: "Lights out" }
+    ' every mood with a picture of its own (built-in and Plex clips), not The Window
+    m.moods = []
+    m.titles = {}
+    for each it in ambItems()
+        if it.mood <> "window"
+            m.moods.push(it.mood)
+            m.titles[it.mood] = it.title
+        end if
+    end for
     m.video = m.top.findNode("video")
     m.video.observeField("state", "onVideoState")
     m.credit = m.top.findNode("credit")
@@ -55,12 +62,23 @@ sub onMood()
         m.scene.running = false
         m.scene.visible = false
         m.sound.active = false
-        c = CreateObject("roSGNode", "ContentNode")
-        c.url = it.video
-        c.streamFormat = "mp4"
-        m.video.content = c
-        ' the still covers the screen until the first frame is up
-        m.still.uri = "pkg:/images/amb/full-" + md + ".jpg"
+        m.clip = it.clip
+        m.clipRetried = false
+        if m.clip <> invalid
+            ' the person's own footage, streamed from their Plex "Ambiance" library
+            m.video.content = clipContent(m.clip, false)
+            pic = m.clip.art
+            if pic = invalid then pic = m.clip.thumb
+            m.still.uri = ""
+            if pic <> invalid then m.still.uri = fullStill(pic)
+        else
+            c = CreateObject("roSGNode", "ContentNode")
+            c.url = it.video
+            c.streamFormat = "mp4"
+            m.video.content = c
+            ' the still covers the screen until the first frame is up
+            m.still.uri = "pkg:/images/amb/full-" + md + ".jpg"
+        end if
         m.still.visible = true
         m.video.visible = true
         m.video.mute = not soundPref(md)
@@ -84,20 +102,59 @@ sub onMood()
     m.reg.Write("ambLast", md)
     m.reg.Flush()
     paintClock()
-    m.top.findNode("name").text = UCase(m.titles[md])
+    m.top.findNode("name").text = UCase(titleOf(md))
     paintState()
     showHud()
 end sub
 
+' A Plex clip as video content: the file as it is, or (transcode=true) converted by Plex to HLS
+' for files the TV can't play directly. Either way it loops.
+function clipContent(clip as object, transcode as boolean) as object
+    server = m.global.plexServer
+    token = m.global.plexServerToken
+    c = CreateObject("roSGNode", "ContentNode")
+    if not transcode
+        c.url = server + clip.key + "?X-Plex-Token=" + token
+        if LCase(clip.container) = "mkv" then c.streamFormat = "mkv" else c.streamFormat = "mp4"
+    else
+        q = "path=" + hEscape("/library/metadata/" + clip.Id.toStr()) + "&mediaIndex=0&partIndex=0&protocol=hls&fastSeek=1"
+        q = q + "&directPlay=0&directStream=1&directStreamAudio=1&videoResolution=1920x1080&maxVideoBitrate=12000"
+        q = q + "&subtitles=none&session=" + m.global.deviceId + "-amb" + Rnd(100000).toStr()
+        q = q + "&X-Plex-Client-Identifier=" + hEscape(m.global.deviceId) + "&X-Plex-Product=Hearth&X-Plex-Platform=Roku&X-Plex-Token=" + token
+        q = q + "&X-Plex-Client-Profile-Extra=" + hEscape("add-transcode-target(type=videoProfile&context=streaming&protocol=hls&container=mpegts&videoCodec=h264&audioCodec=aac,ac3)")
+        c.url = server + "/video/:/transcode/universal/start.m3u8?" + q
+        c.streamFormat = "hls"
+    end if
+    return c
+end function
+
+function fullStill(path as string) as string
+    return m.global.plexServer + "/photo/:/transcode?width=1280&height=720&minSize=1&upscale=1&url=" + hEscape(path) + "&X-Plex-Token=" + m.global.plexServerToken
+end function
+
 sub onVideoState()
     print "[ambiance] video state "; m.video.state
-    if m.video.state = "error" then print "[ambiance] video error: "; m.video.errorMsg
+    if m.video.state = "error"
+        print "[ambiance] video error: "; m.video.errorMsg
+        ' a phone clip in a format the TV can't open directly: ask Plex to convert it, once
+        if m.clip <> invalid and not m.clipRetried
+            m.clipRetried = true
+            m.video.content = clipContent(m.clip, true)
+            m.video.control = "play"
+        end if
+    end if
     if m.video.state = "playing" then m.still.visible = false
 end sub
 
 function soundOn() as boolean
     if m.useVideo then return not m.video.mute
     return m.sound.on
+end function
+
+function titleOf(md as string) as string
+    t = m.titles[md]
+    if t = invalid then return md
+    return t
 end function
 
 sub onShown(unused as dynamic)
@@ -182,7 +239,7 @@ end sub
 
 sub sleepMenu()
     d = CreateObject("roSGNode", "StandardMessageDialog")
-    d.title = m.titles[m.top.mood]
+    d.title = titleOf(m.top.mood)
     d.message = ["Sound and sleep timer"]
     if soundOn() then snd = "Turn sound off" else snd = "Turn sound on"
     m.menuMins = [-1, 0, 30, 60, 90, -2]
