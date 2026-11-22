@@ -2,7 +2,7 @@
 <!-- First launch: server address, then Quick Connect (or password). -->
 <component name="SetupScreen" extends="Group">
   <children>
-    <Poster uri="pkg:/images/lantern.png" translation="[96, 80]" width="40" height="72" />
+    <Poster uri="pkg:/images/lantern.png" translation="[96, 80]" width="41" height="72" />
     <Label id="step" translation="[160, 96]" color="0xD9A066FF" />
     <Label id="heading" translation="[96, 220]" width="1500" color="0xEDE6CAFF" />
     <Label id="body" translation="[96, 320]" width="1300" wrap="true" color="0xB5AF8CFF" />

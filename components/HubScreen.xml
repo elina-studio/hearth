@@ -4,7 +4,7 @@
   <children>
     <Group id="roomHolder" translation="[0, 150]" />
     <Rectangle id="topShade" width="1920" height="150" color="0x0B0E09E6" />
-    <Poster uri="pkg:/images/lantern.png" translation="[100, 50]" width="40" height="72" />
+    <Poster uri="pkg:/images/lantern.png" translation="[100, 50]" width="41" height="72" />
     <LayoutGroup id="pills" translation="[164, 57]" layoutDirection="horiz" itemSpacings="[8]" />
     <Label id="clock" translation="[1524, 52]" width="300" horizAlign="right" color="0xEDE6CAFF" />
     <Label id="weather" translation="[1524, 98]" width="300" horizAlign="right" color="0xB5AF8CFF" />
