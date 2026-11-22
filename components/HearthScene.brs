@@ -129,6 +129,10 @@ sub handle(r as object)
         s.albumId = r.albumId
         s.albumName = r.albumName
         pushScreen(s)
+    else if a = "mood"
+        s = CreateObject("roSGNode", "MoodScreen")
+        s.mood = r.mood
+        pushScreen(s)
     else if a = "back"
         popScreen()
     else if a = "musicView"

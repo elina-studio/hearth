@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A mood, full screen. OK = sound on/off, Left/Right = next mood, * = sound and sleep timer, Back = leave. -->
+<component name="MoodScreen" extends="Group">
+  <children>
+    <MoodScene id="scene" />
+    <AmbientSound id="sound" />
+    <!-- never shown or played: its disableScreenSaver keeps the TV screensaver off while a mood is up -->
+    <Video id="keepAwake" width="2" height="2" visible="false" disableScreenSaver="true" />
+    <Group id="hud" opacity="0">
+      <Poster uri="pkg:/images/shade.png" width="1920" height="300" translation="[0, 780]" />
+      <Label id="name" translation="[96, 900]" width="1200" color="0xEDE6CAFF" />
+      <Label id="state" translation="[96, 968]" width="1200" color="0xE0B34AFF" />
+      <Label id="hint" translation="[1000, 976]" width="824" horizAlign="right" color="0xB5AF8CFF" />
+      <Label id="clock" translation="[1524, 900]" width="300" horizAlign="right" color="0xEDE6CAFF" />
+    </Group>
+    <Rectangle id="night" width="1920" height="1080" color="0x000000FF" opacity="0" />
+    <Animation id="hudIn" duration="0.4" easeFunction="outQuad">
+      <FloatFieldInterpolator key="[0.0, 1.0]" keyValue="[0.0, 1.0]" fieldToInterp="hud.opacity" />
+    </Animation>
+    <Animation id="hudOut" duration="1.2" easeFunction="inQuad">
+      <FloatFieldInterpolator key="[0.0, 1.0]" keyValue="[1.0, 0.0]" fieldToInterp="hud.opacity" />
+    </Animation>
+    <Animation id="sleepFade" duration="20" easeFunction="linear">
+      <FloatFieldInterpolator key="[0.0, 1.0]" keyValue="[0.0, 1.0]" fieldToInterp="night.opacity" />
+    </Animation>
+    <Timer id="hudTimer" duration="5" repeat="false" />
+    <Timer id="sleepTimer" repeat="false" />
+  </children>
+  <interface>
+    <field id="mood" type="string" onChange="onMood" />
+    <field id="request" type="assocarray" alwaysNotify="true" />
+    <function name="onShown" />
+  </interface>
+  <script type="text/brightscript" uri="pkg:/source/util.brs" />
+  <script type="text/brightscript" uri="pkg:/components/ambiance/MoodScreen.brs" />
+</component>

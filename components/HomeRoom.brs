@@ -180,7 +180,8 @@ sub activate()
     if m.row = 1
         m.top.request = { action: "play", item: card.item, resume: true }
     else if m.row = 2
-        hMessage(card.title, "Moods arrive in the Ambiance build: a looping fire, rain and fireflies, with music underneath.")
+        moods = ["hearth", "rain", "lightsout", "fireflies"]
+        m.top.request = { action: "mood", mood: moods[m.mood.index] }
     else
         m.top.request = { action: "details", item: card.item }
     end if

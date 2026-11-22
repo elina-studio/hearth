@@ -10,7 +10,7 @@ sub init()
     m.clock.font = hFont("bold", 40)
     m.weather = m.top.findNode("weather")
     m.weather.font = hFont("regular", 22)
-    m.weather.text = "build 11"
+    m.weather.text = "build 12"
     m.clockTimer = m.top.findNode("clockTimer")
     m.clockTimer.observeField("fire", "tick")
     m.clockTimer.control = "start"
@@ -83,6 +83,8 @@ sub showRoom(name as string, focus as boolean)
             room = CreateObject("roSGNode", "MusicRoom")
         else if name = "Photos"
             room = CreateObject("roSGNode", "PhotosRoom")
+        else if name = "Ambiance"
+            room = CreateObject("roSGNode", "AmbianceRoom")
         else
             room = CreateObject("roSGNode", "PlaceholderRoom")
             room.name = name
