@@ -22,6 +22,7 @@
     </Group>
     <Label id="toast" translation="[96, 860]" width="1728" color="0xE0B34AFF" />
     <Timer id="toastTimer" duration="4" repeat="false" />
+    <Timer id="buildTimer" duration="6" repeat="false" />
     <Animation id="scroll" duration="0.22" easeFunction="outQuad">
       <Vector2DFieldInterpolator id="scrollTo" key="[0.0, 1.0]" fieldToInterp="content.translation" />
     </Animation>

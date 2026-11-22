@@ -19,6 +19,8 @@ sub init()
     m.toastTimer = m.top.findNode("toastTimer")
     m.toastTimer.observeField("fire", "hideToast")
     m.scroll = m.top.findNode("scroll")
+    m.buildTimer = m.top.findNode("buildTimer")
+    m.buildTimer.observeField("fire", "onBuildTimer")
     m.scrollTo = m.top.findNode("scrollTo")
 
     ' chips: [label, action]
@@ -64,7 +66,12 @@ sub showNow()
     m.eyebrow.text = n.eyebrow
     m.title.text = n.title
     m.sub.text = n.sub
-    if n.track <> invalid then m.art.uri = pxImage(n.track.thumb, 300, 300) else m.art.uri = ""
+    ' with nothing queued, the lantern keeps the square from sitting empty
+    if n.track <> invalid
+        m.art.uri = pxImage(n.track.thumb, 300, 300)
+    else
+        m.art.uri = "pkg:/images/lantern.png"
+    end if
     if not pxReady()
         m.eyebrow.text = "PLEX ISN'T LINKED"
         m.title.text = "Sign in to Plex"
@@ -126,16 +133,30 @@ sub refresh(unused = invalid as dynamic)
     m.loadedFor = s
     m.results = {}
     m.hubOrder = []
-    pxApi("/hubs/sections/" + s + "?count=20", {}, "onHubs", "hubs")
+    ' build the shelves once, when every answer is in (or after a few seconds), so they don't jump about
+    m.waiting = 4
+    m.builtOnce = false
+    m.buildTimer.control = "stop"
+    m.buildTimer.control = "start"
+    pxApi("/hubs/sections/" + s + "?count=12", {}, "onHubs", "hubs")
     pxApi("/playlists", { playlistType: "audio" }, "onShelf", "Playlists")
-    pxApi("/library/sections/" + s + "/all", { type: "8", sort: "titleSort", "X-Plex-Container-Start": "0", "X-Plex-Container-Size": "120" }, "onShelf", "Artists")
-    pxApi("/library/sections/" + s + "/all", { type: "9", sort: "titleSort", "X-Plex-Container-Start": "0", "X-Plex-Container-Size": "120" }, "onShelf", "Albums A to Z")
+    pxApi("/library/sections/" + s + "/all", { type: "8", sort: "titleSort", "X-Plex-Container-Start": "0", "X-Plex-Container-Size": "40" }, "onShelf", "Artists")
+    pxApi("/library/sections/" + s + "/all", { type: "9", sort: "titleSort", "X-Plex-Container-Start": "0", "X-Plex-Container-Size": "40" }, "onShelf", "Albums A to Z")
+end sub
+
+sub arrived()
+    m.waiting = m.waiting - 1
+    if m.waiting <= 0 or m.builtOnce then build()
+end sub
+
+sub onBuildTimer()
+    if not m.builtOnce then build()
 end sub
 
 sub onHubs(event as object)
     t = hTaskFrom(event)
     if not t.ok or t.response.MediaContainer = invalid or t.response.MediaContainer.Hub = invalid
-        build()
+        arrived()
         return
     end if
     for each hub in t.response.MediaContainer.Hub
@@ -146,7 +167,7 @@ sub onHubs(event as object)
             m.results[name] = hub.Metadata
         end if
     end for
-    build()
+    arrived()
 end sub
 
 sub onShelf(event as object)
@@ -156,10 +177,12 @@ sub onShelf(event as object)
         m.failed = "Couldn't load " + t.tag + " from Plex (error " + t.status.toStr() + ")."
         onMessageText(m.failed)
     end if
-    build()
+    arrived()
 end sub
 
 sub build()
+    m.builtOnce = true
+    m.buildTimer.control = "stop"
     order = []
     if m.hubOrder <> invalid then order.append(m.hubOrder)
     order.push("Artists")
