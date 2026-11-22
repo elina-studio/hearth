@@ -9,8 +9,15 @@ sub init()
     m.clock = m.top.findNode("clock")
     m.clock.font = hFont("bold", 40)
     m.weather = m.top.findNode("weather")
-    m.weather.font = hFont("regular", 22)
-    m.weather.text = "build 13"
+    m.weather.font = hFont("regular", 26)
+    m.buildTag = m.top.findNode("buildTag")
+    m.buildTag.font = hFont("regular", 18)
+    m.buildTag.text = "build " + CreateObject("roAppInfo").GetValue("build_version")
+    ' weather from Home Assistant (same settings as the photo slideshow), refreshed every 15 minutes
+    wt = m.top.findNode("weatherTimer")
+    wt.observeField("fire", "loadWeather")
+    wt.control = "start"
+    loadWeather()
     m.clockTimer = m.top.findNode("clockTimer")
     m.clockTimer.observeField("fire", "tick")
     m.clockTimer.control = "start"
@@ -218,4 +225,22 @@ sub onMenu()
     choice = m.dialog.buttonSelected
     m.dialog.close = true
     if choice = 1 then m.top.request = { action: "signOut" } else m.pillsGroup.getChild(m.pillIndex).setFocus(true)
+end sub
+
+sub loadWeather()
+    c = pCfg()
+    if c.haToken = ""
+        m.weather.text = ""
+        return
+    end if
+    pHa("/api/states/" + c.haEntity, "onWeather")
+end sub
+
+sub onWeather(event as object)
+    t = pTaskFrom(event)
+    if not t.ok or t.response.state = invalid then return
+    s = pWeatherWord(t.response.state)
+    a = t.response.attributes
+    if a <> invalid and a.temperature <> invalid then s = Int(a.temperature + 0.5).toStr() + "° · " + s
+    m.weather.text = s
 end sub

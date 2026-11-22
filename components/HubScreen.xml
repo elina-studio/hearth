@@ -8,7 +8,9 @@
     <LayoutGroup id="pills" translation="[164, 57]" layoutDirection="horiz" itemSpacings="[8]" />
     <Label id="clock" translation="[1524, 52]" width="300" horizAlign="right" color="0xEDE6CAFF" />
     <Label id="weather" translation="[1524, 98]" width="300" horizAlign="right" color="0xB5AF8CFF" />
+    <Label id="buildTag" translation="[1524, 128]" width="300" horizAlign="right" color="0xB5AF8C66" />
     <Timer id="clockTimer" duration="20" repeat="true" />
+    <Timer id="weatherTimer" duration="900" repeat="true" />
     <Timer id="previewTimer" duration="0.33" repeat="false" />
   </children>
   <interface>
@@ -16,5 +18,6 @@
     <function name="onShown" />
   </interface>
   <script type="text/brightscript" uri="pkg:/source/util.brs" />
+  <script type="text/brightscript" uri="pkg:/source/photos.brs" />
   <script type="text/brightscript" uri="pkg:/components/HubScreen.brs" />
 </component>
