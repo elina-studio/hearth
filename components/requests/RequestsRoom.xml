@@ -25,6 +25,8 @@
   </children>
   <interface>
     <field id="request" type="assocarray" alwaysNotify="true" />
+    <!-- set by the hub (e.g. from Search) to run an Overseerr search right away -->
+    <field id="searchTerm" type="string" alwaysNotify="true" onChange="onSearchTerm" />
     <function name="focusIn" />
     <function name="refresh" />
   </interface>

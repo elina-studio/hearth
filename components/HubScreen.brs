@@ -134,6 +134,7 @@ sub onRoomRequest(event as object)
     else if r.action = "room"
         m.pillIndex = indexOf(r.name)
         showRoom(r.name, true)
+        if r.search <> invalid and r.name = "Requests" then m.rooms["Requests"].searchTerm = r.search
     else
         m.top.request = r
     end if

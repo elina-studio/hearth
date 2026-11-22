@@ -404,6 +404,18 @@ sub askSearch()
     m.top.getScene().dialog = d
 end sub
 
+sub onSearchTerm()
+    text = m.top.searchTerm.Trim()
+    if text = "" or apiKey() = "" then return
+    runSearch(text)
+end sub
+
+sub runSearch(text as string)
+    m.query = text
+    flash("Searching for " + Chr(8220) + text + Chr(8221) + "…")
+    oApi("GET", "/api/v1/search", { query: text, page: "1" }, invalid, "onSearch", "Results")
+end sub
+
 sub onSearchTyped()
     d = m.searchDialog
     text = d.text
@@ -411,9 +423,7 @@ sub onSearchTyped()
     if d.buttonSelected <> 0 or text = invalid then return
     text = text.Trim()
     if text = "" then return
-    m.query = text
-    flash("Searching for " + Chr(8220) + text + Chr(8221) + "…")
-    oApi("GET", "/api/v1/search", { query: text, page: "1" }, invalid, "onSearch", "Results")
+    runSearch(text)
 end sub
 
 sub openCard(c as object)
