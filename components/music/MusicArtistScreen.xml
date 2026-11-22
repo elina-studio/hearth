@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- An artist: their albums as an accordion. OK on an album shows or hides its songs; OK on a song plays the album from there.
+     The buttons up top play everything, shuffle, or open/close every album at once. -->
+<component name="MusicArtistScreen" extends="Group">
+  <children>
+    <Rectangle width="1920" height="1080" color="0x0B0E09FF" />
+    <Poster id="backdrop" width="1920" height="1080" loadDisplayMode="scaleToZoom" opacity="0.18" />
+    <Rectangle translation="[96, 60]" width="240" height="240" color="0x1D2418FF" />
+    <Poster id="art" translation="[96, 60]" width="240" height="240" loadDisplayMode="scaleToZoom" />
+    <Label id="eyebrow" translation="[372, 70]" color="0xD9A066FF" text="ARTIST" />
+    <Label id="name" translation="[372, 104]" width="1450" maxLines="1" color="0xEDE6CAFF" />
+    <Label id="sub" translation="[372, 196]" width="1450" maxLines="1" color="0xB5AF8CFF" />
+    <LayoutGroup id="buttons" translation="[372, 242]" layoutDirection="horiz" itemSpacings="[12]" />
+    <Rectangle translation="[96, 330]" width="1728" height="2" color="0xD9A06655" />
+    <Group clippingRect="[0, 340, 1920, 740]">
+      <Group id="list" translation="[96, 350]" />
+    </Group>
+    <Label id="toast" translation="[96, 1020]" width="1728" color="0xE0B34AFF" />
+    <Timer id="toastTimer" duration="4" repeat="false" />
+  </children>
+  <interface>
+    <field id="artistId" type="string" />
+    <field id="openAlbumId" type="string" />
+    <field id="request" type="assocarray" alwaysNotify="true" />
+    <function name="onShown" />
+    <function name="load" />
+  </interface>
+  <script type="text/brightscript" uri="pkg:/source/util.brs" />
+  <script type="text/brightscript" uri="pkg:/components/music/plex.brs" />
+  <script type="text/brightscript" uri="pkg:/components/music/musicui.brs" />
+  <script type="text/brightscript" uri="pkg:/components/music/MusicArtistScreen.brs" />
+</component>

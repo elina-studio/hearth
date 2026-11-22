@@ -244,7 +244,14 @@ sub activate()
     if card = invalid then return
     md = card.item
     kind = pxStr(md.type)
-    muSend("playContainer", { kind: kind, id: pxStr(md.ratingKey), shuffle: (kind = "artist"), label: pxStr(md.title) })
+    ' artists open their page; albums open their artist's page with that album unfolded
+    if kind = "artist"
+        m.top.request = { action: "musicView", mode: "artist", artistId: pxStr(md.ratingKey) }
+    else if kind = "album" and md.parentRatingKey <> invalid
+        m.top.request = { action: "musicView", mode: "artist", artistId: pxStr(md.parentRatingKey), albumId: pxStr(md.ratingKey) }
+    else
+        muSend("playContainer", { kind: kind, id: pxStr(md.ratingKey), shuffle: false, label: pxStr(md.title) })
+    end if
 end sub
 
 sub onMessageText(t as string)

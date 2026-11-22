@@ -135,6 +135,12 @@ sub handle(r as object)
         pushScreen(s)
     else if a = "back"
         popScreen()
+    else if a = "musicView" and r.mode = "artist"
+        s = CreateObject("roSGNode", "MusicArtistScreen")
+        s.artistId = r.artistId
+        if r.albumId <> invalid then s.openAlbumId = r.albumId
+        pushScreen(s)
+        s.callFunc("load", invalid)
     else if a = "musicView" and r.mode = "request"
         pushScreen(CreateObject("roSGNode", "LidarrScreen"))
     else if a = "musicView"
