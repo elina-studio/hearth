@@ -51,6 +51,8 @@ sub runTask()
         for each d in dirs(res.body)
             ct = invalid
             if d.type = "movie" then ct = "movies"
+            ' the person's own footage for the Ambiance room; never a Movies shelf
+            if LCase(toS(d.title, "")) = "ambiance" then ct = "ambiance"
             if d.type = "show" then ct = "tvshows"
             if d.type = "artist" then ct = "music"
             if d.type = "photo" then ct = "photos"
@@ -84,6 +86,21 @@ sub runTask()
         if a.unwatched = true then q.unwatched = "1"
         res = req("GET", m.server + "/library/sections/" + a.section + "/all", q, m.token)
         out = { Items: normAll(metas(res.body)) }
+    else if op = "clips"
+        ' the Ambiance library: each clip with what the mood screen needs to stream it
+        res = req("GET", m.server + "/library/sections/" + a.section + "/all", { "X-Plex-Container-Start": "0", "X-Plex-Container-Size": "60" }, m.token)
+        clips = []
+        for each md in metas(res.body)
+            if md.Media <> invalid and md.Media.count() > 0 and md.Media[0].Part <> invalid and md.Media[0].Part.count() > 0
+                med = md.Media[0]
+                part = med.Part[0]
+                f = toS(part.file, "")
+                bits = f.split("/")
+                if bits.count() > 0 then f = bits[bits.count() - 1]
+                clips.push({ Id: md.ratingKey, Name: toS(md.title, f), file: f, key: part.key, container: toS(med.container, ""), videoCodec: toS(med.videoCodec, ""), thumb: md.thumb, art: md.art, duration: md.duration })
+            end if
+        end for
+        out = { Clips: clips }
     else if op = "titles"
         ' just the names in a library, for the search keyboard's predictions
         res = req("GET", m.server + "/library/sections/" + a.section + "/all", { "X-Plex-Container-Start": "0", "X-Plex-Container-Size": toS(a.limit, "5000") }, m.token)

@@ -6,15 +6,28 @@ sub init()
     m.RULE = 24
     m.PEEK = 120
     m.W = Int((1920 - 2 * m.RULE - 2 * m.PEEK) / 3)
-    m.items = ambMoods()
-    m.n = m.items.count()
-    last = CreateObject("roRegistrySection", "hearth").Read("ambLast")
-    m.index = 0
-    for i = 0 to m.n - 1
-        if m.items[i].mood = last then m.index = i
-    end for
     m.active = false
     m.strip = m.top.findNode("strip")
+    m.dotsGroup = m.top.findNode("dots")
+    m.clipsAsked = false
+    build(ambItems(), CreateObject("roRegistrySection", "hearth").Read("ambLast"))
+    m.slideTo = m.top.findNode("slideTo")
+    m.slide = m.top.findNode("slide")
+    m.strip.translation = [stripX(), 0]
+    paint()
+    loadClips()
+end sub
+
+' (Re)build the panels, dividers and dots for a list of moods, focusing the one named keep.
+sub build(items as object, keep as string)
+    m.items = items
+    m.n = items.count()
+    m.index = 0
+    for i = 0 to m.n - 1
+        if m.items[i].mood = keep then m.index = i
+    end for
+    m.strip.removeChildrenIndex(m.strip.getChildCount(), 0)
+    m.dotsGroup.removeChildrenIndex(m.dotsGroup.getChildCount(), 0)
     m.panels = []
     for i = 0 to m.n - 1
         m.panels.push(makePanel(i))
@@ -26,18 +39,47 @@ sub init()
             r.translation = [panelX(i) + m.W, 0]
         end if
     end for
-    dots = m.top.findNode("dots")
     m.dots = []
     for i = 0 to m.n - 1
-        dt = dots.createChild("Rectangle")
+        dt = m.dotsGroup.createChild("Rectangle")
         dt.width = 12
         dt.height = 12
         dt.translation = [960 - (m.n * 26) / 2 + i * 26, m.H - 26]
         m.dots.push(dt)
     end for
-    m.slideTo = m.top.findNode("slideTo")
-    m.slide = m.top.findNode("slide")
     m.strip.translation = [stripX(), 0]
+end sub
+
+' A Plex picture cropped to the panel's shape (Plex scales it to cover, the Poster trims the rest).
+function plexStill(path as string) as string
+    w = 760
+    h = 930
+    if CreateObject("roDeviceInfo").GetUIResolution().name = "HD"
+        w = 507
+        h = 620
+    end if
+    return m.global.plexServer + "/photo/:/transcode?width=" + w.toStr() + "&height=" + h.toStr() + "&minSize=1&upscale=1&url=" + hEscape(path) + "&X-Plex-Token=" + m.global.plexServerToken
+end function
+
+' Ask Plex for the clips in the "Ambiance" library once it's known.
+sub loadClips()
+    if m.clipsAsked then return
+    libs = m.global.libraries
+    if libs = invalid or libs.ambiance = invalid then return
+    m.clipsAsked = true
+    hPlex("clips", { section: libs.ambiance }, "onClips")
+end sub
+
+sub onClips(event as object)
+    t = hTaskFrom(event)
+    if not t.ok or t.response.Clips = invalid then return
+    print "[ambiance] plex clips: "; t.response.Clips.count()
+    if t.response.Clips.count() = 0 then return
+    items = ambMerge(t.response.Clips)
+    if not m.global.hasField("ambItems") then m.global.addFields({ ambItems: [] })
+    m.global.ambItems = items
+    keep = m.items[m.index].mood
+    build(items, keep)
     paint()
 end sub
 
@@ -64,6 +106,7 @@ function makePanel(i as integer) as object
     pic.height = m.H
     pic.loadDisplayMode = "scaleToZoom"
     pic.uri = it.still
+    if it.plexStill <> invalid and it.plexStill <> "" then pic.uri = plexStill(it.plexStill)
     top = g.createChild("Poster")
     top.uri = "pkg:/images/amb/shade-top.png"
     top.width = m.W
@@ -159,6 +202,7 @@ sub paint()
 end sub
 
 sub focusIn(unused as dynamic)
+    loadClips()
     m.active = true
     paint()
     m.top.setFocus(true)
@@ -166,6 +210,7 @@ end sub
 
 ' sound settings can change inside a mood; repaint when we come back
 sub refresh(unused as dynamic)
+    loadClips()
     paint()
 end sub
 
