@@ -2,7 +2,8 @@
 # Turn a phone video into a Hearth ambiance loop.
 #   sh tools/ambiance/clip.sh input.mov <hearth|rain|fireflies|lightsout> [start_s] [length_s]
 # Writes videos/<mood>.mp4 (1280x720 H.264, AAC, seamless loop: the last second crossfades
-# into the first) and images/amb/col-<mood>.jpg (760x930 still for the room column).
+# into the first), images/amb/col-<mood>.jpg (760x930 still for the room column) and
+# images/amb/full-<mood>.jpg (first frame, shown while the video starts).
 set -e
 IN="$1"; MOOD="$2"; SS="${3:-0}"; LEN="${4:-24}"; XF=1.5
 cd "$(dirname "$0")/../.."
@@ -35,5 +36,7 @@ fi
 # 3. column still from the middle of the loop
 ffmpeg -y -loglevel error -ss "$(echo "$LEN / 2" | bc)" -i "videos/$MOOD.mp4" -frames:v 1 \
   -vf "scale=-2:930,crop=760:930" -q:v 3 "images/amb/col-$MOOD.jpg"
+# full-screen still, shown while the video buffers (first frame, so the fade-in matches)
+ffmpeg -y -loglevel error -i "videos/$MOOD.mp4" -frames:v 1 -q:v 4 "images/amb/full-$MOOD.jpg"
 rm -rf "$T"
-ls -la "videos/$MOOD.mp4" "images/amb/col-$MOOD.jpg"
+ls -la "videos/$MOOD.mp4" "images/amb/col-$MOOD.jpg" "images/amb/full-$MOOD.jpg"
