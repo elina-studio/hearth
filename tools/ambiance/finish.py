@@ -28,7 +28,7 @@ keep("hearth-glow.png", "hearth-glow.png", (480, 270))
 keep("rain-window.png", "rain-window.png", (560, 560))
 keep("rain-far.png", "rain-far.png", (560, 560))
 keep("rain-near.png", "rain-near.png", (560, 560))
-keep("weave.png", "weave.png")
+keep("vine.png", "divider.png")  # the divider the person picks (see mockups/ambiance)
 Image.open(os.path.join(tmp, "fire.jpg")).save(os.path.join(img, "fire.jpg"), quality=86)
 
 # room tiles, 300 x 420, cut from the composed scenes

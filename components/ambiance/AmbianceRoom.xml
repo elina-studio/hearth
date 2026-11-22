@@ -1,10 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Ambiance room: five tall columns edge to edge, split by gold weave rules, titles over the pictures.
-     The focused column widens. OK opens the mood full screen; Up or Back returns to the pills. -->
+<!-- Ambiance room (layout C): three tall panels at a time with a peek at each side, gold dividers between,
+     number, title and line of text over the top of each picture. Left/Right slides; OK opens the mood
+     full screen; Up or Back returns to the pills. -->
 <component name="AmbianceRoom" extends="Group">
   <children>
-    <Group id="cols" />
-    <Timer id="step" duration="0.033" repeat="true" />
+    <Group id="strip" />
+    <Group id="dots" />
+    <Animation id="slide" duration="0.32" easeFunction="outCubic">
+      <Vector2DFieldInterpolator id="slideTo" key="[0.0, 1.0]" fieldToInterp="strip.translation" />
+    </Animation>
   </children>
   <interface>
     <field id="request" type="assocarray" alwaysNotify="true" />
