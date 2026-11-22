@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A titled row of request posters, each with a status chip underneath. The room owns focus and calls move(). -->
+<component name="ReqRow" extends="Group">
+  <children>
+    <Label id="title" color="0xB5AF8CFF" />
+    <Rectangle id="rule" color="0xD9A06655" height="2" translation="[0, 22]" />
+    <Group translation="[0, 56]">
+      <Group id="strip" />
+    </Group>
+  </children>
+  <interface>
+    <field id="title" type="string" onChange="onTitle" />
+    <!-- cards: [{ kind: "media"|"search", title, image, chip, lit, data }] -->
+    <field id="cards" type="array" onChange="build" />
+    <field id="index" type="integer" value="0" />
+    <field id="active" type="boolean" value="false" onChange="paint" />
+    <field id="rowHeight" type="integer" />
+    <function name="move" />
+    <function name="current" />
+    <function name="setChip" />
+  </interface>
+  <script type="text/brightscript" uri="pkg:/source/util.brs" />
+  <script type="text/brightscript" uri="pkg:/components/requests/ReqRow.brs" />
+</component>
