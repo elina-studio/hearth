@@ -52,7 +52,9 @@ sub reveal()
     print "[hearth] intro reveal"
     m.clock.Mark()
     onSway()
-    m.top.findNode("appear").control = "start"
+    ap = m.top.findNode("appear")
+    ap.observeField("state", "onAppeared")
+    ap.control = "start"
     st = m.top.findNode("swayTimer")
     st.observeField("fire", "onSway")
     st.control = "start"
@@ -69,6 +71,10 @@ sub reveal()
     qt = m.top.findNode("quoteTimer")
     qt.observeField("fire", "onQuoteTimer")
     qt.control = "start"
+end sub
+
+sub onAppeared(event as object)
+    if event.getData() = "stopped" then m.top.findNode("still").visible = false
 end sub
 
 sub onMode()

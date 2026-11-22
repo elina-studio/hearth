@@ -2,15 +2,17 @@
 <!-- Movies or Shows: a hero for the focused title, then shelves. -->
 <component name="LibraryRoom" extends="Group">
   <children>
-    <Poster id="backdrop" translation="[620, -150]" width="1300" height="640" loadDisplayMode="scaleToZoom" />
-    <Poster uri="pkg:/images/shade.png" translation="[620, -150]" width="1300" height="640" />
+    <!-- backdrop sits top right and stops above the shelves; fades into the background on its left and bottom edges -->
+    <Poster id="backdrop" translation="[720, -150]" width="1200" height="490" loadDisplayMode="scaleToZoom" />
+    <Poster uri="pkg:/images/fade-left.png" translation="[720, -150]" width="560" height="490" />
+    <Poster uri="pkg:/images/fade-down.png" translation="[720, 180]" width="1200" height="160" />
     <Group id="info" translation="[96, 10]">
       <Label id="eyebrow" color="0xD9A066FF" />
-      <Label id="title" translation="[0, 36]" width="900" wrap="true" maxLines="2" color="0xEDE6CAFF" />
-      <Label id="overview" translation="[0, 210]" width="820" height="110" wrap="true" maxLines="3" color="0xB5AF8CFF" />
+      <Label id="title" translation="[0, 36]" width="1000" wrap="true" maxLines="2" color="0xEDE6CAFF" />
+      <Label id="overview" translation="[0, 140]" width="900" wrap="true" maxLines="3" color="0xB5AF8CFF" />
     </Group>
     <Label id="empty" translation="[96, 420]" width="1500" color="0xB5AF8CFF" />
-    <Group id="shelves" translation="[0, 360]">
+    <Group id="shelves" translation="[0, 360]" clippingRect="[0, -16, 1920, 586]">
       <Group id="content" />
     </Group>
     <Animation id="scroll" duration="0.22" easeFunction="outQuad">

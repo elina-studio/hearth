@@ -29,6 +29,10 @@ sub refresh(unused as dynamic)
     m.types = types
     m.pending = {}
     m.results = {}
+    m.content.removeChildrenIndex(m.content.getChildCount(), 0)
+    m.rowByName = {}
+    m.rows = []
+    m.row = 0
     if types = "Movie"
         hPlex("resume", { section: m.parent, limit: 12 }, "onRow", "Continue")
     end if
@@ -45,48 +49,45 @@ sub onRow(event as object)
     build()
 end sub
 
+' Each shelf is made once, when its answer arrives; later answers only slot in and shift the rows below.
 sub build()
     order = ["Continue", "Recently added", "Unwatched", "A to Z"]
-    ' remember position
-    keepTitle = invalid
-    keepIndex = 0
-    if m.rows.count() > 0 and m.row < m.rows.count()
-        keepTitle = m.rows[m.row].title
-        keepIndex = m.rows[m.row].index
-    end if
-    m.content.removeChildrenIndex(m.content.getChildCount(), 0)
+    if m.rowByName = invalid then m.rowByName = {}
+    keep = invalid
+    if m.row < m.rows.count() then keep = m.rows[m.row]
     m.rows = []
     y = 0
     for each name in order
         items = m.results[name]
-        if items <> invalid and items.count() > 0
+        r = m.rowByName[name]
+        if r = invalid and items <> invalid and items.count() > 0
             r = m.content.createChild("CardRow")
-            r.translation = [96, y]
             r.title = name
+            shape = "wide"
             if name = "A to Z"
                 r.cardWidth = 236
                 r.cardHeight = 354
                 shape = "tall"
-            else
-                shape = "wide"
             end if
             cards = []
             for each it in items
                 cards.push(hCard(it, shape))
             end for
             r.cards = cards
-            if name = keepTitle then r.index = keepIndex
+            m.rowByName[name] = r
+        end if
+        if r <> invalid
+            r.translation = [96, y]
             m.rows.push(r)
             y = y + r.rowHeight + 30
         end if
     end for
     m.row = 0
-    if keepTitle <> invalid
-        for i = 0 to m.rows.count() - 1
-            if m.rows[i].title = keepTitle then m.row = i
-        end for
-    end if
-    if m.rows.count() = 0 and m.empty.text = "" then m.empty.text = "Nothing here yet."
+    for i = 0 to m.rows.count() - 1
+        if keep <> invalid and m.rows[i].isSameNode(keep) then m.row = i
+    end for
+    if m.rows.count() = 0 and m.empty.text = "" and m.results.count() >= 2 then m.empty.text = "Nothing here yet."
+    if m.rows.count() > 0 then m.empty.text = ""
     paint()
 end sub
 
@@ -121,6 +122,10 @@ sub showInfo()
     ov = item.Overview
     if ov = invalid then ov = ""
     m.overview.text = ov
+    ' the synopsis sits under however many lines the title took
+    th = m.title.boundingRect().height
+    m.overview.translation = [0, 36 + th + 10]
+    if th > 100 then m.overview.maxLines = 2 else m.overview.maxLines = 3
     m.backdrop.uri = hImageAny(item, ["Backdrop", "Thumb"], 1300)
 end sub
 

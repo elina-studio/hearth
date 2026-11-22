@@ -4,6 +4,8 @@
 <component name="IntroScreen" extends="Group">
   <children>
     <Poster id="bg" uri="pkg:/images/intro-bg.jpg" width="1920" height="1080" />
+    <!-- the intro's first frame, the same picture as the splash, so the hand-off from the splash is seamless -->
+    <Poster id="still" uri="pkg:/images/intro-still.jpg" width="1920" height="1080" />
     <Group id="all" opacity="0">
     <Poster id="glow" uri="pkg:/images/intro-glow.png" width="432" height="432" translation="[744, 337]" opacity="0.8" />
     <!-- The sway is 21 pre-rotated frames (-3..+3 degrees) swapped by translation: no Group rotation, which this TV did not render.

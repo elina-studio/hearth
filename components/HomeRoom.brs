@@ -126,6 +126,7 @@ sub onNextUp(event as object)
     end for
     m.nextUp.cards = cards
     m.nextUp.visible = cards.count() > 0
+    layoutRows()
     updateHero()
 end sub
 
@@ -139,7 +140,23 @@ sub onLatest(event as object)
     end for
     m.latest.cards = cards
     m.latest.visible = cards.count() > 0
+    layoutRows()
     updateHero()
+end sub
+
+' stack the rows under the dashboard with no gaps for hidden ones
+sub layoutRows()
+    y = 540
+    for r = 1 to 3
+        row = m.rows[r]
+        if row.visible
+            row.translation = [96, y]
+            m.rowY[r] = y
+            h = row.rowHeight
+            if h = 0 then h = 300
+            y = y + h + 30
+        end if
+    end for
 end sub
 
 sub updateHero()
