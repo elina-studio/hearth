@@ -129,10 +129,10 @@ end sub
 sub applyPreset()
     ' name, spin seconds, four tints for each layer group
     presets = [
-        { name: "Embers", spin: 60, c: ["0xE0B34AFF", "0xF0907CFF", "0xD9A066FF", "0xE0B34AFF"] },
-        { name: "Moss", spin: 80, c: ["0xA3A35AFF", "0x6E8B4AFF", "0xE0B34AFF", "0xA3A35AFF"] },
-        { name: "Night sky", spin: 110, c: ["0x8FA7C9FF", "0xE0B34AFF", "0xB59ACFFF", "0x8FA7C9FF"] },
-        { name: "Bonfire", spin: 36, c: ["0xF0907CFF", "0xE0B34AFF", "0xFF6A3DFF", "0xF0907CFF"] }
+        { name: "Embers", spin: 60, c: [&hE0B34AFF, &hF0907CFF, &hD9A066FF, &hE0B34AFF] },
+        { name: "Moss", spin: 80, c: [&hA3A35AFF, &h6E8B4AFF, &hE0B34AFF, &hA3A35AFF] },
+        { name: "Night sky", spin: 110, c: [&h8FA7C9FF, &hE0B34AFF, &hB59ACFFF, &h8FA7C9FF] },
+        { name: "Bonfire", spin: 36, c: [&hF0907CFF, &hE0B34AFF, &hFF6A3DFF, &hF0907CFF] }
     ]
     p = presets[m.preset mod presets.count()]
     spin = m.top.findNode("vSpin")
