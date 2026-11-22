@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Full-screen music: mode "cover" (big album art), "milk" (visualizer stand-in) or "hearth" (the fire, with
+     fire + music / fire only / music only). The now-playing strip shows on any key and fades after a few seconds. -->
+<component name="MusicView" extends="Group">
+  <children>
+    <Rectangle width="1920" height="1080" color="0x0B0E09FF" />
+
+    <Group id="cover" visible="false">
+      <Poster id="coverBlur" width="1920" height="1080" loadDisplayMode="scaleToZoom" opacity="0.45" />
+      <Rectangle width="1920" height="1080" color="0x0B0E0966" />
+      <Rectangle id="coverBg" translation="[660, 110]" width="600" height="600" color="0x1D2418FF" />
+      <Poster id="coverArt" translation="[660, 110]" width="600" height="600" loadDisplayMode="scaleToFit" />
+      <Label id="coverTitle" translation="[160, 750]" width="1600" horizAlign="center" maxLines="1" color="0xEDE6CAFF" />
+      <Label id="coverSub" translation="[160, 822]" width="1600" horizAlign="center" maxLines="1" color="0xB5AF8CFF" />
+      <Rectangle id="coverTrack" translation="[660, 885]" width="600" height="6" color="0xFFFFFF1A" />
+      <Rectangle id="coverFill" translation="[660, 885]" width="0" height="6" color="0xE0B34AFF" />
+    </Group>
+
+    <Group id="milk" visible="false">
+      <Poster id="vGlow" uri="pkg:/images/intro-glow.png" translation="[510, 90]" width="900" height="900" opacity="0.5" />
+      <Poster id="v1" uri="pkg:/images/music/viz-dots.png" translation="[360, -60]" width="1200" height="1200" scaleRotateCenter="[600, 600]" opacity="0.35" />
+      <Poster id="v2" uri="pkg:/images/music/viz-spiral.png" translation="[410, -10]" width="1100" height="1100" scaleRotateCenter="[550, 550]" opacity="0.55" />
+      <Poster id="v3" uri="pkg:/images/music/viz-rosette.png" translation="[510, 90]" width="900" height="900" scaleRotateCenter="[450, 450]" opacity="0.8" />
+      <Poster id="v4" uri="pkg:/images/music/viz-rosette.png" translation="[660, 240]" width="600" height="600" scaleRotateCenter="[300, 300]" opacity="0.5" />
+      <Label id="presetName" translation="[96, 60]" width="900" color="0xB5AF8C99" />
+    </Group>
+
+    <Group id="hearth" visible="false">
+      <Group id="moodHolder" />
+      <Label id="noFire" translation="[160, 480]" width="1600" horizAlign="center" wrap="true" color="0xB5AF8CFF" visible="false" />
+    </Group>
+
+    <Group id="strip" opacity="0">
+      <Rectangle translation="[0, 860]" width="1920" height="220" color="0x0B0E09D9" />
+      <Rectangle translation="[96, 890]" width="150" height="150" color="0x1D2418FF" />
+      <Poster id="sArt" translation="[96, 890]" width="150" height="150" loadDisplayMode="scaleToFit" />
+      <Label id="sEyebrow" translation="[280, 898]" width="900" color="0xD9A066FF" />
+      <Label id="sTitle" translation="[280, 936]" width="1000" maxLines="1" color="0xEDE6CAFF" />
+      <Label id="sSub" translation="[280, 990]" width="1000" maxLines="1" color="0xB5AF8CFF" />
+      <Label id="sHint" translation="[1220, 912]" width="604" horizAlign="right" wrap="true" color="0xB5AF8CFF" />
+      <Label id="sToast" translation="[1220, 1010]" width="604" horizAlign="right" maxLines="1" color="0xE0B34AFF" />
+    </Group>
+
+    <Animation id="stripIn" duration="0.25" easeFunction="outQuad">
+      <FloatFieldInterpolator id="stripInI" key="[0.0, 1.0]" keyValue="[0.0, 1.0]" fieldToInterp="strip.opacity" />
+    </Animation>
+    <Animation id="stripOut" duration="0.8" easeFunction="inOutQuad">
+      <FloatFieldInterpolator key="[0.0, 1.0]" keyValue="[1.0, 0.0]" fieldToInterp="strip.opacity" />
+    </Animation>
+    <Timer id="stripTimer" duration="4" repeat="false" />
+
+    <Animation id="vSpin" duration="60" repeat="true" easeFunction="linear">
+      <FloatFieldInterpolator id="r1" key="[0.0, 1.0]" keyValue="[0.0, 6.2832]" fieldToInterp="v1.rotation" />
+      <FloatFieldInterpolator id="r2" key="[0.0, 1.0]" keyValue="[0.0, -12.5664]" fieldToInterp="v2.rotation" />
+      <FloatFieldInterpolator id="r3" key="[0.0, 1.0]" keyValue="[0.0, 18.8496]" fieldToInterp="v3.rotation" />
+      <FloatFieldInterpolator id="r4" key="[0.0, 1.0]" keyValue="[0.0, -25.1327]" fieldToInterp="v4.rotation" />
+    </Animation>
+    <Animation id="vTint" duration="24" repeat="true" easeFunction="linear">
+      <ColorFieldInterpolator id="c1" key="[0.0, 0.33, 0.66, 1.0]" fieldToInterp="v1.blendColor" />
+      <ColorFieldInterpolator id="c2" key="[0.0, 0.33, 0.66, 1.0]" fieldToInterp="v2.blendColor" />
+      <ColorFieldInterpolator id="c3" key="[0.0, 0.33, 0.66, 1.0]" fieldToInterp="v3.blendColor" />
+      <ColorFieldInterpolator id="c4" key="[0.0, 0.33, 0.66, 1.0]" fieldToInterp="v4.blendColor" />
+      <ColorFieldInterpolator id="cg" key="[0.0, 0.33, 0.66, 1.0]" fieldToInterp="vGlow.blendColor" />
+    </Animation>
+    <Animation id="vBreath" duration="4" repeat="true" easeFunction="inOutQuad">
+      <Vector2DFieldInterpolator id="b3" key="[0.0, 0.5, 1.0]" keyValue="[[1.0, 1.0], [1.08, 1.08], [1.0, 1.0]]" fieldToInterp="v3.scale" />
+      <Vector2DFieldInterpolator id="b4" key="[0.0, 0.5, 1.0]" keyValue="[[1.1, 1.1], [0.94, 0.94], [1.1, 1.1]]" fieldToInterp="v4.scale" />
+      <FloatFieldInterpolator key="[0.0, 0.5, 1.0]" keyValue="[0.4, 0.65, 0.4]" fieldToInterp="vGlow.opacity" />
+    </Animation>
+  </children>
+  <interface>
+    <field id="mode" type="string" onChange="onMode" />
+    <field id="request" type="assocarray" alwaysNotify="true" />
+    <function name="onShown" />
+  </interface>
+  <script type="text/brightscript" uri="pkg:/source/util.brs" />
+  <script type="text/brightscript" uri="pkg:/components/music/plex.brs" />
+  <script type="text/brightscript" uri="pkg:/components/music/musicui.brs" />
+  <script type="text/brightscript" uri="pkg:/components/music/MusicView.brs" />
+</component>

@@ -79,6 +79,8 @@ sub showRoom(name as string, focus as boolean)
             room = CreateObject("roSGNode", "SearchRoom")
         else if name = "Requests"
             room = CreateObject("roSGNode", "RequestsRoom")
+        else if name = "Music"
+            room = CreateObject("roSGNode", "MusicRoom")
         else
             room = CreateObject("roSGNode", "PlaceholderRoom")
             room.name = name

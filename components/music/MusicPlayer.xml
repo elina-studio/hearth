@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The one music player for the whole app (m.global.music). It lives on the scene, so music keeps
+     playing in every room. Send commands with music.command = { cmd: ... }; read state, track, position. -->
+<component name="MusicPlayer" extends="Group">
+  <children>
+    <Audio id="audio" notificationInterval="1" />
+    <Timer id="report" duration="10" repeat="true" />
+  </children>
+  <interface>
+    <field id="command" type="assocarray" alwaysNotify="true" onChange="onCommand" />
+    <field id="state" type="string" value="none" />
+    <field id="track" type="assocarray" />
+    <field id="queue" type="array" />
+    <field id="index" type="integer" value="0" />
+    <field id="position" type="float" />
+    <field id="duration" type="float" />
+    <field id="shuffle" type="boolean" value="false" />
+    <field id="repeat" type="string" value="off" />
+    <field id="busy" type="boolean" value="false" />
+    <field id="section" type="string" />
+    <field id="message" type="string" alwaysNotify="true" />
+  </interface>
+  <script type="text/brightscript" uri="pkg:/source/util.brs" />
+  <script type="text/brightscript" uri="pkg:/components/music/plex.brs" />
+  <script type="text/brightscript" uri="pkg:/components/music/MusicPlayer.brs" />
+</component>
