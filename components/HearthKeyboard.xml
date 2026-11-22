@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Hearth's own on-screen keyboard, in place of Roku's built-in one.
+  - Shows what you've typed, up to three suggestion chips, and a 6x6 key grid with a wide bottom row.
+  - Give it a vocabulary in `words` (titles, names...). It then suggests whole entries as you type and
+    dims the keys that can't lead to any of them, so the next useful letter stands out.
+  - The parent keeps focus and forwards keys: edge = kb.callFunc("handleKey", key).
+    It returns "" when the keyboard used the key, otherwise "up", "right", "left", "down" or "back"
+    so the parent can move focus out.
+  - mode "search": A-Z, 0-9, Space / Delete / Clear.
+    mode "full": adds a symbols page (for addresses and names) via the #+= key.
+-->
+<component name="HearthKeyboard" extends="Group">
+  <children>
+    <Label id="display" translation="[0, 0]" width="554" height="64" vertAlign="center" color="0xE0B34AFF" />
+    <Rectangle id="rule" translation="[0, 70]" width="554" height="2" color="0xD9A06655" />
+    <Group id="chips" translation="[0, 88]" />
+    <Group id="keys" translation="[0, 164]" />
+  </children>
+  <interface>
+    <field id="text" type="string" onChange="onText" alwaysNotify="true" />
+    <field id="words" type="array" onChange="onWords" />
+    <field id="mode" type="string" value="search" onChange="onMode" />
+    <field id="placeholder" type="string" value="" onChange="onText" />
+    <field id="maxLength" type="integer" value="40" />
+    <field id="active" type="boolean" value="false" onChange="paint" />
+    <field id="picked" type="string" alwaysNotify="true" />
+    <field id="keyboardHeight" type="integer" value="714" />
+    <function name="handleKey" />
+    <function name="reset" />
+  </interface>
+  <script type="text/brightscript" uri="pkg:/source/util.brs" />
+  <script type="text/brightscript" uri="pkg:/components/HearthKeyboard.brs" />
+</component>

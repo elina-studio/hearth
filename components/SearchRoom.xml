@@ -1,11 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Search: a 6x6 letter grid (plus Space, Delete, Clear) on the left; matches on the right as you type. -->
+<!-- Search: a Hearth keyboard (letter grid with suggestions) on the left; matches on the right as you type. -->
 <component name="SearchRoom" extends="Group">
   <children>
     <Label id="eyebrow" translation="[96, 10]" color="0xD9A066FF" text="SEARCH" />
-    <Label id="query" translation="[96, 46]" width="554" height="64" vertAlign="center" />
-    <Rectangle id="queryRule" translation="[96, 116]" width="554" height="2" color="0xD9A06655" />
-    <Group id="keys" translation="[96, 150]" />
+    <HearthKeyboard id="kb" translation="[96, 50]" placeholder="Type a title" />
 
     <Label id="resultsLabel" translation="[760, 10]" width="1064" color="0xD9A066FF" />
     <Label id="hint" translation="[760, 70]" width="1000" wrap="true" color="0xB5AF8CFF" />

@@ -1,11 +1,11 @@
-' Search room. Left: a letter grid you drive with the arrows. Right: matches from
+' Search room. Left: the Hearth keyboard (suggests titles, dims dead keys). Right: matches from
 ' Jellyfin (movies, shows, music, and episodes once you've typed 3 letters),
 ' updating as you type. Right from the grid's last column jumps to the results.
 
 sub init()
     m.top.findNode("eyebrow").font = hFont("caps", 28)
-    m.queryLabel = m.top.findNode("query")
-    m.queryLabel.font = hFont("bold", 48)
+    m.kb = m.top.findNode("kb")
+    m.kb.observeField("text", "onKbText")
     m.resultsLabel = m.top.findNode("resultsLabel")
     m.resultsLabel.font = hFont("caps", 28)
     m.hint = m.top.findNode("hint")
@@ -16,12 +16,9 @@ sub init()
     m.debounce = m.top.findNode("debounce")
     m.debounce.observeField("fire", "runSearch")
 
-    m.keyW = 84
-    m.keyH = 70
-    m.keyGap = 10
     m.rowPitch = 142
     m.visibleRows = 5
-    m.idleHint = "Type a few letters. Movies, shows and music show up here as you go."
+    m.idleHint = "Type a few letters. Movies, shows and music show up here as you go, and the keyboard suggests titles from your library."
 
     m.query = ""
     m.results = []
@@ -29,113 +26,40 @@ sub init()
     m.first = 0
     m.zone = "kb"
     m.active = false
-    m.r = 0
-    m.c = 0
     m.seq = 0
     m.pending = 0
 
-    buildKeys()
-    showQuery()
     m.hint.text = m.idleHint
+    loadVocabulary()
     paint()
 end sub
 
-' ---------- the letter grid ----------
+' Every title and artist name, so the keyboard can suggest and dim keys.
+sub loadVocabulary()
+    m.vocabParts = []
+    m.vocabPending = 2
+    hApi("GET", "/Items", { userId: hUser(), Recursive: "true", IncludeItemTypes: "Movie,Series,MusicAlbum", EnableImages: "false", EnableUserData: "false", Limit: 8000 }, invalid, "onVocabulary")
+    hApi("GET", "/Artists", { userId: hUser(), EnableImages: "false", EnableUserData: "false", Limit: 4000 }, invalid, "onVocabulary")
+end sub
 
-sub buildKeys()
-    letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890"
-    keys = m.top.findNode("keys")
-    m.keyNodes = []
-    for r = 0 to 5
-        row = []
-        for c = 0 to 5
-            ch = Mid(letters, r * 6 + c + 1, 1)
-            row.push(makeKey(keys, c * (m.keyW + m.keyGap), r * (m.keyH + m.keyGap), m.keyW, m.keyH, ch, 34))
+sub onVocabulary(event as object)
+    t = hTaskFrom(event)
+    m.vocabPending = m.vocabPending - 1
+    if t.ok and t.response <> invalid and t.response.Items <> invalid
+        for each it in t.response.Items
+            if it.Name <> invalid then m.vocabParts.push(it.Name)
         end for
-        m.keyNodes.push(row)
-    end for
-    ' bottom row: three wide keys, each two columns wide
-    m.wideLabels = ["Space", "Delete", "Clear"]
-    m.wideNodes = []
-    wideW = m.keyW * 2 + m.keyGap
-    for k = 0 to 2
-        m.wideNodes.push(makeKey(keys, k * (wideW + m.keyGap), 6 * (m.keyH + m.keyGap), wideW, m.keyH, m.wideLabels[k], 28))
-    end for
-end sub
-
-function makeKey(parent as object, x as integer, y as integer, w as integer, h as integer, text as string, size as integer) as object
-    g = parent.createChild("Group")
-    g.translation = [x, y]
-    base = g.createChild("Poster")
-    base.uri = "pkg:/images/tile.9.png"
-    base.width = w
-    base.height = h
-    lab = g.createChild("Label")
-    lab.width = w
-    lab.height = h
-    lab.horizAlign = "center"
-    lab.vertAlign = "center"
-    lab.font = hFont("bold", size)
-    lab.text = text
-    return g
-end function
-
-sub paintKey(g as object, focused as boolean)
-    base = g.getChild(0)
-    lab = g.getChild(1)
-    if focused
-        base.blendColor = "0xE0B34AFF"
-        lab.color = "0x1F1606FF"
-    else
-        base.blendColor = "0x1D2418FF"
-        lab.color = "0xEDE6CAFF"
+    end if
+    if m.vocabPending = 0
+        m.kb.words = m.vocabParts
+        m.vocabParts = invalid
     end if
 end sub
 
-sub pressKey()
-    if m.r < 6
-        typeText(LCase(Mid("ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890", m.r * 6 + m.c + 1, 1)))
-        return
-    end if
-    k = m.c \ 2
-    if k = 0
-        if m.query <> "" and Right(m.query, 1) <> " " then typeText(" ")
-    else if k = 1
-        deleteLetter()
-    else
-        m.query = ""
-        queryChanged()
-    end if
-end sub
-
-sub typeText(s as string)
-    if Len(m.query) >= 40 then return
-    m.query = m.query + s
-    queryChanged()
-end sub
-
-sub deleteLetter()
-    if m.query = "" then return
-    m.query = Left(m.query, Len(m.query) - 1)
-    queryChanged()
-end sub
-
-sub queryChanged()
-    showQuery()
+sub onKbText()
+    m.query = m.kb.text
     m.debounce.control = "stop"
     m.debounce.control = "start"
-end sub
-
-sub showQuery()
-    if m.query = ""
-        m.queryLabel.text = "_"
-        m.queryLabel.color = "0xE0B34AFF"
-        return
-    end if
-    shown = m.query
-    if Len(shown) > 18 then shown = "..." + Right(shown, 17)
-    m.queryLabel.text = shown + "_"
-    m.queryLabel.color = "0xE0B34AFF"
 end sub
 
 ' ---------- searching ----------
@@ -196,17 +120,19 @@ sub onFound(event as object)
     for each k in keyed
         if list.count() < 40 then list.push(k.item)
     end for
+    matches = list.count()
+    ' last row: hand the term to the Requests room (Overseerr)
+    if m.failures < 2 then list.push({ Type: "HearthRequest", Name: "Ask for " + Chr(34) + m.term + Chr(34) })
     setResults(list)
 
-    if list.count() > 0
-        if list.count() = 1 then m.resultsLabel.text = "1 MATCH" else m.resultsLabel.text = list.count().toStr() + " MATCHES"
-        m.hint.text = ""
+    m.hint.text = ""
+    if matches > 0
+        if matches = 1 then m.resultsLabel.text = "1 MATCH" else m.resultsLabel.text = matches.toStr() + " MATCHES"
     else if m.failures >= 2
         m.resultsLabel.text = ""
         m.hint.text = "Couldn't reach Jellyfin. Check that the NAS is on, then type again."
     else
-        m.resultsLabel.text = ""
-        m.hint.text = "Nothing in your library matches " + Chr(34) + m.term + Chr(34) + "."
+        m.resultsLabel.text = "NOTHING IN YOUR LIBRARY YET"
     end if
 end sub
 
@@ -261,6 +187,10 @@ sub makeRow(it as object, y as integer)
         letter.font = hFont("caps", 48)
         letter.color = "0xB5AF8CFF"
         letter.text = UCase(Left(rowTitle(it), 1))
+        if it.Type = "HearthRequest"
+            letter.text = "+"
+            letter.color = "0xE0B34AFF"
+        end if
     end if
 
     title = g.createChild("Label")
@@ -309,6 +239,8 @@ function rowSubtitle(it as object) as string
         if it.ProductionYear <> invalid then parts.push(it.ProductionYear.toStr())
     else if t = "MusicArtist"
         parts.push("Artist")
+    else if t = "HearthRequest"
+        parts.push("Search Overseerr and request it")
     else if t = "Audio"
         parts.push("Song")
         artist = it.AlbumArtist
@@ -323,6 +255,7 @@ end function
 
 function artFor(it as object) as object
     t = it.Type
+    if t = "HearthRequest" then return { uri: "", square: false }
     if t = "Movie" or t = "Series"
         return { uri: hImageAny(it, ["Thumb", "Backdrop", "Primary"], 400), square: false }
     else if t = "Episode"
@@ -342,8 +275,26 @@ end function
 sub openResult()
     if m.sel >= m.results.count() then return
     it = m.results[m.sel]
-    if isMusic(it)
-        hMessage("Music is on its way", "Search can find songs, albums and artists, but they'll open once the Music room is built.")
+    if it.Type = "HearthRequest"
+        m.top.request = { action: "room", name: "Requests", search: m.term }
+    else if isMusic(it)
+        ' the Music room plays from Plex, so it gets names rather than Jellyfin ids
+        r = { action: "playMusic", title: rowTitle(it), artist: "" }
+        if it.Type = "MusicAlbum"
+            r.kind = "album"
+            if it.AlbumArtist <> invalid then r.artist = it.AlbumArtist
+        else if it.Type = "MusicArtist"
+            r.kind = "artist"
+            r.artist = rowTitle(it)
+        else
+            r.kind = "track"
+            if it.Artists <> invalid and it.Artists.count() > 0
+                r.artist = it.Artists[0]
+            else if it.AlbumArtist <> invalid
+                r.artist = it.AlbumArtist
+            end if
+        end if
+        m.top.request = r
     else
         m.top.request = { action: "details", item: it }
     end if
@@ -352,15 +303,7 @@ end sub
 ' ---------- focus and painting ----------
 
 sub paint()
-    for r = 0 to 5
-        for c = 0 to 5
-            paintKey(m.keyNodes[r][c], m.active and m.zone = "kb" and m.r = r and m.c = c)
-        end for
-    end for
-    for k = 0 to 2
-        paintKey(m.wideNodes[k], m.active and m.zone = "kb" and m.r = 6 and (m.c \ 2) = k)
-    end for
-
+    m.kb.active = (m.active and m.zone = "kb")
     n = m.list.getChildCount()
     for i = 0 to n - 1
         g = m.list.getChild(i)
@@ -403,51 +346,24 @@ end sub
 function onKeyEvent(key as string, press as boolean) as boolean
     if not press then return false
 
-    ' typing from the Roku phone app's keyboard
-    if Left(key, 4) = "Lit_"
-        typeText(LCase(Mid(key, 5)))
-        return true
-    else if key = "backspace"
-        deleteLetter()
-        return true
-    end if
-
     if m.zone = "kb"
-        if key = "up"
-            if m.r = 0
-                toPills()
-                return true
-            end if
-            m.r = m.r - 1
-        else if key = "down"
-            if m.r < 6 then m.r = m.r + 1
-        else if key = "left"
-            if m.r = 6
-                if m.c \ 2 > 0 then m.c = (m.c \ 2 - 1) * 2
-            else if m.c > 0
-                m.c = m.c - 1
-            end if
-        else if key = "right"
-            atEdge = (m.c = 5)
-            if m.r = 6 then atEdge = (m.c \ 2 = 2)
-            if atEdge
-                if m.results.count() > 0 then m.zone = "results"
-            else if m.r = 6
-                m.c = (m.c \ 2 + 1) * 2
-            else
-                m.c = m.c + 1
-            end if
-        else if key = "OK"
-            pressKey()
-        else if key = "back"
+        edge = m.kb.callFunc("handleKey", key)
+        if edge = "up" or edge = "back"
             toPills()
-            return true
+        else if edge = "right"
+            if m.results.count() > 0
+                m.zone = "results"
+                paint()
+            end if
         end if
-        paint()
         return true
     end if
 
-    ' results
+    ' results; typing from the phone app still goes to the keyboard
+    if Left(key, 4) = "Lit_" or key = "backspace"
+        m.kb.callFunc("handleKey", key)
+        return true
+    end if
     if key = "up"
         if m.sel > 0 then m.sel = m.sel - 1 else m.zone = "kb"
     else if key = "down"
@@ -458,7 +374,7 @@ function onKeyEvent(key as string, press as boolean) as boolean
         openResult()
     else if key = "options"
         it = m.results[m.sel]
-        if not isMusic(it) then hOptions(it)
+        if not isMusic(it) and it.Type <> "HearthRequest" then hOptions(it)
     end if
     paint()
     return true
