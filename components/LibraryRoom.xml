@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Movies or Shows: a hero for the focused title, then shelves. -->
+<component name="LibraryRoom" extends="Group">
+  <children>
+    <Poster id="backdrop" translation="[620, -150]" width="1300" height="640" loadDisplayMode="scaleToZoom" />
+    <Poster uri="pkg:/images/shade.png" translation="[620, -150]" width="1300" height="640" />
+    <Group id="info" translation="[96, 10]">
+      <Label id="eyebrow" color="0xD9A066FF" />
+      <Label id="title" translation="[0, 36]" width="900" wrap="true" maxLines="2" color="0xEDE6CAFF" />
+      <Label id="overview" translation="[0, 210]" width="820" height="110" wrap="true" maxLines="3" color="0xB5AF8CFF" />
+    </Group>
+    <Label id="empty" translation="[96, 420]" width="1500" color="0xB5AF8CFF" />
+    <Group id="shelves" translation="[0, 360]">
+      <Group id="content" />
+    </Group>
+    <Animation id="scroll" duration="0.22" easeFunction="outQuad">
+      <Vector2DFieldInterpolator id="scrollTo" key="[0.0, 1.0]" fieldToInterp="content.translation" />
+    </Animation>
+  </children>
+  <interface>
+    <field id="kind" type="string" onChange="refresh" />
+    <field id="request" type="assocarray" alwaysNotify="true" />
+    <function name="focusIn" />
+    <function name="refresh" />
+  </interface>
+  <script type="text/brightscript" uri="pkg:/source/util.brs" />
+  <script type="text/brightscript" uri="pkg:/components/dialogs.brs" />
+  <script type="text/brightscript" uri="pkg:/components/LibraryRoom.brs" />
+</component>

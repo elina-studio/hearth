@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Root scene: saved login, a stack of screens (Setup or Hub at the bottom, then Details, Player). -->
+<component name="HearthScene" extends="Scene">
+  <children>
+    <Poster id="bg" uri="pkg:/images/bg.jpg" width="1920" height="1080" />
+    <Group id="stack" />
+  </children>
+  <interface>
+    <field id="exitApp" type="boolean" value="false" />
+    <field id="request" type="assocarray" alwaysNotify="true" onChange="onRequest" />
+  </interface>
+  <script type="text/brightscript" uri="pkg:/source/util.brs" />
+  <script type="text/brightscript" uri="pkg:/components/HearthScene.brs" />
+</component>

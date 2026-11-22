@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Details: big title, overview, one row of buttons, then episodes (shows) or more like this (movies). -->
+<component name="DetailsScreen" extends="Group">
+  <children>
+    <Poster id="backdrop" translation="[620, 0]" width="1300" height="700" loadDisplayMode="scaleToZoom" />
+    <Poster uri="pkg:/images/shade.png" translation="[620, 0]" width="1300" height="700" />
+    <Rectangle width="760" height="700" color="0x0B0E09B0" />
+    <Group id="content">
+      <Group translation="[96, 90]">
+        <Label id="eyebrow" color="0xD9A066FF" />
+        <Label id="title" translation="[0, 40]" width="1100" wrap="true" maxLines="2" color="0xEDE6CAFF" />
+        <Label id="meta" translation="[0, 232]" width="1100" color="0xD9A066FF" />
+        <Label id="overview" translation="[0, 280]" width="900" height="150" wrap="true" maxLines="4" color="0xB5AF8CFF" />
+        <Rectangle id="track" translation="[0, 446]" width="520" height="8" color="0xFFFFFF22" visible="false" />
+        <Rectangle id="bar" translation="[0, 446]" width="0" height="8" color="0xE0B34AFF" />
+        <LayoutGroup id="buttons" translation="[0, 480]" layoutDirection="horiz" itemSpacings="[16]" />
+      </Group>
+      <CardRow id="below" translation="[96, 680]" />
+    </Group>
+    <Animation id="scroll" duration="0.22" easeFunction="outQuad">
+      <Vector2DFieldInterpolator id="scrollTo" key="[0.0, 1.0]" fieldToInterp="content.translation" />
+    </Animation>
+  </children>
+  <interface>
+    <field id="item" type="assocarray" onChange="load" />
+    <field id="request" type="assocarray" alwaysNotify="true" />
+    <function name="onShown" />
+  </interface>
+  <script type="text/brightscript" uri="pkg:/source/util.brs" />
+  <script type="text/brightscript" uri="pkg:/components/dialogs.brs" />
+  <script type="text/brightscript" uri="pkg:/components/DetailsScreen.brs" />
+</component>

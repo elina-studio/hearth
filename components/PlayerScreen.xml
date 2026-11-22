@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Full-screen playback with resume. Uses the Roku video UI for now; the Hearth HUD comes later. -->
+<component name="PlayerScreen" extends="Group">
+  <children>
+    <Rectangle width="1920" height="1080" color="0x000000FF" />
+    <Video id="video" width="1920" height="1080" enableUI="true" />
+    <Label id="status" translation="[96, 980]" width="1728" color="0xB5AF8CFF" text="Lighting the lantern..." />
+    <Timer id="tick" duration="10" repeat="true" />
+  </children>
+  <interface>
+    <field id="item" type="assocarray" onChange="start" />
+    <field id="resume" type="boolean" />
+    <field id="request" type="assocarray" alwaysNotify="true" />
+    <function name="onShown" />
+  </interface>
+  <script type="text/brightscript" uri="pkg:/source/util.brs" />
+  <script type="text/brightscript" uri="pkg:/components/dialogs.brs" />
+  <script type="text/brightscript" uri="pkg:/components/PlayerScreen.brs" />
+</component>

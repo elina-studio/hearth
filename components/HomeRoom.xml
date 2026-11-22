@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Home dashboard: Continue hero + tiles, Next up, mood row, Recently added. -->
+<component name="HomeRoom" extends="Group">
+  <children>
+    <Group id="content">
+      <Group id="hero" translation="[96, 20]">
+        <Rectangle width="1060" height="470" color="0x141A11FF" />
+        <Poster id="heroArt" width="1060" height="470" loadDisplayMode="scaleToZoom" />
+        <Poster uri="pkg:/images/shade.png" width="1060" height="470" />
+        <Label id="heroEyebrow" translation="[40, 312]" width="980" color="0xE0B34AFF" />
+        <Label id="heroTitle" translation="[40, 344]" width="980" color="0xEDE6CAFF" />
+        <Rectangle id="heroTrack" translation="[40, 432]" width="520" height="8" color="0xFFFFFF22" />
+        <Rectangle id="heroBar" translation="[40, 432]" width="0" height="8" color="0xE0B34AFF" />
+        <Poster id="heroRing" uri="pkg:/images/ring.9.png" blendColor="0xE0B34AFF" translation="[-10, -10]" width="1080" height="490" visible="false" />
+      </Group>
+      <Group id="nowTile" translation="[1186, 20]">
+        <Poster uri="pkg:/images/tile.9.png" blendColor="0x141A11FF" width="638" height="225" />
+        <Label id="nowEyebrow" translation="[34, 34]" width="570" color="0xD9A066FF" text="MUSIC" />
+        <Label id="nowTitle" translation="[34, 72]" width="570" color="0xEDE6CAFF" text="Music room is next" />
+        <Label id="nowSub" translation="[34, 130]" width="570" wrap="true" color="0xB5AF8CFF" text="Music Assistant connects in the music build." />
+        <Poster id="nowRing" uri="pkg:/images/ring.9.png" blendColor="0xE0B34AFF" translation="[-10, -10]" width="658" height="245" visible="false" />
+      </Group>
+      <Group id="reqTile" translation="[1186, 265]">
+        <Poster uri="pkg:/images/tile.9.png" blendColor="0x141A11FF" width="638" height="225" />
+        <Label id="reqEyebrow" translation="[34, 34]" width="570" color="0xB5AF8CFF" text="REQUESTS" />
+        <Label id="reqBig" translation="[34, 72]" width="570" color="0xE0B34AFF" text="Soon" />
+        <Label id="reqSub" translation="[34, 160]" width="570" color="0xB5AF8CFF" text="Overseerr connects in a later build" />
+        <Poster id="reqRing" uri="pkg:/images/ring.9.png" blendColor="0xE0B34AFF" translation="[-10, -10]" width="658" height="245" visible="false" />
+      </Group>
+      <CardRow id="nextUp" translation="[96, 540]" title="Next up" />
+      <CardRow id="mood" translation="[96, 880]" title="Set the mood" cardWidth="400" cardHeight="130" showCaption="false" />
+      <CardRow id="latest" translation="[96, 1100]" title="Recently added" />
+    </Group>
+    <Animation id="scroll" duration="0.22" easeFunction="outQuad">
+      <Vector2DFieldInterpolator id="scrollTo" key="[0.0, 1.0]" fieldToInterp="content.translation" />
+    </Animation>
+  </children>
+  <interface>
+    <field id="request" type="assocarray" alwaysNotify="true" />
+    <function name="focusIn" />
+    <function name="refresh" />
+  </interface>
+  <script type="text/brightscript" uri="pkg:/source/util.brs" />
+  <script type="text/brightscript" uri="pkg:/components/dialogs.brs" />
+  <script type="text/brightscript" uri="pkg:/components/HomeRoom.brs" />
+</component>

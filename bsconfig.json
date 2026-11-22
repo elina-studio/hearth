@@ -1,0 +1,9 @@
+{
+  "rootDir": "./",
+  "files": ["manifest", "source/**/*", "components/**/*", "images/**/*", "fonts/**/*", "LICENSE"],
+  "stagingDir": "out/staging",
+  "outFile": "out/hearth.zip",
+  "createPackage": true,
+  "retainStagingDir": false,
+  "diagnosticFilters": [{ "codes": [1128] }]
+}

@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A titled row of cards. The parent owns focus and calls move(); OK handling stays with the parent. -->
+<component name="CardRow" extends="Group">
+  <children>
+    <Label id="title" color="0xB5AF8CFF" translation="[0, 0]" />
+    <Rectangle id="rule" color="0xD9A06655" height="2" translation="[0, 22]" />
+    <Group id="clip" translation="[0, 56]">
+      <Group id="strip" />
+    </Group>
+  </children>
+  <interface>
+    <field id="title" type="string" onChange="onTitle" />
+    <field id="cards" type="array" onChange="build" />
+    <field id="cardWidth" type="integer" value="320" />
+    <field id="cardHeight" type="integer" value="180" />
+    <field id="showCaption" type="boolean" value="true" />
+    <field id="index" type="integer" value="0" />
+    <field id="active" type="boolean" value="false" onChange="paint" />
+    <field id="rowHeight" type="integer" />
+    <function name="move" />
+    <function name="current" />
+    <function name="count" />
+  </interface>
+  <script type="text/brightscript" uri="pkg:/source/util.brs" />
+  <script type="text/brightscript" uri="pkg:/components/CardRow.brs" />
+</component>
