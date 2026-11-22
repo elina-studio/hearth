@@ -20,7 +20,7 @@
       <Poster id="qR" uri="pkg:/images/intro-qR.png" width="112" height="47" opacity="0.55" />
       <Label id="quote" color="0xB5AF8CFF" />
     </Group>
-    <Animation id="swayAnim" duration="16" repeat="true" easeFunction="linear">
+    <Animation id="swayAnim" duration="12" repeat="true" easeFunction="linear">
       <FloatFieldInterpolator id="swayInterp" fieldToInterp="sway.rotation" />
       <Vector2DFieldInterpolator id="flameFollow" fieldToInterp="flameClip.translation" />
     </Animation>

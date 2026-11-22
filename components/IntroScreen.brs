@@ -10,10 +10,10 @@ sub init()
     m.frame = 0
     m.dir = 1
 
-    ' sway: +-0.9 degrees about the top centre, 8 s each way, sine eased
+    ' sway: +-2.5 degrees about the top centre, 6 s each way, sine eased
     keys = [] : vals = [] : follow = []
     for i = 0 to 32
-        a = 0.0157 * Sin(i / 32 * 6.2832)
+        a = 0.0436 * Sin(i / 32 * 6.2832)
         keys.push(i / 32)
         vals.push(a)
         ' where the flame's centre (960, 540) lands when the lantern turns by a about (960, 0)
