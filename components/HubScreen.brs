@@ -75,6 +75,8 @@ sub showRoom(name as string, focus as boolean)
         else if name = "Movies" or name = "Shows"
             room = CreateObject("roSGNode", "LibraryRoom")
             if name = "Movies" then room.kind = "movies" else room.kind = "tvshows"
+        else if name = "Search"
+            room = CreateObject("roSGNode", "SearchRoom")
         else
             room = CreateObject("roSGNode", "PlaceholderRoom")
             room.name = name
