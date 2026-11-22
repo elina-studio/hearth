@@ -76,7 +76,7 @@ sub onAlbums(event as object)
         tile.title = a.Name
         n = a.count
         if n = invalid then tile.sub = "Album" else if n = 1 then tile.sub = "1 photo" else tile.sub = n.toStr() + " photos"
-        tile.image = pPhotoUrl(a, 260, 260)
+        tile.image = pPhotoUrl(a, 180, 180)
     end for
     if m.albums.count() = 0 then m.note.text = "No albums yet. Subfolders of your photos folder show up here." else m.note.text = ""
     if m.sel >= m.albums.count() then m.sel = 0
@@ -96,7 +96,7 @@ sub onHeroPhoto(event as object)
         m.heroSub.text = "The photos library is empty so far. Plex may still be scanning."
         return
     end if
-    m.heroArt.uri = pPhotoUrl(items[0], 1180, 620)
+    m.heroArt.uri = pPhotoUrl(items[0], 800, 420)
 end sub
 
 ' ---------- focus ----------

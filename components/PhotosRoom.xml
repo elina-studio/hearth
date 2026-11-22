@@ -4,7 +4,7 @@
   <children>
     <Group id="hero" translation="[96, 20]">
       <Rectangle width="1180" height="620" color="0x141A11FF" />
-      <Poster id="heroArt" width="1180" height="620" loadWidth="1180" loadHeight="620" loadDisplayMode="scaleToZoom" />
+      <Poster id="heroArt" width="1180" height="620" loadWidth="800" loadHeight="420" loadDisplayMode="scaleToZoom" />
       <Poster uri="pkg:/images/shade.png" width="1180" height="620" />
       <Label id="heroEyebrow" translation="[44, 430]" width="1090" color="0xE0B34AFF" />
       <Label id="heroTitle" translation="[44, 466]" width="1090" color="0xEDE6CAFF" />

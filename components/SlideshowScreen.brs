@@ -123,7 +123,7 @@ sub load(item as object)
     m.loading = true
     m.advance.control = "stop"
     m.pending = item
-    url = pPhotoUrl(item, 1920, 1080)
+    url = pPhotoUrl(item, 1280, 720)
     nextLayer = m.layers[1 - m.front]
     ' stepping back can land on the photo this layer already holds; no reload event comes then
     if nextLayer.photo.uri = url and nextLayer.photo.loadStatus = "ready"
