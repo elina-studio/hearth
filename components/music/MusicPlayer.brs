@@ -50,6 +50,12 @@ sub onCommand()
         if m.top.position > 4 then restart() else skip(-1)
     else if cmd = "restart"
         restart()
+    else if cmd = "queueTracks"
+        enqueue(c.tracks, c.next = true, c.label)
+    else if cmd = "queueContainer"
+        if c.next = true then tag = "queueNext" else tag = "queueEnd"
+        path = containerPath(c.kind, c.id)
+        if path <> "" then withSection({ path: path, query: {}, label: c.label, tag: tag })
     else if cmd = "nextLibrary"
         nextLibrary()
     else if cmd = "findLibrary"
@@ -175,16 +181,37 @@ sub shuffleAll()
     withSection({ path: "", query: { type: "10", sort: "random", "X-Plex-Container-Start": "0", "X-Plex-Container-Size": "150" }, label: "", tag: "all" })
 end sub
 
-sub playContainer(kind as string, id as string, shuffle as boolean, label as dynamic)
-    if kind = "album"
-        path = "/library/metadata/" + id + "/children"
-    else if kind = "artist"
-        path = "/library/metadata/" + id + "/allLeaves"
-    else if kind = "playlist"
-        path = "/playlists/" + id + "/items"
-    else
+function containerPath(kind as string, id as string) as string
+    if kind = "album" then return "/library/metadata/" + id + "/children"
+    if kind = "artist" then return "/library/metadata/" + id + "/allLeaves"
+    if kind = "playlist" then return "/playlists/" + id + "/items"
+    return ""
+end function
+
+' Play next (right after this song) or add to the end of the queue
+sub enqueue(tracks as object, nextUp as boolean, label as dynamic)
+    if tracks = invalid or tracks.Count() = 0 then return
+    q = m.top.queue
+    if q = invalid or q.Count() = 0
+        load(tracks, 0, false, label)
         return
     end if
+    out = []
+    for i = 0 to q.Count() - 1
+        out.push(q[i])
+        if nextUp and i = m.top.index then out.append(tracks)
+    end for
+    if not nextUp then out.append(tracks)
+    m.top.queue = out
+    if m.original <> invalid then m.original.append(tracks)
+    name = ""
+    if label <> invalid then name = label
+    if nextUp then say(name + " plays next") else say(name + " added to the queue")
+end sub
+
+sub playContainer(kind as string, id as string, shuffle as boolean, label as dynamic)
+    path = containerPath(kind, id)
+    if path = "" then return
     withSection({ path: path, query: {}, label: label, shuffle: shuffle, tag: kind })
 end sub
 
@@ -215,6 +242,10 @@ sub onTracks(event as object)
         return
     end if
     tracks = pxTracks(pxItems(t))
+    if t.tag = "queueNext" or t.tag = "queueEnd"
+        enqueue(tracks, t.tag = "queueNext", m.label)
+        return
+    end if
     if t.tag = "nearest"
         if tracks.count() = 0
             say("Plex has no sonic matches for this song. That needs Plex Pass and sonic analysis.")

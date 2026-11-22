@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- ✱ in the slideshow: a small card in the corner with this photo and five icon chips
+     (Favourite, seconds per photo, order, pan and zoom, screensaver). The photo stays visible. -->
+<component name="PhotoOptions" extends="Group">
+  <children>
+    <Group id="card">
+      <Poster id="cardBg" uri="pkg:/images/tile.9.png" blendColor="0x0F140CF2" width="760" />
+      <Poster id="cardRing" uri="pkg:/images/ring.9.png" blendColor="0xE0B34AFF" translation="[-10, -10]" width="780" />
+      <Rectangle translation="[34, 34]" width="120" height="80" color="0x1C2418FF" />
+      <Poster id="thumb" translation="[34, 34]" width="120" height="80" loadWidth="240" loadHeight="160" loadDisplayMode="scaleToZoom" />
+      <Label id="eyebrow" translation="[176, 38]" width="550" color="0xE0B34AFF" />
+      <Label id="caption" translation="[176, 74]" width="550" color="0xEDE6CAFF" />
+      <Group id="chips" translation="[34, 140]" />
+    </Group>
+    <Group translation="[1824, 1004]">
+      <KeyHints id="help" />
+    </Group>
+  </children>
+  <interface>
+    <field id="eyebrowText" type="string" />
+    <field id="captionText" type="string" />
+    <field id="thumbUri" type="string" alias="thumb.uri" />
+    <field id="favourite" type="boolean" value="false" />
+    <field id="saverChoice" type="string" />
+    <!-- what changed: { key, value } -->
+    <field id="changed" type="assocarray" alwaysNotify="true" />
+    <field id="closed" type="boolean" alwaysNotify="true" />
+    <function name="setup" />
+  </interface>
+  <script type="text/brightscript" uri="pkg:/source/util.brs" />
+  <script type="text/brightscript" uri="pkg:/source/photos.brs" />
+  <script type="text/brightscript" uri="pkg:/components/PhotoOptions.brs" />
+</component>

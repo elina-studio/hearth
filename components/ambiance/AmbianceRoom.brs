@@ -1,139 +1,181 @@
-' Column geometry: the room is 1920 x 930 under the pills. The focused column is WIDE px,
-' the others share the rest; RULE px of gold weave sits between neighbours.
+' Geometry (1920 x 930 under the pills): PEEK px of the neighbours show at each edge, three panels of
+' W px fill the middle, RULE px dividers sit between. The focused panel is kept in the middle slot
+' (or the first/last slot at the ends) by sliding the whole strip.
 sub init()
     m.H = 930
-    m.WIDE = 760
-    m.RULE = 14
+    m.RULE = 24
+    m.PEEK = 120
+    m.W = Int((1920 - 2 * m.RULE - 2 * m.PEEK) / 3)
     m.items = ambMoods()
     m.n = m.items.count()
-    m.narrow = (1920 - m.WIDE - (m.n - 1) * m.RULE) / (m.n - 1)
-    ' open on the mood used last
-    m.index = 0
     last = CreateObject("roRegistrySection", "hearth").Read("ambLast")
-    for i = 0 to m.items.count() - 1
+    m.index = 0
+    for i = 0 to m.n - 1
         if m.items[i].mood = last then m.index = i
     end for
     m.active = false
-    m.cols = []
-    holder = m.top.findNode("cols")
+    m.strip = m.top.findNode("strip")
+    m.panels = []
     for i = 0 to m.n - 1
-        it = m.items[i]
-        c = {}
-        g = holder.createChild("Group")
-        c.group = g
-        p = g.createChild("Poster")
-        ' the picture is always drawn at the wide size and centred; the clip shows the middle of it
-        p.width = m.WIDE
-        p.height = m.H
-        p.loadDisplayMode = "scaleToZoom"
-        p.uri = it.still
-        c.poster = p
-        sh = g.createChild("Poster")
-        sh.uri = "pkg:/images/shade.png"
-        sh.height = 520
-        sh.translation = [0, m.H - 520]
-        c.shade = sh
-        t = g.createChild("Label")
-        t.font = hFont("caps", 64)
-        t.wrap = true
-        t.maxLines = 2
-        t.vertAlign = "bottom"
-        t.height = 160
-        t.color = "0xEDE6CAFF"
-        t.text = UCase(it.title)
-        c.title = t
-        s = g.createChild("Label")
-        s.font = hFont("fell", 30)
-        s.color = "0xB5AF8CFF"
-        s.text = it.sub
-        c.sub = s
-        bar = g.createChild("Rectangle")
-        bar.height = 6
-        bar.color = "0xE0B34AFF"
-        c.bar = bar
-        m.cols.push(c)
+        m.panels.push(makePanel(i))
         if i < m.n - 1
-            w = holder.createChild("Poster")
-            w.uri = "pkg:/images/amb/weave.png"
-            w.width = m.RULE
-            w.height = m.H
-            c.rule = w
+            r = m.strip.createChild("Poster")
+            r.uri = "pkg:/images/amb/divider.png"
+            r.width = m.RULE
+            r.height = m.H
+            r.translation = [panelX(i) + m.W, 0]
         end if
     end for
-    m.cur = targets()
-    layout(m.cur)
-    m.step = m.top.findNode("step")
-    m.step.observeField("fire", "onStep")
+    dots = m.top.findNode("dots")
+    m.dots = []
+    for i = 0 to m.n - 1
+        dt = dots.createChild("Rectangle")
+        dt.width = 12
+        dt.height = 12
+        dt.translation = [960 - (m.n * 26) / 2 + i * 26, m.H - 26]
+        m.dots.push(dt)
+    end for
+    m.slideTo = m.top.findNode("slideTo")
+    m.slide = m.top.findNode("slide")
+    m.strip.translation = [stripX(), 0]
+    paint()
 end sub
 
-' target width for each column
-function targets() as object
-    out = []
-    for i = 0 to m.n - 1
-        if i = m.index then out.push(m.WIDE) else out.push(m.narrow)
-    end for
-    return out
+function panelX(i as integer) as integer
+    return i * (m.W + m.RULE)
 end function
 
-sub layout(widths as object)
-    x = 0
-    for i = 0 to m.n - 1
-        c = m.cols[i]
-        w = widths[i]
-        c.group.translation = [x, 0]
-        c.group.clippingRect = [0, 0, w, m.H]
-        c.poster.translation = [(w - m.WIDE) / 2, 0]
-        c.shade.width = w
-        focused = (m.active and i = m.index)
-        c.title.translation = [28, m.H - 250]
-        c.title.width = w - 50
-        c.sub.translation = [30, m.H - 78]
-        c.sub.width = w - 50
-        c.sub.visible = (w > m.narrow + 200)
-        if focused then c.title.color = "0xE0B34AFF" else c.title.color = "0xEDE6CAFF"
-        c.bar.width = w
-        c.bar.translation = [0, m.H - 6]
-        c.bar.visible = focused
-        if focused or not m.active then c.group.opacity = 1.0 else c.group.opacity = 0.62
-        x = x + w
-        if c.rule <> invalid
-            c.rule.translation = [x, 0]
-            x = x + m.RULE
-        end if
-    end for
-end sub
+' strip offset that puts the focused panel in its slot (slot 1 of 0..2 when possible)
+function stripX() as integer
+    slot = 1
+    if m.index = 0 then slot = 0
+    if m.index = m.n - 1 then slot = 2
+    return m.PEEK + slot * (m.W + m.RULE) - panelX(m.index)
+end function
 
-' ease the widths toward their targets, about a quarter of a second
-sub onStep()
-    goal = targets()
-    done = true
+function makePanel(i as integer) as object
+    it = m.items[i]
+    p = {}
+    g = m.strip.createChild("Group")
+    g.translation = [panelX(i), 0]
+    p.group = g
+    pic = g.createChild("Poster")
+    pic.width = m.W
+    pic.height = m.H
+    pic.loadDisplayMode = "scaleToZoom"
+    pic.uri = it.still
+    top = g.createChild("Poster")
+    top.uri = "pkg:/images/amb/shade-top.png"
+    top.width = m.W
+    top.height = 420
+    bot = g.createChild("Poster")
+    bot.uri = "pkg:/images/shade.png"
+    bot.width = m.W
+    bot.height = 220
+    bot.translation = [0, m.H - 220]
+    p.bottomShade = bot
+    num = g.createChild("Label")
+    num.font = hFont("caps", 34)
+    num.translation = [40, 40]
+    nn = (i + 1).toStr()
+    if i + 1 < 10 then nn = "0" + nn
+    num.text = nn
+    p.num = num
+    t = g.createChild("Label")
+    t.font = hFont("caps", 92)
+    t.translation = [40, 76]
+    t.width = m.W - 60
+    t.text = UCase(it.title)
+    p.title = t
+    s = g.createChild("Label")
+    s.font = hFont("fell", 34)
+    s.color = "0xB5AF8CFF"
+    s.translation = [44, 190]
+    s.width = m.W - 70
+    s.text = it.sub
+    ' controls on the focused panel: OK Play, and the sound state
+    c = g.createChild("Group")
+    c.translation = [40, m.H - 82]
+    ok = c.createChild("Poster")
+    ok.uri = "pkg:/images/amb/icon-ok.png"
+    ok.width = 62
+    ok.height = 44
+    lab = c.createChild("Label")
+    lab.font = hFont("regular", 26)
+    lab.color = "0xB5AF8CFF"
+    lab.translation = [76, 6]
+    if it.mood = "window" then lab.text = "Open" else lab.text = "Play"
+    snd = c.createChild("Poster")
+    snd.width = 46
+    snd.height = 34
+    snd.translation = [170, 5]
+    sl = c.createChild("Label")
+    sl.font = hFont("regular", 26)
+    sl.color = "0xB5AF8CFF"
+    sl.translation = [228, 6]
+    p.soundIcon = snd
+    p.soundLabel = sl
+    p.controls = c
+    bar = g.createChild("Rectangle")
+    bar.width = m.W
+    bar.height = 6
+    bar.color = "0xE0B34AFF"
+    bar.translation = [0, m.H - 6]
+    p.bar = bar
+    p.mood = it.mood
+    return p
+end function
+
+sub paint()
+    reg = CreateObject("roRegistrySection", "hearth")
     for i = 0 to m.n - 1
-        d = goal[i] - m.cur[i]
-        if Abs(d) < 2
-            m.cur[i] = goal[i]
+        p = m.panels[i]
+        foc = (i = m.index)
+        lit = foc and m.active
+        if lit
+            p.title.color = "0xE0B34AFF"
+            p.num.color = "0xE0B34AFF"
+            p.group.opacity = 1.0
         else
-            m.cur[i] = m.cur[i] + d * 0.35
-            done = false
+            p.title.color = "0xEDE6CAFF"
+            p.num.color = "0xB5AF8CFF"
+            if foc then p.group.opacity = 1.0 else p.group.opacity = 0.55
+        end if
+        p.bar.visible = lit
+        p.controls.visible = lit
+        p.bottomShade.visible = lit
+        if p.mood = "window"
+            p.soundIcon.visible = false
+            p.soundLabel.visible = false
+        else
+            on = (reg.Read("ambSound_" + p.mood) <> "0")
+            if on then p.soundIcon.uri = "pkg:/images/amb/icon-sound-on.png" else p.soundIcon.uri = "pkg:/images/amb/icon-sound-off.png"
+            if on then p.soundLabel.text = "Sound on" else p.soundLabel.text = "Sound off"
         end if
     end for
-    layout(m.cur)
-    if done then m.step.control = "stop"
+    for i = 0 to m.n - 1
+        if i = m.index then m.dots[i].color = "0xE0B34AFF" else m.dots[i].color = "0x464638FF"
+    end for
 end sub
 
 sub focusIn(unused as dynamic)
     m.active = true
-    layout(m.cur)
+    paint()
     m.top.setFocus(true)
 end sub
 
+' sound settings can change inside a mood; repaint when we come back
 sub refresh(unused as dynamic)
+    paint()
 end sub
 
 sub move(d as integer)
     i = m.index + d
     if i < 0 or i >= m.n then return
     m.index = i
-    m.step.control = "start"
+    m.slideTo.keyValue = [m.strip.translation, [stripX(), 0]]
+    m.slide.control = "start"
+    paint()
 end sub
 
 function onKeyEvent(key as string, press as boolean) as boolean
@@ -155,7 +197,7 @@ function onKeyEvent(key as string, press as boolean) as boolean
         return true
     else if key = "up" or key = "back"
         m.active = false
-        layout(m.cur)
+        paint()
         m.top.request = { action: "pills" }
         return true
     end if

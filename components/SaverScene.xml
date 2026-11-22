@@ -1,7 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Screensaver: the lantern intro with nothing to press. -->
+<!-- Screensaver: your photos when "Use for screensaver" is on in the slideshow, otherwise the lantern. -->
 <component name="SaverScene" extends="Scene">
   <children>
-    <IntroScreen id="intro" mode="saver" />
+    <IntroScreen id="intro" mode="saver" visible="false" />
   </children>
+  <script type="text/brightscript" uri="pkg:/source/util.brs" />
+  <script type="text/brightscript" uri="pkg:/source/photos.brs" />
+  <script type="text/brightscript" uri="pkg:/components/SaverScene.brs" />
 </component>

@@ -1,24 +1,30 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Photos room ("The Window"): start a slideshow of everything, or pick an album. -->
+<!-- Photos room, layout C "The window": a live photo fills the room behind three buttons; albums on one rail. -->
 <component name="PhotosRoom" extends="Group">
   <children>
-    <Group id="hero" translation="[96, 20]">
-      <Rectangle width="1180" height="620" color="0x141A11FF" />
-      <Poster id="heroArt" width="1180" height="620" loadWidth="800" loadHeight="420" loadDisplayMode="scaleToZoom" />
-      <Poster uri="pkg:/images/shade.png" width="1180" height="620" />
-      <Label id="heroEyebrow" translation="[44, 430]" width="1090" color="0xE0B34AFF" />
-      <Label id="heroTitle" translation="[44, 466]" width="1090" color="0xEDE6CAFF" />
-      <Label id="heroSub" translation="[44, 560]" width="1090" color="0xB5AF8CFF" />
-      <Poster id="heroRing" uri="pkg:/images/ring.9.png" blendColor="0xE0B34AFF" translation="[-10, -10]" width="1200" height="640" visible="false" />
+    <!-- the room sits 150 px below the top of the screen; the window photo fills the whole screen -->
+    <Group id="window" translation="[0, -150]">
+      <Poster id="winA" width="1920" height="1080" loadWidth="1280" loadHeight="720" loadDisplayMode="scaleToZoom" opacity="0" />
+      <Poster id="winB" width="1920" height="1080" loadWidth="1280" loadHeight="720" loadDisplayMode="scaleToZoom" opacity="0" />
+      <Poster uri="pkg:/images/photos/room-shade.png" width="1920" height="1080" />
     </Group>
-    <Label id="albumsLabel" translation="[1316, 20]" width="508" color="0xB5AF8CFF" text="ALBUMS" />
-    <Group id="albumClip" translation="[1306, 60]" clippingRect="[0, 0, 528, 600]">
+    <Poster id="eyeIcon" uri="pkg:/images/icons/icon-album.png" blendColor="0xE0B34AFF" translation="[96, 182]" width="30" height="30" />
+    <Label id="eyebrow" translation="[140, 180]" width="1200" color="0xE0B34AFF" />
+    <Label id="title" translation="[96, 214]" width="1700" color="0xEDE6CAFF" />
+    <Group id="buttons" translation="[96, 360]" />
+    <Label id="albumsLabel" translation="[96, 548]" width="600" color="0xB5AF8CFF" text="ALBUMS" />
+    <Group id="albumClip" translation="[86, 584]" clippingRect="[0, 0, 1760, 300]">
       <Group id="albums" translation="[10, 10]" />
     </Group>
-    <Label id="note" translation="[96, 680]" width="1728" wrap="true" maxLines="5" color="0xB5AF8CFF" />
+    <Label id="note" translation="[96, 600]" width="1728" wrap="true" maxLines="4" color="0xB5AF8CFF" />
+    <Animation id="winFade" duration="1.5" easeFunction="inOutQuad">
+      <FloatFieldInterpolator id="winIn" key="[0.0, 1.0]" keyValue="[0.0, 1.0]" fieldToInterp="winA.opacity" />
+      <FloatFieldInterpolator id="winOut" key="[0.0, 1.0]" keyValue="[1.0, 0.0]" fieldToInterp="winB.opacity" />
+    </Animation>
     <Animation id="scroll" duration="0.18" easeFunction="outQuad">
       <Vector2DFieldInterpolator id="scrollTo" key="[0.0, 1.0]" fieldToInterp="albums.translation" />
     </Animation>
+    <Timer id="winTimer" duration="12" repeat="true" />
   </children>
   <interface>
     <field id="request" type="assocarray" alwaysNotify="true" />

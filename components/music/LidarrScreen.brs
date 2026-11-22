@@ -328,3 +328,11 @@ function onKeyEvent(key as string, press as boolean) as boolean
     paint()
     return true
 end function
+
+' opened from an artist page: search for them straight away
+sub onTerm()
+    if m.top.term = "" or not hasKey() then return
+    m.kb.text = m.top.term
+    m.debounce.control = "stop"
+    lookup()
+end sub

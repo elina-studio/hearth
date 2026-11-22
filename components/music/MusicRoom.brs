@@ -24,12 +24,26 @@ sub init()
     m.scrollTo = m.top.findNode("scrollTo")
 
     ' chips: [label, action]
-    m.chipDefs = [["Play", "toggle"], ["Shuffle", "shuffle"], ["Repeat", "repeat"], ["More like this", "more"], ["Cover", "cover"], ["Visualizer", "milk"], ["Hearth fire", "hearth"], ["Request", "request"]]
+    ' playback controls, a divider, then the views. Shuffle and Repeat light up gold when on.
+    m.chipDefs = [["Play", "toggle"], ["Shuffle", "shuffle"], ["Repeat", "repeat"], ["", "sep"], ["Cover", "cover"], ["Visualizer", "milk"], ["Hearth fire", "hearth"], ["Request", "request"]]
     for each c in m.chipDefs
-        p = m.chips.createChild("HearthPill")
-        p.button = true
-        p.width = chipWidth(c[0])
-        p.text = c[0]
+        if c[1] = "sep"
+            g = m.chips.createChild("Group")
+            spacer = g.createChild("Rectangle")
+            spacer.width = 26
+            spacer.height = 58
+            spacer.color = "0x00000000"
+            line = g.createChild("Rectangle")
+            line.translation = [12, 9]
+            line.width = 2
+            line.height = 40
+            line.color = "0xD9A06655"
+        else
+            p = m.chips.createChild("HearthPill")
+            p.button = true
+            p.width = chipWidth(c[0])
+            p.text = c[0]
+        end if
     end for
 
     m.row = 0
@@ -80,14 +94,17 @@ sub showNow()
     ' chip labels follow the player
     labels = {}
     if p.state = "playing" or p.state = "buffering" then labels.toggle = "Pause" else labels.toggle = "Play"
-    if p.shuffle then labels.shuffle = "Shuffle on" else labels.shuffle = "Shuffle off"
-    labels.repeat = muRepeatLabel()
+    labels.shuffle = "Shuffle"
+    if p.repeat = "one" then labels.repeat = "Repeat one" else labels.repeat = "Repeat"
+    lit = { shuffle: p.shuffle, repeat: (p.repeat <> "off") }
     for i = 0 to m.chipDefs.count() - 1
         l = labels[m.chipDefs[i][1]]
         if l <> invalid
             m.chips.getChild(i).width = chipWidth(l)
             m.chips.getChild(i).text = l
         end if
+        on = lit[m.chipDefs[i][1]]
+        if on <> invalid then m.chips.getChild(i).current = on
     end for
     showTime()
 end sub
@@ -205,6 +222,8 @@ sub build()
             r.title = name
             r.cardWidth = 220
             r.cardHeight = 220
+            ' artists are round, albums square
+            if items[0].type = "artist" then r.maskUri = "pkg:/images/music/round-mask.png"
             cards = []
             for each md in items
                 c = pxCard(md, 220)
@@ -235,7 +254,7 @@ end sub
 ' ---------- focus ----------
 sub paint()
     for i = 0 to m.chips.getChildCount() - 1
-        m.chips.getChild(i).focused = (m.focused and m.row = 0 and i = m.chip)
+        if m.chipDefs[i][1] <> "sep" then m.chips.getChild(i).focused = (m.focused and m.row = 0 and i = m.chip)
     end for
     for i = 0 to m.rows.count() - 1
         m.rows[i].active = (m.focused and m.row = i + 1)
@@ -331,6 +350,7 @@ function onKeyEvent(key as string, press as boolean) as boolean
         if key = "left" then d = -1 else d = 1
         if m.row = 0
             i = m.chip + d
+            if i >= 0 and i < m.chipDefs.count() and m.chipDefs[i][1] = "sep" then i = i + d
             if i >= 0 and i < m.chipDefs.count() then m.chip = i
         else
             m.rows[m.row - 1].callFunc("move", d)

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A right-aligned row of remote-key chips: an icon (or short text like OK) in a round chip, then what it does.
+     keys: [{ icon: "lr" | text: "OK", label: "Photos" }, ...]. The row ends at x = 0. -->
+<component name="KeyHints" extends="Group">
+  <children>
+    <Group id="row" />
+  </children>
+  <interface>
+    <field id="keys" type="array" onChange="build" />
+  </interface>
+  <script type="text/brightscript" uri="pkg:/source/util.brs" />
+  <script type="text/brightscript" uri="pkg:/components/KeyHints.brs" />
+</component>
