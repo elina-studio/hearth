@@ -20,6 +20,7 @@ sub init()
     m.music = CreateObject("roSGNode", "MusicPlayer")
     m.top.appendChild(m.music)
     m.global.addFields({ music: m.music })
+    m.global.observeField("remote", "onRemote")
 
     ' the lantern intro plays while the saved login is checked
     m.introDone = false
@@ -155,6 +156,26 @@ sub handle(r as object)
     else if a = "exit"
         m.top.exitApp = true
     end if
+end sub
+
+'' Phone remote. Text goes to an open Roku keyboard dialog; the Hearth keyboard listens itself.
+' go = "search" or "request" climbs back to the hub and opens that room with the text.
+sub onRemote()
+    r = m.global.remote
+    if r = invalid or r.n = invalid then return
+    d = m.top.dialog
+    if r.go = "" and d <> invalid and d.subtype() = "StandardKeyboardDialog"
+        d.text = r.text
+        return
+    end if
+    if r.go <> "search" and r.go <> "request" then return
+    if d <> invalid then d.close = true
+    while m.stack.getChildCount() > 1 and topScreen().subtype() <> "HubScreen"
+        popScreen()
+    end while
+    hub = topScreen()
+    if hub = invalid or hub.subtype() <> "HubScreen" then return
+    hub.callFunc("remoteGo", { go: r.go, text: r.text })
 end sub
 
 ' Outside video, Play, Rewind, Fast forward and Replay always control the music.

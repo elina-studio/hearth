@@ -28,6 +28,17 @@ sub init()
 
     buildKeys()
     onText()
+    ' phone remote: live text lands in whichever Hearth keyboard has focus
+    m.global.observeField("remote", "onRemote")
+end sub
+
+sub onRemote()
+    r = m.global.remote
+    if r = invalid or r.go <> "" or not m.top.active then return
+    t = r.text
+    if t = invalid then return
+    if Len(t) > m.top.maxLength then t = Left(t, m.top.maxLength)
+    m.top.text = t
 end sub
 
 function charsOf(s as string) as object

@@ -3,6 +3,8 @@ sub Main(args as dynamic)
     screen = CreateObject("roSGScreen")
     port = CreateObject("roMessagePort")
     screen.setMessagePort(port)
+    ' phone remote (tools/remote): POST /input?hearthText=...&hearthGo=search|request
+    screen.getGlobalNode().addFields({ remote: {} })
     scene = screen.CreateScene("HearthScene")
     screen.show()
     scene.observeField("exitApp", port)
@@ -20,6 +22,18 @@ end sub
 ' Keys and addresses for other services stay on the TV (registry), never in the repo.
 sub saveInput(screen as object, info as object)
     if info = invalid then return
+    if info.hearthText <> invalid or info.hearthGo <> invalid
+        g = screen.getGlobalNode()
+        n = 1
+        if g.remote <> invalid and g.remote.n <> invalid then n = g.remote.n + 1
+        text = info.hearthText
+        if text = invalid then text = ""
+        dest = info.hearthGo
+        if dest = invalid then dest = ""
+        ' n changes every time, so the same text sent twice still notifies
+        g.remote = { text: text, go: dest, n: n }
+        return
+    end if
     reg = CreateObject("roRegistrySection", "hearth")
     g = screen.getGlobalNode()
     if not g.hasField("overseerrKey") then g.addFields({ overseerrKey: "" })
