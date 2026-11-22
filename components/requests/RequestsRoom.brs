@@ -33,6 +33,7 @@ sub init()
     m.focusTag = ""
     m.tasks = {}
     m.problem = ""
+    m.touched = false
 
     if not m.global.hasField("overseerrKey") then m.global.addFields({ overseerrKey: "" })
     m.global.observeField("overseerrKey", "onKeyArrived")
@@ -243,7 +244,8 @@ sub build()
     order = ["Results", "Trending", "Your requests", "Popular movies", "Popular shows"]
     keepTag = m.focusTag
     keepIndex = 0
-    if keepTag = "" and m.row < m.rows.count()
+    ' rows arrive in any order; until the person moves, stay on the first row (Trending)
+    if keepTag = "" and m.touched and m.row < m.rows.count()
         keepTag = m.rows[m.row].tag
         keepIndex = m.rows[m.row].index
     end if
@@ -518,6 +520,7 @@ function onKeyEvent(key as string, press as boolean) as boolean
     end if
     if m.rows.count() = 0 then return true
     current = m.rows[m.row]
+    if key = "left" or key = "right" or key = "up" or key = "down" then m.touched = true
     if key = "left" or key = "right"
         if key = "left" then d = -1 else d = 1
         current.callFunc("move", d)
