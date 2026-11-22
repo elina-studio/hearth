@@ -1,35 +1,72 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Home dashboard: Continue hero + tiles, Next up, mood row, Recently added. -->
+<!-- Home: a full-width hero that steps through your top 3 Continue items, three cards (Now playing,
+     Requests, Set the mood), then Next up and Recently added. Coordinates are relative to the room,
+     which sits 150 below the top of the screen. -->
 <component name="HomeRoom" extends="Group">
   <children>
     <Group id="content">
-      <Group id="hero" translation="[96, 20]">
-        <Rectangle width="1060" height="470" color="0x141A11FF" />
-        <Poster id="heroArt" width="1060" height="470" loadDisplayMode="scaleToZoom" />
-        <Poster uri="pkg:/images/shade.png" width="1060" height="470" />
-        <Label id="heroEyebrow" translation="[40, 312]" width="980" color="0xE0B34AFF" />
-        <Label id="heroTitle" translation="[40, 344]" width="980" color="0xEDE6CAFF" />
-        <Rectangle id="heroTrack" translation="[40, 432]" width="520" height="8" color="0xFFFFFF22" />
-        <Rectangle id="heroBar" translation="[40, 432]" width="0" height="8" color="0xE0B34AFF" />
-        <Poster id="heroRing" uri="pkg:/images/ring.9.png" blendColor="0xE0B34AFF" translation="[-10, -10]" width="1080" height="490" visible="false" />
+      <!-- hero art runs full width behind the pills and fades into the night on its left and bottom -->
+      <Poster id="heroArt" translation="[0, -150]" width="1920" height="690" loadDisplayMode="scaleToZoom" />
+      <Poster uri="pkg:/images/fade-left.png" translation="[0, -150]" width="1500" height="690" />
+      <Poster uri="pkg:/images/fade-down.png" translation="[0, 330]" width="1920" height="210" />
+
+      <Label id="greeting" translation="[96, 0]" color="0xD9A066FF" />
+      <Label id="heroEyebrow" translation="[96, 62]" width="1400" color="0xE0B34AFF" />
+      <Label id="heroTitle" translation="[96, 96]" width="1500" maxLines="1" color="0xEDE6CAFF" />
+      <Group id="heroProgress" translation="[96, 240]">
+        <Rectangle width="420" height="8" color="0xFFFFFF26" />
+        <Rectangle id="heroBar" width="0" height="8" color="0xE0B34AFF" />
+        <Label id="heroLeft" translation="[440, -16]" height="40" vertAlign="center" color="0xEDE6CAFF" />
       </Group>
-      <Group id="nowTile" translation="[1186, 20]">
-        <Poster uri="pkg:/images/tile.9.png" blendColor="0x141A11FF" width="638" height="225" />
-        <Label id="nowEyebrow" translation="[34, 34]" width="570" color="0xD9A066FF" text="MUSIC" />
-        <Label id="nowTitle" translation="[34, 72]" width="570" color="0xEDE6CAFF" text="Shuffle my music" />
-        <Label id="nowSub" translation="[34, 130]" width="570" wrap="true" color="0xB5AF8CFF" text="Press OK to open Music" />
-        <Poster id="nowRing" uri="pkg:/images/ring.9.png" blendColor="0xE0B34AFF" translation="[-10, -10]" width="658" height="245" visible="false" />
+      <Group id="buttons" translation="[96, 288]" />
+
+      <!-- which of the 3 Continue items is showing -->
+      <Group id="pager" translation="[0, 368]">
+        <Poster id="pgLeft" uri="pkg:/images/icons/home-left.png" width="30" height="30" blendColor="0xB5AF8CFF" />
+        <Group id="dots" />
+        <Poster id="pgRight" uri="pkg:/images/icons/home-right.png" width="30" height="30" blendColor="0xB5AF8CFF" />
+        <Label id="pgText" height="30" vertAlign="center" color="0xB5AF8CFF" />
       </Group>
-      <Group id="reqTile" translation="[1186, 265]">
-        <Poster uri="pkg:/images/tile.9.png" blendColor="0x141A11FF" width="638" height="225" />
-        <Label id="reqEyebrow" translation="[34, 34]" width="570" color="0xB5AF8CFF" text="REQUESTS" />
-        <Label id="reqBig" translation="[34, 72]" width="570" color="0xE0B34AFF" text="" />
-        <Label id="reqSub" translation="[34, 160]" width="570" color="0xB5AF8CFF" text="Asking Overseerr…" />
-        <Poster id="reqRing" uri="pkg:/images/ring.9.png" blendColor="0xE0B34AFF" translation="[-10, -10]" width="658" height="245" visible="false" />
+
+      <!-- Now playing -->
+      <Group id="musicCard" translation="[96, 450]">
+        <Poster uri="pkg:/images/tile.9.png" blendColor="0x141A11F2" width="604" height="230" />
+        <Rectangle translation="[28, 26]" width="178" height="178" color="0x2A2620FF" />
+        <Poster id="musicArt" translation="[28, 26]" width="178" height="178" loadDisplayMode="scaleToZoom" />
+        <Poster uri="pkg:/images/icons/home-note.png" translation="[228, 30]" width="28" height="28" blendColor="0xD9A066FF" />
+        <Label id="musicEyebrow" translation="[264, 28]" height="32" vertAlign="center" color="0xD9A066FF" />
+        <Label id="musicTitle" translation="[228, 64]" width="350" maxLines="1" color="0xEDE6CAFF" />
+        <Label id="musicSub" translation="[228, 108]" width="350" maxLines="1" color="0xB5AF8CFF" />
+        <Poster id="mRing0" uri="pkg:/images/ring.9.png" blendColor="0xE0B34AFF" translation="[216, 158]" width="56" height="56" visible="false" />
+        <Poster id="mRing1" uri="pkg:/images/ring.9.png" blendColor="0xE0B34AFF" translation="[272, 158]" width="56" height="56" visible="false" />
+        <Poster id="mRing2" uri="pkg:/images/ring.9.png" blendColor="0xE0B34AFF" translation="[328, 158]" width="56" height="56" visible="false" />
+        <Poster id="mPrev" uri="pkg:/images/icons/home-prev.png" translation="[228, 170]" width="32" height="32" blendColor="0xEDE6CAFF" />
+        <Poster id="mToggle" uri="pkg:/images/icons/home-play.png" translation="[284, 170]" width="32" height="32" blendColor="0xEDE6CAFF" />
+        <Poster id="mNext" uri="pkg:/images/icons/home-next.png" translation="[340, 170]" width="32" height="32" blendColor="0xEDE6CAFF" />
+        <Rectangle translation="[396, 183]" width="180" height="6" color="0xFFFFFF1F" />
+        <Rectangle id="musicBar" translation="[396, 183]" width="0" height="6" color="0xA3A35AFF" />
       </Group>
-      <CardRow id="nextUp" translation="[96, 540]" title="Next up" />
-      <CardRow id="mood" translation="[96, 880]" title="Set the mood" cardWidth="400" cardHeight="130" showCaption="false" />
-      <CardRow id="latest" translation="[96, 1100]" title="Recently added" />
+
+      <!-- Requests -->
+      <Group id="reqCard" translation="[730, 450]">
+        <Poster uri="pkg:/images/tile.9.png" blendColor="0x141A11F2" width="532" height="230" />
+        <Poster uri="pkg:/images/icons/home-down.png" translation="[28, 30]" width="28" height="28" blendColor="0xB5AF8CFF" />
+        <Label id="reqEyebrow" translation="[64, 28]" height="32" vertAlign="center" color="0xB5AF8CFF" text="REQUESTS" />
+        <Group id="reqLines" translation="[28, 70]" />
+        <Label id="reqFoot" translation="[28, 184]" width="476" color="0xE0B34AFF" />
+        <Poster id="reqRing" uri="pkg:/images/ring.9.png" blendColor="0xE0B34AFF" translation="[-10, -10]" width="552" height="250" visible="false" />
+      </Group>
+
+      <!-- Set the mood -->
+      <Group id="moodCard" translation="[1292, 450]">
+        <Poster uri="pkg:/images/tile.9.png" blendColor="0x141A11F2" width="532" height="230" />
+        <Poster uri="pkg:/images/icons/home-flame.png" translation="[28, 30]" width="28" height="28" blendColor="0xB5AF8CFF" />
+        <Label id="moodEyebrow" translation="[64, 28]" height="32" vertAlign="center" color="0xB5AF8CFF" text="SET THE MOOD" />
+        <Group id="moodTiles" translation="[28, 70]" />
+      </Group>
+
+      <CardRow id="nextUp" translation="[96, 724]" title="Next up" />
+      <CardRow id="latest" translation="[96, 1064]" title="Recently added" />
     </Group>
     <Animation id="scroll" duration="0.22" easeFunction="outQuad">
       <Vector2DFieldInterpolator id="scrollTo" key="[0.0, 1.0]" fieldToInterp="content.translation" />
@@ -42,5 +79,7 @@
   </interface>
   <script type="text/brightscript" uri="pkg:/source/util.brs" />
   <script type="text/brightscript" uri="pkg:/components/dialogs.brs" />
+  <script type="text/brightscript" uri="pkg:/components/requests/reqdata.brs" />
+  <script type="text/brightscript" uri="pkg:/components/music/plex.brs" />
   <script type="text/brightscript" uri="pkg:/components/HomeRoom.brs" />
 </component>

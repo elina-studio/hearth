@@ -28,7 +28,9 @@ end sub
 
 ' Your requests, newest first, each with its title and poster filled in.
 sub loadRequests()
-    r = fetch("GET", "/api/v1/request", { take: "20", skip: "0", sort: "added", filter: "all" }, invalid)
+    take = "20"
+    if m.top.query <> invalid and m.top.query.take <> invalid then take = m.top.query.take.toStr()
+    r = fetch("GET", "/api/v1/request", { take: take, skip: "0", sort: "added", filter: "all" }, invalid)
     if r.status < 200 or r.status >= 300 or r.data = invalid or r.data.results = invalid
         finish(r.status, r.data)
         return
