@@ -3,8 +3,8 @@
 <component name="LanternMark" extends="Group">
   <children>
     <Poster uri="pkg:/images/lantern.png" width="41" height="72" />
-    <Group translation="[11, 30]" clippingRect="[0, 0, 18, 27]">
-      <Poster id="flame" uri="pkg:/images/mark-flame.png" width="222" height="216" />
+    <Group translation="[11, 31]" clippingRect="[0, 0, 18, 27]">
+      <Poster id="flame" uri="pkg:/images/mark-flame.png" width="216" height="216" />
     </Group>
     <Timer id="tick" duration="0.083" repeat="true" />
   </children>

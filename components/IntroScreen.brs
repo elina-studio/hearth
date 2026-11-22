@@ -1,6 +1,9 @@
 sub init()
-    m.sway = m.top.findNode("sway")
     m.flame = m.top.findNode("flame")
+    m.sheet = m.top.findNode("lanternSheet")
+    m.glow = m.top.findNode("glow")
+    m.sparks = m.top.findNode("sparks")
+    m.flameClip = m.top.findNode("flameClip")
     m.quote = m.top.findNode("quote")
     m.quote.font = hFont("fell", 32)
     m.qL = m.top.findNode("qL")
@@ -9,46 +12,63 @@ sub init()
     m.fadeIn = m.top.findNode("fadeIn")
     m.frame = 0
     m.dir = 1
-
-    ' sway: the lantern and rope swing about the top centre, set every frame from a clock
-    m.flameClip = m.top.findNode("flameClip")
+    m.lastK = -1
+    m.ticks = 0
     m.clock = CreateObject("roTimespan")
-    st = m.top.findNode("swayTimer")
-    st.observeField("fire", "onSway")
     m.toStart = [m.top.findNode("glowAnim")]
-
-    ft = m.top.findNode("flameTimer")
-    ft.observeField("fire", "onFlame")
-    ft.control = "start"
 
     makeSparks()
     makeFlies()
 
     m.quotes = loadQuotes()
     m.qi = 0
-    showQuote()
-    qt = m.top.findNode("quoteTimer")
-    qt.observeField("fire", "onQuoteTimer")
-    qt.control = "start"
     m.fadeOut.observeField("state", "onFadedOut")
 
-    ' start the animations a moment after the screen is on, so they're attached when they begin
-    kick = CreateObject("roSGNode", "Timer")
-    kick.duration = 0.3
-    kick.observeField("fire", "startMotion")
-    m.top.appendChild(kick)
-    kick.control = "start"
+    ' everything stays hidden until the big images have loaded, then fades in, so the first frames never glitch
+    m.shown = false
+    m.waiting = [m.top.findNode("bg"), m.sheet, m.flame, m.glow]
+    for each p in m.waiting
+        p.observeField("loadStatus", "onLoaded")
+    end for
+    fb = CreateObject("roSGNode", "Timer")
+    fb.duration = 1.5
+    fb.observeField("fire", "reveal")
+    m.top.appendChild(fb)
+    fb.control = "start"
+    m.fallback = fb
+    onLoaded()
 end sub
 
-sub startMotion()
+sub onLoaded()
+    for each p in m.waiting
+        if p.loadStatus <> "ready" then return
+    end for
+    reveal()
+end sub
+
+sub reveal()
+    if m.shown then return
+    m.shown = true
+    print "[hearth] intro reveal"
     m.clock.Mark()
-    m.top.findNode("swayTimer").control = "start"
+    onSway()
+    m.top.findNode("appear").control = "start"
+    st = m.top.findNode("swayTimer")
+    st.observeField("fire", "onSway")
+    st.control = "start"
+    ft = m.top.findNode("flameTimer")
+    ft.observeField("fire", "onFlame")
+    ft.control = "start"
     for each a in m.toStart
         a.control = "start"
     end for
     for i = 0 to m.flyData.count() - 1
         planFly(i)
     end for
+    showQuote()
+    qt = m.top.findNode("quoteTimer")
+    qt.observeField("fire", "onQuoteTimer")
+    qt.control = "start"
 end sub
 
 sub onMode()
@@ -63,22 +83,35 @@ sub onShown(unused as dynamic)
     m.top.setFocus(true)
 end sub
 
-'  +-3 degrees, 7 s per full swing; the flame sits outside the rotated group (clipping) and follows by translation
+' snap to whole 720p pixels (1.5 fhd units) so nothing shimmers on this HD TV
+function px(v as float) as float
+    return Int(v / 1.5 + 0.5) * 1.5
+end function
+
+' +-3 degrees, 7 s per full swing. Picks the nearest of 21 pre-rotated frames; the flame, glow and sparks follow by translation.
 sub onSway()
     t = m.clock.TotalMilliseconds() / 1000.0
-    a = 0.0524 * Sin(t * 6.2832 / 7.0)
-    m.sway.rotation = a
-    m.flameClip.translation = [901 + 540 * Sin(a), 454 + 540 * (Cos(a) - 1)]
+    deg = 3.0 * Sin(t * 6.2832 / 7.0)
+    k = Int((deg + 3.0) / 6.0 * 20.0 + 0.5)
+    if k < 0 then k = 0
+    if k > 20 then k = 20
+    if k = m.lastK then return
+    m.lastK = k
+    a = (-3.0 + 6.0 * k / 20.0) * 3.14159265 / 180.0
+    m.sheet.translation = [-(k mod 7) * 252, -Int(k / 7) * 690]
+    m.flameClip.translation = [px(900 + 540 * Sin(a)), px(453 + 540 * (Cos(a) - 1))]
+    m.glow.translation = [px(744 + 553 * Sin(a)), px(337 + 553 * (Cos(a) - 1))]
+    m.sparks.translation = [px(540 * Sin(a)), px(540 * (Cos(a) - 1))]
+    m.ticks = m.ticks + 1
+    if m.ticks mod 10 = 0 then print "[hearth] sway frame " k
 end sub
 
-' ---------- flame: 96 pre-rendered frames in a 12 x 8 sheet, played back and forth ----------
+' ---------- flame: 96 pre-rendered frames in a 12 x 8 sheet (120 x 177 each = 80 x 118 at 720p), played back and forth ----------
 sub onFlame()
     m.frame = m.frame + m.dir
     if m.frame >= 95 then m.dir = -1
     if m.frame <= 0 then m.dir = 1
-    col = m.frame mod 12
-    row = Int(m.frame / 12)
-    m.flame.translation = [-col * 119, -row * 177]
+    m.flame.translation = [-(m.frame mod 12) * 120, -Int(m.frame / 12) * 177]
 end sub
 
 ' ---------- sparks rise from the flame ----------

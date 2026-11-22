@@ -3,25 +3,30 @@
      Art is pre-rendered from the approved motion preview. mode "intro" runs 10 s then hands off; mode "saver" runs as the screensaver. -->
 <component name="IntroScreen" extends="Group">
   <children>
-    <Poster uri="pkg:/images/intro-bg.jpg" width="1920" height="1080" />
-    <Group id="sway" scaleRotateCenter="[960, 0]">
-      <Poster id="glow" uri="pkg:/images/intro-glow.png" width="432" height="432" translation="[744, 337]" opacity="0.8" />
-      <Poster uri="pkg:/images/intro-lantern.png" width="163" height="688" translation="[878, 0]" />
-      <Group id="sparks" />
+    <Poster id="bg" uri="pkg:/images/intro-bg.jpg" width="1920" height="1080" />
+    <Group id="all" opacity="0">
+    <Poster id="glow" uri="pkg:/images/intro-glow.png" width="432" height="432" translation="[744, 337]" opacity="0.8" />
+    <!-- The sway is 21 pre-rotated frames (-3..+3 degrees) swapped by translation: no Group rotation, which this TV did not render.
+         Each frame is 252 x 690 (168 x 460 at 720p), pivot at its top centre = screen (960, 0). -->
+    <Group id="lanternClip" translation="[834, 0]" clippingRect="[0, 0, 252, 690]">
+      <Poster id="lanternSheet" uri="pkg:/images/intro-sway.png" width="1764" height="2070" />
     </Group>
-    <!-- Roku ignores clippingRect inside a rotated group, so the flame sits outside the sway and follows it by translation -->
-    <Group id="flameClip" translation="[901, 454]" clippingRect="[0, 0, 119, 177]">
-      <Poster id="flame" uri="pkg:/images/intro-flame.png" width="1428" height="1416" />
+    <Group id="sparks" />
+    <Group id="flameClip" translation="[900, 453]" clippingRect="[0, 0, 120, 177]">
+      <Poster id="flame" uri="pkg:/images/intro-flame.png" width="1440" height="1416" />
     </Group>
-
     <Group id="flies" />
     <Group id="quoteGroup" opacity="0">
       <Poster id="qL" uri="pkg:/images/intro-qL.png" width="112" height="47" opacity="0.55" />
       <Poster id="qR" uri="pkg:/images/intro-qR.png" width="112" height="47" opacity="0.55" />
       <Label id="quote" color="0xB5AF8CFF" />
     </Group>
+    </Group>
     <Animation id="glowAnim" duration="5.2" repeat="true" easeFunction="linear">
       <FloatFieldInterpolator key="[0.0, 0.2, 0.35, 0.5, 0.65, 0.8, 1.0]" keyValue="[0.8, 1.0, 0.93, 1.0, 0.93, 1.0, 0.8]" fieldToInterp="glow.opacity" />
+    </Animation>
+    <Animation id="appear" duration="0.6" easeFunction="linear">
+      <FloatFieldInterpolator key="[0.0, 1.0]" keyValue="[0.0, 1.0]" fieldToInterp="all.opacity" />
     </Animation>
     <Animation id="fadeIn" duration="1.6" easeFunction="inOutQuad">
       <FloatFieldInterpolator key="[0.0, 1.0]" keyValue="[0.0, 0.9]" fieldToInterp="quoteGroup.opacity" />
@@ -30,7 +35,7 @@
       <FloatFieldInterpolator key="[0.0, 1.0]" keyValue="[0.9, 0.0]" fieldToInterp="quoteGroup.opacity" />
     </Animation>
     <Timer id="flameTimer" duration="0.083" repeat="true" />
-    <Timer id="swayTimer" duration="0.033" repeat="true" />
+    <Timer id="swayTimer" duration="0.05" repeat="true" />
     <Timer id="quoteTimer" duration="9" repeat="true" />
     <Timer id="leaveTimer" duration="10" repeat="false" />
   </children>
