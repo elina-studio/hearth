@@ -163,7 +163,7 @@ def proxy(h, method, path):
         return
     try:
         while True:
-            chunk = r.read(65536)
+            chunk = r.read(262144)
             if not chunk:
                 break
             h.wfile.write(chunk)

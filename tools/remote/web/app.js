@@ -21,7 +21,9 @@ function fit() {
   const h = Math.min(innerHeight, document.documentElement.clientHeight || 1e9, vv ? vv.height : 1e9);
   K = Math.min(w / 1920, h / 1080) * adj;
   const ox = vv ? vv.offsetLeft : 0, oy = vv ? vv.offsetTop : 0;
-  stage.style.transform = `translate(${ox + (w - 1920 * K) / 2}px,${oy + (h - 1080 * K) / 2}px) scale(${K})`;
+  const tf = `translate(${ox + (w - 1920 * K) / 2}px,${oy + (h - 1080 * K) / 2}px) scale(${K})`;
+  stage.style.transform = tf;
+  document.querySelectorAll('.hudbox').forEach(e => { e.style.transform = tf; });
 }
 function nudge(f) { adj = Math.max(.3, Math.min(2, adj * f)); try { localStorage.setItem('hearth.k', adj); } catch (e) { /* ignore */ } fit(); }
 addEventListener('resize', fit); if (window.visualViewport) { visualViewport.addEventListener('resize', fit); visualViewport.addEventListener('scroll', fit); }
@@ -160,19 +162,23 @@ function move(dir) {
 function openLayer(cls, html, handlers) {
   const el = document.createElement('div');
   el.className = 'layer ' + cls; el.innerHTML = html;
-  $('#layers').appendChild(el);
+  // The video player sits outside the scaled stage: a video inside a scaled, animated page makes weak chips drop frames
+  (cls === 'player' ? $('#vlayers') : $('#layers')).appendChild(el);
   const L = Object.assign({ el, prev: focusEl }, handlers || {});
   layers.push(L);
   history.pushState({ n: layers.length }, '');
+  syncCover(); fit();
   firstFocus(el);
   return L;
 }
+// While a full-screen layer is open, the pages underneath stop drawing (and the fireflies stop moving)
+function syncCover() { stage.classList.toggle('cover', layers.some(l => /player|mood/.test(l.el.className))); }
 function closeLayer() { if (layers.length) history.back(); }
 addEventListener('popstate', () => {
   const L = layers.pop();
   if (!L) return;
   try { L.close && L.close(); } catch (e) { /* fine */ }
-  L.el.remove();
+  L.el.remove(); syncCover();
   if (L.prev && document.contains(L.prev)) setFocus(L.prev); else firstFocus(layers.length ? layers[layers.length - 1].el : $('#room'));
 });
 history.replaceState({ n: 0 }, '');
@@ -562,7 +568,7 @@ function canDirect(media) {
   if (!['mp4', 'm4v', 'mov', 'mkv', 'webm'].includes(c)) return false;
   const vOk = (v === 'h264' && CAP.h264) || (v === 'hevc' && CAP.hevc) || (v === 'vp9' && CAP.vp9) || (v === 'av1' && CAP.av1);
   const aOk = ['aac', 'mp3', 'opus', 'vorbis', 'flac'].includes(a) || (a === 'ac3' && CAP.ac3) || (a === 'eac3' && CAP.eac3);
-  return vOk && aOk && (media.videoProfile || '') !== 'high 10';
+  return vOk && aOk && (media.videoProfile || '') !== 'high 10' && (!media.bitrate || media.bitrate <= 12000); // big files go through the converter, which sends a steady 8 Mbps
 }
 function hlsUrl(id, offsetSec, res, session, kbps, direct) {
   const q = new URLSearchParams({
@@ -591,7 +597,7 @@ async function playItem(rk, type, o) {
   if (mode === 'auto') mode = canDirect(media) ? 'direct' : 'hls1080';
   const session = 'hp' + Date.now().toString(36);
   const sub = full.type === 'episode' ? `${full.grandparentTitle} · S${full.parentIndex} E${full.index}` : (full.year || '');
-  const L = openLayer('player', `<video id="pv" playsinline></video><div class="stats" id="pst"></div><div class="pov show" id="pov"><h3>${esc(full.type === 'episode' ? full.title : full.title)}</h3><div class="sub">${esc(sub)}</div><div class="tm"><span id="pcur">0:00</span><div class="tr"><i id="pbar"></i></div><span id="pdur">${fmt(dur)}</span></div><div class="pbtns"><div class="fx chip" data-a="back">‹ Back</div><div class="fx chip" data-a="pseek" data-d="-10">⏪ 10s</div><div class="fx chip live" data-a="ppp">Play / Pause</div><div class="fx chip" data-a="pseek" data-d="30">30s ⏩</div><div class="fx chip" data-a="pstats">Stats</div></div></div><div class="msg" id="pmsg" style="display:none"></div>`, {
+  const L = openLayer('player', `<video id="pv" playsinline poster="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" disablepictureinpicture disableremoteplayback controlslist="nodownload noremoteplayback"></video><div class="hudbox"><div class="stats" id="pst"></div><div class="pov show" id="pov"><h3>${esc(full.type === 'episode' ? full.title : full.title)}</h3><div class="sub">${esc(sub)}</div><div class="tm"><span id="pcur">0:00</span><div class="tr"><i id="pbar"></i></div><span id="pdur">${fmt(dur)}</span></div><div class="pbtns"><div class="fx chip" data-a="back">‹ Back</div><div class="fx chip" data-a="pseek" data-d="-10">⏪ 10s</div><div class="fx chip live" data-a="ppp">Play / Pause</div><div class="fx chip" data-a="pseek" data-d="30">30s ⏩</div><div class="fx chip" data-a="pstats">Stats</div></div></div><div class="msg" id="pmsg" style="display:none"></div></div>`, {
     onKey(e) {
       const v = L.v, k = e.key;
       if (k === ' ' || k === 'Enter' || k === 'MediaPlayPause') { v.paused ? v.play() : v.pause(); L.hud(); return true; }
