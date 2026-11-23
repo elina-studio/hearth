@@ -38,6 +38,9 @@ sub init()
     m.top.findNode("undoTimer").observeField("fire", "onUndoTick")
     m.top.findNode("detailTimer").observeField("fire", "onDetailTimer")
     m.top.findNode("searchTimer").observeField("fire", "runSearch")
+    m.top.findNode("pollTimer").observeField("fire", "onPoll")
+    m.mineSig = ""
+    m.mineActive = false
 
     m.lists = [
         { key: "search", icon: "search", name: "Search", about: "TYPE A TITLE" },
@@ -187,6 +190,13 @@ sub paintTabs()
     end for
 end sub
 
+' Download bars: while Your requests is on screen and something is on its way, ask Overseerr again every 10 s
+sub onPoll()
+    if not m.focused or m.popup <> invalid or m.setup.visible then return
+    if currentList().key <> "mine" or not m.mineActive then return
+    loadMine()
+end sub
+
 sub loadMine()
     t = CreateObject("roSGNode", "OverseerrTask")
     t.mode = "requests"
@@ -289,6 +299,16 @@ sub onMine(event as object)
             cards.push(rqRequestCard(r.request, r.info))
         end for
     end if
+    sig = ""
+    for each c in cards
+        sig = sig + c.title + "|" + c.chip.text + "|" + c.progress.toStr() + "|" + c.caption + ";"
+    end for
+    if m.cards["mine"] <> invalid and sig = m.mineSig then return
+    m.mineSig = sig
+    m.mineActive = false
+    for each c in cards
+        if c.active = true then m.mineActive = true
+    end for
     m.cards["mine"] = cards
     m.ver = m.ver + 1
     paintRail()
@@ -446,11 +466,17 @@ sub buildGrid()
     if m.gridIndex >= cards.count() then m.gridIndex = 0
     for i = 0 to cards.count() - 1
         n = m.grid.createChild("ReqCard")
-        n.translation = [(i mod m.cols) * m.pitchX, Int(i / m.cols) * m.pitchY]
+        n.translation = [(i mod m.cols) * m.pitchX, Int(i / m.cols) * gridPitchY()]
         n.card = cards[i]
     end for
     paintGrid()
 end sub
+
+' Your requests carries a title and a status line under each bar, so its rows sit further apart
+function gridPitchY() as integer
+    if currentList().key = "mine" then return 410
+    return m.pitchY
+end function
 
 sub paintGrid()
     n = m.grid.getChildCount()
@@ -458,7 +484,7 @@ sub paintGrid()
     ' keep the focused row as the first or second row on screen
     top = row - 1
     if top < 0 then top = 0
-    m.grid.translation = [0, -top * m.pitchY]
+    m.grid.translation = [0, -top * gridPitchY()]
     for i = 0 to n - 1
         c = m.grid.getChild(i)
         r = Int(i / m.cols)
