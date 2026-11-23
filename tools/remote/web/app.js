@@ -199,6 +199,7 @@ addEventListener('keydown', e => {
   else if (k === 'MediaTrackPrevious') { M.prev(); }
 });
 function back() {
+  { const t = layers[layers.length - 1]; if (t && t.onBack && t.onBack()) return; }
   if (layers.length) { closeLayer(); return; }
   if ((cur === 'Movies' || cur === 'Shows') && LRBack && LRBack()) return;
   if (cur !== 'Home') go('Home');
@@ -574,13 +575,36 @@ function canDirect(media) {
   const aOk = ['aac', 'mp3', 'opus', 'vorbis', 'flac'].includes(a) || (a === 'ac3' && CAP.ac3) || (a === 'eac3' && CAP.eac3);
   return vOk && aOk && (media.videoProfile || '') !== 'high 10' && (!media.bitrate || media.bitrate <= 12000); // big files go through the converter, which sends a steady 8 Mbps
 }
-function hlsUrl(id, offsetSec, res, session, kbps, direct) {
+function hlsUrl(id, offsetSec, res, session, kbps, direct, aud) {
   const q = new URLSearchParams({
     path: '/library/metadata/' + id, mediaIndex: 0, partIndex: 0, protocol: 'hls', fastSeek: 1, directPlay: 0, directStream: direct ? 1 : 0,
     subtitleSize: 100, audioBoost: 100, maxVideoBitrate: kbps, videoResolution: res, videoQuality: 100, offset: offsetSec | 0, location: 'lan', session,
     'X-Plex-Product': 'Plex Web', 'X-Plex-Platform': 'Chrome', 'X-Plex-Device': 'Windows', 'X-Plex-Client-Identifier': 'hearth-projector', 'X-Plex-Session-Identifier': session
   });
+  if (aud) q.set('audioStreamID', aud);
   return `${PX}/video/:/transcode/universal/start.m3u8?${q}`;
+}
+const streamsOf = md => { const p = md && md.Media && md.Media[0] && md.Media[0].Part && md.Media[0].Part[0]; return (p && p.Stream) || []; };
+const subsOf = md => streamsOf(md).filter(s => s.streamType === 3);
+const audOf = md => streamsOf(md).filter(s => s.streamType === 2);
+const defAud = md => { const a = audOf(md); return (a.find(s => s.selected) || a[0] || {}).id || 0; };
+const defSub = md => (subsOf(md).find(s => s.selected) || {}).id || 0;
+const sLabel = s => s.displayTitle || s.extendedDisplayTitle || s.language || 'Unknown';
+function parseSubs(t) {
+  t = String(t || '').replace(/^﻿/, '').replace(/\r/g, '');
+  const tm = x => { const m = /(?:(\d+):)?(\d+):(\d+)[,.](\d+)/.exec(x); return m ? (+(m[1] || 0)) * 3600 + (+m[2]) * 60 + (+m[3]) + (+m[4].padEnd(3, '0').slice(0, 3)) / 1000 : 0; };
+  const out = [];
+  for (const b of t.split(/\n\n+/)) {
+    const ls = b.split('\n'); const i = ls.findIndex(l => l.includes('-->')); if (i < 0) continue;
+    const [a, c] = ls[i].split('-->');
+    const txt = ls.slice(i + 1).join('\n').replace(/<[^>]+>/g, '').replace(/\{\\[^}]*\}/g, '').trim();
+    if (txt) out.push({ s: tm(a), e: tm(c), t: txt });
+  }
+  return out.sort((x, y) => x.s - y.s);
+}
+function pickSheet(title, labels, cb, cur) {
+  const L = openLayer('sheet pick', `<div class="in" style="flex-direction:column"><h2>${esc(title)}</h2><div class="pgrid scroll" style="position:relative;flex:1;overflow:hidden;padding:20px 0 80px">${labels.map((l, i) => `<div class="fx chip ${i === cur ? 'live' : ''}" data-a="pickopt" data-i="${i}">${esc(l)}</div>`).join('')}</div></div>`);
+  L.cb = cb; return L;
 }
 async function playItem(rk, type, o) {
   o = o || {};
@@ -599,9 +623,12 @@ async function playItem(rk, type, o) {
   if (dur && (start < 10 || start > dur * .95)) start = 0;
   let mode = o.mode || 'auto';
   if (mode === 'auto') mode = canDirect(media) ? 'direct' : 'hls1080';
-  const session = 'hp' + Date.now().toString(36);
+  let session = 'hp' + Date.now().toString(36);
+  const subL = subsOf(full), audL = audOf(full), audDef = defAud(full);
+  let audId = o.audio !== undefined ? o.audio : audDef, subId = o.sub !== undefined ? o.sub : defSub(full);
+  if (mode === 'direct' && audId && audId !== audDef) mode = 'hls1080';
   const sub = full.type === 'episode' ? `${full.grandparentTitle} · S${full.parentIndex} E${full.index}` : (full.year || '');
-  const L = openLayer('player', `<video id="pv" playsinline poster="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" disablepictureinpicture disableremoteplayback controlslist="nodownload noremoteplayback"></video><div class="hudbox"><div class="stats" id="pst"></div><div class="pov show" id="pov"><h3>${esc(full.type === 'episode' ? full.title : full.title)}</h3><div class="sub">${esc(sub)}</div><div class="tm"><span id="pcur">0:00</span><div class="tr"><i id="pbar"></i></div><span id="pdur">${fmt(dur)}</span></div><div class="pbtns"><div class="fx chip" data-a="back">‹ Back</div><div class="fx chip" data-a="pseek" data-d="-10">⏪ 10s</div><div class="fx chip live" data-a="ppp">Play / Pause</div><div class="fx chip" data-a="pseek" data-d="30">30s ⏩</div><div class="fx chip" data-a="pstats">Stats</div></div></div><div class="msg" id="pmsg" style="display:none"></div></div>`, {
+  const L = openLayer('player', `<video id="pv" playsinline poster="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" disablepictureinpicture disableremoteplayback controlslist="nodownload noremoteplayback"></video><div class="hudbox"><div class="stats" id="pst"></div><div class="subs" id="psub"></div><div class="pov show" id="pov"><h3>${esc(full.type === 'episode' ? full.title : full.title)}</h3><div class="sub">${esc(sub)}</div><div class="tm"><span id="pcur">0:00</span><div class="tr"><i id="pbar"></i></div><span id="pdur">${fmt(dur)}</span></div><div class="pbtns"><div class="fx chip" data-a="back">‹ Back</div><div class="fx chip" data-a="pseek" data-d="-10">⏪ 10s</div><div class="fx chip live" data-a="ppp">Play / Pause</div><div class="fx chip" data-a="pseek" data-d="30">30s ⏩</div><div class="fx chip" data-a="pcc">CC</div><div class="fx chip" data-a="paud">Audio</div><div class="fx chip" data-a="pstats">Stats</div></div></div><div class="msg" id="pmsg" style="display:none"></div></div>`, {
     onKey(e) {
       const v = L.v, k = e.key;
       if (k === ' ' || k === 'Enter' || k === 'MediaPlayPause') { v.paused ? v.play() : v.pause(); L.hud(); return true; }
@@ -614,7 +641,7 @@ async function playItem(rk, type, o) {
   });
   const v = L.v = $('#pv', L.el); L.mode = mode; L.base = 0; L.hls = null; L.stats = !!o.stats;
   $('#pst', L.el).style.display = L.stats ? 'block' : 'none';
-  L.hud = () => { const p = $('#pov', L.el); p.classList.add('show'); clearTimeout(L.ht); L.ht = setTimeout(() => { if (!v.paused) p.classList.remove('show'); }, 3500); };
+  L.hud = () => { const p = $('#pov', L.el); p.classList.add('show'); $('#psub', L.el).classList.add('up'); clearTimeout(L.ht); L.ht = setTimeout(() => { if (!v.paused) { p.classList.remove('show'); $('#psub', L.el).classList.remove('up'); } }, 3500); };
   L.pos = () => L.base + (v.currentTime || 0);
   L.seekTo = t => {
     t = Math.max(0, Math.min(dur - 2, t));
@@ -638,7 +665,7 @@ async function playItem(rk, type, o) {
       v.addEventListener('loadedmetadata', () => { if (at) v.currentTime = at; }, { once: true });
     } else {
       const res = m === 'hls720' ? '1280x720' : '1920x1080', kb = m === 'hls720' ? 4000 : 8000;
-      const url = hlsUrl(full.ratingKey, at, res, session, kb, m !== 'hlsforce');
+      const url = hlsUrl(full.ratingKey, at, res, session, kb, m !== 'hlsforce', audId !== audDef ? audId : 0);
       L.base = at;
       if (window.Hls && Hls.isSupported()) { L.hls = new Hls({ maxBufferLength: 40 }); L.hls.loadSource(url); L.hls.attachMedia(v); L.hls.on(Hls.Events.ERROR, (ev, d) => { if (d.fatal) msg('Playback failed (' + d.details + ')'); }); }
       else v.src = url;
@@ -654,8 +681,40 @@ async function playItem(rk, type, o) {
   }, 500);
   L.rt = setInterval(() => report(v.paused ? 'paused' : 'playing'), 10000);
   v.addEventListener('ended', () => { fetch(`${PX}/:/scrobble?key=${full.ratingKey}&identifier=com.plexapp.plugins.library`).catch(() => {}); closeLayer(); });
+  L.cues = [];
+  L.setSub = async id => {
+    subId = id; L.cues = []; $('#psub', L.el).textContent = '';
+    if (!id) return;
+    const st = subL.find(x => x.id === id); if (!st) return;
+    try {
+      const base = st.key || '/library/streams/' + id;
+      let r = await fetch(`${PX}${base}${base.includes('?') ? '&' : '?'}format=srt&encoding=utf-8`); let t = r.ok ? await r.text() : '';
+      if (!t || !t.includes('-->')) { r = await fetch(`${PX}${base}.srt`); t = r.ok ? await r.text() : ''; }
+      L.cues = parseSubs(t);
+      if (!L.cues.length) toast('Those subtitles could not be read');
+    } catch (e) { toast('Subtitles did not load'); }
+  };
+  L.subTick = setInterval(() => { const el = $('#psub', L.el); if (!el) return; const p = L.pos(); const c = L.cues.find(x => p >= x.s && p <= x.e); const t = c ? c.t : ''; if (el.textContent !== t) el.textContent = t; }, 200);
+  L.menu = (title, opts, cb) => {
+    L.closeMenu();
+    const hb = $('.hudbox', L.el); hb.insertAdjacentHTML('beforeend', `<div class="pmenu" id="pmenu"><h4>${esc(title)}</h4>${opts.map((x, i) => `<div class="fx chip ${x.on ? 'live' : ''}" data-a="pmopt" data-i="${i}">${esc(x.label)}</div>`).join('')}</div>`);
+    L.menuCb = cb; clearTimeout(L.ht); $('#pov', L.el).classList.add('show'); $('#psub', L.el).classList.add('up');
+    setFocus($$('.fx', $('#pmenu', L.el)).find(e => e.classList.contains('live')) || $('#pmenu .fx', L.el));
+  };
+  L.closeMenu = () => { const m = $('#pmenu', L.el); if (m) { m.remove(); L.menuCb = null; return true; } return false; };
+  L.onBack = () => { if (L.closeMenu()) { setFocus($('.pbtns .fx', L.el)); L.hud(); return true; } return false; };
+  L.pickSub = () => L.menu('Subtitles', [{ label: 'Off', on: !subId }].concat(subL.map(x => ({ label: sLabel(x), on: x.id === subId }))), i => L.setSub(i ? subL[i - 1].id : 0));
+  L.pickAud = () => {
+    if (audL.length < 2) { toast('Only one audio track'); return; }
+    L.menu('Audio', audL.map(x => ({ label: sLabel(x), on: x.id === audId })), i => {
+      const old = session; audId = audL[i].id; session = 'hp' + Date.now().toString(36);
+      fetch(`${PX}/video/:/transcode/universal/stop?session=${old}`).catch(() => {});
+      load(L.mode === 'direct' ? 'hls1080' : L.mode, L.pos());
+    });
+  };
+  L.setSub(subId);
   aud.pause(); M.playing = false; M.paint();
-  L.close = () => { clearInterval(L.iv); clearInterval(L.rt); clearTimeout(L.ht); report('stopped'); if (L.hls) L.hls.destroy(); v.pause(); v.removeAttribute('src'); v.load(); if (L.mode !== 'direct') fetch(`${PX}/video/:/transcode/universal/stop?session=${session}`).catch(() => {}); };
+  L.close = () => { clearInterval(L.iv); clearInterval(L.rt); clearInterval(L.subTick); clearTimeout(L.ht); report('stopped'); if (L.hls) L.hls.destroy(); v.pause(); v.removeAttribute('src'); v.load(); if (L.mode !== 'direct') fetch(`${PX}/video/:/transcode/universal/stop?session=${session}`).catch(() => {}); };
   load(mode, mode === 'direct' ? start : start);
   L.hud(); setFocus(null);
 }
@@ -756,10 +815,7 @@ async function roomLib(room, tok, type) {
     try { const items = await getAll({ genre: g.genreKey, sort: 'titleSort', 'X-Plex-Container-Size': 500 }); R.draw(items); $('#lc', room).textContent = `${g.genreName} · ${items.length}`; } catch (e) { $('#lempty', room).textContent = e.message; }
   };
   LRBack = () => { if (S.genreOpen) { S.genreOpen = null; R.load().then(() => setFocus($$('.pc2', room)[0] || null)); return true; } return false; };
-  R.pickList = (title, labels, cb) => {
-    const L = openLayer('sheet pick', `<div class="in" style="flex-direction:column"><h2>${esc(title)}</h2><div class="pgrid scroll" style="position:relative;flex:1;overflow:hidden;padding:20px 0 80px">${labels.map((l, i) => `<div class="fx chip" data-a="pickopt" data-i="${i}">${esc(l)}</div>`).join('')}</div></div>`);
-    L.cb = cb;
-  };
+  R.pickList = (title, labels, cb) => pickSheet(title, labels, cb);
   await R.load();
 }
 
@@ -791,7 +847,7 @@ async function openDetail(id, type, opt) {
       L.sIdx = pick < 0 ? 0 : pick;
       await L.loadEps();
     } else L.eps = [];
-    L.full = L.target && (L.target.Media ? L.target : (await pj('/library/metadata/' + L.target.ratingKey)).Metadata?.[0]) || L.target;
+    L.full = L.isShow ? (L.target ? ((await pj('/library/metadata/' + L.target.ratingKey)).Metadata?.[0] || L.target) : null) : md;
     L.render();
     $$('.ep', L.el).length; L.focusInit();
     pj(`/library/metadata/${md.ratingKey}/similar`).then(mc => L.below('More like this', 'heart', 'tall', (mc.Metadata || []).filter(x => !hiddenItem(x)))).catch(() => {});
@@ -842,6 +898,13 @@ async function openDetail(id, type, opt) {
       if (resume) { acts.push(['play', 'Resume' + ep, 'resume']); acts.push(['restart', 'From start', 'restart']); } else acts.push(['play', 'Play' + ep, 'restart']);
     }
     const trailer = L.extras.find(x => x.subtype === 'trailer'); if (trailer) acts.push(['film', 'Trailer', 'trailer:' + trailer.ratingKey]);
+    if (L.full) {
+      const sl = subsOf(L.full), al = audOf(L.full);
+      const sid = L.subSel !== undefined ? L.subSel : defSub(L.full), aid = L.audSel !== undefined ? L.audSel : defAud(L.full);
+      const sst = sl.find(x => x.id === sid), ast = al.find(x => x.id === aid);
+      acts.push(['cc', sst ? (sst.language || 'Subtitles') : (sl.length ? 'Subs off' : 'No subs'), 'cc']);
+      if (al.length > 1) acts.push(['audio', ast ? (ast.language || 'Audio') : 'Audio', 'audio']);
+    }
     const allW = L.isShow ? !((md.leafCount || 0) - (md.viewedLeafCount || 0)) : !!md.viewCount;
     acts.push(allW ? ['checkc', 'Watched', 'unwatch'] : ['eye', 'Mark watched', 'watch']);
     L.acts = acts;
@@ -882,7 +945,9 @@ async function openDetail(id, type, opt) {
 }
 function playTarget(L, from, tgt) {
   const t = tgt || L.target; if (!t) { toast('Nothing to play yet'); return; }
-  playItem(t.ratingKey, t.type, from != null ? { from } : {}).catch(e => toast(e.message));
+  const o = from != null ? { from } : {};
+  if (!tgt) { if (L.subSel !== undefined) o.sub = L.subSel; if (L.audSel !== undefined) o.audio = L.audSel; }
+  playItem(t.ratingKey, t.type, o).catch(e => toast(e.message));
 }
 
 /* ---------- Test room ---------- */
@@ -949,7 +1014,13 @@ function act(el) {
   else if (a === 'pickopt') { const L = layers[layers.length - 1]; const cb = L.cb; closeLayer(); cb(+d.i); }
   else if (a === 'dact') {
     const L = layers[layers.length - 1], k = d.d;
-    if (k === 'resume') playTarget(L); else if (k === 'restart') playTarget(L, 0);
+    if (k === 'cc') {
+      const sl = subsOf(L.full), cur = L.subSel !== undefined ? L.subSel : defSub(L.full);
+      pickSheet('Subtitles', ['Off'].concat(sl.map(sLabel)), i => { L.subSel = i ? sl[i - 1].id : 0; L.render(); setFocus($$('.ib', L.el)[L.acts.findIndex(x => x[2] === 'cc')]); }, 1 + sl.findIndex(x => x.id === cur));
+    } else if (k === 'audio') {
+      const al = audOf(L.full), cur = L.audSel !== undefined ? L.audSel : defAud(L.full);
+      pickSheet('Audio', al.map(sLabel), i => { L.audSel = al[i].id; L.render(); setFocus($$('.ib', L.el)[L.acts.findIndex(x => x[2] === 'audio')]); }, al.findIndex(x => x.id === cur));
+    } else if (k === 'resume') playTarget(L); else if (k === 'restart') playTarget(L, 0);
     else if (k.startsWith('trailer:')) playItem(k.slice(8), 'clip', { from: 0 }).catch(e => toast(e.message));
     else if (k === 'watch' || k === 'unwatch') fetch(`${PX}/:/${k === 'watch' ? 'scrobble' : 'unscrobble'}?key=${L.md.ratingKey}&identifier=com.plexapp.plugins.library`).then(() => { toast(k === 'watch' ? 'Marked watched' : 'Marked unwatched'); L.load(); }).catch(() => toast('Plex did not answer'));
   }
@@ -974,6 +1045,9 @@ function act(el) {
   else if (a === 'pseek') { const L = layers[layers.length - 1]; L.seek(+d.d); }
   else if (a === 'ppp') layers[layers.length - 1].toggle();
   else if (a === 'pstats') layers[layers.length - 1].toggleStats();
+  else if (a === 'pcc') layers[layers.length - 1].pickSub();
+  else if (a === 'paud') layers[layers.length - 1].pickAud();
+  else if (a === 'pmopt') { const L = layers[layers.length - 1]; const cb = L.menuCb; L.closeMenu(); setFocus($('.pbtns .fx', L.el)); if (cb) cb(+d.i); }
 }
 
 /* ---------- start ---------- */
