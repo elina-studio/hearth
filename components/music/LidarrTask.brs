@@ -37,6 +37,7 @@ sub runTask()
     end if
     status = 0
     text = ""
+    clock = CreateObject("roTimespan")
     if started
         msg = wait(m.top.timeout, port)
         if type(msg) = "roUrlEvent"
@@ -47,7 +48,8 @@ sub runTask()
             status = -1
         end if
     end if
-    print "[hearth lidarr] "; method; " "; m.top.path; " -> "; status
+    print "[hearth lidarr] "; method; " "; m.top.path; " -> "; status; " in "; clock.TotalMilliseconds(); " ms, "; Len(text); " bytes"
+    if status <> 200 and status <> 201 and status <> 202 and text <> "" then print "[hearth lidarr] reply: "; Left(text, 300)
     resp = {}
     if text <> invalid and text <> ""
         parsed = ParseJson(hFixText(text))
