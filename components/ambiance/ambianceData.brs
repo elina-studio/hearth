@@ -51,8 +51,13 @@ end function
 ' Which built-in mood a clip belongs to, from the start of its file name or title ("rain-creek.mp4" -> rain).
 ' "" means it's a new mood of its own.
 function ambClipMood(name as string) as string
-    n = LCase(name)
-    n = n.replace(" ", "").replace("-", "").replace("_", "")
+    ' letters and digits only, lower case (no String.Replace: older Roku OS doesn't have it)
+    n = ""
+    low = LCase(name)
+    for i = 1 to Len(low)
+        ch = Mid(low, i, 1)
+        if ch <> " " and ch <> "-" and ch <> "_" then n = n + ch
+    end for
     for each pair in [["firefl", "fireflies"], ["lightsout", "lightsout"], ["embers", "lightsout"], ["hearth", "hearth"], ["fireplace", "hearth"], ["campfire", "hearth"], ["fire", "hearth"], ["rain", "rain"]]
         if Left(n, Len(pair[0])) = pair[0] then return pair[1]
     end for
