@@ -42,6 +42,8 @@ sub init()
     m.panMove = m.top.findNode("panMove")
     m.advance = m.top.findNode("advance")
     m.advance.observeField("fire", "onAdvance")
+    m.loadTimeout = m.top.findNode("loadTimeout")
+    m.loadTimeout.observeField("fire", "onLoadTimeout")
     m.clockTimer = m.top.findNode("clockTimer")
     m.clockTimer.observeField("fire", "tick")
     m.weatherTimer = m.top.findNode("weatherTimer")
@@ -110,6 +112,8 @@ sub fetchBatch()
     if m.top.albumId = "@favourites"
         pPhotos("favourites", { section: lib }, "onBatch")
     else if m.top.albumId = "@onthisday"
+        ' this looks through every past year, so it can take a few seconds
+        if m.queue.count() = 0 then m.status.text = "Looking back through the years…"
         pPhotos("onthisday", { section: lib }, "onBatch")
     else if m.top.albumId <> ""
         pPhotos("album", { id: m.top.albumId }, "onBatch")
@@ -138,7 +142,7 @@ sub onBatch(event as object)
         m.offset = m.offset + 60
     end if
     if photos.count() = 0
-        m.status.text = "No photos here yet."
+        if m.top.albumId = "@onthisday" then m.status.text = "No photos from this day in other years." else m.status.text = "No photos here yet."
         return
     end if
     if m.order = "shuffle" then shuffle(photos)
@@ -213,10 +217,10 @@ sub load(slide as object)
         L.photo.width = 960
         L.photo.height = 1080
         L.photo.loadDisplayMode = "scaleToZoom"
-        url2 = pPhotoUrl(slide.items[1], 960, 1080)
+        url2 = pPhotoUrl(slide.items[1], 960, 1080, true)
         L.photo2.visible = true
         setPhoto(L.photo2, url2)
-        url = pPhotoUrl(slide.items[0], 960, 1080)
+        url = pPhotoUrl(slide.items[0], 960, 1080, true)
     else
         L.photo.translation = [0, 0]
         L.photo.width = 1920
@@ -226,7 +230,12 @@ sub load(slide as object)
     end if
     L.back.uri = url
     setPhoto(L.photo, url)
-    if m.need = 0 then reveal()
+    if m.need = 0
+        reveal()
+    else
+        m.loadTimeout.control = "stop"
+        m.loadTimeout.control = "start"
+    end if
     ' tell the TV someone's here, so its own screensaver doesn't cover the slideshow
     if not m.top.saver then pHa("", "", true)
 end sub
@@ -247,17 +256,33 @@ sub onLoadStatus(event as object)
     if not m.loading then return
     ' a late answer for a photo we've already skipped past
     if m.expect = invalid or m.expect[node.uri] <> true then return
-    m.expect.delete(node.uri)
+    ' "loading" comes first; wait for the answer before crossing the photo off
     if s = "ready"
+        m.expect.delete(node.uri)
         m.need = m.need - 1
         if m.need <= 0 then reveal()
     else if s = "failed"
+        m.expect.delete(node.uri)
         skip()
     end if
 end sub
 
+' Safety net: a photo that hasn't answered in 20 seconds is passed over
+sub onLoadTimeout()
+    if not m.loading then return
+    L = m.layers[1 - m.front]
+    ready = true
+    for each p in [L.photo, L.photo2]
+        if m.expect[p.uri] = true
+            if p.loadStatus = "ready" then m.expect.delete(p.uri) else ready = false
+        end if
+    end for
+    if ready then reveal() else skip()
+end sub
+
 ' A photo that won't download or draw is passed over, up to a point
 sub skip()
+    m.loadTimeout.control = "stop"
     m.loading = false
     m.fails = m.fails + 1
     if m.fails >= 5
@@ -268,6 +293,7 @@ sub skip()
 end sub
 
 sub reveal()
+    m.loadTimeout.control = "stop"
     m.loading = false
     m.fails = 0
     m.status.text = ""
@@ -394,7 +420,7 @@ sub openOptions()
     if m.top.albumName <> "" then o.eyebrowText = UCase(m.top.albumName) else o.eyebrowText = "ALL PHOTOS"
     if m.pending <> invalid
         o.captionText = slideCaption(m.pending)
-        o.thumbUri = pPhotoUrl(m.pending.items[0], 240, 160)
+        o.thumbUri = pPhotoUrl(m.pending.items[0], 240, 160, true)
     end if
     if m.top.albumId <> "" then o.saverChoice = m.top.albumId else o.saverChoice = "all"
     o.favourite = slideFav(m.pending)

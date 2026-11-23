@@ -48,10 +48,15 @@ function pLibrary() as string
     return libs.photos.toStr()
 end function
 
-' A photo (or album cover) sized for the TV, through Plex's photo transcoder
-function pPhotoUrl(item as object, w as integer, h as integer) as string
+'' A photo (or album cover) sized for the TV, through Plex's photo transcoder.
+' fill = true: the image covers the whole w x h box (for posters drawn with scaleToZoom).
+' Without it a tall photo came back 405 px wide and was blown up three times: very blurry.
+' fill = false: the image fits inside the box (for scaleToFit). upscale lets small photos reach the box too.
+function pPhotoUrl(item as object, w as integer, h as integer, fill = false as boolean) as string
     if item = invalid or item.path = invalid or item.path = "" then return ""
-    return m.global.plexServer + "/photo/:/transcode?width=" + w.toStr() + "&height=" + h.toStr() + "&minSize=0&upscale=0&url=" + hEscape(item.path) + "&X-Plex-Token=" + m.global.plexServerToken
+    minSize = "0"
+    if fill then minSize = "1"
+    return m.global.plexServer + "/photo/:/transcode?width=" + w.toStr() + "&height=" + h.toStr() + "&minSize=" + minSize + "&upscale=1&url=" + hEscape(item.path) + "&X-Plex-Token=" + m.global.plexServerToken
 end function
 
 ' Start a PhotoTask (see PhotoTask.brs). cb takes the event.

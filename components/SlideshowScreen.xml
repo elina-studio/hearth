@@ -62,6 +62,7 @@
       <FloatFieldInterpolator key="[0.0, 1.0]" keyValue="[1.0, 0.0]" fieldToInterp="hint.opacity" />
     </Animation>
     <Timer id="advance" duration="8" repeat="false" />
+    <Timer id="loadTimeout" duration="20" repeat="false" />
     <Timer id="clockTimer" duration="15" repeat="true" />
     <Timer id="weatherTimer" duration="900" repeat="true" />
   </children>
