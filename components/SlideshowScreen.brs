@@ -408,7 +408,7 @@ sub showMusic()
     t = mp.track.title
     if t = invalid then t = ""
     if mp.track.artist <> invalid and mp.track.artist <> "" then t = t + " · " + mp.track.artist
-    m.npTitle.text = pPlainText(t)
+    m.npTitle.text = hFixText(t)
     m.nowPlaying.visible = (t <> "")
 end sub
 
