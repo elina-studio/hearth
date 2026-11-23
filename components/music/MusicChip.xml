@@ -1,11 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- A Music control: an icon, optionally followed by a word. Round when it has no word.
+<!-- A Music control: an icon, optionally followed by a word. Rough-edged like Hearth's other buttons (no moss in Music).
      States: idle (dim fill), on (gold ring and gold icon, e.g. Shuffle on), focused (gold fill). -->
 <component name="MusicChip" extends="Group">
   <children>
-    <Poster id="base" uri="pkg:/images/pill.9.png" blendColor="0xFFFFFF14" />
-    <Poster id="fill" uri="pkg:/images/pill.9.png" blendColor="0xE0B34AFF" visible="false" />
-    <Poster id="ring" uri="pkg:/images/pill-ring.9.png" blendColor="0xE0B34AFF" visible="false" />
+    <!-- rough hand-cut edges (whimsy spec 6): 9-patches with 12px padding, so they sit at -12,-12 and are 24 bigger -->
+    <Poster id="base" translation="[-12, -12]" blendColor="0xFFFFFF14" />
+    <Poster id="fill" translation="[-12, -12]" blendColor="0xE0B34A80" visible="false" />
+    <Poster id="ring" translation="[-12, -12]" blendColor="0xE0B34AFF" visible="false" />
     <Poster id="icon" width="34" height="34" />
     <Label id="label" vertAlign="center" />
     <Label id="badge" vertAlign="center" />

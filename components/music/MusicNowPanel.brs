@@ -130,6 +130,11 @@ sub build()
         setText(m.chipName, [x, 888], w, "regular", 22)
     end if
     m.track.width = m.barW
+    m.track.visible = false
+    m.fill.visible = false
+    if m.braid <> invalid then m.top.removeChild(m.braid)
+    m.braid = hBraid(m.top, m.barW, 0)
+    m.braid.translation = [m.track.translation[0], m.track.translation[1] + m.track.height / 2 - 6]
     if m.top.castOpen and m.top.layout = "column"
         drawCast()
     else
@@ -225,12 +230,14 @@ sub showTime()
     p = muPlayer()
     if p.track = invalid
         m.fill.width = 0
+        setBraid(0)
         m.elapsed.text = ""
         m.total.text = ""
         return
     end if
     d = p.duration
     if d > 0 then m.fill.width = m.barW * p.position / d else m.fill.width = 0
+    setBraid(m.fill.width)
     m.elapsed.text = pxClock(p.position)
     m.total.text = pxClock(d)
     if m.top.layout = "bar" then m.elapsed.text = pxClock(p.position) + " / " + pxClock(d)
@@ -508,4 +515,17 @@ sub drawCast()
     wh.text = "Whole house"
     wh.translation = [96, 852]
     wh.focused = (m.top.active and m.r = n + 1)
+end sub
+
+' the braid bar keeps its empty track showing; only the fill hides at zero
+sub setBraid(fillPx as float)
+    if m.braid = invalid then return
+    on = fillPx > 0
+    m.braid.clip.visible = on
+    m.braid.tip.visible = on
+    if not on then return
+    fillW = Int((m.braid.w - 2) * fillPx / m.barW)
+    if fillW < 15 then fillW = 15
+    m.braid.clip.clippingRect = [0, 0, fillW - 12, 10]
+    m.braid.tip.translation = [1 + fillW - 12, 1]
 end sub

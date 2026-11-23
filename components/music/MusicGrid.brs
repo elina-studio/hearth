@@ -91,13 +91,16 @@ sub makeSlot()
     if m.top.round
         ring.uri = "pkg:/images/music/round-ring.png"
         ring.translation = [x0 - 10, -10]
+        ring.blendColor = "0xE0B34AFF"
+        ring.width = s + 20
+        ring.height = s + 20
     else
-        ring.uri = "pkg:/images/ring.9.png"
-        ring.translation = [-10, -10]
+        ' whimsy spec 4: rough rope-gold line with a soft glow (20px padding + 7px gap), no moss in Music
+        ring.uri = "pkg:/images/w/focus-ring" + hVar(m.strip.getChildCount()) + ".9.png"
+        ring.translation = [-27, -27]
+        ring.width = s + 54
+        ring.height = s + 54
     end if
-    ring.blendColor = "0xE0B34AFF"
-    ring.width = s + 20
-    ring.height = s + 20
     ring.visible = false
     g.addFields({ poster: p, fb: fb, cap: cap, sub2: sub2, ring: ring, tagBg: tagBg, tagL: tagL })
 end sub

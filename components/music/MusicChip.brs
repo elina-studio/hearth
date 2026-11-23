@@ -28,9 +28,19 @@ sub update()
     end if
     m.top.width = w
     m.top.height = h
+    ' each control gets one of the 6 rough edges, fixed by its icon and word so neighbours differ
+    k = 0
+    key = m.top.icon + m.top.text
+    for i = 1 to Len(key)
+        k = k + Asc(Mid(key, i, 1)) * i
+    end for
+    v = hVar(k)
+    m.base.uri = "pkg:/images/w/button-fill" + v + ".9.png"
+    m.fill.uri = "pkg:/images/w/button-fill" + v + ".9.png"
+    m.ring.uri = "pkg:/images/w/button-outline" + v + ".9.png"
     for each p in [m.base, m.fill, m.ring]
-        p.width = w
-        p.height = h
+        p.width = w + 24
+        p.height = h + 24
     end for
     if m.top.icon <> "" then m.icon.uri = "pkg:/images/music/icons/" + m.top.icon + ".png" else m.icon.uri = ""
     m.icon.width = ic
@@ -46,7 +56,6 @@ sub update()
     f = m.top.focused
     m.base.visible = not f
     m.fill.visible = f
-    m.fill.blendColor = "0xE0B34A80"
     m.ring.visible = f or m.top.on
     if f
         c = "0xFFFFFFFF"

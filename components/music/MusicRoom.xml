@@ -7,7 +7,7 @@
     <MusicNowPanel id="panel" />
     <Group id="tabs" translation="[690, 40]" />
     <Group id="letters" translation="[690, 112]" visible="false">
-      <Rectangle width="1150" height="58" color="0xFFFFFF08" />
+      <Poster uri="pkg:/images/w/panel-v3.9.png" translation="[-12, -12]" width="1174" height="82" blendColor="0x141A11FF" />
     </Group>
     <Label id="heading" translation="[690, 190]" width="1150" color="0xD9A066FF" />
     <Group clippingRect="[660, 112, 1260, 818]">
@@ -15,8 +15,8 @@
       <MusicGrid id="grid" translation="[690, 240]" visible="false" />
     </Group>
     <Group id="spot" translation="[690, 132]" visible="false">
-      <Rectangle width="1150" height="252" color="0xFFFFFF08" />
-      <Rectangle translation="[22, 22]" width="208" height="208" color="0x1D2418FF" />
+      <Poster uri="pkg:/images/w/panel-v5.9.png" translation="[-12, -12]" width="1174" height="276" blendColor="0x141A11FF" />
+      <Poster uri="pkg:/images/w/panel-v2.9.png" translation="[10, 10]" width="232" height="232" blendColor="0x1D2418FF" />
       <Poster id="spotArt" translation="[22, 22]" width="208" height="208" loadDisplayMode="scaleToZoom" />
       <Label id="spotEyebrow" translation="[256, 28]" width="860" color="0xD9A066FF" />
       <Label id="spotTitle" translation="[256, 60]" width="860" maxLines="1" color="0xEDE6CAFF" />
