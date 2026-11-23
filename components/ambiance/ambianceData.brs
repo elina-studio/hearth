@@ -80,3 +80,31 @@ function ambMerge(clips as object) as object
     end for
     return out
 end function
+
+' Which generated sound goes with a mood (for "Both"): built-ins use their own; your clips by name.
+function ambSoundMood(it as dynamic) as string
+    if it = invalid then return "hearth"
+    md = it.mood
+    if md = "hearth" or md = "rain" or md = "fireflies" or md = "lightsout" then return md
+    n = LCase(it.title)
+    for each w in ["creek", "river", "water", "stream", "brook", "rain", "lake", "ocean", "wave", "falls"]
+        if Instr(1, n, w) > 0 then return "rain"
+    end for
+    for each w in ["fire", "camp", "ember", "hearth"]
+        if Instr(1, n, w) > 0 then return "hearth"
+    end for
+    return "fireflies"
+end function
+
+' The word and icon for a mood's own sound on the switch.
+function ambSoundLabel(it as dynamic) as object
+    md = ambSoundMood(it)
+    if it <> invalid and it.mood = "lightsout" then return { word: "Embers", icon: "flame" }
+    if md = "hearth" then return { word: "Fire", icon: "flame" }
+    if md = "rain"
+        if it <> invalid and it.mood = "rain" then return { word: "Rain", icon: "drop" }
+        return { word: "Water", icon: "drop" }
+    end if
+    if it <> invalid and it.mood = "fireflies" then return { word: "Night", icon: "moon" }
+    return { word: "Nature", icon: "leaf" }
+end function

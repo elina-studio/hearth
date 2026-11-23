@@ -35,7 +35,11 @@ sub init()
     m.state.font = hFont("bold", 28)
     m.hint = m.top.findNode("hint")
     m.hint.font = hFont("regular", 24)
-    m.hint.text = "OK sound   ·   Left/Right mood   ·   Up/Down dim   ·   * options   ·   Back leaves"
+    m.hint.text = "OK switch sound   ·   Left/Right mood   ·   Up/Down dim   ·   * options   ·   Back leaves"
+    m.mixGroup = m.top.findNode("mix")
+    m.drift = m.top.findNode("drift")
+    m.still.scaleRotateCenter = [960, 540]
+    if m.global.hasField("music") and m.global.music <> invalid then m.global.music.observeField("track", "paintState")
     m.clock = m.top.findNode("clock")
     m.clock.font = hFont("bold", 40)
     m.hudIn = m.top.findNode("hudIn")
@@ -65,58 +69,23 @@ sub onMood()
         return
     end if
     it = ambMood(md)
-    m.useVideo = ambHasVideo(it)
-    if m.useVideo
-        ' real footage: the video carries its own sound, muted on request
-        m.scene.running = false
-        m.scene.visible = false
-        m.sound.active = false
-        m.clip = it.clip
-        m.clipRetried = false
-        m.retried5 = false
-        if m.clip <> invalid
-            ' the person's own footage, streamed from their Plex "Ambiance" library
-            m.video.content = clipContent(m.clip, false)
-            pic = m.clip.art
-            if pic = invalid then pic = m.clip.thumb
-            m.still.uri = ""
-            if pic <> invalid then m.still.uri = fullStill(pic)
-        else
-            c = CreateObject("roSGNode", "ContentNode")
-            c.url = it.video
-            c.streamFormat = "mp4"
-            m.video.content = c
-            ' the still covers the screen until the first frame is up
-            m.still.uri = "pkg:/images/amb/full-" + md + ".jpg"
-        end if
-        m.still.visible = true
-        m.video.visible = true
-        m.video.mute = not soundPref(md)
-        fillScreen(m.clip)
-        ' the TV plays one thing at a time: music (even paused) holds the player, so stop it first
-        mp = m.global.music
-        if mp <> invalid and mp.state <> invalid and mp.state <> "none" and mp.state <> "stopped"
-            print "[ambiance] stopping music ("; mp.state; ") so the video can play"
-            mp.command = { cmd: "stop" }
-            startVideoSoon(0.6)
-        else
-            m.video.control = "play"
-        end if
-        m.credit.text = it.credit
-    else
-        ' no footage in this build: the drawn scene and its generated sound
-        m.video.control = "stop"
-        m.video.visible = false
-        fillScreen(invalid)
-        m.still.visible = false
-        m.scene.visible = true
-        m.scene.mood = md
-        m.scene.running = true
-        m.sound.mood = md
-        m.sound.on = soundPref(md)
-        m.sound.active = true
+    m.item = it
+    m.clip = invalid
+    if it <> invalid then m.clip = it.clip
+    m.clipRetried = false
+    m.retried5 = false
+    m.video.control = "stop"
+    if m.clip <> invalid
+        ' the person's own footage, streamed from their Plex "Ambiance" library
+        m.video.content = clipContent(m.clip, false)
+        pic = m.clip.art
+        if pic = invalid then pic = m.clip.thumb
+        m.still.uri = ""
+        if pic <> invalid then m.still.uri = fullStill(pic)
         m.credit.text = ""
     end if
+    fillScreen(m.clip)
+    applyMix()
     ' lights out means "stop in 30 min" unless a timer is already set
     if md = "lightsout" and m.sleepMin = 0 then setSleep(30)
     m.reg.Write("ambLast", md)
@@ -173,6 +142,144 @@ sub fillScreen(clip as dynamic)
     m.video.height = Int(h)
     m.video.translation = [Int((1920 - w) / 2), Int((1080 - h) / 2)]
     print "[ambiance] video rect "; Int(w); "x"; Int(h); " (clip aspect "; ar; ")"
+end sub
+
+' ---------- the sound switch: Fire (or Rain...) / Music / Both ----------
+' The TV plays one stream at a time, so:
+'   fire  = the clip moving, with its own sound; music is stopped (drawn moods: scene + generated sound)
+'   music = your music keeps playing; the clip's still drifts slowly (no video)
+'   both  = music + the generated crackle/rain loop (a SoundEffect, which can play alongside music)
+function mixMode() as string
+    v = m.reg.Read("ambMix")
+    if v <> "music" and v <> "both" then v = "fire"
+    return v
+end function
+
+function musicNode() as dynamic
+    if not m.global.hasField("music") then return invalid
+    return m.global.music
+end function
+
+sub applyMix()
+    mode = mixMode()
+    md = m.top.mood
+    mp = musicNode()
+    hasClip = (m.clip <> invalid)
+    m.useVideo = hasClip and mode = "fire"
+    m.drift.control = "stop"
+    m.still.scale = [1.0, 1.0]
+    m.still.translation = [0, 0]
+    if mode = "fire"
+        m.sound.preferSfx = false
+        if hasClip
+            m.scene.running = false
+            m.scene.visible = false
+            m.sound.active = false
+            m.still.visible = true
+            m.video.visible = true
+            m.video.mute = not soundPref(md)
+            ' music (even paused) holds the player, so stop it first
+            if mp <> invalid and mp.state <> invalid and mp.state <> "none" and mp.state <> "stopped"
+                print "[ambiance] stopping music ("; mp.state; ") so the video can play"
+                mp.command = { cmd: "stop" }
+                startVideoSoon(0.6)
+            else
+                m.video.control = "play"
+            end if
+        else
+            if mp <> invalid and (mp.state = "playing" or mp.state = "buffering") then mp.command = { cmd: "pause" }
+            showScene(md)
+            m.sound.mood = md
+            m.sound.on = soundPref(md)
+            m.sound.active = true
+        end if
+    else
+        m.video.control = "stop"
+        m.video.visible = false
+        if hasClip
+            m.scene.running = false
+            m.scene.visible = false
+            m.still.visible = true
+            m.drift.control = "start"
+        else
+            showScene(md)
+        end if
+        if mp <> invalid and mp.state <> "playing" and mp.state <> "buffering" then mp.command = { cmd: "play" }
+        if mode = "both"
+            ' never the Audio node here: it would fight the music for the player
+            m.sound.preferSfx = true
+            m.sound.mood = ambSoundMood(m.item)
+            m.sound.on = true
+            m.sound.active = true
+        else
+            m.sound.active = false
+        end if
+    end if
+    paintMix()
+end sub
+
+sub showScene(md as string)
+    m.video.control = "stop"
+    m.video.visible = false
+    m.still.visible = false
+    m.scene.visible = true
+    m.scene.mood = md
+    m.scene.running = true
+end sub
+
+sub cycleMix()
+    mode = mixMode()
+    if mode = "fire"
+        mode = "music"
+    else if mode = "music"
+        mode = "both"
+    else
+        mode = "fire"
+    end if
+    m.reg.Write("ambMix", mode)
+    m.reg.Flush()
+    applyMix()
+end sub
+
+' the switch: three segments, the chosen one filled gold
+sub paintMix()
+    lab = ambSoundLabel(m.item)
+    names = [lab.word, "Music", "Both"]
+    icons = [[lab.icon], ["note"], [lab.icon, "note"]]
+    modes = ["fire", "music", "both"]
+    cur = mixMode()
+    m.mixGroup.removeChildrenIndex(m.mixGroup.getChildCount(), 0)
+    pill = m.mixGroup.createChild("Poster")
+    pill.uri = "pkg:/images/amb/mix-pill.png"
+    pill.width = 528
+    pill.height = 80
+    for i = 0 to 2
+        on = (modes[i] = cur)
+        x = 8 + i * 172
+        if on
+            seg = m.mixGroup.createChild("Poster")
+            seg.uri = "pkg:/images/amb/mix-seg.png"
+            seg.width = 168
+            seg.height = 64
+            seg.translation = [x, 8]
+        end if
+        if on then col = "0x1A1408FF" else col = "0xEDE6CAFF"
+        ix = x + 18
+        for each ic in icons[i]
+            p = m.mixGroup.createChild("Poster")
+            p.uri = "pkg:/images/amb/mix-" + ic + ".png"
+            p.width = 32
+            p.height = 32
+            p.translation = [ix, 24]
+            p.blendColor = col
+            ix = ix + 34
+        end for
+        l = m.mixGroup.createChild("Label")
+        l.font = hFont("regular", 28)
+        l.color = col
+        l.text = names[i]
+        l.translation = [ix + 6, 20]
+    end for
 end sub
 
 sub startVideoSoon(sec as float)
@@ -232,7 +339,18 @@ function soundPref(md as string) as boolean
 end function
 
 sub paintState()
-    if soundOn() then s = "Sound on" else s = "Sound off"
+    mode = mixMode()
+    if mode = "fire"
+        if soundOn() then s = "Sound on" else s = "Sound off"
+    else
+        s = "Your music"
+        mp = musicNode()
+        if mp <> invalid and mp.track <> invalid and mp.track.title <> invalid
+            s = mp.track.title
+            if mp.track.artist <> invalid and mp.track.artist <> "" then s = s + "  ·  " + mp.track.artist
+        end if
+        if mode = "both" then s = s + "   +   " + LCase(ambSoundLabel(m.item).word)
+    end if
     if m.dimIndex > 0 then s = s + "   ·   Dimmed " + Int(m.dimLevels[m.dimIndex] * 100).toStr() + "%"
     if m.sleepMin > 0 and m.sleepAt <> invalid then s = s + "   ·   Stops at " + clockText(m.sleepAt)
     m.state.text = s
@@ -354,6 +472,9 @@ sub onSleepFaded()
     m.sound.active = false
     m.scene.running = false
     if m.useVideo then m.video.control = "pause"
+    m.drift.control = "stop"
+    mp = musicNode()
+    if mixMode() <> "fire" and mp <> invalid then mp.command = { cmd: "pause" }
     m.sleepMin = 0
     m.sleepAt = invalid
 end sub
@@ -365,8 +486,7 @@ sub wake()
     if m.useVideo
         m.video.control = "resume"
     else
-        m.scene.running = true
-        m.sound.active = true
+        applyMix()
     end if
     showHud()
 end sub
@@ -376,6 +496,7 @@ sub leave()
     m.sound.active = false
     m.scene.running = false
     m.video.control = "stop"
+    m.drift.control = "stop"
     m.top.request = { action: "back" }
 end sub
 
@@ -391,7 +512,7 @@ function onKeyEvent(key as string, press as boolean) as boolean
         return true
     end if
     if key = "OK"
-        toggleSound()
+        cycleMix()
         showHud()
     else if key = "left"
         nextMood(-1)
