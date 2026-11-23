@@ -8,6 +8,7 @@
     <Video id="video" width="1920" height="1080" visible="false" enableUI="false" loop="true" disableScreenSaver="true" />
     <!-- shown instantly, hidden once the video is actually playing -->
     <Poster id="still" width="1920" height="1080" loadDisplayMode="scaleToZoom" visible="false" />
+    <Label id="note" translation="[96, 80]" width="1200" color="0xEDE6CACC" visible="false" />
     <Rectangle id="dim" width="1920" height="1080" color="0x000000FF" opacity="0" />
     <Label id="cornerClock" translation="[1524, 60]" width="300" horizAlign="right" color="0xEDE6CA99" visible="false" />
     <Timer id="clockTick" duration="20" repeat="true" />
@@ -31,17 +32,18 @@
       <FloatFieldInterpolator key="[0.0, 1.0]" keyValue="[0.0, 1.0]" fieldToInterp="night.opacity" />
     </Animation>
     <!-- music modes: the clip's still drifts slowly instead of the video -->
-    <Animation id="drift" duration="60" repeat="true" easeFunction="inOutQuad">
-      <Vector2DFieldInterpolator key="[0.0, 0.5, 1.0]" keyValue="[[1.0, 1.0], [1.12, 1.12], [1.0, 1.0]]" fieldToInterp="still.scale" />
-      <Vector2DFieldInterpolator key="[0.0, 0.5, 1.0]" keyValue="[[0, 0], [-40, -18], [0, 0]]" fieldToInterp="still.translation" />
+    <Animation id="drift" duration="120" repeat="true" easeFunction="inOutSine">
+      <Vector2DFieldInterpolator key="[0.0, 0.5, 1.0]" keyValue="[[1.0, 1.0], [1.06, 1.06], [1.0, 1.0]]" fieldToInterp="still.scale" />
     </Animation>
     <Timer id="hudTimer" duration="5" repeat="false" />
     <Timer id="sleepTimer" repeat="false" />
+    <Timer id="videoWatch" repeat="false" duration="10" />
   </children>
   <interface>
     <field id="mood" type="string" onChange="onMood" />
     <field id="request" type="assocarray" alwaysNotify="true" />
     <function name="onShown" />
+    <function name="leave" />
   </interface>
   <script type="text/brightscript" uri="pkg:/source/util.brs" />
   <script type="text/brightscript" uri="pkg:/components/ambiance/ambianceData.brs" />

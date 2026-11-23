@@ -13,6 +13,10 @@ sub init()
     m.credit = m.top.findNode("credit")
     m.credit.font = hFont("regular", 20)
     m.useVideo = false
+    m.note = m.top.findNode("note")
+    m.note.font = hFont("regular", 24)
+    m.videoWatch = m.top.findNode("videoWatch")
+    m.videoWatch.observeField("fire", "onVideoWatch")
     m.still = m.top.findNode("still")
     m.dim = m.top.findNode("dim")
     m.dimLevels = [0, 0.25, 0.5, 0.7]
@@ -79,7 +83,8 @@ sub onMood()
     m.video.control = "stop"
     if m.clip <> invalid
         ' the person's own footage, streamed from their Plex "Ambiance" library
-        m.video.content = clipContent(m.clip, false)
+        m.note.visible = false
+        m.video.content = clipContent(m.clip, needsConvert(m.clip))
         pic = m.clip.art
         if pic = invalid then pic = m.clip.thumb
         m.still.uri = ""
@@ -100,6 +105,21 @@ end sub
 
 ' A Plex clip as video content: the file as it is, or (transcode=true) converted by Plex to HLS
 ' for files the TV can't play directly. Either way it loops.
+' This TV (TCL 5000X family) has no HEVC decode and a 1080p limit: a phone clip in HEVC or 4K never
+' direct-plays, so skip the failed attempt (10+ s) and go straight to the converted stream.
+function needsConvert(clip as object) as boolean
+    vc = LCase(toStr0(clip.videoCodec))
+    if vc <> "" and vc <> "h264" then return true
+    if clip.width <> invalid and Val(clip.width.toStr()) > 1920 then return true
+    if clip.height <> invalid and Val(clip.height.toStr()) > 1080 then return true
+    return false
+end function
+
+function toStr0(v as dynamic) as string
+    if v = invalid then return ""
+    return v.toStr()
+end function
+
 function clipContent(clip as object, transcode as boolean) as object
     server = m.global.plexServer
     token = m.global.plexServerToken
@@ -109,7 +129,7 @@ function clipContent(clip as object, transcode as boolean) as object
         if LCase(clip.container) = "mkv" then c.streamFormat = "mkv" else c.streamFormat = "mp4"
     else
         q = "path=" + hEscape("/library/metadata/" + clip.Id.toStr()) + "&mediaIndex=0&partIndex=0&protocol=hls&fastSeek=1"
-        q = q + "&directPlay=0&directStream=1&directStreamAudio=1&videoResolution=1920x1080&maxVideoBitrate=12000"
+        q = q + "&directPlay=0&directStream=1&directStreamAudio=1&videoResolution=1280x720&maxVideoBitrate=6000"
         q = q + "&subtitles=none&session=" + m.global.deviceId + "-amb" + Rnd(100000).toStr()
         q = q + "&X-Plex-Client-Identifier=" + hEscape(m.global.deviceId) + "&X-Plex-Product=Hearth&X-Plex-Platform=Roku&X-Plex-Token=" + token
         q = q + "&X-Plex-Client-Profile-Extra=" + hEscape("add-transcode-target(type=videoProfile&context=streaming&protocol=hls&container=mpegts&videoCodec=h264&audioCodec=aac,ac3)")
@@ -184,6 +204,7 @@ sub applyMix()
             wasYielded = m.yielded
             yieldMusic()
             if m.yielded and not wasYielded then startVideoSoon(0.6) else m.video.control = "play"
+            armWatch(10)
         else
             yieldMusic()
             showScene(md)
@@ -326,11 +347,61 @@ sub startVideoSoon(sec as float)
 end sub
 
 sub startVideoNow()
-    if m.useVideo and not m.asleep then m.video.control = "play"
+    if m.useVideo and not m.asleep
+        m.video.control = "play"
+        armWatch(10)
+    end if
+end sub
+
+sub armWatch(sec as float)
+    m.videoWatch.control = "stop"
+    m.videoWatch.duration = sec
+    m.videoWatch.control = "start"
+end sub
+
+' the video never started (or errored twice): show the still, calm, with a small note; Back always works
+sub videoFailed(why as string)
+    print "[ambiance] video gave up: "; why
+    m.videoWatch.control = "stop"
+    m.video.control = "stop"
+    m.video.visible = false
+    m.useVideo = false
+    m.drift.control = "stop"
+    m.still.scale = [1.0, 1.0]
+    m.still.translation = [0, 0]
+    m.still.visible = true
+    m.note.text = "Video unavailable. Back to leave."
+    m.note.visible = true
+    if m.yielded then rejoinMusic()
+    refocus()
+    showHud()
+end sub
+
+sub onVideoWatch()
+    if not m.useVideo or m.asleep then return
+    if m.video.state = "playing" then return
+    print "[ambiance] video start timeout, state "; m.video.state
+    if m.clip <> invalid and not m.clipRetried
+        m.clipRetried = true
+        m.video.control = "stop"
+        m.video.content = clipContent(m.clip, true)
+        m.video.control = "play"
+        armWatch(20)
+    else
+        videoFailed("timeout")
+    end if
+end sub
+
+' focus must stay on this screen or Back goes nowhere
+sub refocus()
+    if m.controls.visible then return
+    if m.top.getScene().dialog <> invalid then return
+    if not m.top.hasFocus() then m.top.setFocus(true)
 end sub
 
 sub onVideoState()
     print "[ambiance] video state "; m.video.state
+    refocus()
     if m.video.state = "error"
         print "[ambiance] video error: "; m.video.errorCode; " "; m.video.errorMsg
         ' -5 "only one playing instance": something (music) still holds the player; stop it and retry once
@@ -347,9 +418,16 @@ sub onVideoState()
             m.clipRetried = true
             m.video.content = clipContent(m.clip, true)
             m.video.control = "play"
+            armWatch(20)
+        else
+            videoFailed("error " + m.video.errorCode.toStr())
         end if
     end if
-    if m.video.state = "playing" then m.still.visible = false
+    if m.video.state = "playing"
+        m.videoWatch.control = "stop"
+        m.note.visible = false
+        m.still.visible = false
+    end if
 end sub
 
 function soundOn() as boolean
@@ -527,6 +605,7 @@ end sub
 
 sub leave()
     m.sleepTimer.control = "stop"
+    m.videoWatch.control = "stop"
     m.sound.active = false
     m.scene.running = false
     m.video.control = "stop"
@@ -537,6 +616,10 @@ end sub
 
 function onKeyEvent(key as string, press as boolean) as boolean
     if not press then return false
+    if key = "back"
+        leave()
+        return true
+    end if
     if hMediaKey(key) then return false
     if key = "back"
         leave()

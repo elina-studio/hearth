@@ -205,6 +205,13 @@ end sub
 
 ' Outside video, Play, Rewind, Fast forward and Replay always control the music.
 function onKeyEvent(key as string, press as boolean) as boolean
+    if press and key = "back"
+        top = topScreen()
+        if top <> invalid and top.subtype() = "MoodScreen"
+            top.callFunc("leave", invalid)
+            return true
+        end if
+    end if
     if not press or not hMediaKey(key) then return false
     top = topScreen()
     if top <> invalid and top.subtype() = "PlayerScreen" then return false
