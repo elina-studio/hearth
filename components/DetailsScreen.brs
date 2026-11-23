@@ -42,6 +42,8 @@ sub init()
     ' the page sits 80px lower to make room for the rooms bar (RoomBar, 0-120)
     m.offset = 80
     m.roomBar = m.top.findNode("roomBar")
+    m.hints = m.top.findNode("hints")
+    m.hintSig = ""
     m.zone = "act"
     m.isShow = false
     m.btn = 0
@@ -243,17 +245,17 @@ sub fillHeader()
     it = m.full
     fillHeaderBasic(it)
     tgt = m.target
+    ' the kicker is the path back (Back climbs one step): SHOWS › SUPERNATURAL › NEXT UP S4 E3
     if m.isShow
-        k = "SHOW"
+        k = "SHOWS  ›  " + UCase(hTitle(it))
         if tgt <> invalid and tgt.Type = "Episode"
-            k = k + " · "
+            k = k + "  ›  "
             if hPercent(tgt) > 0 then k = k + "CONTINUE " else k = k + "NEXT UP "
             k = k + "S" + hNum(tgt.ParentIndexNumber) + " E" + hNum(tgt.IndexNumber)
-            if tgt.Name <> invalid then k = k + " · " + UCase(tgt.Name)
         end if
     else
-        k = "MOVIE"
-        if it.Studio <> invalid then k = k + " · " + UCase(it.Studio)
+        k = "MOVIES  ›  " + UCase(hTitle(it))
+        if it.Studio <> invalid then k = k + "  ›  " + UCase(it.Studio)
     end if
     m.kicker.text = k
 
@@ -688,7 +690,7 @@ sub paint()
         off = 80
     else
         if top + off < 130 then off = 130 - top
-        if top + h + off > 1050 then off = 1050 - top - h
+        if top + h + off > 995 then off = 995 - top - h
         if off > 80 then off = 80
     end if
     if off <> m.offset
@@ -698,6 +700,20 @@ sub paint()
         m.offset = off
     end if
     placeRows()
+    paintHints()
+end sub
+
+sub paintHints()
+    opt = "More"
+    if m.zone = "eps" then opt = "Episode options"
+    keys = [{ icon: "back", label: m.roomBar.current }]
+    if m.zone = "act" then keys.push({ icon: "up", label: "Rooms" })
+    if m.zone <> "bar" then keys.push({ icon: "asterisk", label: opt })
+    sig = FormatJson(keys)
+    if sig <> m.hintSig
+        m.hintSig = sig
+        m.hints.keys = keys
+    end if
 end sub
 
 function onKeyEvent(key as string, press as boolean) as boolean
