@@ -12,7 +12,9 @@ Settings (environment):
   WHISPER_HOST   Wyoming whisper host      (default 127.0.0.1)
   WHISPER_PORT   Wyoming whisper port      (default 10300)
   WHISPER_LANG   spoken language           (default en)
-  DATA_DIR       where the HTTPS cert lives (default /data)
+  DATA_DIR       where the HTTPS cert, lyrics cache and Last.fm session live (default /data)
+  LASTFM_API_KEY / LASTFM_API_SECRET / PUBLIC_URL   Last.fm scrobbling (lastfm.py)
+  MUSIC_ROOT     folder .lrc lyrics files may be read from (default /volume1, mounted read-only)
 """
 import json
 import os
@@ -23,6 +25,9 @@ import threading
 import urllib.parse
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+import lastfm
+import lyrics
 
 TV_IP = os.environ.get("TV_IP", "192.168.254.9")
 HTTP_PORT = int(os.environ.get("HTTP_PORT", "8765"))
@@ -120,6 +125,32 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def send_html(self, text):
+        body = text.encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def qr(self):
+        """A QR code of the phone page, for the TV's connect screen (needs the qrcode package; the page address is also shown as text)."""
+        try:
+            import io
+            import qrcode
+            img = qrcode.make(lastfm.PUBLIC_URL + "/lastfm", box_size=8, border=2)
+            buf = io.BytesIO()
+            img.save(buf, "PNG")
+            body = buf.getvalue()
+        except Exception:
+            return self.send_json({"error": "no qr"}, 404)
+        self.send_response(200)
+        self.send_header("Content-Type", "image/png")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
     def body(self):
         n = int(self.headers.get("Content-Length") or 0)
         return self.rfile.read(n) if n else b""
@@ -137,8 +168,73 @@ class Handler(BaseHTTPRequestHandler):
             self.wfile.write(page)
         elif path == "/api/status":
             self.status()
+        elif path == "/api/round":
+            self.round_image()
+        elif path == "/api/keys":
+            # Hearth restores its saved keys from here after a reinstall (file written by tools/remote/save-keys.sh)
+            try:
+                with open(os.path.join(DATA_DIR, "hearth-keys.json")) as fh:
+                    self.send_json(json.load(fh))
+            except (OSError, ValueError):
+                self.send_json({})
+        elif path == "/api/lyrics":
+            q = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            g = lambda k: (q.get(k) or [""])[0]
+            try:
+                dur = float(g("duration") or 0)
+            except ValueError:
+                dur = 0
+            self.send_json(lyrics.find(g("artist"), g("title"), g("album"), dur, g("file")))
+        elif path == "/api/lastfm/status":
+            self.send_json(lastfm.status())
+        elif path in ("/lastfm", "/lastfm/done"):
+            q = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            page = lastfm.done_page((q.get("token") or [""])[0]) if path == "/lastfm/done" else lastfm.phone_page()
+            self.send_html(page)
+        elif path == "/lastfm/qr.png":
+            self.qr()
         else:
             self.send_json({"error": "not found"}, 404)
+
+    def round_image(self):
+        # a picture cut to a circle with real transparency (Roku can't clip): ?u=<image url>&s=<size>
+        q = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+        url = (q.get("u") or [""])[0]
+        try:
+            size = max(32, min(600, int((q.get("s") or ["200"])[0])))
+        except ValueError:
+            size = 200
+        if not url.startswith("http://"):
+            self.send_json({"error": "bad url"}, 400)
+            return
+        import hashlib
+        cdir = os.path.join(DATA_DIR, "round")
+        os.makedirs(cdir, exist_ok=True)
+        f = os.path.join(cdir, hashlib.sha1((url + str(size)).encode()).hexdigest() + ".png")
+        if not os.path.exists(f):
+            try:
+                from PIL import Image, ImageDraw
+                import io
+                raw = urllib.request.urlopen(url, timeout=10).read()
+                im = Image.open(io.BytesIO(raw)).convert("RGBA")
+                w, h = im.size
+                side = min(w, h)
+                im = im.crop(((w - side) // 2, (h - side) // 2, (w + side) // 2, (h + side) // 2)).resize((size, size), Image.LANCZOS)
+                big = Image.new("L", (size * 4, size * 4), 0)
+                ImageDraw.Draw(big).ellipse((0, 0, size * 4 - 1, size * 4 - 1), fill=255)
+                im.putalpha(big.resize((size, size), Image.LANCZOS))
+                im.save(f, "PNG")
+            except Exception as e:
+                self.send_json({"error": str(e)}, 502)
+                return
+        with open(f, "rb") as fh:
+            body = fh.read()
+        self.send_response(200)
+        self.send_header("Content-Type", "image/png")
+        self.send_header("Cache-Control", "max-age=86400")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
 
     def status(self):
         out = {"tv": False, "app": "", "hearth": False, "httpsPort": HTTPS_PORT}
@@ -166,6 +262,13 @@ class Handler(BaseHTTPRequestHandler):
                     return self.send_json({"text": ""})
                 return self.send_json({"text": transcribe(pcm)})
             req = json.loads(self.body() or b"{}")
+            if path == "/api/lastfm/begin":
+                return self.send_json(lastfm.begin())
+            if path == "/api/lastfm/event":
+                return self.send_json(lastfm.event(req))
+            if path == "/api/lastfm/disconnect":
+                lastfm.disconnect()
+                return self.send_json({"ok": True})
             if path == "/api/key":
                 key = req.get("key", "")
                 if key not in KEYS:
@@ -183,6 +286,10 @@ class Handler(BaseHTTPRequestHandler):
                     ecp_post("/keypress/Backspace")
                 for ch in req.get("add", "")[:200]:
                     ecp_post(lit(ch))
+            elif path == "/api/cast":
+                # seconds to move the TV's music by (from the phone's microphone), signed
+                d = max(-6.0, min(6.0, float(req.get("delta", 0))))
+                ecp_post("/input?castTrim=" + ("%.3f" % d))
             elif path == "/api/launch":
                 ecp_post("/launch/dev")
             else:
@@ -224,6 +331,7 @@ def main():
         threading.Thread(target=s.serve_forever, daemon=True).start()
     print("Hearth remote: http :%d%s, TV %s, whisper %s:%d" % (
         HTTP_PORT, (", https :%d" % HTTPS_PORT) if len(servers) > 1 else "", TV_IP, WHISPER_HOST, WHISPER_PORT), flush=True)
+    threading.Thread(target=lastfm.worker, daemon=True).start()
     servers[0].serve_forever()
 
 

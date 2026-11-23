@@ -64,6 +64,7 @@ sub runTask()
         end for
         out = { Items: libs }
     else if op = "resume" or op = "nextup"
+        blocked = blockedSections()
         q = { "X-Plex-Container-Start": "0", "X-Plex-Container-Size": "40" }
         res = req("GET", m.server + "/library/onDeck", q, m.token)
         if res.status <> 200
@@ -75,7 +76,7 @@ sub runTask()
             inProgress = (md.viewOffset <> invalid and md.viewOffset > 0)
             want = (op = "resume" and inProgress) or (op = "nextup" and not inProgress and it.Type = "Episode")
             if a.section <> invalid and md.librarySectionID <> invalid and md.librarySectionID.toStr() <> a.section.toStr() then want = false
-            if isHiddenName(toS(md.librarySectionTitle, "")) then want = false
+            if isHiddenName(toS(md.librarySectionTitle, "")) or isBlocked(blocked, md) or isHiddenItem(md) then want = false
             if want then items.push(it)
         end for
         out = { Items: limit(items, a.limit) }
@@ -83,10 +84,11 @@ sub runTask()
         q = { "X-Plex-Container-Start": "0", "X-Plex-Container-Size": toS(a.limit, "16") }
         path = "/library/recentlyAdded"
         if a.section <> invalid then path = "/library/sections/" + a.section + "/recentlyAdded"
+        blocked = blockedSections()
         res = req("GET", m.server + path, q, m.token)
         shown = []
         for each md in metas(res.body)
-            if not isHiddenName(toS(md.librarySectionTitle, "")) then shown.push(md)
+            if not isHiddenName(toS(md.librarySectionTitle, "")) and not isBlocked(blocked, md) and not isHiddenItem(md) then shown.push(md)
         end for
         out = { Items: dedupe(shown) }
     else if op = "arrived"
@@ -98,7 +100,7 @@ sub runTask()
             if (d.type = "movie" or d.type = "show" or d.type = "artist") and not isAmbiance(d) and not isHiddenName(toS(d.title, ""))
                 r2 = req("GET", m.server + "/library/sections/" + d.key + "/recentlyAdded", { "X-Plex-Container-Start": "0", "X-Plex-Container-Size": toS(a.limit, "30") }, m.token)
                 for each md in metas(r2.body)
-                    if md.type <> "track" then all.push(md)
+                    if md.type <> "track" and not isHiddenItem(md) then all.push(md)
                 end for
             end if
         end for
@@ -271,11 +273,12 @@ sub runTask()
         ' every hub (movies, shows, episodes, artists, albums, tracks), flattened; Type is Movie/Series/Episode or Plex's own type
         res = req("GET", m.server + "/hubs/search", { query: a.query, limit: toS(a.limit, "20") }, m.token)
         items = []
+        blocked = blockedSections()
         if res.body <> invalid and res.body.MediaContainer <> invalid and res.body.MediaContainer.Hub <> invalid
             for each h in res.body.MediaContainer.Hub
                 if h.Metadata <> invalid
                     for each md in h.Metadata
-                        items.push(norm(md))
+                        if not isBlocked(blocked, md) and not isHiddenItem(md) and not isHiddenName(toS(md.librarySectionTitle, "")) then items.push(norm(md))
                     end for
                 end if
             end for
@@ -368,6 +371,21 @@ end function
 function isHiddenName(title as string) as boolean
     t = LCase(title)
     return Instr(1, t, "exercise") > 0 or Instr(1, t, "audiobook") > 0 or Instr(1, t, "audio book") > 0
+end function
+
+' ids of libraries that must never show on a shelf or in search: Ambiance/Hearth footage, Exercise, Audiobooks
+function blockedSections() as object
+    ids = {}
+    r = req("GET", m.server + "/library/sections", {}, m.token)
+    for each d in dirs(r.body)
+        if isAmbiance(d) or isHiddenName(toS(d.title, "")) then ids[toS(d.key, "")] = true
+    end for
+    return ids
+end function
+
+function isBlocked(blocked as object, md as object) as boolean
+    if md.librarySectionID = invalid then return false
+    return blocked.doesExist(md.librarySectionID.toStr())
 end function
 
 function isAmbiance(d as object) as boolean

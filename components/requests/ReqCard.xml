@@ -21,7 +21,7 @@
     <Group id="bar" translation="[0, 318]" visible="false">
       <Poster id="track" uri="pkg:/images/w/progress-track.9.png" width="180" height="12" />
       <Group id="clip" translation="[1, 1]" clippingRect="[0, 0, 0, 10]">
-        <Poster uri="pkg:/images/w/progress-fill-body.png" width="1900" height="10" />
+        <Poster uri="pkg:/images/w/progress-fill-body.png" width="512" height="10" />
       </Group>
       <Poster id="tip" uri="pkg:/images/w/progress-fill-tip.png" width="12" height="10" visible="false" />
     </Group>

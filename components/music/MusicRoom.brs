@@ -2,6 +2,7 @@
 sub init()
     m.panel = m.top.findNode("panel")
     m.panel.observeField("request", "onPanelRequest")
+    m.queue = m.top.findNode("queue")
     m.tabsG = m.top.findNode("tabs")
     m.lettersG = m.top.findNode("letters")
     m.heading = m.top.findNode("heading")
@@ -20,7 +21,7 @@ sub init()
     m.buildTimer.observeField("fire", "onBuildTimer")
 
     ' tabs are plain words with a gold underline (like Movies and Shows); Request sits apart after a divider
-    m.tabDefs = [["For you", "foryou"], ["Artists", "artists"], ["Albums", "albums"], ["Playlists", "playlists"], ["New", "new"], ["Request", "request"]]
+    m.tabDefs = [["For you", "foryou"], ["Artists", "artists"], ["Albums", "albums"], ["Playlists", "playlists"], ["New", "new"], ["Radio", "radio"], ["Request", "request"]]
     m.tabNodes = []
     x = 0
     for each t in m.tabDefs
@@ -131,6 +132,10 @@ sub onPanelRequest()
     if r = invalid then return
     if r.action = "refocus"
         m.top.setFocus(true)
+    else if r.action = "queue"
+        m.queue.visible = true
+        m.queue.callFunc("open")
+        m.zone = "queue"
     else
         m.top.request = r
     end if
@@ -264,7 +269,7 @@ sub build()
             r.title = name
             r.cardWidth = 200
             r.cardHeight = 200
-            if items[0].type = "artist" then r.maskUri = "pkg:/images/music/round-mask.png"
+            if items[0].type = "artist" then r.roundCards = true
             cards = []
             for each md in items
                 cards.push(pxCard(md, 200))
@@ -473,7 +478,7 @@ sub paint()
     m.panel.active = (m.focused and m.zone = "panel")
     for i = 0 to m.tabNodes.Count() - 1
         g = m.tabNodes[i]
-        cur = (i = m.tab and m.tabDefs[i][1] <> "request")
+        cur = (i = m.tab and m.tabDefs[i][1] <> "request" and m.tabDefs[i][1] <> "radio")
         foc = (m.focused and m.zone = "tabs" and i = m.tabSel)
         g.under.visible = cur or foc
         if foc
@@ -593,6 +598,14 @@ end sub
 function onKeyEvent(key as string, press as boolean) as boolean
     if not press then return false
     if muMediaKey(key) then return true
+    if m.zone = "queue"
+        if m.queue.callFunc("handleKey", key) = "close"
+            m.queue.visible = false
+            m.zone = "panel"
+            paint()
+        end if
+        return true
+    end if
     if key = "back"
         if m.zone = "panel" and m.panel.castOpen
             m.panel.callFunc("handleKey", key)
@@ -622,18 +635,24 @@ function onKeyEvent(key as string, press as boolean) as boolean
     return true
 end function
 
+' Request and Radio open their own screens instead of showing shelves
+function isActionTab(i as integer) as boolean
+    k = m.tabDefs[i][1]
+    return (k = "request" or k = "radio")
+end function
+
 sub tabKey(key as string)
     n = m.tabDefs.Count()
     if key = "up"
         toPills()
     else if key = "left"
         if m.tabSel > 0 then m.tabSel = m.tabSel - 1 else m.zone = "panel"
-        if m.zone = "tabs" and m.tabDefs[m.tabSel][1] <> "request" then showTab(m.tabSel)
+        if m.zone = "tabs" and not isActionTab(m.tabSel) then showTab(m.tabSel)
     else if key = "right"
         if m.tabSel < n - 1 then m.tabSel = m.tabSel + 1
-        if m.tabDefs[m.tabSel][1] <> "request" then showTab(m.tabSel)
-    else if key = "OK" and m.tabDefs[m.tabSel][1] = "request"
-        m.top.request = { action: "musicView", mode: "request" }
+        if not isActionTab(m.tabSel) then showTab(m.tabSel)
+    else if key = "OK" and isActionTab(m.tabSel)
+        m.top.request = { action: "musicView", mode: m.tabDefs[m.tabSel][1] }
     else if key = "down" or key = "OK"
         if m.lettersG.visible and hasContent()
             m.zone = "letters"

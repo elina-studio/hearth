@@ -35,6 +35,7 @@ sub makeSlot()
     bg.width = s
     bg.height = s
     bg.color = "0x1D2418FF"
+    if m.top.round then bg.visible = false
     p = g.createChild("Poster")
     p.translation = [x0, 0]
     p.width = s
@@ -52,13 +53,6 @@ sub makeSlot()
     fb.horizAlign = "center"
     fb.font = hFont("bold", 18)
     fb.color = "0xEDE6CAFF"
-    if m.top.round
-        mask = g.createChild("Poster")
-        mask.uri = "pkg:/images/music/round-mask.png"
-        mask.translation = [x0, 0]
-        mask.width = s
-        mask.height = s
-    end if
     cap = g.createChild("Label")
     cap.translation = [0, s + 14]
     cap.width = cw - 20

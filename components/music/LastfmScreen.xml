@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Last.fm: pair Hearth with your account from your phone (the NAS helper does the signing in, the TV never sees a password),
+     then choose what to send. Shows today's scrobbles once connected. Plays are counted by lastfm.brs in the player. -->
+<component name="LastfmScreen" extends="Group">
+  <children>
+    <Rectangle width="1920" height="1080" color="0x0B0E09FF" />
+    <Label id="title" translation="[100, 150]" color="0xEDE6CAFF" text="Last.fm" />
+    <Rectangle id="rule" translation="[320, 186]" width="1500" height="3" color="0x6E4526FF" />
+    <Label id="sub" translation="[100, 230]" width="900" wrap="true" color="0xB5AF8CFF" />
+    <Group id="dyn" />
+    <Label id="note" translation="[100, 960]" width="1700" color="0xE0B34AFF" />
+    <Timer id="poll" duration="3" repeat="true" />
+  </children>
+  <interface>
+    <field id="request" type="assocarray" alwaysNotify="true" />
+    <function name="onShown" />
+  </interface>
+  <script type="text/brightscript" uri="pkg:/source/text.brs" />
+  <script type="text/brightscript" uri="pkg:/source/util.brs" />
+  <script type="text/brightscript" uri="pkg:/components/music/plex.brs" />
+  <script type="text/brightscript" uri="pkg:/components/music/musicui.brs" />
+  <script type="text/brightscript" uri="pkg:/components/music/nas.brs" />
+  <script type="text/brightscript" uri="pkg:/components/music/LastfmScreen.brs" />
+</component>

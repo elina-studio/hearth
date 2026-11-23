@@ -38,6 +38,7 @@
       <Label id="caption" translation="[96, 968]" width="900" color="0xEDE6CAFF" />
       <Label id="star" translation="[96, 890]" width="200" color="0xE0B34AFF" />
     </Group>
+    <LyricsPanel id="lyrics" translation="[1060, 330]" />
     <Group id="nowPlaying" visible="false">
       <Poster id="npIcon" uri="pkg:/images/icons/icon-note.png" width="24" height="24" blendColor="0xE0B34AFF" translation="[1600, 940]" />
       <Label id="npEyebrow" translation="[1024, 936]" width="800" horizAlign="right" color="0xE0B34AFF" text="NOW PLAYING" />

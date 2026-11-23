@@ -21,6 +21,8 @@ sub init()
     m.top.appendChild(m.music)
     m.global.addFields({ music: m.music })
     m.global.observeField("remote", "onRemote")
+    m.ribbon = m.top.findNode("ribbon")
+    m.music.observeField("track", "onMusicTrack")
 
     ' the lantern intro plays while the saved login is checked
     m.introDone = false
@@ -119,6 +121,7 @@ sub handle(r as object)
         s.item = r.item
         pushScreen(s)
     else if a = "play"
+        lastFromItem(r.item)
         ' the TV plays one stream at a time: a paused Audio node still holds it, so music stops for video
         m.music.command = { cmd: "stop" }
         ' the next queued episode replaces the player that just finished
@@ -129,11 +132,13 @@ sub handle(r as object)
         s.item = r.item
         pushScreen(s)
     else if a = "slideshow"
+        lastSave({ kind: "photos", albumId: r.albumId, albumName: r.albumName })
         s = CreateObject("roSGNode", "SlideshowScreen")
         s.albumId = r.albumId
         s.albumName = r.albumName
         pushScreen(s)
     else if a = "mood"
+        lastSave({ kind: "mood", mood: r.mood })
         s = CreateObject("roSGNode", "MoodScreen")
         s.mood = r.mood
         pushScreen(s)
@@ -156,6 +161,12 @@ sub handle(r as object)
         s = CreateObject("roSGNode", "LidarrScreen")
         pushScreen(s)
         if r.term <> invalid then s.term = r.term
+    else if a = "musicView" and r.mode = "radio"
+        pushScreen(CreateObject("roSGNode", "RadioScreen"))
+    else if a = "musicView" and r.mode = "lastfm"
+        pushScreen(CreateObject("roSGNode", "LastfmScreen"))
+    else if a = "musicView" and r.mode = "schedules"
+        pushScreen(CreateObject("roSGNode", "ScheduleScreen"))
     else if a = "musicView" and r.mode = "big"
         pushScreen(CreateObject("roSGNode", "MusicBigView"))
     else if a = "musicView"
@@ -194,9 +205,27 @@ end sub
 
 ' Outside video, Play, Rewind, Fast forward and Replay always control the music.
 function onKeyEvent(key as string, press as boolean) as boolean
+    if press and key = "back"
+        top = topScreen()
+        if top <> invalid and top.subtype() = "MoodScreen"
+            top.callFunc("leave", invalid)
+            return true
+        end if
+    end if
     if not press or not hMediaKey(key) then return false
     top = topScreen()
     if top <> invalid and top.subtype() = "PlayerScreen" then return false
+    if m.ribbon.shown
+        ' second press: go
+        m.ribbon.callFunc("hide", invalid)
+        if key = "play"
+            lastContinue()
+            return true
+        end if
+    else if key = "play" and not musicLive() and lastLoad() <> invalid
+        lastShow()
+        return true
+    end if
     if key = "play"
         m.music.command = { cmd: "toggle" }
     else if key = "fastforward"
@@ -208,3 +237,118 @@ function onKeyEvent(key as string, press as boolean) as boolean
     end if
     return true
 end function
+
+' ---------- Continue ribbon (Play with nothing playing) ----------
+' registry hearth/last = the last thing played: { kind: video | music | mood | photos, ... }
+function musicLive() as boolean
+    s = m.music.state
+    if s = "playing" or s = "buffering" or s = "paused" then return true
+    q = m.music.queue
+    return (s = "stopped" and q <> invalid and q.count() > 0)
+end function
+
+sub lastSave(d as object)
+    m.last = d
+    m.reg.Write("last", FormatJson(d))
+    m.reg.Flush()
+end sub
+
+function lastLoad() as dynamic
+    if m.last <> invalid then return m.last
+    j = m.reg.Read("last")
+    if j = invalid or j = "" then return invalid
+    d = ParseJson(j)
+    if type(d) <> "roAssociativeArray" then return invalid
+    m.last = d
+    return d
+end function
+
+sub lastFromItem(it as dynamic)
+    if it = invalid or it.Id = invalid then return
+    if it.Type <> "Episode" and it.Type <> "Movie" then return
+    ' Continue itself replays the saved entry: keep it as it is
+    if it._cont = true then return
+    title = it.Name
+    tag = ""
+    epName = ""
+    if it.Type = "Episode"
+        title = it.SeriesName
+        tag = "S" + hNum(it.ParentIndexNumber) + " E" + hNum(it.IndexNumber)
+        epName = it.Name
+    end if
+    thumb = ""
+    if it._img <> invalid
+        if it._img.Thumb <> invalid then thumb = it._img.Thumb else if it._img.Primary <> invalid then thumb = it._img.Primary else if it._img.Backdrop <> invalid then thumb = it._img.Backdrop
+    end if
+    lastSave({ kind: "video", id: it.Id.toStr(), title: title, tag: tag, epName: epName, thumb: thumb })
+end sub
+
+
+sub onMusicTrack()
+    tr = m.music.track
+    if tr = invalid or tr.album = invalid or tr.album = "" then return
+    lastSave({ kind: "music", album: tr.album, artist: tr.artist, title: tr.title })
+end sub
+
+sub lastShow()
+    d = lastLoad()
+    if d = invalid then return
+    info = { kicker: "Continue", title: "", meta: "", thumb: "", pct: 0.0 }
+    if d.kind = "video"
+        info.kicker = "Continue"
+        if d.tag <> invalid and d.tag <> "" then info.kicker = "Continue - " + d.tag
+        info.title = d.title
+        info.meta = ""
+        if d.epName <> invalid then info.meta = d.epName
+        if d.thumb <> invalid and d.thumb <> "" then info.thumb = hPlexImage(d.thumb, 320, "Thumb")
+        hPlex("item", { id: d.id }, "onLastItem")
+    else if d.kind = "music"
+        info.kicker = "Continue - music"
+        info.title = d.album
+        info.meta = d.artist
+    else if d.kind = "mood"
+        info.kicker = "Continue - ambiance"
+        info.title = d.mood
+        info.meta = "Back to the room"
+    else
+        info.kicker = "Continue - photos"
+        info.title = d.albumName
+        info.meta = "Slideshow"
+    end if
+    m.ribbon.info = info
+    m.ribbon.callFunc("show", invalid)
+end sub
+
+' the video's progress arrives after the ribbon is up
+sub onLastItem(event as object)
+    t = hTaskFrom(event)
+    if not t.ok or t.response = invalid or not m.ribbon.shown then return
+    it = t.response
+    i = m.ribbon.info
+    pct = 0.0
+    lft = ""
+    if it.UserData <> invalid and it.UserData.PlayedPercentage <> invalid then pct = it.UserData.PlayedPercentage
+    if it.RunTimeTicks <> invalid and it.RunTimeTicks > 0
+        mins = Int(it.RunTimeTicks / 600000000 * (100 - pct) / 100)
+        lft = mins.toStr() + " min left"
+    end if
+    if pct > 0
+        if i.meta <> "" then i.meta = lft + " - " + i.meta else i.meta = lft
+    end if
+    i.pct = pct
+    m.ribbon.info = i
+end sub
+
+sub lastContinue()
+    d = lastLoad()
+    if d = invalid then return
+    if d.kind = "video"
+        handle({ action: "play", item: { Id: d.id, Type: "Movie", Name: d.title, _cont: true }, resume: true })
+    else if d.kind = "music"
+        m.music.command = { cmd: "search", kind: "album", title: d.album, artist: d.artist }
+    else if d.kind = "mood"
+        handle({ action: "mood", mood: d.mood })
+    else if d.kind = "photos"
+        handle({ action: "slideshow", albumId: d.albumId, albumName: d.albumName })
+    end if
+end sub

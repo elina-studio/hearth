@@ -87,6 +87,7 @@ sub makeSlot(w as integer, h as integer, k as integer)
     bg.width = w
     bg.height = h
     bg.color = "0x1D2418FF"
+    if m.top.roundCards then bg.visible = false
     fb = g.createChild("Label")
     fb.width = w - 30
     fb.height = h - 20
@@ -107,23 +108,10 @@ sub makeSlot(w as integer, h as integer, k as integer)
         mask.width = w
         mask.height = h
     end if
-    ' braid progress bar (whimsy spec 5): 12px track, gold fill clipped to the percentage, leaf tip
+    ' braid progress bar (whimsy spec 5): built the first time a card in this slot has progress
     bar = g.createChild("Group")
     bar.translation = [0, h + 14]
-    track = bar.createChild("Poster")
-    track.uri = "pkg:/images/w/progress-track.9.png"
-    track.width = w
-    track.height = 12
-    clip = bar.createChild("Group")
-    clip.translation = [1, 1]
-    body = clip.createChild("Poster")
-    body.uri = "pkg:/images/w/progress-fill-body.png"
-    body.width = 1900
-    body.height = 10
-    tip = bar.createChild("Poster")
-    tip.uri = "pkg:/images/w/progress-fill-tip.png"
-    tip.width = 12
-    tip.height = 10
+    bar.visible = false
     cap = g.createChild("Label")
     cap.width = w
     cap.translation = [0, h + 34]
@@ -146,10 +134,18 @@ sub makeSlot(w as integer, h as integer, k as integer)
     ring.translation = [-27, -27]
     ring.width = w + 54
     ring.height = h + 54
+    if m.top.roundCards
+        ' round artist cards: a circle focus ring in gold, not the square rope
+        ring.uri = "pkg:/images/music/round-ring.png"
+        ring.blendColor = "0xE0B34AFF"
+        ring.translation = [-10, -10]
+        ring.width = w + 20
+        ring.height = h + 20
+    end if
     ring.visible = false
     moss = g.createChild("Poster")
     moss.visible = false
-    g.addFields({ poster: p, fb: fb, bar: bar, clip: clip, tip: tip, cap: cap, sub2: sub2, ring: ring, moss: moss })
+    g.addFields({ poster: p, fb: fb, bar: bar, built: false, cap: cap, sub2: sub2, ring: ring, moss: moss })
 end sub
 
 sub fillSlot(g as object, c as object, w as integer)
@@ -162,10 +158,29 @@ sub fillSlot(g as object, c as object, w as integer)
     hasBar = (c.progress <> invalid and c.progress > 0)
     g.bar.visible = hasBar
     if hasBar
+        if not g.built
+            track = g.bar.createChild("Poster")
+            track.uri = "pkg:/images/w/progress-track.9.png"
+            track.width = w
+            track.height = 12
+            clip = g.bar.createChild("Group")
+            clip.translation = [1, 1]
+            clip.id = "clip"
+            body = clip.createChild("Poster")
+            body.uri = "pkg:/images/w/progress-fill-body.png"
+            body.width = 512
+            body.height = 10
+            tip = g.bar.createChild("Poster")
+            tip.uri = "pkg:/images/w/progress-fill-tip.png"
+            tip.width = 12
+            tip.height = 10
+            tip.id = "tip"
+            g.built = true
+        end if
         fillW = Int((w - 2) * c.progress / 100)
         if fillW < 15 then fillW = 15
-        g.clip.clippingRect = [0, 0, fillW - 12, 10]
-        g.tip.translation = [1 + fillW - 12, 1]
+        g.bar.findNode("clip").clippingRect = [0, 0, fillW - 12, 10]
+        g.bar.findNode("tip").translation = [1 + fillW - 12, 1]
     end if
     g.cap.visible = m.top.showCaption
     g.sub2.visible = m.top.showCaption

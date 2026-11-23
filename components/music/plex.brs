@@ -59,9 +59,14 @@ function pxItems(t as object) as object
     if t = invalid or not t.ok or t.response = invalid then return []
     mc = t.response.MediaContainer
     if mc = invalid then return []
-    if mc.Metadata <> invalid then return mc.Metadata
-    if mc.Directory <> invalid then return mc.Directory
-    return []
+    src = mc.Metadata
+    if src = invalid then src = mc.Directory
+    if src = invalid then return []
+    keep = []
+    for each md in src
+        if not isHiddenItem(md) then keep.push(md)
+    end for
+    return keep
 end function
 
 ' Plex resizes (and can blur) any library image
@@ -80,7 +85,7 @@ end function
 
 ' Generic track from Plex track metadata: what the player, the rooms and the views use
 function pxTrack(md as object) as object
-    tr = { id: pxStr(md.ratingKey), title: pxStr(md.title), album: pxStr(md.parentTitle), albumId: pxStr(md.parentRatingKey), artistId: pxStr(md.grandparentRatingKey), url: "", format: "mp3", duration: 0 }
+    tr = { id: pxStr(md.ratingKey), title: pxStr(md.title), album: pxStr(md.parentTitle), albumId: pxStr(md.parentRatingKey), artistId: pxStr(md.grandparentRatingKey), url: "", format: "mp3", duration: 0, file: "", rating: 0 }
     artist = md.originalTitle
     if artist = invalid or artist = "" then artist = md.grandparentTitle
     tr.artist = pxStr(artist)
@@ -89,9 +94,11 @@ function pxTrack(md as object) as object
     if thumb = invalid then thumb = md.grandparentThumb
     tr.thumb = pxStr(thumb)
     if md.duration <> invalid then tr.duration = md.duration / 1000
+    if md.userRating <> invalid then tr.rating = md.userRating
     if md.Media = invalid or md.Media.count() = 0 or md.Media[0].Part = invalid or md.Media[0].Part.count() = 0 then return tr
     media = md.Media[0]
     part = media.Part[0]
+    tr.file = pxStr(part.file)
     c = LCase(pxStr(media.container))
     if c = "" then c = LCase(pxStr(part.container))
     codec = LCase(pxStr(media.audioCodec))
@@ -115,6 +122,13 @@ function pxTracks(items as object) as object
     return out
 end function
 
+' An image cut to a circle by the NAS helper (real transparency, so no box behind it)
+function pxRound(url as string, size as integer) as string
+    b = CreateObject("roRegistrySection", "hearth").Read("nasUrl")
+    if b = "" then b = "http://192.168.254.41:8765"
+    return b + "/api/round?s=" + size.toStr() + "&u=" + pxEscape(url)
+end function
+
 ' Card for CardRow from an album, artist or playlist
 function pxCard(md as object, size as integer) as object
     sub2 = ""
@@ -127,7 +141,9 @@ function pxCard(md as object, size as integer) as object
     end if
     thumb = md.thumb
     if thumb = invalid then thumb = md.composite
-    return { item: md, title: pxStr(md.title), sub: sub2, image: pxImage(thumb, size, size), progress: 0 }
+    img = pxImage(thumb, size, size)
+    if md.type = "artist" and img <> "" then img = pxRound(img, size)
+    return { item: md, title: pxStr(md.title), sub: sub2, image: img, progress: 0 }
 end function
 
 function pxClock(sec as dynamic) as string

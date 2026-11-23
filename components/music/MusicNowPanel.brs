@@ -13,16 +13,20 @@ sub init()
     m.chips = m.top.findNode("chips")
     m.chipName = m.top.findNode("chipName")
     m.castList = m.top.findNode("castList")
+    m.scrobTick = m.top.findNode("scrobTick")
+    m.scrobText = m.top.findNode("scrobText")
+    m.scrobText.font = hFont("regular", 22)
     m.castTop = 0
-    m.names = { prev: "Previous", toggle: "Play", next: "Next", shuffle: "Shuffle", repeat: "Repeat", cover: "Cover", milk: "Visualizer", hearth: "Hearth fire", big: "Big view", library: "Back to the library", cast: "Play in other rooms" }
+    m.names = { prev: "Previous", toggle: "Play", next: "Next", shuffle: "Shuffle", repeat: "Repeat", cover: "Cover", milk: "Visualizer", hearth: "Hearth fire", big: "Big view", library: "Back to the library", cast: "Play in other rooms", like: "Like", dislike: "Dislike", queue: "Queue" }
     m.r = 0
     m.c = 1
     p = muPlayer()
-    for each f in ["track", "state", "shuffle", "repeat", "queue"]
+    for each f in ["track", "state", "shuffle", "repeat", "queue", "liked"]
         p.observeFieldScoped(f, "showNow")
     end for
     p.observeFieldScoped("position", "showTime")
     p.observeFieldScoped("castCount", "showNow")
+    p.observeFieldScoped("lfmState", "showScrob")
     p.observeFieldScoped("rooms", "drawCast")
     p.observeFieldScoped("castDelay", "drawCast")
     build()
@@ -125,11 +129,17 @@ sub build()
         m.fill.translation = [x, 652]
         setText(m.elapsed, [x, 668], 200, "regular", 24)
         setText(m.total, [x + w - 200, 668], 200, "regular", 24)
-        addRow([x, 714], [["prev", "", "prev"], ["play", "", "toggle"], ["next", "", "next"], ["cast", "", "cast"]], 0)
-        addRow([x, 812], [["shuffle", "", "shuffle"], ["repeat", "", "repeat"], ["cover", "", "cover"], ["viz", "", "milk"], ["fire", "", "hearth"], ["expand", "", "big"]], 1)
+        ' top row: transport, then Dislike and Like over the last two boxes of the row below; cast moves to the second row
+        gap = 76
+        addRow([x, 714], [["prev", "", "prev"], ["play", "", "toggle"], ["next", "", "next"], ["thumbdown", "", "dislike", x + 4 * gap], ["thumbup", "", "like", x + 5 * gap], ["queue", "", "queue", x + 6 * gap]], 0)
+        addRow([x, 812], [["cast", "", "cast"], ["shuffle", "", "shuffle"], ["repeat", "", "repeat"], ["cover", "", "cover"], ["viz", "", "milk"], ["fire", "", "hearth"], ["expand", "", "big"]], 1)
         setText(m.chipName, [x, 888], w, "regular", 22)
     end if
     m.track.width = m.barW
+    ' Last.fm: a tick where the song counts (half way), and a word once it has
+    m.scrobTick.translation = [m.track.translation[0] + m.barW / 2 - 2, m.track.translation[1] - 12]
+    m.scrobText.translation = [m.track.translation[0] + m.barW / 2 - 110, m.track.translation[1] + 16]
+    m.scrobText.width = 220
     m.track.visible = false
     m.fill.visible = false
     if m.braid <> invalid then m.top.removeChild(m.braid)
@@ -174,6 +184,7 @@ sub addRow(xy as object, defs as object, r as integer)
             line.color = "0xD9A06655"
             x = x + 38
         else
+            if d.Count() > 3 then x = d[3]
             c = m.chips.createChild("MusicChip")
             c.icon = d[0]
             c.text = d[1]
@@ -216,6 +227,10 @@ sub showNow()
             else if it.action = "repeat"
                 c.on = (p.repeat <> "off")
                 if p.repeat = "one" then c.badge = "1" else c.badge = ""
+            else if it.action = "like"
+                c.on = (p.liked = "like")
+            else if it.action = "dislike"
+                c.on = (p.liked = "dislike")
             else if it.action = "cast"
                 c.on = (p.castCount > 0)
                 if p.castCount > 0 then c.badge = p.castCount.toStr() else c.badge = ""
@@ -226,7 +241,27 @@ sub showNow()
     paint()
 end sub
 
+sub showScrob()
+    s = muPlayer().lfmState
+    show = (s <> "off" and (m.top.layout = "column" or m.top.layout = "big") and not m.top.castOpen)
+    m.scrobTick.visible = show
+    m.scrobText.visible = show
+    if s = "counted"
+        m.scrobTick.color = "0xFFE7A0FF"
+        m.scrobText.color = "0xE0B34AFF"
+        m.scrobText.text = "Scrobbled"
+    else if s = "queued"
+        m.scrobTick.color = "0x5E5A44FF"
+        m.scrobText.color = "0xB5AF8CFF"
+        m.scrobText.text = "Last.fm: will retry"
+    else
+        m.scrobTick.color = "0x5E5A44FF"
+        m.scrobText.text = ""
+    end if
+end sub
+
 sub showTime()
+    showScrob()
     p = muPlayer()
     if p.track = invalid
         m.fill.width = 0
@@ -303,12 +338,16 @@ sub act(a as string)
             m.r = 2
             m.top.castOpen = true
         end if
+    else if a = "queue"
+        m.top.request = { action: "queue" }
     else if a = "big"
         m.top.request = { action: "musicView", mode: "big" }
     else if a = "library"
         m.top.request = { action: "back" }
     else if a = "prev" or a = "next"
         muSend(a)
+    else if a = "like" or a = "dislike"
+        muSend("rate", { value: a })
     else
         muDo(a)
     end if
@@ -330,8 +369,8 @@ function castItems() as object
 end function
 
 sub closeCast()
-    m.r = 0
-    m.c = 3
+    m.r = 1
+    m.c = 0
     m.top.castOpen = false
 end sub
 

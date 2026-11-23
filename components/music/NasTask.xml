@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One call to the Hearth helper on the NAS (tools/remote): lyrics, Last.fm. Address: registry hearth/nasUrl,
+     default http://192.168.254.41:8765. A JSON object reply arrives as response. -->
+<component name="NasTask" extends="Task">
+  <interface>
+    <field id="path" type="string" />
+    <field id="method" type="string" value="GET" />
+    <field id="bodyText" type="string" />
+    <field id="tag" type="string" />
+    <field id="key" type="string" />
+    <field id="status" type="integer" />
+    <field id="ok" type="boolean" />
+    <field id="response" type="assocarray" />
+    <field id="done" type="boolean" alwaysNotify="true" />
+  </interface>
+  <script type="text/brightscript" uri="pkg:/source/text.brs" />
+  <script type="text/brightscript" uri="pkg:/source/util.brs" />
+  <script type="text/brightscript" uri="pkg:/components/music/NasTask.brs" />
+</component>

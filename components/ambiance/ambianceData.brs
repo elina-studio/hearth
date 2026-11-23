@@ -52,6 +52,31 @@ function ambMerge(clips as object) as object
     items = ambMoods()
     extra = []
     taken = {}
+    ' a TV-friendly copy named "<name>-tv.mp4" (made with the ffmpeg command) stands in for "<name>.<ext>"
+    tvOf = {}
+    for each c in clips
+        b = ambBase(c.file)
+        if Len(b) > 3 and Right(b, 3) = "-tv" then tvOf[Left(b, Len(b) - 3)] = c
+    end for
+    picked = []
+    for each c in clips
+        b = ambBase(c.file)
+        if Len(b) > 3 and Right(b, 3) = "-tv"
+            ' only used through its original, unless the original isn't in the library
+            hasOrig = false
+            for each o in clips
+                if ambBase(o.file) = Left(b, Len(b) - 3) then hasOrig = true
+            end for
+            if not hasOrig then picked.push(c)
+        else if tvOf[b] <> invalid
+            t = tvOf[b]
+            t.Name = c.Name
+            picked.push(t)
+        else
+            picked.push(c)
+        end if
+    end for
+    clips = picked
     for each c in clips
         md = ambClipMood(c.file)
         if md = "" then md = ambClipMood(c.Name)
@@ -107,4 +132,23 @@ function ambSoundLabel(it as dynamic) as object
     end if
     if it <> invalid and it.mood = "fireflies" then return { word: "Night", icon: "moon" }
     return { word: "Nature", icon: "leaf" }
+end function
+
+' file name without folders or extension, lower case
+function ambBase(path as dynamic) as string
+    if path = invalid then return ""
+    p = LCase(path.toStr())
+    i = Len(p)
+    while i > 0
+        if Mid(p, i, 1) = "/" then exit while
+        i = i - 1
+    end while
+    p = Mid(p, i + 1)
+    j = Len(p)
+    while j > 0
+        if Mid(p, j, 1) = "." then exit while
+        j = j - 1
+    end while
+    if j > 1 then p = Left(p, j - 1)
+    return p
 end function

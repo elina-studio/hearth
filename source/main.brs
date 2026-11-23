@@ -5,6 +5,7 @@ sub Main(args as dynamic)
     screen.setMessagePort(port)
     ' phone remote (tools/remote): POST /input?hearthText=...&hearthGo=search|request
     screen.getGlobalNode().addFields({ remote: {} })
+    restoreKeys()
     scene = screen.CreateScene("HearthScene")
     screen.show()
     scene.observeField("exitApp", port)
@@ -34,6 +35,12 @@ sub saveInput(screen as object, info as object)
         g.remote = { text: text, go: dest, n: n }
         return
     end if
+    ' the phone's microphone measured the TV against the speakers: move the TV by this many seconds
+    if info.castTrim <> invalid
+        mu = screen.getGlobalNode().music
+        if mu <> invalid then mu.command = { cmd: "castNudge", delta: Val(info.castTrim) }
+        return
+    end if
     reg = CreateObject("roRegistrySection", "hearth")
     g = screen.getGlobalNode()
     if not g.hasField("overseerrKey") then g.addFields({ overseerrKey: "" })
@@ -44,6 +51,8 @@ sub saveInput(screen as object, info as object)
     if info.overseerrKey <> invalid and info.overseerrKey <> ""
         reg.Write("overseerrKey", info.overseerrKey)
         reg.Flush()
+        ' clear first so Requests notices (and says "key saved") even when the same key is sent again
+        g.overseerrKey = ""
         g.overseerrKey = info.overseerrKey
     end if
     ' Lidarr (music requests): lidarrUrl, lidarrKey
@@ -90,4 +99,32 @@ sub RunScreenSaver()
         msg = wait(0, port)
         if type(msg) = "roSGScreenEvent" and msg.isScreenClosed() then return
     end while
+end sub
+
+' After a reinstall the TV's registry is empty. If the NAS helper holds a copy of the keys
+' (tools/remote/save-keys.sh puts them in data/hearth-keys.json), pull them back before the app starts.
+sub restoreKeys()
+    reg = CreateObject("roRegistrySection", "hearth")
+    if reg.Read("plexToken") <> "" then return
+    base = reg.Read("nasUrl")
+    if base = "" then base = "http://192.168.254.41:8765"
+    port = CreateObject("roMessagePort")
+    xfer = CreateObject("roUrlTransfer")
+    xfer.setMessagePort(port)
+    xfer.setUrl(base + "/api/keys")
+    if not xfer.asyncGetToString() then return
+    msg = wait(3000, port)
+    if type(msg) <> "roUrlEvent" or msg.getResponseCode() <> 200 then return
+    data = ParseJson(msg.getString())
+    if data = invalid or type(data) <> "roAssociativeArray" then return
+    ok = ["plexToken", "plexServer", "plexServerToken", "plexServerName", "overseerrUrl", "overseerrKey", "lidarrUrl", "lidarrKey", "bazarrUrl", "bazarrKey", "radarrUrl", "radarrKey", "sonarrUrl", "sonarrKey", "haUrl", "haToken", "haEntity", "lastfmOn"]
+    n = 0
+    for each k in ok
+        if data[k] <> invalid and type(data[k]) = "String" and data[k] <> ""
+            reg.Write(k, data[k])
+            n = n + 1
+        end if
+    end for
+    if n > 0 then reg.Flush()
+    print "[hearth] restored "; n; " saved keys from the NAS helper"
 end sub

@@ -10,6 +10,8 @@ sub init()
     m.pending = invalid
     m.lastId = ""
     castInit()
+    lfmInit()
+    radioInit()
 end sub
 
 sub say(text as string)
@@ -23,6 +25,7 @@ sub onCommand()
     if c.cmd = invalid then return
     cmd = c.cmd
     if castCommand(c) then return
+    if queueCommand(c) then return
     ' the TV's screen is lent to a video and no speaker plays: play/pause only decides what happens on tvRejoin
     if m.tvYielded = true and not castActive() and (cmd = "toggle" or cmd = "play" or cmd = "resume" or cmd = "pause")
         m.tvYieldResume = (cmd <> "pause" and not (cmd = "toggle" and m.tvYieldResume = true))
@@ -94,6 +97,20 @@ sub onCommand()
         moreLikeThis()
     else if cmd = "search"
         searchAndPlay(c)
+    else if cmd = "rate"
+        rateTrack(c.value)
+    else if cmd = "love"
+        lfmLove()
+    else if cmd = "lfmReload"
+        lfmReload()
+    else if cmd = "radioStart"
+        radioStart(c)
+    else if cmd = "radioStop"
+        radioStop()
+    else if cmd = "radioNope"
+        radioNope()
+    else if cmd = "radioVariety"
+        radioVariety(c.delta)
     else if cmd = "setShuffle"
         setShuffle(c.value = true)
     else if cmd = "cycleRepeat"
@@ -200,7 +217,15 @@ sub runPending(p as object)
     pxApi(p.path, p.query, "onTracks", p.tag)
 end sub
 
+sub saveLastPlay(mode as string, kind as string, id as string, label as string)
+    reg = CreateObject("roRegistrySection", "hearth")
+    clean = label.Replace("|", " ")
+    reg.Write("lastPlay", mode + "|" + kind + "|" + id + "|" + clean)
+    reg.Flush()
+end sub
+
 sub shuffleAll()
+    saveLastPlay("s", "all", "", "Shuffle my music")
     say("Shuffling your music")
     withSection({ path: "", query: { type: "10", sort: "random", "X-Plex-Container-Start": "0", "X-Plex-Container-Size": "150" }, label: "", tag: "all" })
 end sub
@@ -236,6 +261,7 @@ end sub
 sub playContainer(kind as string, id as string, shuffle as boolean, label as dynamic)
     path = containerPath(kind, id)
     if path = "" then return
+    if label <> invalid and label <> "" then saveLastPlay("c", kind, id, label)
     withSection({ path: path, query: {}, label: label, shuffle: shuffle, tag: kind })
 end sub
 
@@ -261,6 +287,10 @@ end sub
 sub onTracks(event as object)
     t = hTaskFrom(event)
     m.top.busy = false
+    if t.tag = "radioGo"
+        radioRefill()
+        return
+    end if
     if t.tag = "search"
         playSearchHit(t)
         return
@@ -318,6 +348,7 @@ end sub
 
 sub load(tracks as object, start as dynamic, shuffle as boolean, label as dynamic)
     if tracks = invalid or tracks.count() = 0 then return
+    radioDetach()
     if start = invalid then start = 0
     m.original = invalid
     if shuffle
@@ -388,6 +419,7 @@ sub playIndex(i as integer, startAt = 0 as float)
     if i < 0 then i = 0
     if i >= q.count() then i = q.count() - 1
     tr = q[i]
+    radioLeaving(tr)
     timeline("stopped")
     m.top.index = i
     m.top.track = tr
@@ -402,12 +434,17 @@ sub playIndex(i as integer, startAt = 0 as float)
     m.audio.control = "stop"
     m.audio.content = c
     m.scrobbled = false
+    likedFrom(tr)
+    if startAt = 0 then lfmTrackStart()
     if castActive()
         ' the speakers start this song now; the TV follows castDelay later, or keeps quiet
         m.castFresh = false
         m.castClock.control = "stop"
-        castPlayTrack()
-        if castTvOn()
+        already = castPlayTrack()
+        if castTvOn() and already
+            ' the speakers are already part-way into this song: the TV jumps in where they are
+            castStartTv(m.top.castDelay + 0.5)
+        else if castTvOn()
             castStartTv(0)
         else
             castStartClock()
@@ -499,7 +536,10 @@ sub trackFinished()
     if m.top.repeat = "one"
         playIndex(m.top.index)
     else if m.top.index + 1 < q.count()
+        ' the speakers may already be on the next song (castQueueNext)
+        m.castAdvanced = true
         playIndex(m.top.index + 1)
+        m.castAdvanced = false
     else if m.top.repeat = "all"
         playIndex(0)
     else
@@ -525,7 +565,10 @@ sub timeline(state as string)
     if tr = invalid or tr.id = invalid or not pxReady() then return
     if state = "stopped" and m.lastId <> tr.id then return
     m.lastId = tr.id
-    q = { ratingKey: tr.id, key: "/library/metadata/" + tr.id, state: state, time: Int(m.top.position * 1000).toStr(), duration: Int(m.top.duration * 1000).toStr() }
+    ' Plex answers 400 when the time is past the end of the song
+    at = m.top.position
+    if m.top.duration > 0 and at > m.top.duration then at = m.top.duration
+    q = { ratingKey: tr.id, key: "/library/metadata/" + tr.id, state: state, time: Int(at * 1000).toStr(), duration: Int(m.top.duration * 1000).toStr() }
     pxApi("/:/timeline", q, "onReported")
     if state = "stopped" then m.lastId = ""
 end sub
@@ -539,5 +582,52 @@ sub scrobble()
 end sub
 
 sub onReported(event as object)
+    hTaskFrom(event)
+end sub
+
+' ---------- like / dislike: saved as the song's Plex rating (Plexamp-style: like = 10, dislike = 2; pressing again clears) ----------
+sub likedFrom(tr as object)
+    r = tr.rating
+    v = ""
+    if r <> invalid and r >= 8 then v = "like"
+    if r <> invalid and r > 0 and r <= 2 then v = "dislike"
+    m.top.liked = v
+end sub
+
+sub rateTrack(which as dynamic)
+    tr = m.top.track
+    if tr = invalid or tr.id = invalid or tr.id = "" then return
+    if not pxReady()
+        say("Sign in to Plex first.")
+        return
+    end if
+    cur = m.top.liked
+    if which = cur
+        newRating = -1
+        newState = ""
+    else if which = "like"
+        newRating = 10
+        newState = "like"
+    else
+        newRating = 2
+        newState = "dislike"
+    end if
+    pxApi("/:/rate", { key: tr.id, identifier: "com.plexapp.plugins.library", rating: newRating.toStr() }, "onRated", "", "PUT")
+    q = m.top.queue
+    if q <> invalid and m.top.index < q.Count()
+        if newRating < 0 then q[m.top.index].rating = 0 else q[m.top.index].rating = newRating
+    end if
+    m.top.liked = newState
+    if newState = "like"
+        say("Liked " + tr.title)
+    else if newState = "dislike"
+        ' a dislike is also "not this one": skip it and keep it out for a month (as in the radio)
+        radioNope()
+    else
+        say("Rating cleared")
+    end if
+end sub
+
+sub onRated(event as object)
     hTaskFrom(event)
 end sub

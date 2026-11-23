@@ -7,6 +7,7 @@
     <Timer id="report" duration="10" repeat="true" />
     <Timer id="castTimer" repeat="false" />
     <Timer id="castClock" duration="1" repeat="true" />
+    <Timer id="castPoll" repeat="false" />
     <Timer id="castAlign" duration="0.35" repeat="false" />
   </children>
   <interface>
@@ -28,10 +29,24 @@
     <field id="rooms" type="array" />
     <field id="castCount" type="integer" value="0" />
     <field id="castDelay" type="float" value="1.5" />
+    <!-- Last.fm (lastfm.brs): off | idle | now | counted | queued -->
+    <!-- Plex rating of this song: "like" (8 to 10 stars), "dislike" (up to 2), or "" -->
+    <field id="liked" type="string" value="" />
+    <field id="lfmState" type="string" value="off" />
+    <!-- a lyrics panel is open on this screen / found lyrics for this song (LyricsPanel) -->
+    <field id="lyricsActive" type="boolean" value="false" />
+    <field id="lyricsFound" type="boolean" value="false" />
+    <!-- Radio (radio.brs): false | true, and its seed name -->
+    <field id="radioOn" type="boolean" value="false" />
+    <field id="radioName" type="string" />
   </interface>
   <script type="text/brightscript" uri="pkg:/source/util.brs" />
   <script type="text/brightscript" uri="pkg:/components/music/plex.brs" />
   <script type="text/brightscript" uri="pkg:/source/photos.brs" />
   <script type="text/brightscript" uri="pkg:/components/music/cast.brs" />
+  <script type="text/brightscript" uri="pkg:/components/music/nas.brs" />
+  <script type="text/brightscript" uri="pkg:/components/music/lastfm.brs" />
+  <script type="text/brightscript" uri="pkg:/components/music/radio.brs" />
+  <script type="text/brightscript" uri="pkg:/components/music/queue.brs" />
   <script type="text/brightscript" uri="pkg:/components/music/MusicPlayer.brs" />
 </component>

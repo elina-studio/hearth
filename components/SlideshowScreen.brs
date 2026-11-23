@@ -87,6 +87,7 @@ sub onShown(unused as dynamic)
     end if
     if m.started = invalid
         m.started = true
+        if not m.top.saver then m.top.findNode("lyrics").callFunc("start", invalid)
         if m.top.saver then m.hint.visible = false
         if m.top.albumName <> "" then m.album.text = UCase(m.top.albumName) else m.album.text = "ALL PHOTOS"
         fetchBatch()
@@ -524,6 +525,7 @@ function onKeyEvent(key as string, press as boolean) as boolean
 end function
 
 sub cleanup()
+    m.top.findNode("lyrics").callFunc("lyricsStop", invalid)
     m.advance.control = "stop"
     m.clockTimer.control = "stop"
     m.weatherTimer.control = "stop"
