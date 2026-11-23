@@ -21,6 +21,8 @@ ICONS = {
  "tv": '<rect x="3" y="5" width="18" height="12" rx="2"/><path d="M8 21h8M12 17v4"/>',
  "house": '<path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h12V9.5"/><path d="M10 20v-5h4v5"/>',
  "timing": '<circle cx="12" cy="13" r="7.5"/><path d="M12 9v4l2.5 2"/><path d="M9.5 2.5h5"/>',
+ "queue": '<path d="M4 6h12M4 12h12M4 18h7"/><path d="M18 14v6l4-3z" fill="currentColor"/>',
+ "close": '<path d="M6 6l12 12M18 6L6 18"/>',
 }
 def svg(name, size=30, color="currentColor", sw=2):
     return f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="{sw}" stroke-linecap="round" stroke-linejoin="round" style="display:block">{ICONS[name]}</svg>'

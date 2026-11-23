@@ -14,7 +14,7 @@ sub init()
     m.chipName = m.top.findNode("chipName")
     m.castList = m.top.findNode("castList")
     m.castTop = 0
-    m.names = { prev: "Previous", toggle: "Play", next: "Next", shuffle: "Shuffle", repeat: "Repeat", cover: "Cover", milk: "Visualizer", hearth: "Hearth fire", big: "Big view", library: "Back to the library", cast: "Play in other rooms" }
+    m.names = { prev: "Previous", toggle: "Play", next: "Next", shuffle: "Shuffle", repeat: "Repeat", cover: "Cover", milk: "Visualizer", hearth: "Hearth fire", big: "Big view", library: "Back to the library", cast: "Play in other rooms", queue: "Queue" }
     m.r = 0
     m.c = 1
     p = muPlayer()
@@ -125,7 +125,7 @@ sub build()
         m.fill.translation = [x, 652]
         setText(m.elapsed, [x, 668], 200, "regular", 24)
         setText(m.total, [x + w - 200, 668], 200, "regular", 24)
-        addRow([x, 714], [["prev", "", "prev"], ["play", "", "toggle"], ["next", "", "next"], ["cast", "", "cast"]], 0)
+        addRow([x, 714], [["prev", "", "prev"], ["play", "", "toggle"], ["next", "", "next"], ["cast", "", "cast"], ["queue", "", "queue"]], 0)
         addRow([x, 812], [["shuffle", "", "shuffle"], ["repeat", "", "repeat"], ["cover", "", "cover"], ["viz", "", "milk"], ["fire", "", "hearth"], ["expand", "", "big"]], 1)
         setText(m.chipName, [x, 888], w, "regular", 22)
     end if
@@ -303,6 +303,8 @@ sub act(a as string)
             m.r = 2
             m.top.castOpen = true
         end if
+    else if a = "queue"
+        m.top.request = { action: "queue" }
     else if a = "big"
         m.top.request = { action: "musicView", mode: "big" }
     else if a = "library"

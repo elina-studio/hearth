@@ -23,6 +23,7 @@
       <Label id="spotSub" translation="[256, 124]" width="860" maxLines="1" color="0xB5AF8CFF" />
       <Group id="spotChips" translation="[256, 166]" />
     </Group>
+    <QueueSheet id="queue" translation="[1010, 150]" visible="false" />
     <Label id="empty" translation="[690, 160]" width="1150" wrap="true" color="0xB5AF8CFF" />
     <Label id="toast" translation="[690, 880]" width="1150" color="0xE0B34AFF" />
     <Timer id="toastTimer" duration="4" repeat="false" />

@@ -33,5 +33,6 @@
   <script type="text/brightscript" uri="pkg:/components/music/plex.brs" />
   <script type="text/brightscript" uri="pkg:/source/photos.brs" />
   <script type="text/brightscript" uri="pkg:/components/music/cast.brs" />
+  <script type="text/brightscript" uri="pkg:/components/music/queue.brs" />
   <script type="text/brightscript" uri="pkg:/components/music/MusicPlayer.brs" />
 </component>

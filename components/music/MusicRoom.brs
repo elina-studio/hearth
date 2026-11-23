@@ -2,6 +2,7 @@
 sub init()
     m.panel = m.top.findNode("panel")
     m.panel.observeField("request", "onPanelRequest")
+    m.queue = m.top.findNode("queue")
     m.tabsG = m.top.findNode("tabs")
     m.lettersG = m.top.findNode("letters")
     m.heading = m.top.findNode("heading")
@@ -131,6 +132,10 @@ sub onPanelRequest()
     if r = invalid then return
     if r.action = "refocus"
         m.top.setFocus(true)
+    else if r.action = "queue"
+        m.queue.visible = true
+        m.queue.callFunc("open")
+        m.zone = "queue"
     else
         m.top.request = r
     end if
@@ -593,6 +598,14 @@ end sub
 function onKeyEvent(key as string, press as boolean) as boolean
     if not press then return false
     if muMediaKey(key) then return true
+    if m.zone = "queue"
+        if m.queue.callFunc("handleKey", key) = "close"
+            m.queue.visible = false
+            m.zone = "panel"
+            paint()
+        end if
+        return true
+    end if
     if key = "back"
         if m.zone = "panel" and m.panel.castOpen
             m.panel.callFunc("handleKey", key)
