@@ -1,24 +1,36 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Details B: poster on the left, no backdrop. Eyebrow, title, meta, overview, one row of buttons
-     (Play / Subtitles / Mark watched) and a cast line beside it; episodes or more like this below. -->
+<!-- Details, layout A "Ledger" (picked Nov 23; mockups/details/A-ledger.png). Poster on the left; kicker,
+     title, meta, ratings and file tags, overview, then an icon action row (Play/Resume, From start, Trailer,
+     CC, Audio, Watched, More). Shows add season tabs and a full episode list. Rows below: cast and crew,
+     extras, collection, more like this. Everything scrolls as one page. -->
 <component name="DetailsScreen" extends="Group">
   <children>
     <Group id="content">
-      <Rectangle translation="[96, 40]" width="340" height="510" color="0x2A2620FF" />
-      <Poster id="backdrop" translation="[96, 40]" width="340" height="510" loadDisplayMode="scaleToZoom" />
-      <Group translation="[480, 50]">
-        <Label id="eyebrow" color="0xD9A066FF" />
-        <Label id="title" translation="[0, 34]" width="1340" maxLines="1" color="0xEDE6CAFF" />
-        <Label id="meta" translation="[0, 132]" width="1300" color="0xB5AF8CFF" />
-        <Label id="overview" translation="[0, 178]" width="1240" height="120" wrap="true" maxLines="3" color="0xEDE6CAFF" />
-        <Rectangle id="track" translation="[0, 310]" width="420" height="6" color="0xFFFFFF22" visible="false" />
-        <Rectangle id="bar" translation="[0, 310]" width="0" height="6" color="0xE0B34AFF" />
-        <LayoutGroup id="buttons" translation="[0, 334]" layoutDirection="horiz" itemSpacings="[16]" />
-        <Label id="cast" translation="[0, 420]" width="1300" maxLines="1" color="0xB5AF8CFF" />
+      <Poster uri="pkg:/images/w/panel.9.png" translation="[88, 48]" width="224" height="324" blendColor="0x1D2418FF" />
+      <Poster id="poster" translation="[100, 60]" width="200" height="300" loadDisplayMode="scaleToZoom" />
+      <Group translation="[340, 0]">
+        <Label id="kicker" translation="[0, 56]" width="1480" maxLines="1" color="0xE0B34AFF" />
+        <Label id="title" translation="[0, 88]" width="1480" maxLines="1" color="0xEDE6CAFF" />
+        <Label id="meta" translation="[0, 166]" width="1480" maxLines="1" color="0xB5AF8CFF" />
+        <LayoutGroup id="tags" translation="[0, 206]" layoutDirection="horiz" vertAlignment="center" itemSpacings="[22]" />
+        <Label id="overview" translation="[0, 250]" width="1460" maxLines="2" wrap="true" color="0xEDE6CAFF" />
+        <Group id="actions" translation="[0, 334]" />
       </Group>
-      <CardRow id="below" translation="[96, 600]" />
+      <Group id="tabsBox" translation="[100, 440]" visible="false">
+        <Group id="tabsClip" clippingRect="[-10, -10, 1320, 70]">
+          <Group id="tabs" />
+        </Group>
+        <LayoutGroup id="chips" translation="[1724, 2]" layoutDirection="horiz" horizAlignment="right" vertAlignment="center" itemSpacings="[14]" />
+        <Rectangle translation="[0, 50]" width="1724" height="2" color="0x404B2DFF" />
+      </Group>
+      <Group id="rows" translation="[100, 0]" />
+      <Label id="empty" translation="[100, 520]" width="1700" color="0xB5AF8CFF" visible="false" />
+      <Group id="below" translation="[100, 0]" />
     </Group>
+    <SideSheet id="sheet" />
     <SubsFinder id="finder" />
+    <Timer id="seasonWait" duration="0.35" />
+    <Timer id="later" duration="6" />
     <Animation id="scroll" duration="0.22" easeFunction="outQuad">
       <Vector2DFieldInterpolator id="scrollTo" key="[0.0, 1.0]" fieldToInterp="content.translation" />
     </Animation>
@@ -31,5 +43,8 @@
   <script type="text/brightscript" uri="pkg:/source/util.brs" />
   <script type="text/brightscript" uri="pkg:/components/dialogs.brs" />
   <script type="text/brightscript" uri="pkg:/components/subs.brs" />
+  <script type="text/brightscript" uri="pkg:/components/playback.brs" />
+  <script type="text/brightscript" uri="pkg:/components/details/tags.brs" />
+  <script type="text/brightscript" uri="pkg:/components/details/actions.brs" />
   <script type="text/brightscript" uri="pkg:/components/DetailsScreen.brs" />
 </component>

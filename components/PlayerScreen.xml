@@ -11,6 +11,8 @@
   <interface>
     <field id="item" type="assocarray" onChange="start" />
     <field id="resume" type="boolean" />
+    <!-- what plays after this one finishes (shuffle, a season from the start), from the details page -->
+    <field id="queue" type="array" />
     <field id="request" type="assocarray" alwaysNotify="true" />
     <function name="onShown" />
   </interface>

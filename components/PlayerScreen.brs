@@ -11,6 +11,7 @@ sub init()
     m.video.observeField("state", "onState")
     m.video.observeField("availableSubtitleTracks", "applyEmbeddedSub")
     m.retried5 = false
+    m.finished = false
     m.hlsLight = false
     m.subApplied = false
     m.leaving = false
@@ -211,6 +212,7 @@ sub onState()
     else if s = "paused" and m.started
         report("paused")
     else if s = "finished"
+        m.finished = true
         leave()
     else if s = "error"
         if m.video.errorCode = -5 and not m.retried5
@@ -291,14 +293,28 @@ sub leave()
         ms = Int(position() * 1000)
         hPlex("timeline", { id: m.item.Id, state: "stopped", time: ms.toStr(), duration: m.durationMs.toStr() }, "onStopped")
     else
-        m.top.request = { action: "back" }
+        goOn()
     end if
     m.video.control = "stop"
 end sub
 
 sub onStopped(event as object)
     hTaskFrom(event)
-    m.top.request = { action: "back" }
+    goOn()
+end sub
+
+' Back to the page, or on to the next queued episode when this one played to the end.
+sub goOn()
+    q = m.top.queue
+    if m.finished = true and q <> invalid and q.count() > 0
+        rest = []
+        for i = 1 to q.count() - 1
+            rest.push(q[i])
+        end for
+        m.top.request = { action: "play", item: q[0], resume: false, queue: rest, replace: true }
+    else
+        m.top.request = { action: "back" }
+    end if
 end sub
 
 sub fail(reason as string)
