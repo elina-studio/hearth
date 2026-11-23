@@ -1,5 +1,5 @@
 #!/bin/bash
-# Run on the Mac:  bash <(curl -sL https://raw.githubusercontent.com/elina-studio/hearth/claude/project-thread-3b4es1/tools/remote/save-keys.sh)
+# Run on the Mac:  bash <(curl -sL https://raw.githubusercontent.com/elina-studio/hearth/claude/project-thread-nqrlx1/tools/remote/save-keys.sh)
 # 1. rebuilds the NAS helper (it now serves the saved keys at /api/keys)
 # 2. reads each app's API key from its container's config on the NAS
 # 3. saves them all in the helper's data folder (so Hearth restores them itself after any reinstall)
@@ -14,7 +14,7 @@ echo "Signing in to the NAS (ssh password, then the sudo password)..."
 R "sudo -v" || exit 1
 
 echo "Updating the NAS helper..."
-R "mkdir -p /volume1/docker/hearth-remote && rm -rf /tmp/hearth-dl && mkdir /tmp/hearth-dl && cd /tmp/hearth-dl && curl -sL https://github.com/elina-studio/hearth/archive/refs/heads/claude/project-thread-3b4es1.tar.gz | tar xz && cp hearth-*/tools/remote/* /volume1/docker/hearth-remote/ && cd /volume1/docker/hearth-remote && sudo /usr/local/bin/docker compose up -d --build >/dev/null 2>&1; echo helper updated"
+R "mkdir -p /volume1/docker/hearth-remote && rm -rf /tmp/hearth-dl && mkdir /tmp/hearth-dl && cd /tmp/hearth-dl && curl -sL https://github.com/elina-studio/hearth/archive/refs/heads/claude/project-thread-nqrlx1.tar.gz | tar xz && cp -r hearth-*/tools/remote/* /volume1/docker/hearth-remote/ && cd /volume1/docker/hearth-remote && sudo /usr/local/bin/docker compose up -d --build >/dev/null 2>&1; echo helper updated"
 
 echo "Reading keys from the NAS..."
 R "cp /volume1/docker/hearth-remote/gather-keys.sh /tmp/hearth-gather.sh" >/dev/null

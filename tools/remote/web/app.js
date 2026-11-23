@@ -11,11 +11,21 @@ const stage = $('#stage');
 let K = 1; // stage scale
 
 /* ---------- stage fit, clock, fireflies ---------- */
+// Fit to what is really visible: browsers in "desktop mode" can report a layout wider than the screen,
+// so take the smallest of the sizes they report. +/- (or ?k=0.8) nudges the size and is remembered.
+let adj = 1;
+try { adj = parseFloat(new URLSearchParams(location.search).get('k')) || parseFloat(localStorage.getItem('hearth.k')) || 1; } catch (e) { /* ignore */ }
 function fit() {
-  K = Math.min(innerWidth / 1920, innerHeight / 1080);
-  stage.style.transform = `translate(${(innerWidth - 1920 * K) / 2}px,${(innerHeight - 1080 * K) / 2}px) scale(${K})`;
+  const vv = window.visualViewport;
+  const w = Math.min(innerWidth, document.documentElement.clientWidth || 1e9, vv ? vv.width : 1e9);
+  const h = Math.min(innerHeight, document.documentElement.clientHeight || 1e9, vv ? vv.height : 1e9);
+  K = Math.min(w / 1920, h / 1080) * adj;
+  const ox = vv ? vv.offsetLeft : 0, oy = vv ? vv.offsetTop : 0;
+  stage.style.transform = `translate(${ox + (w - 1920 * K) / 2}px,${oy + (h - 1080 * K) / 2}px) scale(${K})`;
 }
-addEventListener('resize', fit); fit();
+function nudge(f) { adj = Math.max(.3, Math.min(2, adj * f)); try { localStorage.setItem('hearth.k', adj); } catch (e) { /* ignore */ } fit(); }
+addEventListener('resize', fit); if (window.visualViewport) { visualViewport.addEventListener('resize', fit); visualViewport.addEventListener('scroll', fit); }
+fit(); setTimeout(fit, 300); setTimeout(fit, 1500);
 function tick() {
   const d = new Date();
   $('#clk').textContent = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
@@ -158,6 +168,8 @@ addEventListener('keydown', e => {
   if (k.startsWith('Arrow')) { e.preventDefault(); move(k); }
   else if (k === 'Enter' || k === ' ') { if (focusEl) { e.preventDefault(); act(focusEl); } }
   else if (k === 'Escape' || k === 'Backspace' || k === 'BrowserBack' || k === 'GoBack') { e.preventDefault(); back(); }
+  else if (k === '-' || k === 'PageDown') { nudge(.92); toast('Smaller'); }
+  else if (k === '=' || k === '+' || k === 'PageUp') { nudge(1.08); toast('Bigger'); }
   else if (k === 'MediaPlayPause') { M.toggle(); }
   else if (k === 'MediaTrackNext') { M.next(); }
   else if (k === 'MediaTrackPrevious') { M.prev(); }
