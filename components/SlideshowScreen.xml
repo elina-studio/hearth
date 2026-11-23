@@ -25,17 +25,23 @@
 
     <Poster uri="pkg:/images/photo-shade-tr.png" translation="[820, 0]" width="1100" height="640" />
     <Poster uri="pkg:/images/photo-shade-bottom.png" translation="[0, 720]" width="1920" height="360" />
-    <Label id="clock" translation="[1024, 70]" width="800" horizAlign="right" color="0xEDE6CAFF" />
-    <Label id="date" translation="[1024, 216]" width="800" horizAlign="right" color="0xEDE6CAFF" />
-    <Label id="weather" translation="[1024, 278]" width="800" horizAlign="right" color="0xB5AF8CFF" />
+    <!-- the Home clock ("twig and sprig") at a size a little larger than Home: Cinzel time with one firefly, the wild twig,
+         the date in Fell, then a gold weather icon and the weather in the book serif. Right-aligned to x 1824. -->
+    <Label id="clock" translation="[1700, 48]" color="0xEDE6CAFF" />
+    <Poster id="clockFly" uri="pkg:/images/firefly.png" width="20" height="20" translation="[1640, 86]" />
+    <Poster uri="pkg:/images/clock/twig.png" translation="[1562, 106]" width="266" height="75" />
+    <Label id="date" translation="[1024, 180]" width="800" horizAlign="right" color="0xEDE6CAFF" />
+    <Poster id="wxIcon" translation="[1600, 238]" width="28" height="28" blendColor="0xE0B34AFF" visible="false" />
+    <Label id="weather" translation="[1650, 232]" height="40" vertAlign="center" color="0xB5AF8CFF" />
     <Group id="captionGroup">
       <Label id="album" translation="[96, 930]" width="900" color="0xE0B34AFF" />
       <Label id="caption" translation="[96, 968]" width="900" color="0xEDE6CAFF" />
       <Label id="star" translation="[96, 890]" width="200" color="0xE0B34AFF" />
     </Group>
     <Group id="nowPlaying" visible="false">
-      <Label id="npEyebrow" translation="[1024, 938]" width="800" horizAlign="right" color="0xB5AF8CFF" text="♪ NOW PLAYING" />
-      <Label id="npTitle" translation="[1024, 970]" width="800" horizAlign="right" color="0xEDE6CAFF" />
+      <Poster id="npIcon" uri="pkg:/images/icons/icon-note.png" width="24" height="24" blendColor="0xE0B34AFF" translation="[1600, 940]" />
+      <Label id="npEyebrow" translation="[1024, 936]" width="800" horizAlign="right" color="0xE0B34AFF" text="NOW PLAYING" />
+      <Label id="npTitle" translation="[924, 970]" width="900" horizAlign="right" color="0xEDE6CAFF" />
     </Group>
     <Group id="paused" visible="false" translation="[960, 540]">
       <Poster uri="pkg:/images/pill.9.png" blendColor="0x0B0E09CC" translation="[-130, -40]" width="260" height="80" />
@@ -47,13 +53,9 @@
     </Group>
     <Group id="optionsHolder" />
 
-    <Animation id="fade" duration="1.5" easeFunction="inOutQuad">
+    <Animation id="fade" duration="2" easeFunction="inOutQuad">
       <FloatFieldInterpolator id="fadeIn" key="[0.0, 1.0]" keyValue="[0.0, 1.0]" fieldToInterp="layerA.opacity" />
       <FloatFieldInterpolator id="fadeOut" key="[0.0, 1.0]" keyValue="[1.0, 0.0]" fieldToInterp="layerB.opacity" />
-    </Animation>
-    <Animation id="panAnim" duration="10" easeFunction="linear">
-      <Vector2DFieldInterpolator id="panScale" key="[0.0, 1.0]" keyValue="[[1.0, 1.0], [1.08, 1.08]]" fieldToInterp="panA.scale" />
-      <Vector2DFieldInterpolator id="panMove" key="[0.0, 1.0]" keyValue="[[0, 0], [-30, -16]]" fieldToInterp="panA.translation" />
     </Animation>
     <Animation id="captionFade" duration="0.8" delay="5">
       <FloatFieldInterpolator key="[0.0, 1.0]" keyValue="[1.0, 0.0]" fieldToInterp="captionGroup.opacity" />

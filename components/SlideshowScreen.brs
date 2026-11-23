@@ -1,5 +1,6 @@
-' The Window. One photo at a time with a slow pan and zoom, crossfading every few seconds.
-' Left/Right step through photos, OK pauses, ✱ opens the options panel, Back closes.
+' The Window. One photo at a time, crossfading every few seconds.
+' Left/Right step through photos, OK pauses, Down or ✱ opens the options card, Back closes.
+' Photos stay still (no pan and zoom) and crossfade softly.
 ' Play, Rewind and Fast forward stay with the music.
 sub init()
     m.layers = [
@@ -9,11 +10,13 @@ sub init()
     m.front = 1 ' index of the layer on screen; the first photo goes to the other one
     m.prefetch = m.top.findNode("prefetch")
     m.clock = m.top.findNode("clock")
-    m.clock.font = hFont("bold", 120)
+    m.clock.font = hFont("clock", 72)
+    m.clockFly = m.top.findNode("clockFly")
+    m.wxIcon = m.top.findNode("wxIcon")
     m.date = m.top.findNode("date")
-    m.date.font = hFont("fell", 48)
+    m.date.font = hFont("fell", 36)
     m.weather = m.top.findNode("weather")
-    m.weather.font = hFont("regular", 32)
+    m.weather.font = hFont("book", 28)
     m.album = m.top.findNode("album")
     m.album.font = hFont("caps", 28)
     m.caption = m.top.findNode("caption")
@@ -23,9 +26,12 @@ sub init()
     m.captionGroup = m.top.findNode("captionGroup")
     m.captionFade = m.top.findNode("captionFade")
     m.nowPlaying = m.top.findNode("nowPlaying")
-    m.top.findNode("npEyebrow").font = hFont("caps", 24)
+    npEyebrow = m.top.findNode("npEyebrow")
+    npEyebrow.font = hFont("caps", 24)
+    ' the note icon sits just left of the eyebrow (the ♪ character isn't in the fonts)
+    m.top.findNode("npIcon").translation = [1824 - npEyebrow.localBoundingRect().width - 34, 940]
     m.npTitle = m.top.findNode("npTitle")
-    m.npTitle.font = hFont("regular", 28)
+    m.npTitle.font = hFont("book", 30)
     m.pausedBadge = m.top.findNode("paused")
     m.top.findNode("pausedText").font = hFont("bold", 32)
     m.status = m.top.findNode("status")
@@ -37,9 +43,6 @@ sub init()
     m.fade = m.top.findNode("fade")
     m.fadeIn = m.top.findNode("fadeIn")
     m.fadeOut = m.top.findNode("fadeOut")
-    m.panAnim = m.top.findNode("panAnim")
-    m.panScale = m.top.findNode("panScale")
-    m.panMove = m.top.findNode("panMove")
     m.advance = m.top.findNode("advance")
     m.advance.observeField("fire", "onAdvance")
     m.loadTimeout = m.top.findNode("loadTimeout")
@@ -95,11 +98,10 @@ sub applyPrefs()
     if m.seconds < 3 then m.seconds = 8
     m.advance.duration = m.seconds
     m.order = pPref("photoOrder", "shuffle")
-    m.pan = (pPref("photoPan", "on") = "on")
 end sub
 
 function normalHint() as object
-    return [{ icon: "lr", label: "Photos" }, { text: "OK", label: "Pause" }, { icon: "asterisk", label: "Options" }, { icon: "back", label: "Back" }]
+    return [{ icon: "lr", label: "Photos" }, { text: "OK", label: "Pause" }, { icon: "down", label: "Options" }, { icon: "back", label: "Back" }]
 end function
 
 ' ---------- photos ----------
@@ -206,8 +208,6 @@ sub load(slide as object)
     m.advance.control = "stop"
     m.pending = slide
     L = m.layers[1 - m.front]
-    L.pan.scale = [1.0, 1.0]
-    L.pan.translation = [0, 0]
     url = pPhotoUrl(slide.items[0], 1280, 720)
     m.need = 0
     m.expect = {}
@@ -305,7 +305,6 @@ sub reveal()
     m.fadeOut.keyValue = [outgoing.group.opacity, 0.0]
     m.fade.control = "start"
     m.front = 1 - m.front
-    startPan(incoming)
     if m.back = 0 and (m.history.count() = 0 or m.history.peek().Id <> m.pending.Id) then m.history.push(m.pending)
     if m.history.count() > 50 then m.history.shift()
     m.caption.text = slideCaption(m.pending)
@@ -342,19 +341,6 @@ sub showStar()
     if slideFav(m.pending) then m.star.text = "★ FAVOURITE" else m.star.text = ""
 end sub
 
-' Slow drift in one of four directions, lasting the photo's whole time on screen
-sub startPan(layer as object)
-    m.panAnim.control = "stop"
-    if not m.pan then return
-    dirs = [[-30, -16], [30, -16], [-30, 16], [30, 16]]
-    m.panScale.fieldToInterp = layer.panName + ".scale"
-    m.panMove.fieldToInterp = layer.panName + ".translation"
-    m.panMove.keyValue = [[0, 0], dirs[Rnd(4) - 1]]
-    m.panAnim.duration = m.seconds + 1.5
-    m.panAnim.control = "start"
-    if m.paused then m.panAnim.control = "pause"
-end sub
-
 sub onAdvance()
     if not m.paused and not m.loading and m.options = invalid then showNext()
 end sub
@@ -370,6 +356,10 @@ sub tick()
     mm = mi.toStr()
     if mi < 10 then mm = "0" + mm
     m.clock.text = h12.toStr() + ":" + mm
+    ' right-align by measuring, so the firefly can sit just left of the time
+    w = m.clock.localBoundingRect().width
+    m.clock.translation = [1824 - w, 48]
+    m.clockFly.translation = [1824 - w - 40, 86]
     m.date.text = dt.GetWeekday() + " " + dt.GetDayOfMonth().toStr() + " " + pMonthName(dt.GetMonth())
 end sub
 
@@ -377,6 +367,7 @@ sub loadWeather()
     c = pCfg()
     if c.haToken = ""
         m.weather.text = ""
+        layoutWeather()
         return
     end if
     pHa("/api/states/" + c.haEntity, "onWeather")
@@ -386,14 +377,25 @@ sub onWeather(event as object)
     t = pTaskFrom(event)
     if not t.ok or t.response.state = invalid
         m.weather.text = ""
+        layoutWeather()
         return
     end if
+    m.wxIcon.uri = pWxIcon(t.response.state)
     s = pWeatherWord(t.response.state)
     a = t.response.attributes
     if a <> invalid and a.temperature <> invalid
         s = Int(a.temperature + 0.5).toStr() + "° · " + s
     end if
     m.weather.text = s
+    layoutWeather()
+end sub
+
+' Weather line: gold icon, then text, right-aligned to 1824
+sub layoutWeather()
+    w = m.weather.localBoundingRect().width
+    m.weather.translation = [1824 - w, 232]
+    m.wxIcon.translation = [1824 - w - 38, 238]
+    m.wxIcon.visible = (m.weather.text <> "" and m.wxIcon.uri <> "")
 end sub
 
 ' Only while music is actually playing
@@ -406,14 +408,13 @@ sub showMusic()
     t = mp.track.title
     if t = invalid then t = ""
     if mp.track.artist <> invalid and mp.track.artist <> "" then t = t + " · " + mp.track.artist
-    m.npTitle.text = t
+    m.npTitle.text = pPlainText(t)
     m.nowPlaying.visible = (t <> "")
 end sub
 
 ' ---------- options panel (✱) ----------
 sub openOptions()
     m.advance.control = "stop"
-    m.panAnim.control = "pause"
     m.captionGroup.visible = false
     m.hint.visible = false
     o = CreateObject("roSGNode", "PhotoOptions")
@@ -447,7 +448,6 @@ sub onOptionChanged(event as object)
         m.reorder = true
     end if
     applyPrefs()
-    if not m.pan then m.panAnim.control = "stop"
 end sub
 
 sub onRated(event as object)
@@ -472,10 +472,7 @@ sub closeOptions()
         m.next = 0
         m.back = 0
     end if
-    if not m.paused
-        if m.pan then m.panAnim.control = "resume"
-        if not m.loading then m.advance.control = "start"
-    end if
+    if not m.paused and not m.loading then m.advance.control = "start"
 end sub
 
 ' ---------- keys ----------
@@ -492,11 +489,9 @@ sub setPaused(p as boolean)
     m.pausedBadge.visible = p
     if p
         m.advance.control = "stop"
-        m.panAnim.control = "pause"
-        showHint([{ icon: "lr", label: "Photos" }, { text: "OK", label: "Resume" }, { icon: "asterisk", label: "Options" }, { icon: "back", label: "Back" }])
+        showHint([{ icon: "lr", label: "Photos" }, { text: "OK", label: "Resume" }, { icon: "down", label: "Options" }, { icon: "back", label: "Back" }])
     else
         showHint(normalHint())
-        if m.pan then m.panAnim.control = "resume"
         if not m.loading then showNext()
     end if
 end sub
@@ -515,9 +510,9 @@ function onKeyEvent(key as string, press as boolean) as boolean
         showHint(normalHint())
     else if key = "OK"
         setPaused(not m.paused)
-    else if key = "options"
+    else if key = "options" or key = "down"
         openOptions()
-    else if key = "up" or key = "down"
+    else if key = "up"
         showHint(normalHint())
         m.captionGroup.opacity = 1.0
         m.captionFade.control = "stop"
@@ -532,7 +527,6 @@ sub cleanup()
     m.advance.control = "stop"
     m.clockTimer.control = "stop"
     m.weatherTimer.control = "stop"
-    m.panAnim.control = "stop"
     mp = m.global.music
     if mp <> invalid
         mp.unobserveField("state")

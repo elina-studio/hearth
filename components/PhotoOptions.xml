@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- ✱ in the slideshow: a small card in the corner with this photo and five icon chips
-     (Favourite, seconds per photo, order, pan and zoom, screensaver). The photo stays visible. -->
+<!-- ✱ in the slideshow: a small card in the corner with this photo and four icon chips
+     (Favourite, seconds per photo, order, screensaver). The photo stays visible. -->
 <component name="PhotoOptions" extends="Group">
   <children>
     <Group id="card">
