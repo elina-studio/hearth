@@ -28,7 +28,24 @@ function ambHasVideo(it as object) as boolean
     if it = invalid then return false
     if it.clip <> invalid then return true
     if it.video = "" then return false
-    return CreateObject("roFileSystem").Exists(it.video)
+    ' roFileSystem can come back invalid on the render thread (build 26 crash), so look the file up with ListDir
+    fs = CreateObject("roFileSystem")
+    if fs <> invalid then return fs.Exists(it.video)
+    cut = 0
+    for i = Len(it.video) to 1 step -1
+        if Mid(it.video, i, 1) = "/"
+            cut = i
+            exit for
+        end if
+    end for
+    if cut = 0 then return false
+    name = Mid(it.video, cut + 1)
+    files = ListDir(Left(it.video, cut - 1))
+    if files = invalid then return false
+    for each f in files
+        if f = name then return true
+    end for
+    return false
 end function
 
 ' Which built-in mood a clip belongs to, from the start of its file name or title ("rain-creek.mp4" -> rain).
