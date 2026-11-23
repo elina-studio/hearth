@@ -67,6 +67,9 @@
 
       <CardRow id="nextUp" translation="[96, 590]" title="Next up" />
       <CardRow id="latest" translation="[96, 930]" title="Recently added" />
+      <CardRow id="musicRow" translation="[96, 1270]" title="Music · new albums" cardWidth="240" cardHeight="240" />
+      <CardRow id="reqRow" translation="[96, 1610]" title="Requests" cardWidth="200" cardHeight="300" />
+      <CardRow id="photoRow" translation="[96, 1950]" title="Photos · lately" />
     </Group>
     <Animation id="scroll" duration="0.22" easeFunction="outQuad">
       <Vector2DFieldInterpolator id="scrollTo" key="[0.0, 1.0]" fieldToInterp="content.translation" />

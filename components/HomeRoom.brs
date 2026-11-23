@@ -35,8 +35,11 @@ sub init()
 
     m.nextUp = m.top.findNode("nextUp")
     m.latest = m.top.findNode("latest")
-    m.rows = [m.nextUp, m.latest]
-    m.rowY = [590, 930]
+    m.rows = [m.nextUp, m.latest, m.top.findNode("musicRow"), m.top.findNode("reqRow"), m.top.findNode("photoRow")]
+    m.rowY = [590, 930, 1270, 1610, 1950]
+    for each r in m.rows
+        r.visible = false
+    end for
 
     buildButtons()
     buildMoods()
@@ -302,6 +305,14 @@ sub onRequests(event as object)
         m.reqLines[0].fill.visible = false
         m.reqLines[0].visible = true
     end if
+    rcards = []
+    for each r in t.response.results
+        if r.info <> invalid and r.info.title <> invalid and r.info.title <> ""
+            c = rqRequestCard(r.request, r.info)
+            rcards.push({ title: c.title, sub: c.chip.text, image: c.image, progress: 0, item: c.data })
+        end if
+    end for
+    setRow(3, rcards)
     if ready = 1
         foot.text = "1 ready to watch"
     else if ready > 1
@@ -354,6 +365,43 @@ sub refresh(unused as dynamic)
     hPlex("resume", { limit: 12 }, "onResume")
     hPlex("nextup", { limit: 12 }, "onNextUp")
     hPlex("latest", { limit: 16 }, "onLatest")
+    libs = m.global.libraries
+    if libs <> invalid
+        if libs.music <> invalid then hPlex("latest", { section: libs.music, limit: 16 }, "onMusicRow")
+        if libs.photos <> invalid then hPlex("latest", { section: libs.photos, limit: 16 }, "onPhotoRow")
+    end if
+end sub
+
+sub onMusicRow(event as object)
+    t = hTaskFrom(event)
+    cards = []
+    if t.ok and t.response.Items <> invalid
+        for each it in t.response.Items
+            c = hCard(it, "tall")
+            if it.ArtistName <> invalid then c.sub = it.ArtistName
+            cards.push(c)
+        end for
+    end if
+    setRow(2, cards)
+end sub
+
+sub onPhotoRow(event as object)
+    t = hTaskFrom(event)
+    cards = []
+    if t.ok and t.response.Items <> invalid
+        for each it in t.response.Items
+            c = hCard(it, "wide")
+            c.sub = ""
+            cards.push(c)
+        end for
+    end if
+    setRow(4, cards)
+end sub
+
+sub setRow(r as integer, cards as object)
+    m.rows[r].cards = cards
+    m.rows[r].visible = cards.count() > 0
+    layoutRows()
 end sub
 
 sub onResume(event as object)
@@ -392,7 +440,7 @@ end sub
 ' stack the rows under the cards with no gaps for hidden ones
 sub layoutRows()
     y = 590
-    for r = 0 to 1
+    for r = 0 to m.rows.count() - 1
         row = m.rows[r]
         if row.visible
             row.translation = [96, y]
@@ -513,6 +561,9 @@ end sub
 
 ' ---------- focus ----------
 sub focusIn(unused as dynamic)
+    ' coming down from the pills always lands on the hero's first button, not wherever you were last
+    m.zone = "hero"
+    m.btn = 0
     m.top.setFocus(true)
     showGreeting()
     paint()
@@ -541,7 +592,7 @@ sub paint()
     for i = 0 to 3
         m.moodRings[i].visible = focused and m.zone = "dash" and m.dash = i + 4
     end for
-    for r = 0 to 1
+    for r = 0 to m.rows.count() - 1
         m.rows[r].active = focused and m.zone = "rows" and m.row = r
     end for
     y = 0
@@ -602,6 +653,13 @@ sub activate()
         if card = invalid then return
         if m.row = 0
             m.top.request = { action: "play", item: card.item, resume: true }
+        else if m.row = 2
+            mp = m.global.music
+            if mp <> invalid then mp.command = { cmd: "playContainer", kind: "album", id: card.item.Id.toStr(), shuffle: false, label: card.title }
+        else if m.row = 3
+            m.top.request = { action: "room", name: "Requests" }
+        else if m.row = 4
+            m.top.request = { action: "room", name: "Photos" }
         else
             m.top.request = { action: "details", item: card.item }
         end if
@@ -692,7 +750,7 @@ sub moveDown()
 end sub
 
 function firstRow(from as integer) as integer
-    for r = from to 1
+    for r = from to m.rows.count() - 1
         if rowUsable(r) then return r
     end for
     return -1
@@ -751,7 +809,7 @@ sub hideFocus()
     for each r in m.moodRings
         r.visible = false
     end for
-    for r = 0 to 1
+    for r = 0 to m.rows.count() - 1
         m.rows[r].active = false
     end for
 end sub
