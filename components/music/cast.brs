@@ -87,15 +87,27 @@ end sub
 
 sub onCastService(event as object)
     t = hTaskFrom(event)
-    if t.ok then return
+    if t.ok
+        if t.tag = "playjoin" then castCatchUp(t.bodyText)
+        return
+    end if
+    if t.tag = "playjoin" then t.tag = "play"
     print "[hearth cast] "; t.path; " failed: "; t.status
     if t.tag = "join"
         ' different kinds of speakers can't always be grouped: play on each one instead (not in sync)
         m.castNoJoin = true
         say("These speakers can't be grouped, so they'll play side by side, maybe not quite in step.")
-        castPlayTrack()
+        m.castSeekFrom = m.top.position
+        m.castSeekClock = CreateObject("roTimespan")
+        castPlayTrack("playjoin")
     else if t.tag = "play"
-        if t.status = 0 or t.status = -1 then say("Can't reach Home Assistant.") else say("Music Assistant couldn't play this song on the speakers.")
+        if t.status = -1
+            say("The speakers are slow to answer. The song may still start there.")
+        else if t.status = 0
+            say("Can't reach Home Assistant.")
+        else
+            say("Music Assistant couldn't play this song on the speakers.")
+        end if
     end if
 end sub
 
@@ -173,7 +185,8 @@ sub castApply(before as object, changed as string)
     ' speakers that were unticked stop
     for each id in before
         if not castHas(now, id)
-            haService("media_player", "unjoin", { entity_id: id })
+            ' only a speaker that was grouped with others can be unjoined (a lone one answers 500)
+            if before.count() > 1 and m.castNoJoin <> true then haService("media_player", "unjoin", { entity_id: id })
             haService("media_player", "media_stop", { entity_id: id })
         end if
     end for
@@ -210,7 +223,11 @@ sub castApply(before as object, changed as string)
     m.castNoJoin = false
     if now.count() > 1 then castJoin()
     if playing
-        playIndex(m.top.index)
+        ' keep the song going on the TV; the speakers start it and then skip to where the TV is
+        m.castFresh = false
+        m.castSeekFrom = m.top.position
+        m.castSeekClock = CreateObject("roTimespan")
+        castPlayTrack("playjoin")
     else
         ' nothing is playing yet: the next Play starts the song in every room
         m.castFresh = true
@@ -250,7 +267,7 @@ end sub
 
 ' ---------- playing ----------
 ' Called by playIndex while casting: the speakers get the song now, the TV castDelay seconds later.
-sub castPlayTrack()
+sub castPlayTrack(tag = "play" as string)
     tr = m.top.track
     if tr = invalid then return
     if m.castNoJoin = true then targets = castOnIds() else targets = [m.castLeader]
@@ -258,12 +275,22 @@ sub castPlayTrack()
         data = { entity_id: id, media_id: tr.title, media_type: "track", enqueue: "replace" }
         if tr.artist <> invalid and tr.artist <> "" then data.artist = tr.artist
         if tr.album <> invalid and tr.album <> "" then data.album = tr.album
-        haService("music_assistant", "play_media", data, "play")
+        haService("music_assistant", "play_media", data, tag)
     end for
 end sub
 
 ' at = 0: the song is starting everywhere, so the TV waits castDelay seconds for the speakers.
 ' at > 0: the TV joins mid-song at that point (the speakers run castDelay behind our clock).
+' The speaker answered play_media: skip it to where the TV is now (plus its start-up delay)
+sub castCatchUp(body as string)
+    if m.castSeekClock = invalid then return
+    req = ParseJson(body)
+    if req = invalid or req.entity_id = invalid then return
+    at = m.castSeekFrom + m.castSeekClock.TotalMilliseconds() / 1000 + m.top.castDelay
+    if m.top.duration > 0 and at > m.top.duration - 2 then return
+    haService("media_player", "media_seek", { entity_id: req.entity_id, seek_position: Int(at * 10) / 10 })
+end sub
+
 sub castStartTv(at as float)
     c = m.audio.content
     if c = invalid then return

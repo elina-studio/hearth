@@ -26,10 +26,15 @@ sub runTask()
             started = xfer.AsyncGetToString()
         end if
         if started
-            msg = wait(15000, port)
+            ' a service call returns when it's done; Music Assistant looking up a song can take a while
+            limit = 15000
+            if m.top.method = "POST" then limit = 60000
+            msg = wait(limit, port)
             if type(msg) = "roUrlEvent"
                 status = msg.GetResponseCode()
-                parsed = ParseJson(msg.GetString())
+                body = msg.GetString()
+                parsed = invalid
+                if body <> "" then parsed = ParseJson(body)
                 if type(parsed) = "roAssociativeArray" then resp = parsed
                 if type(parsed) = "roArray" then resp = { items: parsed }
             else
