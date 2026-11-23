@@ -310,20 +310,21 @@ end function
 ' Type-safe checks: Plex and Bazarr send flags as true, 1, "1" or "True" depending on the field
 ' and server version, and BrightScript can't compare a string with a boolean or a number.
 function isTrue(v as dynamic) as boolean
-    t = type(v)
-    if t = "Boolean" or t = "roBoolean" then return v
-    if t = "Integer" or t = "roInteger" or t = "LongInteger" or t = "Float" or t = "Double" then return v <> 0
-    if t = "String" or t = "roString"
+    if GetInterface(v, "ifBoolean") <> invalid then return v
+    if GetInterface(v, "ifString") <> invalid
         s = LCase(v)
         return s = "1" or s = "true" or s = "yes"
     end if
+    if GetInterface(v, "ifInt") <> invalid or GetInterface(v, "ifLongInt") <> invalid or GetInterface(v, "ifFloat") <> invalid or GetInterface(v, "ifDouble") <> invalid then return v <> 0
     return false
 end function
 
 function numOf(v as dynamic) as integer
-    t = type(v)
-    if t = "Integer" or t = "roInteger" or t = "LongInteger" or t = "Float" or t = "Double" or t = "roFloat" then return Int(v)
-    if t = "String" or t = "roString" then return Int(Val(v))
+    if GetInterface(v, "ifInt") <> invalid or GetInterface(v, "ifLongInt") <> invalid or GetInterface(v, "ifFloat") <> invalid or GetInterface(v, "ifDouble") <> invalid then return Int(v)
+    if GetInterface(v, "ifString") <> invalid
+        if v = "" then return -1
+        return Int(Val(v))
+    end if
     return -1
 end function
 
@@ -346,8 +347,7 @@ function simple(v as string) as string
 end function
 
 function strOf(v as dynamic) as string
-    t = type(v)
-    if t = "String" or t = "roString" then return v
-    if t = "Integer" or t = "roInteger" or t = "LongInteger" or t = "Float" or t = "Double" or t = "Boolean" or t = "roBoolean" then return v.toStr()
+    if GetInterface(v, "ifString") <> invalid then return v
+    if GetInterface(v, "ifToStr") <> invalid and GetInterface(v, "ifAssociativeArray") = invalid and GetInterface(v, "ifArray") = invalid then return v.toStr()
     return ""
 end function

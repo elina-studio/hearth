@@ -160,7 +160,7 @@ sub onPolled(event as object)
     if not m.busy or not t.ok or t.response = invalid or t.response._media = invalid then return
     newest = invalid
     for each s in streamList(t.response)
-        real = not isTrue(s.transient) and strOf(s.transient) <> "download" and not m.resultKeys.doesExist(strOf(s.key))
+        real = not m.resultKeys.doesExist(strOf(s.key))
         if real and not m.before.doesExist(strOf(s.id)) and Left(LCase(strOf(s.languageCode)), 2) = "en" then newest = s
     end for
     if newest = invalid then return
@@ -213,26 +213,26 @@ function streamIds(it as object) as object
 end function
 
 function isTrue(v as dynamic) as boolean
-    t = type(v)
-    if t = "Boolean" or t = "roBoolean" then return v
-    if t = "Integer" or t = "roInteger" or t = "LongInteger" or t = "Float" or t = "Double" then return v <> 0
-    if t = "String" or t = "roString"
+    if GetInterface(v, "ifBoolean") <> invalid then return v
+    if GetInterface(v, "ifString") <> invalid
         s = LCase(v)
         return s = "1" or s = "true" or s = "yes"
     end if
+    if GetInterface(v, "ifInt") <> invalid or GetInterface(v, "ifLongInt") <> invalid or GetInterface(v, "ifFloat") <> invalid or GetInterface(v, "ifDouble") <> invalid then return v <> 0
     return false
 end function
 
 function numOf(v as dynamic) as integer
-    t = type(v)
-    if t = "Integer" or t = "roInteger" or t = "LongInteger" or t = "Float" or t = "Double" or t = "roFloat" then return Int(v)
-    if t = "String" or t = "roString" then return Int(Val(v))
+    if GetInterface(v, "ifInt") <> invalid or GetInterface(v, "ifLongInt") <> invalid or GetInterface(v, "ifFloat") <> invalid or GetInterface(v, "ifDouble") <> invalid then return Int(v)
+    if GetInterface(v, "ifString") <> invalid
+        if v = "" then return -1
+        return Int(Val(v))
+    end if
     return -1
 end function
 
 function strOf(v as dynamic) as string
-    t = type(v)
-    if t = "String" or t = "roString" then return v
-    if t = "Integer" or t = "roInteger" or t = "LongInteger" or t = "Float" or t = "Double" or t = "Boolean" or t = "roBoolean" then return v.toStr()
+    if GetInterface(v, "ifString") <> invalid then return v
+    if GetInterface(v, "ifToStr") <> invalid and GetInterface(v, "ifAssociativeArray") = invalid and GetInterface(v, "ifArray") = invalid then return v.toStr()
     return ""
 end function

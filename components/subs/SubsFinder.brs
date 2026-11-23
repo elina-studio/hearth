@@ -382,8 +382,7 @@ sub onPolled(event as object)
         lang = LCase(strOf(s.languageCode))
         print "[hearth-subs] poll: stream "; strOf(s.id); " "; lang; " "; strOf(s.codec); " key "; strOf(s.key); " transient "; strOf(s.transient); " new "; isNew; " "; strOf(s.displayTitle)
         ' only a new subtitle in the language that was searched counts
-        ' search results can show up on the item as temporary ("transient") streams; only a real file counts
-        if isTrue(s.transient) or strOf(s.transient) = "download" then isNew = false
+        ' Plex keeps its own downloads as transient="1" streams, so those count; the search results' own keys don't
         if isNew and m.resultKeys <> invalid and m.resultKeys.doesExist(strOf(s.key)) then isNew = false
         if isNew and (Left(lang, 2) = m.lang or lang = "") then newest = s
     end for
@@ -456,7 +455,7 @@ end function
 function streamIds(it as object) as object
     ids = {}
     for each s in streamList(it)
-        ids[s.id.toStr()] = true
+        ids[strOf(s.id)] = true
     end for
     return ids
 end function
@@ -737,20 +736,21 @@ end function
 ' Type-safe checks: Plex and Bazarr send flags as true, 1, "1" or "True" depending on the field
 ' and server version, and BrightScript can't compare a string with a boolean or a number.
 function isTrue(v as dynamic) as boolean
-    t = type(v)
-    if t = "Boolean" or t = "roBoolean" then return v
-    if t = "Integer" or t = "roInteger" or t = "LongInteger" or t = "Float" or t = "Double" then return v <> 0
-    if t = "String" or t = "roString"
+    if GetInterface(v, "ifBoolean") <> invalid then return v
+    if GetInterface(v, "ifString") <> invalid
         s = LCase(v)
         return s = "1" or s = "true" or s = "yes"
     end if
+    if GetInterface(v, "ifInt") <> invalid or GetInterface(v, "ifLongInt") <> invalid or GetInterface(v, "ifFloat") <> invalid or GetInterface(v, "ifDouble") <> invalid then return v <> 0
     return false
 end function
 
 function numOf(v as dynamic) as integer
-    t = type(v)
-    if t = "Integer" or t = "roInteger" or t = "LongInteger" or t = "Float" or t = "Double" or t = "roFloat" then return Int(v)
-    if t = "String" or t = "roString" then return Int(Val(v))
+    if GetInterface(v, "ifInt") <> invalid or GetInterface(v, "ifLongInt") <> invalid or GetInterface(v, "ifFloat") <> invalid or GetInterface(v, "ifDouble") <> invalid then return Int(v)
+    if GetInterface(v, "ifString") <> invalid
+        if v = "" then return -1
+        return Int(Val(v))
+    end if
     return -1
 end function
 
@@ -760,10 +760,8 @@ function sameNum(a as dynamic, b as dynamic) as boolean
 end function
 
 function strOf(v as dynamic) as string
-    t = type(v)
-    if t = "String" or t = "roString" then return v
-    if v = invalid then return ""
-    if t = "Integer" or t = "roInteger" or t = "LongInteger" or t = "Float" or t = "Double" or t = "Boolean" or t = "roBoolean" then return v.toStr()
+    if GetInterface(v, "ifString") <> invalid then return v
+    if GetInterface(v, "ifToStr") <> invalid and GetInterface(v, "ifAssociativeArray") = invalid and GetInterface(v, "ifArray") = invalid then return v.toStr()
     return ""
 end function
 
