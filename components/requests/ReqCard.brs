@@ -57,19 +57,16 @@ sub drawChip(chip as dynamic)
     bg = m.top.findNode("chipBg")
     icon = m.top.findNode("chipIcon")
     tone = chip.tone
-    ink = "0xEDE6CAFF"
-    if tone = "gold" or tone = "olive"
-        bg.uri = "pkg:/images/pill.9.png"
-        if tone = "gold" then bg.blendColor = "0xE0B34AFF" else bg.blendColor = "0xA3A35AFF"
-        ink = "0x1F1606FF"
+    ink = "0x1F1606FF"
+    if tone = "gold"
+        bg.color = "0xE0B34AFF"
+    else if tone = "olive"
+        bg.color = "0xA3A35AFF"
+    else if tone = "ember"
+        bg.color = "0xF0907CFF"
     else
-        bg.uri = "pkg:/images/pill-ring.9.png"
-        if tone = "ember"
-            bg.blendColor = "0xF0907CFF"
-            ink = "0xF0907CFF"
-        else
-            bg.blendColor = "0xFFFFFF40"
-        end if
+        bg.color = "0x0B0E09D9"
+        ink = "0xEDE6CAFF"
     end if
     icon.uri = "pkg:/images/requests/" + chip.icon + ".png"
     icon.blendColor = ink

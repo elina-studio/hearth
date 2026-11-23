@@ -216,6 +216,7 @@ sub buildRail()
         g = m.rail.createChild("Group")
         g.translation = [0, y]
         bg = g.createChild("Poster")
+        bg.uri = "pkg:/images/requests/glow.png"
         bg.width = 400
         bg.height = 66
         ic = g.createChild("Poster")
@@ -224,7 +225,7 @@ sub buildRail()
         ic.height = 28
         ic.translation = [24, 19]
         lab = g.createChild("Label")
-        lab.font = hFont("bold", 28)
+        lab.font = hFont("fell", 36)
         lab.text = l.name
         lab.width = 270
         lab.height = 66
@@ -236,11 +237,17 @@ sub buildRail()
         cnt.height = 66
         cnt.horizAlign = "right"
         cnt.vertAlign = "center"
+        bar = g.createChild("Rectangle")
+        bar.width = 3
+        bar.height = 66
+        bar.color = "0xE0B34AFF"
         y = y + 76
     end for
     paintRail()
 end sub
 
+' No pills: the chosen list gets a soft gold glow, a thin gold bar on its left and gold icon;
+' the glow is brighter while the rail has focus.
 sub paintRail()
     for i = 0 to m.lists.count() - 1
         g = m.rail.getChild(i)
@@ -249,24 +256,20 @@ sub paintRail()
         ic = g.getChild(1)
         lab = g.getChild(2)
         cnt = g.getChild(3)
+        bar = g.getChild(4)
         sel = (i = m.railIndex)
-        if sel and m.focused and m.zone = "rail"
-            bg.uri = "pkg:/images/pill.9.png"
-            bg.blendColor = "0xE0B34AFF"
-            bg.visible = true
-            ink = "0x1F1606FF"
-        else if sel
-            bg.uri = "pkg:/images/pill-ring.9.png"
-            bg.blendColor = "0xE0B34AFF"
-            bg.visible = true
-            ink = "0xEDE6CAFF"
+        bg.visible = sel
+        bar.visible = sel
+        if sel
+            if m.focused and m.zone = "rail" then bg.blendColor = "0xE0B34A40" else bg.blendColor = "0xE0B34A1F"
+            ic.blendColor = "0xE0B34AFF"
+            lab.color = "0xEDE6CAFF"
+            cnt.color = "0xE0B34AFF"
         else
-            bg.visible = false
-            ink = "0xB5AF8CFF"
+            ic.blendColor = "0xB5AF8C99"
+            lab.color = "0xB5AF8C99"
+            cnt.color = "0xB5AF8C99"
         end if
-        ic.blendColor = ink
-        lab.color = ink
-        cnt.color = ink
         k = m.lists[i].key
         c = m.cards[k]
         if c <> invalid and k <> "search" and k <> "music" then cnt.text = c.count().toStr() else cnt.text = ""
@@ -506,7 +509,7 @@ sub paintResults()
         s.translation = [104, 66]
         ch = g.createChild("ReqCard")
         ch.card = { kind: "chiponly", chip: c.chip }
-        ch.translation = [500, 52 - 282]
+        ch.translation = [500, 52 - 270]
         y = y + 132
     end for
 end sub
