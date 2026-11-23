@@ -189,6 +189,57 @@ sub onFound(event as object)
     m.hint.text = ""
     m.showingRecent = false
     setRows(rows)
+    checkSeasons()
+end sub
+
+' Feedback #23: only offer "Request" on a show when Overseerr says it isn't fully in the library
+' (mediaInfo.status 5 = available; anything else, or not known to Overseerr, means seasons are missing).
+sub checkSeasons()
+    if m.reg.Read("overseerrKey") = "" then return
+    if m.oTasks = invalid then m.oTasks = {}
+    for i = 0 to m.rows.count() - 1
+        r = m.rows[i]
+        if r.pill <> invalid and r.item.Type = "Series"
+            t = CreateObject("roSGNode", "OverseerrTask")
+            t.method = "GET"
+            t.path = "/api/v1/search"
+            t.query = { query: rowTitle(r.item), page: "1" }
+            t.tag = m.seq.toStr() + "|" + i.toStr()
+            k = "s" + i.toStr() + "_" + m.seq.toStr()
+            t.key = k
+            m.oTasks[k] = t
+            t.observeField("done", "onSeasonCheck")
+            t.control = "RUN"
+        end if
+    end for
+end sub
+
+sub onSeasonCheck(event as object)
+    t = event.getRoSGNode()
+    if t.key <> invalid then m.oTasks.delete(t.key)
+    parts = t.tag.Split("|")
+    if parts.count() < 2 or parts[0] <> m.seq.toStr() then return
+    i = parts[1].toInt()
+    if i >= m.rows.count() or m.rows[i].pill = invalid then return
+    if not t.ok or t.response = invalid or t.response.results = invalid then return
+    it = m.rows[i].item
+    want = LCase(rowTitle(it))
+    best = invalid
+    for each x in t.response.results
+        if x.mediaType = "tv" and x.name <> invalid and LCase(x.name) = want
+            year = invalid
+            if x.firstAirDate <> invalid and Len(x.firstAirDate) >= 4 then year = Left(x.firstAirDate, 4).toInt()
+            if best = invalid then best = x
+            if it.ProductionYear <> invalid and year = it.ProductionYear then best = x
+        end if
+    end for
+    if best = invalid then return
+    status = 0
+    if best.mediaInfo <> invalid and best.mediaInfo.status <> invalid then status = best.mediaInfo.status
+    if status <> 5
+        m.rows[i].pill.visible = true
+        paint()
+    end if
 end sub
 
 ' Titles that start with what you typed first (ignoring a leading "The"), otherwise Plex's order.
@@ -256,7 +307,7 @@ sub setRows(rows as object)
             r.y = y
             if r.kind = "recent" then r.h = 64 else r.h = 92
             if r.kind = "item" and (r.item.Type = "Series" or r.item.Type = "artist")
-                if r.item.Type = "Series" then r.more = "More seasons" else r.more = "More albums"
+                r.more = "Request"
             end if
             r.node = makeRow(r)
             m.focusable.push(i)
@@ -390,6 +441,8 @@ function makeRow(r as object) as object
             pl.font = hFont("bold", 24)
             pl.text = r.more
             r.pill = pill
+            ' shows: hidden until Overseerr says seasons are missing (see checkSeasons)
+            pill.visible = (r.item.Type <> "Series")
             textW = textW - pw - 24
         end if
         tl = g.createChild("Label")
@@ -573,7 +626,8 @@ function onKeyEvent(key as string, press as boolean) as boolean
         m.kb.callFunc("handleKey", key)
         return true
     end if
-    hasPill = (m.rows[m.focusable[m.sel]].pill <> invalid)
+    pr = m.rows[m.focusable[m.sel]].pill
+    hasPill = (pr <> invalid and pr.visible)
     if key = "up"
         m.onPill = false
         if m.sel > 0 then m.sel = m.sel - 1 else m.zone = "kb"
