@@ -42,6 +42,7 @@ sub makeSlot()
     p.loadWidth = s
     p.loadHeight = s
     p.loadDisplayMode = "scaleToZoom"
+    hFbWatch(p)
     fb = g.createChild("Label")
     fb.translation = [x0 + 12, 10]
     fb.width = s - 24

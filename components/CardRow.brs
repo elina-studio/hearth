@@ -100,6 +100,7 @@ sub makeSlot(w as integer, h as integer, k as integer)
     p.width = w
     p.height = h
     p.loadDisplayMode = "scaleToZoom"
+    hFbWatch(p)
     if m.top.maskUri <> ""
         mask = g.createChild("Poster")
         mask.uri = m.top.maskUri

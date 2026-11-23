@@ -54,6 +54,8 @@ sub runTask()
             ' the person's own footage for the Ambiance room; never a Movies shelf
             ' (found by name, either spelling, or by its folder: .../hearth or .../ambiance)
             if isAmbiance(d) then ct = "ambiance"
+            ' Exercise and Audiobook libraries stay off the dashboard and every shelf
+            if isHiddenName(toS(d.title, "")) then ct = "hidden"
             if d.type = "show" then ct = "tvshows"
             if d.type = "artist" then ct = "music"
             if d.type = "photo" then ct = "photos"
@@ -73,6 +75,7 @@ sub runTask()
             inProgress = (md.viewOffset <> invalid and md.viewOffset > 0)
             want = (op = "resume" and inProgress) or (op = "nextup" and not inProgress and it.Type = "Episode")
             if a.section <> invalid and md.librarySectionID <> invalid and md.librarySectionID.toStr() <> a.section.toStr() then want = false
+            if isHiddenName(toS(md.librarySectionTitle, "")) then want = false
             if want then items.push(it)
         end for
         out = { Items: limit(items, a.limit) }
@@ -81,14 +84,18 @@ sub runTask()
         path = "/library/recentlyAdded"
         if a.section <> invalid then path = "/library/sections/" + a.section + "/recentlyAdded"
         res = req("GET", m.server + path, q, m.token)
-        out = { Items: dedupe(metas(res.body)) }
+        shown = []
+        for each md in metas(res.body)
+            if not isHiddenName(toS(md.librarySectionTitle, "")) then shown.push(md)
+        end for
+        out = { Items: dedupe(shown) }
     else if op = "arrived"
         ' Newly downloaded: what just landed in the movie, show and music libraries (never Ambiance or Photos),
         ' newest first. Shows come back as seasons or episodes; norm turns both into their show.
         res = req("GET", m.server + "/library/sections", {}, m.token)
         all = []
         for each d in dirs(res.body)
-            if (d.type = "movie" or d.type = "show" or d.type = "artist") and not isAmbiance(d)
+            if (d.type = "movie" or d.type = "show" or d.type = "artist") and not isAmbiance(d) and not isHiddenName(toS(d.title, ""))
                 r2 = req("GET", m.server + "/library/sections/" + d.key + "/recentlyAdded", { "X-Plex-Container-Start": "0", "X-Plex-Container-Size": toS(a.limit, "30") }, m.token)
                 for each md in metas(r2.body)
                     if md.type <> "track" then all.push(md)
@@ -196,7 +203,7 @@ sub runTask()
         res = req("GET", m.server + "/library/sections", {}, m.token)
         items = []
         for each d in dirs(res.body)
-            if (d.type = "movie" or d.type = "show") and not isAmbiance(d)
+            if (d.type = "movie" or d.type = "show") and not isAmbiance(d) and not isHiddenName(toS(d.title, ""))
                 r2 = req("GET", m.server + "/library/sections/" + d.key + "/all", { actor: a.id.toStr(), "X-Plex-Container-Size": "40" }, m.token)
                 for each it in normAll(metas(r2.body))
                     items.push(it)
@@ -355,6 +362,12 @@ function entries(body as dynamic) as object
     if mc.Directory <> invalid then out.append(mc.Directory)
     if mc.Metadata <> invalid then out.append(mc.Metadata)
     return out
+end function
+
+' Libraries kept off the dashboard: Exercise and Audiobook(s) (the Hearth footage library is isAmbiance)
+function isHiddenName(title as string) as boolean
+    t = LCase(title)
+    return Instr(1, t, "exercise") > 0 or Instr(1, t, "audiobook") > 0 or Instr(1, t, "audio book") > 0
 end function
 
 function isAmbiance(d as object) as boolean

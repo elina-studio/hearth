@@ -332,3 +332,15 @@ sub hArrKicked(event as object)
         m.hArrTasks = stillRunning
     end if
 end sub
+
+' Poster cards show their title in a fallback label until the art has loaded; hide it once it has.
+' Call on each slot's Poster; the poster's parent group must carry a "fb" field.
+sub hFbWatch(p as object)
+    p.observeField("loadStatus", "hFbStatus")
+end sub
+
+sub hFbStatus(event as object)
+    p = event.getRoSGNode()
+    g = p.getParent()
+    if g <> invalid and g.hasField("fb") then g.fb.visible = (p.loadStatus <> "ready")
+end sub

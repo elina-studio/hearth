@@ -76,6 +76,7 @@ sub buildSlots()
         pic.width = m.cw
         pic.height = m.ch
         pic.loadDisplayMode = "scaleToZoom"
+        hFbWatch(pic)
         bar = hBraid(g, m.cw, m.ch + 10)
         ring = g.createChild("Poster")
         ring.uri = "pkg:/images/ring" + hVar(i) + ".9.png"
