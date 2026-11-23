@@ -7,16 +7,16 @@ echo "== 1. What the helper says now"
 curl -s --max-time 6 -w "\n   HTTP %{http_code}\n" http://127.0.0.1:8765/px/plex/identity | cut -c1-200
 
 echo "== 2. Looking for the Plex token"
-TOK=""
-FOUND=$(find /volume1 -maxdepth 8 -name Preferences.xml -path '*Plex Media Server*' 2>/dev/null)
-echo "   prefs files found: $(echo "$FOUND" | grep -c Preferences.xml)"
-echo "$FOUND" > /tmp/plexfix.list
-while IFS= read -r p; do
-  [ -z "$p" ] && continue
-  t=$(grep -o 'PlexOnlineToken="[^"]*' "$p" | sed 's/.*"//')
-  if [ -n "$t" ]; then TOK="$t"; echo "   token found in: $p"; break; else echo "   no token in: $p"; fi
-done < /tmp/plexfix.list
-rm -f /tmp/plexfix.list
+TOK="$1"   # a token given on the command line skips the search
+PREFS="/volume1/PlexMediaServer/AppData/Plex Media Server/Preferences.xml"
+if [ -z "$TOK" ]; then
+  if [ -f "$PREFS" ]; then
+    TOK=$(grep -o 'PlexOnlineToken="[^"]*' "$PREFS" | sed 's/.*"//')
+    echo "   read $PREFS (token $([ -n "$TOK" ] && echo found || echo MISSING))"
+  else
+    echo "   no file at $PREFS"
+  fi
+fi
 if [ -z "$TOK" ]; then
   echo "   The NAS has no Plex token to read. Paste one."
   echo "   (Plex web: open a movie > ... > Get Info > View XML; copy the X-Plex-Token=... value from the address bar.)"
