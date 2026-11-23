@@ -85,6 +85,7 @@ sub runTask()
         if a.sort <> invalid then q.sort = a.sort
         if a.unwatched = true then q.unwatched = "1"
         if a.genre <> invalid and a.genre <> "" then q.genre = a.genre.toStr()
+        if a.decade <> invalid and a.decade <> "" then q.decade = a.decade.toStr()
         res = req("GET", m.server + "/library/sections/" + a.section + "/all", q, m.token)
         out = { Items: normAll(metas(res.body)), Total: total(res.body) }
     else if op = "genres"
@@ -330,6 +331,7 @@ function norm(md as object) as object
         it.Genres = g
     end if
     it.RunTimeTicks = ticks(md.duration)
+    if md.titleSort <> invalid then it.SortName = md.titleSort else it.SortName = md.title
     ud = { Played: false, PlayedPercentage: 0 }
     if md.viewOffset <> invalid and md.viewOffset > 0
         ud.PlaybackPositionTicks = ticks(md.viewOffset)

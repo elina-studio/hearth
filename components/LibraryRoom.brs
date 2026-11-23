@@ -1,4 +1,4 @@
-' Movies or Shows. Focus zones: "grid" (posters), "tabs", "buttons" (Play / Captions / Details).
+' Movies or Shows. Focus zones: "grid" (posters), "letters" and "chips" (A to Z only), "tabs", "buttons" (Play / Captions / Details).
 ' Down from the pills lands on the grid. Up from the grid's top row reaches the tabs, then the buttons,
 ' then the pills. Down from the tabs or buttons returns to the grid.
 ' The strip at the top always describes the last poster you were on.
@@ -35,6 +35,21 @@ sub init()
     m.top0 = 0
     m.item = invalid
     m.genre = invalid
+    ' A to Z filters (Sort B) and letters (Letters B)
+    m.gridClip = m.top.findNode("gridClip")
+    m.chipsG = m.top.findNode("chips")
+    m.lettersG = m.top.findNode("letters")
+    m.sorts = [["A to Z", "titleSort"], ["Recently added", "addedAt:desc"], ["Newest first", "originallyAvailableAt:desc"], ["Top rated", "audienceRating:desc"]]
+    m.sortIdx = 0
+    m.unw = false
+    m.genreF = invalid
+    m.decade = ""
+    m.chip = 0
+    m.letter = 1
+    m.firstAt = []
+    m.dialog = invalid
+    m.wantGenrePick = false
+    buildLetters()
 end sub
 
 ' ---------- slots ----------
@@ -257,8 +272,10 @@ sub loadTab(t as integer)
     m.genre = invalid
     paintTabs()
     name = m.tabNames[t]
-    if m.data[name] <> invalid
-        showItems(m.data[name])
+    layoutAZ()
+    key = tabKey()
+    if m.data[key] <> invalid
+        showItems(m.data[key])
         return
     end if
     m.items = []
@@ -274,7 +291,11 @@ sub loadTab(t as integer)
     else if name = "Unwatched"
         hPlex("list", { section: m.section, unwatched: true, sort: "random", limit: 90 }, "onTab", name)
     else if name = "A to Z"
-        hPlex("list", { section: m.section, sort: "titleSort", limit: 2000 }, "onTab", name)
+        q = { section: m.section, sort: m.sorts[m.sortIdx][1], limit: 2000 }
+        if m.unw then q.unwatched = true
+        if m.genreF <> invalid then q.genre = m.genreF.genreKey
+        if m.decade <> "" then q.decade = m.decade
+        hPlex("list", q, "onTab", key)
     else
         hPlex("genres", { section: m.section }, "onGenres", name)
     end if
@@ -285,8 +306,17 @@ sub onTab(event as object)
     items = []
     if t.ok and t.response.Items <> invalid then items = t.response.Items
     m.data[t.tag] = items
-    if m.tabNames[m.tab] = t.tag and m.genre = invalid then showItems(items)
+    if tabKey() = t.tag and m.genre = invalid then showItems(items)
 end sub
+
+' A to Z answers are kept per filter set, so going back to a filter is instant
+function tabKey() as string
+    name = m.tabNames[m.tab]
+    if name <> "A to Z" then return name
+    k = name + "|" + m.sortIdx.toStr() + "|" + m.unw.toStr() + "|" + m.decade
+    if m.genreF <> invalid then k = k + "|" + m.genreF.genreKey
+    return k
+end function
 
 sub onGenres(event as object)
     t = hTaskFrom(event)
@@ -298,10 +328,15 @@ sub onGenres(event as object)
     end if
     m.data["Genres"] = items
     if m.tabNames[m.tab] = "Genres" and m.genre = invalid then showItems(items)
+    if m.wantGenrePick
+        m.wantGenrePick = false
+        pickGenre()
+    end if
 end sub
 
 sub openGenre(g as object)
     m.genre = g
+    layoutAZ()
     m.items = []
     drawGrid()
     m.empty.text = "Loading " + g.genreName + "…"
@@ -338,6 +373,7 @@ sub showItems(items as object)
         m.countLabel.text = ""
     end if
     if m.zone = "grid" and items.count() = 0 and m.focused then m.zone = "tabs"
+    indexLetters()
     paint()
 end sub
 
@@ -387,6 +423,8 @@ sub paint()
     if row > m.top0 + 1 then m.top0 = row - 1
     drawGrid()
     paintTabs()
+    paintChips()
+    paintLetters()
     showInfo()
 end sub
 
@@ -431,6 +469,7 @@ function onKeyEvent(key as string, press as boolean) as boolean
     if key = "back"
         if m.genre <> invalid
             m.genre = invalid
+            layoutAZ()
             showItems(m.data["Genres"])
             return true
         end if
@@ -459,7 +498,7 @@ function onKeyEvent(key as string, press as boolean) as boolean
                 m.index = n - 1
             end if
         else if key = "up"
-            if m.index >= m.cols then m.index = m.index - m.cols else m.zone = "tabs"
+            if m.index >= m.cols then m.index = m.index - m.cols else m.zone = zoneNext("grid", -1)
         else if key = "OK" and n > 0
             it = m.items[m.index]
             if it.genreName <> invalid then openGenre(it) else m.top.request = { action: "details", item: it }
@@ -470,14 +509,42 @@ function onKeyEvent(key as string, press as boolean) as boolean
             loadTab(m.tab - 1)
         else if key = "right" and m.tab < m.tabNames.count() - 1
             loadTab(m.tab + 1)
-        else if (key = "down" or key = "OK") and n > 0
-            m.zone = "grid"
+        else if key = "down" or key = "OK"
+            m.zone = zoneNext("tabs", 1)
         else if key = "up"
             if buttonCount() = 0
                 leaveToPills()
                 return true
             end if
             m.zone = "buttons"
+        end if
+    else if m.zone = "chips"
+        if key = "left" and m.chip > 0
+            m.chip = m.chip - 1
+        else if key = "right" and m.chip < 4
+            m.chip = m.chip + 1
+        else if key = "up" or key = "down"
+            if key = "up" then d = -1 else d = 1
+            m.zone = zoneNext("chips", d)
+        else if key = "OK"
+            runChip()
+            return true
+        end if
+    else if m.zone = "letters"
+        if key = "left" or key = "right"
+            if key = "left" then d = -1 else d = 1
+            j = m.letter + d
+            while j >= 0 and j <= 26 and m.firstAt[j] < 0
+                j = j + d
+            end while
+            if j >= 0 and j <= 26
+                m.letter = j
+                m.index = m.firstAt[j]
+                m.top0 = Int(m.index / m.cols)
+            end if
+        else if key = "up" or key = "down" or key = "OK"
+            if key = "up" then d = -1 else d = 1
+            m.zone = zoneNext("letters", d)
         end if
     else
         bc = buttonCount()
@@ -498,3 +565,240 @@ function onKeyEvent(key as string, press as boolean) as boolean
     paintButtons()
     return true
 end function
+
+' ---------- A to Z: chips and letters ----------
+function onAZ() as boolean
+    return m.tabNames[m.tab] = "A to Z" and m.genre = invalid
+end function
+
+function lettersOn() as boolean
+    return onAZ() and m.sortIdx = 0
+end function
+
+' The zone above (d = -1) or below (d = 1) a zone, skipping ones that aren't showing
+function zoneNext(z as string, d as integer) as string
+    order = ["buttons", "tabs", "chips", "letters", "grid"]
+    i = 0
+    for k = 0 to order.count() - 1
+        if order[k] = z then i = k
+    end for
+    i = i + d
+    while i >= 0 and i < order.count()
+        c = order[i]
+        ok = true
+        if c = "buttons" then ok = buttonCount() > 0
+        if c = "chips" then ok = onAZ()
+        if c = "letters" then ok = lettersOn() and m.items.count() > 0
+        if c = "grid" then ok = m.items.count() > 0
+        if ok then return c
+        i = i + d
+    end while
+    return z
+end function
+
+' Moves the grid down to make room for the chip row and the letter row
+sub layoutAZ()
+    y = 330
+    if onAZ() then y = 386
+    if lettersOn() then y = 446
+    m.gridClip.translation = [0, y]
+    m.empty.translation = [96, y + 30]
+    m.chipsG.visible = onAZ()
+    m.lettersG.visible = lettersOn()
+end sub
+
+sub buildChips()
+    m.chipsG.removeChildrenIndex(m.chipsG.getChildCount(), 0)
+    sortName = m.sorts[m.sortIdx][0]
+    genre = "Genre"
+    if m.genreF <> invalid then genre = m.genreF.genreName
+    decade = "Decade"
+    if m.decade <> "" then decade = m.decade + "s"
+    active = [m.sortIdx > 0, m.unw, m.genreF <> invalid, m.decade <> "", false]
+    unwIcon = "home-check"
+    specs = [[sortName, "home-sort"], ["Unwatched", unwIcon], [genre, "home-filter"], [decade, "home-cal"], ["Clear", "home-x"]]
+    x = 0
+    for i = 0 to 4
+        g = m.chipsG.createChild("Group")
+        g.translation = [x, 0]
+        idle = g.createChild("Poster")
+        fill = g.createChild("Poster")
+        ring = g.createChild("Poster")
+        icon = g.createChild("Poster")
+        icon.uri = "pkg:/images/icons/" + specs[i][1] + ".png"
+        icon.width = 20
+        icon.height = 20
+        icon.translation = [18, 12]
+        l = g.createChild("Label")
+        l.font = hFont("regular", 22)
+        l.text = specs[i][0]
+        l.height = 44
+        l.vertAlign = "center"
+        l.translation = [46, 0]
+        w = Int(l.localBoundingRect().width) + 66
+        idle.uri = "pkg:/images/pill-ring.9.png"
+        idle.blendColor = "0x5E6450FF"
+        fill.uri = "pkg:/images/pill.9.png"
+        fill.blendColor = "0xE0B34AFF"
+        ring.uri = "pkg:/images/pill-ring.9.png"
+        ring.blendColor = "0xEDE6CAFF"
+        ring.translation = [-6, -6]
+        for each p in [idle, fill]
+            p.width = w
+            p.height = 44
+        end for
+        ring.width = w + 12
+        ring.height = 56
+        g.addFields({ fill: fill, idle: idle, ring: ring, icon: icon, label: l, on: active[i] })
+        x = x + w + 12
+    end for
+    paintChips()
+end sub
+
+sub paintChips()
+    if m.chipsG.getChildCount() = 0
+        buildChips()
+        return
+    end if
+    for i = 0 to m.chipsG.getChildCount() - 1
+        g = m.chipsG.getChild(i)
+        g.fill.visible = g.on
+        g.idle.visible = not g.on
+        g.ring.visible = (m.focused and m.zone = "chips" and m.chip = i)
+        if g.on then col = "0x1F1606FF" else col = "0xEDE6CAFF"
+        g.label.color = col
+        g.icon.blendColor = col
+    end for
+end sub
+
+sub runChip()
+    if m.chip = 0
+        m.sortIdx = (m.sortIdx + 1) mod m.sorts.count()
+        applyFilters()
+    else if m.chip = 1
+        m.unw = not m.unw
+        applyFilters()
+    else if m.chip = 2
+        if m.data["Genres"] = invalid
+            m.wantGenrePick = true
+            hPlex("genres", { section: m.section }, "onGenres", "Genres")
+        else
+            pickGenre()
+        end if
+    else if m.chip = 3
+        pick("decade", "Decade", ["Any decade", "2020s", "2010s", "2000s", "1990s", "1980s", "1970s", "1960s", "1950s"])
+    else
+        m.sortIdx = 0
+        m.unw = false
+        m.genreF = invalid
+        m.decade = ""
+        applyFilters()
+    end if
+end sub
+
+sub applyFilters()
+    buildChips()
+    loadTab(m.tab)
+    m.zone = "chips"
+    paint()
+end sub
+
+sub pickGenre()
+    labels = ["Any genre"]
+    for each g in m.data["Genres"]
+        labels.push(g.genreName)
+    end for
+    pick("genre", "Genre", labels)
+end sub
+
+sub pick(kind as string, title as string, labels as object)
+    m.pickKind = kind
+    d = CreateObject("roSGNode", "StandardMessageDialog")
+    d.title = title
+    d.buttons = labels
+    d.observeField("buttonSelected", "onPicked")
+    d.observeField("wasClosed", "onPickClosed")
+    m.dialog = d
+    m.top.getScene().dialog = d
+end sub
+
+sub onPicked()
+    i = m.dialog.buttonSelected
+    m.dialog.close = true
+    if m.pickKind = "genre"
+        if i = 0 then m.genreF = invalid else m.genreF = m.data["Genres"][i - 1]
+    else
+        if i = 0 then m.decade = "" else m.decade = Left(m.dialog.buttons[i], 4)
+    end if
+    m.top.setFocus(true)
+    applyFilters()
+end sub
+
+sub onPickClosed()
+    m.top.setFocus(true)
+end sub
+
+' Letters B: # then A to Z; each knows the first title that starts with it
+sub buildLetters()
+    m.letterChars = "#ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    for i = 0 to 26
+        g = m.lettersG.createChild("Group")
+        g.translation = [i * 58, 0]
+        bg = g.createChild("Poster")
+        bg.uri = "pkg:/images/pill.9.png"
+        bg.width = 52
+        bg.height = 44
+        l = g.createChild("Label")
+        l.font = hFont("caps", 28)
+        l.text = Mid(m.letterChars, i + 1, 1)
+        l.width = 52
+        l.height = 44
+        l.horizAlign = "center"
+        l.vertAlign = "center"
+        g.addFields({ bg: bg, label: l })
+    end for
+end sub
+
+function letterOf(it as object) as integer
+    t = it.SortName
+    if t = invalid or t = "" then t = hTitle(it)
+    c = UCase(Left(t, 1))
+    p = Instr(1, m.letterChars, c)
+    if p <= 1 then return 0
+    return p - 1
+end function
+
+sub indexLetters()
+    m.firstAt = []
+    for i = 0 to 26
+        m.firstAt.push(-1)
+    end for
+    if not lettersOn() then return
+    for i = 0 to m.items.count() - 1
+        k = letterOf(m.items[i])
+        if m.firstAt[k] < 0 then m.firstAt[k] = i
+    end for
+end sub
+
+sub paintLetters()
+    if not m.lettersG.visible or m.firstAt.count() < 27 then return
+    cur = -1
+    if m.index < m.items.count() then cur = letterOf(m.items[m.index])
+    if m.zone <> "letters" and cur >= 0 then m.letter = cur
+    for i = 0 to 26
+        g = m.lettersG.getChild(i)
+        focusedHere = (m.focused and m.zone = "letters" and m.letter = i)
+        g.bg.visible = focusedHere or i = cur
+        if focusedHere
+            g.bg.blendColor = "0xE0B34AFF"
+            g.label.color = "0x1F1606FF"
+        else if i = cur
+            g.bg.blendColor = "0xFFFFFF1A"
+            g.label.color = "0xEDE6CAFF"
+        else if m.firstAt[i] < 0
+            g.label.color = "0x5E645099"
+        else
+            g.label.color = "0xB5AF8CFF"
+        end if
+    end for
+end sub

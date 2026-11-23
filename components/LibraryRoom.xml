@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Movies or Shows (layout "3"): a slim strip about the focused title with Play / Captions / Details
-     and its art on the right, then tabs (Continue, New, Unwatched, A to Z, Genres) over a poster grid. -->
+     and its art on the right, then tabs (Continue, New, Unwatched, A to Z, Genres) over a poster grid.
+     A to Z adds a row of filter chips and a row of letters (Sort B, Letters B). -->
 <component name="LibraryRoom" extends="Group">
   <children>
     <!-- info strip -->
@@ -14,6 +15,10 @@
 
     <!-- tabs -->
     <Group id="tabs" translation="[96, 270]" />
+
+    <!-- A to Z only: filter chips (Sort, Unwatched, Genre, Decade, Clear), then a letter row when sorted by title -->
+    <Group id="chips" translation="[96, 326]" visible="false" />
+    <Group id="letters" translation="[96, 386]" visible="false" />
 
     <!-- poster grid: 9 across, slots are reused as you scroll -->
     <Group id="gridClip" translation="[0, 330]" clippingRect="[0, -16, 1920, 620]">
