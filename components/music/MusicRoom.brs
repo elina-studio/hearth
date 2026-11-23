@@ -216,6 +216,7 @@ sub build()
             r = m.shelves.createChild("CardRow")
             r.translation = [0, y]
             r.viewWidth = 1150
+            r.noMoss = true
             r.title = name
             r.cardWidth = 200
             r.cardHeight = 200

@@ -201,7 +201,7 @@ sub paint()
         end if
         on = (m.top.active and i = m.top.index)
         g.ring.visible = on
-        g.moss.visible = on
+        g.moss.visible = on and not m.top.noMoss
     end for
 end sub
 
