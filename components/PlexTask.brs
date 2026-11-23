@@ -175,6 +175,24 @@ sub runTask()
     else if op = "setSubtitle"
         ' what Plex apps do: remember the chosen subtitle on the server (0 = none), so every player honors it
         res = req("PUT", m.server + "/library/parts/" + a.part.toStr(), { subtitleStreamID: a.stream.toStr(), allParts: "1" }, m.token)
+    else if op = "subSearch"
+        ' Plex's own subtitle search (OpenSubtitles, https://support.plex.tv/articles/subtitle-search/)
+        q = { language: toS(a.language, "en"), hearingImpaired: toS(a.hi, "0"), forced: "0" }
+        res = req("GET", m.server + "/library/metadata/" + a.id + "/subtitles", q, m.token, 45000)
+        items = []
+        if res.body <> invalid and res.body.MediaContainer <> invalid
+            mc = res.body.MediaContainer
+            if mc.Stream <> invalid then items = mc.Stream
+            if items.count() = 0 and mc.Metadata <> invalid then items = mc.Metadata
+        end if
+        if items.count() > 0 then print "[hearth-subs] Plex result fields: "; FormatJson(items[0])
+        out = { Items: items }
+    else if op = "subDownload"
+        ' Plex downloads in the background; the new stream shows up on the item a few seconds later
+        res = req("PUT", m.server + "/library/metadata/" + a.id + "/subtitles", { key: a.key }, m.token)
+    else if op = "refresh"
+        ' rescans the item so Plex lists a subtitle file Bazarr just saved next to the video
+        res = req("PUT", m.server + "/library/metadata/" + a.id + "/refresh", {}, m.token)
     else if op = "timeline"
         q = { ratingKey: a.id, key: "/library/metadata/" + a.id, state: a.state, time: a.time, duration: a.duration, identifier: "com.plexapp.plugins.library" }
         res = req("GET", m.server + "/:/timeline", q, m.token)

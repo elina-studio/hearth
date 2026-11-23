@@ -57,6 +57,16 @@ sub saveInput(screen as object, info as object)
         reg.Flush()
         g.lidarrKey = info.lidarrKey
     end if
+    ' Bazarr (subtitle finder): bazarrUrl, bazarrKey
+    if info.bazarrUrl <> invalid and info.bazarrUrl <> ""
+        reg.Write("bazarrUrl", info.bazarrUrl)
+        reg.Flush()
+    end if
+    if info.bazarrKey <> invalid and info.bazarrKey <> ""
+        reg.Write("bazarrKey", info.bazarrKey)
+        reg.Flush()
+        print "[hearth-subs] Bazarr key saved on the TV"
+    end if
     ' Photos weather: haUrl, haToken, haEntity (source/photos.brs)
     pSaveSettings(info)
 end sub

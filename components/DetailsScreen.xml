@@ -18,6 +18,7 @@
       </Group>
       <CardRow id="below" translation="[96, 600]" />
     </Group>
+    <SubsFinder id="finder" />
     <Animation id="scroll" duration="0.22" easeFunction="outQuad">
       <Vector2DFieldInterpolator id="scrollTo" key="[0.0, 1.0]" fieldToInterp="content.translation" />
     </Animation>

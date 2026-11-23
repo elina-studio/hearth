@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Subtitle finder, layout A (side sheet, picked Nov 23; mockup mockups/player/subs-A-side-sheet.png).
+     Two tabs: the subtitles already on the title, and Find more, which searches Plex (OpenSubtitles)
+     and Bazarr together. OK on a result downloads it, Plex picks it up, and it is turned on.
+     Host: set item (full Plex item from hPlex("item")), then call open. Watch `result` and `closed`.
+     result: { action: "select", stream } | { action: "off" } | { action: "downloaded", stream } -->
+<component name="SubsFinder" extends="Group">
+  <children>
+    <Rectangle id="shade" width="1920" height="1080" color="0x0B0E09B8" />
+    <Poster id="panel" uri="pkg:/images/w/panel.9.png" translation="[1028, 48]" width="824" height="984" blendColor="0x141A11FF" />
+    <Poster id="ccIcon" uri="pkg:/images/icons/home-cc.png" translation="[1084, 104]" width="40" height="40" blendColor="0xE0B34AFF" />
+    <Label id="heading" translation="[1140, 90]" text="Subtitles" color="0xEDE6CAFF" />
+    <Label id="tab0" translation="[1084, 168]" color="0xB5AF8CFF" />
+    <Label id="tab1" translation="[1430, 168]" text="FIND MORE" color="0xB5AF8CFF" />
+    <Rectangle id="tabRule" translation="[1084, 214]" width="712" height="2" color="0x404B2DFF" />
+    <Rectangle id="tabMark" translation="[1084, 210]" width="180" height="4" color="0xE0B34AFF" />
+    <Group id="chips" translation="[1084, 236]" />
+    <Label id="count" translation="[1084, 314]" width="712" color="0xB5AF8CFF" />
+    <Group id="list" translation="[1084, 360]" />
+    <Label id="note" translation="[1084, 380]" width="712" wrap="true" maxLines="8" color="0xB5AF8CFF" />
+    <Label id="hint" translation="[1084, 978]" width="712" color="0xB5AF8CFF" />
+    <Timer id="poll" duration="2" repeat="true" />
+  </children>
+  <interface>
+    <field id="item" type="assocarray" />
+    <field id="context" type="string" value="details" />
+    <field id="result" type="assocarray" alwaysNotify="true" />
+    <field id="closed" type="boolean" alwaysNotify="true" />
+    <function name="open" />
+  </interface>
+  <script type="text/brightscript" uri="pkg:/source/util.brs" />
+  <script type="text/brightscript" uri="pkg:/components/subs/SubsFinder.brs" />
+</component>

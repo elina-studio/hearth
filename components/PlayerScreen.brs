@@ -17,6 +17,10 @@ sub init()
     m.started = false
     m.ready = false
     m.offset = 0
+    m.finder = m.top.findNode("finder")
+    m.finder.observeField("closed", "onFinderClosed")
+    m.finder.observeField("result", "onFinderResult")
+    m.reloadSubs = false
 end sub
 
 sub onShown(unused as dynamic)
@@ -48,6 +52,11 @@ sub onItem(event as object)
     token = m.global.plexServerToken
     m.startSec = 0
     if m.top.resume and it.UserData.PlaybackPositionTicks <> invalid then m.startSec = it.UserData.PlaybackPositionTicks / 10000000
+    ' coming back from the subtitle finder after a download: carry on from the same spot
+    if m.resumeAt <> invalid
+        m.startSec = m.resumeAt
+        m.resumeAt = invalid
+    end if
     m.durationMs = 0
     if media.duration <> invalid then m.durationMs = media.duration
 
@@ -340,6 +349,61 @@ sub onCaptionPicked()
     m.video.setFocus(true)
 end sub
 
+' ---------- subtitle finder (the * key) ----------
+sub openFinder()
+    m.wasPlaying = (m.video.state = "playing")
+    if m.wasPlaying then m.video.control = "pause"
+    m.reloadSubs = false
+    m.finder.item = m.item
+    m.finder.callFunc("open", invalid)
+end sub
+
+sub onFinderResult()
+    r = m.finder.result
+    if r = invalid then return
+    if r.action = "off"
+        m.video.globalCaptionMode = "Off"
+        m.capsPref = "off"
+    else if r.action = "select"
+        s = r.stream
+        m.capsPref = "on"
+        if s.key <> invalid
+            ' a subtitle file: it is one of the tracks handed to the video at the start
+            url = m.global.plexServer + s.key + "?X-Plex-Token=" + m.global.plexServerToken
+            m.video.globalCaptionMode = "On"
+            m.video.subtitleTrack = url
+        else
+            ' inside the file: find the TV's track in that language
+            m.streams.sub = s
+            m.subApplied = false
+            applyEmbeddedSub()
+        end if
+    else if r.action = "downloaded"
+        ' the new file isn't among the video's tracks yet; restart from here once the finder closes
+        m.reloadSubs = true
+    end if
+end sub
+
+sub onFinderClosed()
+    if m.reloadSubs
+        m.reloadSubs = false
+        print "[hearth-play] new subtitle downloaded; restarting at "; Int(position()); " s to load it"
+        m.resumeAt = position()
+        m.tick.control = "stop"
+        m.ready = false
+        m.started = false
+        m.subApplied = false
+        m.retried5 = false
+        m.hlsLight = false
+        m.video.control = "stop"
+        m.status.visible = true
+        hPlex("item", { id: m.item.Id }, "onItem")
+    else if m.wasPlaying
+        m.video.control = "resume"
+    end if
+    m.video.setFocus(true)
+end sub
+
 sub afterOptions()
 end sub
 
@@ -358,7 +422,7 @@ function onKeyEvent(key as string, press as boolean) as boolean
         return true
     end if
     if key = "options" and m.ready
-        showCaptions()
+        openFinder()
         return true
     end if
     return false

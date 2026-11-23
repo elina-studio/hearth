@@ -22,6 +22,10 @@ sub init()
     m.actions = []
     m.full = invalid
     m.nextEpisode = invalid
+    m.finder = m.top.findNode("finder")
+    m.finder.observeField("closed", "onFinderClosed")
+    m.finder.observeField("result", "onFinderResult")
+    m.finderChanged = false
 end sub
 
 sub onShown(unused as dynamic)
@@ -173,10 +177,35 @@ sub runAction(a as string)
     else if a = "playNext" and m.nextEpisode <> invalid
         m.top.request = { action: "play", item: m.nextEpisode, resume: true }
     else if a = "subs"
-        hSubsPick(it)
+        openFinder(it)
     else if a = "played" or a = "unplayed"
         hPlex(a, { id: it.Id }, "onChanged")
     end if
+end sub
+
+' ---------- subtitle finder (components/subs/SubsFinder) ----------
+sub openFinder(it as object)
+    if it._media = invalid
+        hPlex("item", { id: it.Id }, "onFinderItem")
+        return
+    end if
+    m.finderChanged = false
+    m.finder.item = it
+    m.finder.callFunc("open", invalid)
+end sub
+
+sub onFinderItem(event as object)
+    t = hTaskFrom(event)
+    if t.ok and t.response <> invalid and t.response.Id <> invalid then openFinder(t.response)
+end sub
+
+sub onFinderResult()
+    m.finderChanged = true
+end sub
+
+sub onFinderClosed()
+    m.top.setFocus(true)
+    if m.finderChanged then load()
 end sub
 
 sub onChanged(event as object)
