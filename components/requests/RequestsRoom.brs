@@ -41,6 +41,7 @@ sub init()
 
     m.lists = [
         { key: "search", icon: "search", name: "Search", about: "TYPE A TITLE" },
+        { key: "new", icon: "down", name: "New", about: "NEWLY DOWNLOADED · NEWEST FIRST" },
         { key: "trending", icon: "spark", name: "Trending", about: "TRENDING THIS WEEK", path: "/api/v1/discover/trending" },
         { key: "movies", icon: "film", name: "Popular movies", about: "POPULAR MOVIES", path: "/api/v1/discover/movies" },
         { key: "tv", icon: "tv", name: "Popular shows", about: "POPULAR SHOWS", path: "/api/v1/discover/tv" },
@@ -51,9 +52,15 @@ sub init()
     m.cards = {}
     m.details = {}
     m.tasks = {}
-    m.railIndex = 1
+    m.railIndex = 2
     m.gridIndex = 0
     m.resIndex = 0
+    ' New: All / Movies / Shows / Music
+    m.newTabs = [{ key: "", icon: "layers", name: "All" }, { key: "movie", icon: "film", name: "Movies" }, { key: "tv", icon: "tv", name: "Shows" }, { key: "music", icon: "note", name: "Music" }]
+    m.newTab = 0
+    m.newAll = invalid
+    m.tabs = m.top.findNode("tabs")
+    m.gridClip = m.top.findNode("gridClip")
     m.zone = "rail"
     m.focused = false
     m.loaded = false
@@ -70,6 +77,7 @@ sub init()
     if not m.global.hasField("overseerrKey") then m.global.addFields({ overseerrKey: "" })
     m.global.observeField("overseerrKey", "onKeyArrived")
     buildRail()
+    buildTabs()
     refresh(invalid)
 end sub
 
@@ -93,6 +101,90 @@ sub refresh(unused as dynamic)
         end for
     end if
     loadMine()
+    loadNew()
+end sub
+
+' New comes from Plex (what actually landed), so OK can open and play it
+sub loadNew()
+    if m.global.plexServer = invalid or m.global.plexServer = "" then return
+    hPlex("arrived", { limit: 30 }, "onArrived")
+end sub
+
+sub onArrived(event as object)
+    t = hTaskFrom(event)
+    cards = []
+    seen = {}
+    if t.ok and t.response <> invalid and t.response.Items <> invalid
+        for each it in t.response.Items
+            key = it.Id
+            if it.Type = "Episode" and it.SeriesId <> invalid then key = it.SeriesId
+            if key <> invalid and seen[key] = invalid
+                img = hImage(it, "Primary", 180)
+                c = rqArrivedCard(it, img)
+                if c <> invalid
+                    seen[key] = true
+                    cards.push(c)
+                end if
+            end if
+        end for
+    end if
+    m.newAll = cards
+    filterNew()
+end sub
+
+sub filterNew()
+    if m.newAll = invalid then return
+    want = m.newTabs[m.newTab].key
+    out = []
+    for each c in m.newAll
+        if want = "" or c.data.kind = want then out.push(c)
+    end for
+    m.cards["new"] = out
+    m.ver = m.ver + 1
+    paintRail()
+    if currentList().key = "new" then showList()
+end sub
+
+sub buildTabs()
+    x = 0
+    for each tb in m.newTabs
+        g = m.tabs.createChild("Group")
+        g.translation = [x, 0]
+        ic = g.createChild("Poster")
+        ic.uri = "pkg:/images/requests/" + tb.icon + ".png"
+        ic.width = 24
+        ic.height = 24
+        ic.translation = [0, 14]
+        lab = g.createChild("Label")
+        lab.font = hFont("fell", 32)
+        lab.text = tb.name
+        lab.translation = [34, 0]
+        lab.height = 52
+        lab.vertAlign = "center"
+        w = 34 + lab.boundingRect().width
+        line = g.createChild("Rectangle")
+        line.width = w
+        line.height = 3
+        line.translation = [0, 56]
+        line.color = "0xE0B34AFF"
+        x = x + w + 48
+    end for
+end sub
+
+' Plain words, gold underline under the chosen one; brighter while the tabs have focus
+sub paintTabs()
+    for i = 0 to m.newTabs.count() - 1
+        g = m.tabs.getChild(i)
+        sel = (i = m.newTab)
+        on = sel and m.focused and m.zone = "tabs"
+        col = "0xB5AF8C99"
+        if sel then col = "0xEDE6CAFF"
+        if on then col = "0xE0B34AFF"
+        if sel then g.getChild(0).blendColor = "0xE0B34AFF" else g.getChild(0).blendColor = "0xB5AF8C99"
+        g.getChild(1).color = col
+        g.getChild(2).visible = sel
+        if on then g.getChild(2).height = 5 else g.getChild(2).height = 3
+    end for
 end sub
 
 sub loadMine()
@@ -281,7 +373,19 @@ sub showList()
     l = currentList()
     m.searchPanel.visible = (l.key = "search")
     m.musicPanel.visible = (l.key = "music")
-    m.top.findNode("gridClip").visible = (l.key <> "search" and l.key <> "music")
+    m.gridClip.visible = (l.key <> "search" and l.key <> "music")
+    isNew = (l.key = "new")
+    m.tabs.visible = isNew
+    if isNew
+        m.gridClip.translation = [540, 210]
+        m.gridClip.clippingRect = [-14, -14, 1310, 740]
+        m.empty.translation = [540, 230]
+        paintTabs()
+    else
+        m.gridClip.translation = [540, 140]
+        m.gridClip.clippingRect = [-14, -14, 1310, 800]
+        m.empty.translation = [540, 160]
+    end if
     m.empty.text = ""
     if l.key = "search"
         setHeader("SEARCH OVERSEERR", "", "")
@@ -297,10 +401,18 @@ sub showList()
     if m.zone <> "grid" then setHeader(l.about, "", l.name)
     if m.problem <> "" and m.cards[l.key] = invalid
         m.empty.text = m.problem
+    else if m.cards[l.key] = invalid and l.key = "new"
+        if m.global.plexServer = invalid or m.global.plexServer = "" then m.empty.text = "Sign in to Plex to see what's new." else m.empty.text = "Asking Plex…"
     else if m.cards[l.key] = invalid
         m.empty.text = "Asking Overseerr…"
     else if m.cards[l.key].count() = 0
-        if l.key = "mine" then m.empty.text = "No requests yet. Pick something in Trending or Search and press OK." else m.empty.text = "Nothing here right now."
+        if l.key = "mine"
+            m.empty.text = "No requests yet. Pick something in Trending or Search and press OK."
+        else if l.key = "new"
+            m.empty.text = "Nothing new here yet. Things you request show up here once they've downloaded."
+        else
+            m.empty.text = "Nothing here right now."
+        end if
     end if
 end sub
 
@@ -365,6 +477,10 @@ end function
 sub showCardInfo()
     c = currentCard()
     if c = invalid then return
+    if c.kind = "plex"
+        setHeader(rqArrivedEyebrow(c.data), "", c.title)
+        return
+    end if
     d = withDetails(c.data)
     setHeader(rqEyebrow(d), rqRating(d.rating), d.title)
     m.top.findNode("detailTimer").control = "stop"
@@ -526,6 +642,15 @@ sub openCard(c as object)
     end if
     if c.kind = "music"
         m.top.request = { action: "musicView", mode: "request" }
+        return
+    end if
+    if c.kind = "plex"
+        it = c.data.item
+        if c.data.kind = "music"
+            m.top.request = { action: "musicView", mode: "artist", artistId: it.ArtistId, albumId: it.Id }
+        else
+            m.top.request = { action: "details", item: it }
+        end if
         return
     end if
     d = c.data
@@ -899,6 +1024,14 @@ end sub
 
 function onKeyEvent(key as string, press as boolean) as boolean
     if not press then return false
+    ' Play on a new movie plays it straight away
+    if key = "play" and m.zone = "grid" and currentList().key = "new"
+        c = currentCard()
+        if c <> invalid and c.kind = "plex" and c.data.item.Type = "Movie"
+            m.top.request = { action: "play", item: c.data.item, resume: true }
+            return true
+        end if
+    end if
     if hMediaKey(key) then return false
     if m.pending <> invalid and key = "back"
         undoPending()
@@ -932,6 +1065,7 @@ function onKeyEvent(key as string, press as boolean) as boolean
     end if
     if z = "rail" then return railKey(key)
     if z = "grid" then return gridKey(key)
+    if z = "tabs" then return tabsKey(key)
     if z = "kb"
         edge = m.kb.callFunc("handleKey", key)
         if edge = "left" or edge = "back"
@@ -997,6 +1131,8 @@ function railKey(key as string) as boolean
             return true
         else if m.cards[k] <> invalid and m.cards[k].count() > 0
             m.zone = "grid"
+        else if k = "new" and m.newAll <> invalid
+            m.zone = "tabs"
         end if
     else
         return true
@@ -1021,6 +1157,11 @@ function gridKey(key as string) as boolean
     else if key = "right"
         if col < m.cols - 1 and i + 1 < n then m.gridIndex = i + 1
     else if key = "up"
+        if i < m.cols and currentList().key = "new"
+            m.zone = "tabs"
+            refreshFocus()
+            return true
+        end if
         if i < m.cols
             toPills()
             return true
@@ -1041,5 +1182,33 @@ function gridKey(key as string) as boolean
         return true
     end if
     paintGrid()
+    return true
+end function
+
+function tabsKey(key as string) as boolean
+    if key = "left"
+        if m.newTab = 0
+            m.zone = "rail"
+        else
+            m.newTab = m.newTab - 1
+            m.gridIndex = 0
+            filterNew()
+        end if
+    else if key = "right"
+        if m.newTab < m.newTabs.count() - 1
+            m.newTab = m.newTab + 1
+            m.gridIndex = 0
+            filterNew()
+        end if
+    else if key = "down" or key = "OK"
+        c = m.cards["new"]
+        if c <> invalid and c.count() > 0 then m.zone = "grid"
+    else if key = "up"
+        toPills()
+        return true
+    else if key = "back"
+        m.zone = "rail"
+    end if
+    refreshFocus()
     return true
 end function

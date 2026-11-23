@@ -210,3 +210,77 @@ function rqRequestJson(b as object) as string
     end if
     return j + "}"
 end function
+
+' ---------------------------------------------------------------- New (newly downloaded, from Plex)
+
+' Plex item (PlexTask op "arrived") to a grid card. Episodes stand in for their show. Returns invalid for anything else.
+' imgUrl is the poster URL the room built (it knows the Plex server).
+function rqArrivedCard(it as object, imgUrl as string) as object
+    t = it.Type
+    kind = ""
+    if t = "Movie" then kind = "movie"
+    if t = "Series" or t = "Episode" then kind = "tv"
+    if t = "album" then kind = "music"
+    if kind = "" then return invalid
+    name = it.Name
+    if t = "Episode" and it.SeriesName <> invalid then name = it.SeriesName
+    if name = invalid then name = ""
+    when = rqArrivedWhen(it.AddedAt)
+    tone = "out"
+    if when.today then tone = "olive"
+    data = { item: it, kind: kind, title: name, when: when, year: it.ProductionYear }
+    return { kind: "plex", title: name, image: imgUrl, square: (kind = "music"), chip: rqChip(when.band, "down", tone), progress: -1, data: data }
+end function
+
+' { band: "TODAY" | "YESTERDAY" | "THU" | "NOV 20", text: "today 3:12 PM" | "yesterday" | "Thursday" | "Nov 20", today }
+function rqArrivedWhen(secs as dynamic) as object
+    out = { band: "", text: "", today: false }
+    if secs = invalid then return out
+    dt = CreateObject("roDateTime")
+    dt.FromSeconds(secs)
+    dt.ToLocalTime()
+    now = CreateObject("roDateTime")
+    now.ToLocalTime()
+    ' whole days between the two local dates
+    a = CreateObject("roDateTime")
+    a.FromISO8601String(Left(dt.ToISOString(), 10) + "T00:00:00Z")
+    b = CreateObject("roDateTime")
+    b.FromISO8601String(Left(now.ToISOString(), 10) + "T00:00:00Z")
+    days = Int((b.AsSeconds() - a.AsSeconds()) / 86400)
+    months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    if days <= 0
+        h = dt.GetHours()
+        mi = dt.GetMinutes()
+        ap = "AM"
+        if h >= 12 then ap = "PM"
+        h = h mod 12
+        if h = 0 then h = 12
+        mm = mi.toStr()
+        if mi < 10 then mm = "0" + mm
+        return { band: "TODAY", text: "today " + h.toStr() + ":" + mm + " " + ap, today: true }
+    end if
+    if days = 1 then return { band: "YESTERDAY", text: "yesterday", today: false }
+    if days < 7
+        wd = dt.GetWeekday()
+        return { band: UCase(Left(wd, 3)), text: wd, today: false }
+    end if
+    md = months[dt.GetMonth() - 1] + " " + dt.GetDayOfMonth().toStr()
+    return { band: UCase(md), text: md, today: false }
+end function
+
+' "MOVIE · 2024 · ARRIVED TODAY 3:12 PM", "SHOW · ARRIVED YESTERDAY", "ALBUM · BIG THIEF · ARRIVED NOV 20"
+function rqArrivedEyebrow(d as object) as string
+    e = "ALBUM"
+    if d.kind = "movie" then e = "MOVIE"
+    if d.kind = "tv" then e = "SHOW"
+    it = d.item
+    if d.kind = "music" and it.ArtistName <> invalid then e = e + " · " + UCase(it.ArtistName)
+    if d.kind = "tv" and it.Type = "Episode" and it.ParentIndexNumber <> invalid and it.IndexNumber <> invalid
+        e = e + " · S" + it.ParentIndexNumber.toStr() + " E" + it.IndexNumber.toStr()
+    else if d.kind = "tv" and it.SeasonIndex <> invalid
+        e = e + " · SEASON " + it.SeasonIndex.toStr()
+    end if
+    if d.year <> invalid and d.kind <> "music" then e = e + " · " + d.year.toStr()
+    if d.when.text <> "" then e = e + " · ARRIVED " + UCase(d.when.text)
+    return e
+end function
