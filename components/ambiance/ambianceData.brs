@@ -62,7 +62,7 @@ function ambMerge(clips as object) as object
                 end if
             end for
         else
-            extra.push({ mood: "plex" + c.Id.toStr(), title: c.Name, sub: "From your own footage", still: "pkg:/images/amb/col-window.jpg", plexStill: c.thumb, video: "", credit: "", clip: c })
+            extra.push({ mood: "plex" + c.Id.toStr(), title: c.Name, sub: "Your own footage", still: "pkg:/images/amb/col-window.jpg", plexStill: c.thumb, video: "", credit: "", clip: c })
         end if
     end for
     out = []
