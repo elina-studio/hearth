@@ -5,6 +5,12 @@ sub init()
     m.chipText = m.top.findNode("chipText")
     m.chipText.font = hFont("caps", 21)
     m.poster = m.top.findNode("poster")
+    m.cap = m.top.findNode("cap")
+    m.cap.font = hFont("bold", 21)
+    m.cap.color = "0xEDE6CAFF"
+    m.capSub = m.top.findNode("capSub")
+    m.capSub.font = hFont("regular", 19)
+    m.capSub.color = "0xB5AF8CFF"
 end sub
 
 sub draw()
@@ -12,7 +18,7 @@ sub draw()
     if c = invalid then return
     isTile = (c.kind = "search" or c.kind = "music")
     if c.kind = "chiponly"
-        for each id in ["bg", "fallback", "poster", "tile", "track", "fill", "ring"]
+        for each id in ["bg", "fallback", "poster", "tile", "bar", "cap", "capSub", "ring"]
             m.top.findNode(id).visible = false
         end for
         drawChip(c.chip)
@@ -52,10 +58,25 @@ sub draw()
     drawChip(c.chip)
     p = c.progress
     if p = invalid then p = -1
-    m.top.findNode("track").visible = (p >= 0)
-    f = m.top.findNode("fill")
-    f.visible = (p > 0)
-    f.width = 180 * p / 100
+    ' braid bar (whimsy spec 5): fill is the gold body clipped to the percentage, with a leaf tip
+    m.top.findNode("bar").visible = (p >= 0)
+    fw = 0
+    if p > 0 then fw = Int((178 * p / 100))
+    if p > 0 and fw < 15 then fw = 15
+    cw = fw - 12
+    if cw < 0 then cw = 0
+    m.top.findNode("clip").clippingRect = [0, 0, cw, 10]
+    tip = m.top.findNode("tip")
+    tip.visible = (p > 0)
+    tip.translation = [1 + fw - 12, 1]
+    ' caption under the bar: title, then what it is doing (only on Your requests)
+    hasCap = (c.caption <> invalid and c.caption <> "")
+    m.cap.visible = hasCap
+    m.capSub.visible = hasCap
+    if hasCap
+        m.cap.text = c.title
+        m.capSub.text = c.caption
+    end if
 end sub
 
 ' Posters load only once the card is near the screen (the room sets load)

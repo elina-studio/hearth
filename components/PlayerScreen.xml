@@ -10,6 +10,13 @@
     <PauseOverlay id="overlay" />
     <ChapterStrip id="chapters" />
     <PlayerSheet id="sheet" />
+    <SkipButton id="skip" />
+    <Group id="ear" visible="false">
+      <Rectangle translation="[100, 40]" width="1720" height="176" color="0x11170EF2" />
+      <Label id="earKick" translation="[140, 58]" width="1640" color="0xE0B34AFF" text="LINE UP THE WORDS" />
+      <Label id="earInfo" translation="[140, 100]" width="1640" color="0xEDE6CAFF" />
+      <Label id="earHint" translation="[140, 160]" width="1640" color="0xB5AF8CFF" />
+    </Group>
     <UpNextCard id="upnext" />
     <SubsFinder id="finder" context="player" />
     <SubsAuto id="auto" />
