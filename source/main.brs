@@ -34,6 +34,12 @@ sub saveInput(screen as object, info as object)
         g.remote = { text: text, go: dest, n: n }
         return
     end if
+    ' the phone's microphone measured the TV against the speakers: move the TV by this many seconds
+    if info.castTrim <> invalid
+        mu = screen.getGlobalNode().music
+        if mu <> invalid then mu.command = { cmd: "castNudge", delta: Val(info.castTrim) }
+        return
+    end if
     reg = CreateObject("roRegistrySection", "hearth")
     g = screen.getGlobalNode()
     if not g.hasField("overseerrKey") then g.addFields({ overseerrKey: "" })

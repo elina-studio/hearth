@@ -20,3 +20,10 @@ Roku over ECP and types straight into Hearth's keyboards.
 - `hearthGo=request`: back to the hub, Requests room, Overseerr search for the text
 
 "Type into other apps" sends `Lit_` keypresses instead, for any app's Roku keyboard.
+
+## Lining up the TV with the house speakers
+
+"Line up the house" (https page only, it needs the microphone) listens for 5 seconds while the TV and the
+speakers play the same song, finds how far apart they are, and moves the TV by that much:
+`POST http://<tv>:8060/input?castTrim=<seconds>` (signed). It checks again afterwards and flips direction if the
+first move went the wrong way. "Keep checking" repeats every 40 seconds.

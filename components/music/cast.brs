@@ -15,8 +15,15 @@ sub castInit()
     m.castAlignTimer.observeField("fire", "castAlign")
     m.castClock = m.top.findNode("castClock")
     m.castClock.observeField("fire", "onCastClock")
+    m.castPollT = m.top.findNode("castPoll")
+    m.castPollT.observeField("fire", "onCastPoll")
+    ' castDelay = how far the speakers trail the "play" answer (castLag, measured again every song)
+    ' plus castTrim (what the TV needs on top, from the phone's microphone or the TV timing row, kept per set of rooms)
+    m.castLag = 1.5
+    m.castTrim = 0
     d = CreateObject("roRegistrySection", "hearth").Read("castDelay")
     if d = "" then m.top.castDelay = 1.5 else m.top.castDelay = Val(d)
+    m.castTrim = m.top.castDelay - m.castLag
     m.castLeader = ""
     m.top.rooms = [{ id: "tv", name: "This TV", sub: "Hearth", kind: "tv", on: true, vol: -1 }]
 end sub
@@ -52,14 +59,9 @@ function castCommand(c as object) as boolean
     else if cmd = "castVolume"
         castVolume(pxStr(c.id), c.delta)
     else if cmd = "castNudge"
-        d = m.top.castDelay + c.delta
-        if d < 0 then d = 0
-        if d > 6 then d = 6
-        d = Int(d * 10 + 0.5) / 10
-        m.top.castDelay = d
-        reg = CreateObject("roRegistrySection", "hearth")
-        reg.Write("castDelay", d.toStr())
-        reg.Flush()
+        m.castTrim = m.castTrim + c.delta
+        castSetDelay()
+        castSaveTrim()
         ' line the TV up right away (after a short pause, so a run of presses seeks once)
         m.castAlignTimer.control = "stop"
         m.castAlignTimer.control = "start"
@@ -198,9 +200,43 @@ sub castAll()
     castApply(before, "")
 end sub
 
+' castDelay from the measured lag and the trim, kept between 0 and 6 seconds
+sub castSetDelay()
+    d = m.castLag + m.castTrim
+    if d < 0 then d = 0
+    if d > 6 then d = 6
+    m.castTrim = d - m.castLag
+    m.top.castDelay = Int(d * 100 + 0.5) / 100
+end sub
+
+function castRoomKey() as string
+    ids = castOnIds()
+    ids.sort()
+    k = ""
+    for each id in ids
+        k = k + id + "|"
+    end for
+    return k
+end function
+
+sub castSaveTrim()
+    reg = CreateObject("roRegistrySection", "hearth")
+    reg.Write("castTrim_" + castRoomKey(), m.castTrim.toStr())
+    reg.Write("castDelay", m.top.castDelay.toStr())
+    reg.Flush()
+end sub
+
+' a new set of rooms starts from the trim last used with them
+sub castLoadTrim()
+    saved = CreateObject("roRegistrySection", "hearth").Read("castTrim_" + castRoomKey())
+    if saved <> "" then m.castTrim = Val(saved)
+    castSetDelay()
+end sub
+
 ' Make the speakers match the ticks after a change
 sub castApply(before as object, changed as string)
     now = castOnIds()
+    if changed <> "tv" and now.count() > 0 then castLoadTrim()
     m.top.castCount = now.count()
     playing = (m.top.queue <> invalid and m.top.queue.count() > 0 and (m.top.state = "playing" or m.top.state = "buffering"))
     ' speakers that were unticked stop
@@ -317,6 +353,53 @@ end sub
 sub castMark(atPos as float)
     m.castRefPos = atPos
     m.castRefClock = CreateObject("roTimespan")
+    ' a few seconds on, ask Music Assistant where the speakers really are (the delay differs every song)
+    m.castPollN = 0
+    m.castPollT.duration = 5
+    m.castPollT.control = "stop"
+    m.castPollT.control = "start"
+end sub
+
+sub onCastPoll()
+    if m.castLeader = "" or not castActive() then return
+    haCall("GET", "/api/states/" + m.castLeader, "", "onCastPos")
+end sub
+
+' seconds since 1970 from Home Assistant's "2026-11-23T16:00:00.123456+00:00" (always UTC)
+function castIsoSeconds(s as string) as double
+    if Len(s) < 19 then return -1
+    dt = CreateObject("roDateTime")
+    dt.FromISO8601String(Left(s, 19) + "Z")
+    sec# = dt.AsSeconds()
+    if Mid(s, 20, 1) = "." then sec# = sec# + Val("0" + Mid(s, 20, 7))
+    return sec#
+end function
+
+sub onCastPos(event as object)
+    t = hTaskFrom(event)
+    if not t.ok or m.castRefClock = invalid then return
+    st = t.response
+    if st = invalid or st.state <> "playing" or st.attributes = invalid then return
+    a = st.attributes
+    if a.media_position = invalid or a.media_position_updated_at = invalid then return
+    upd# = castIsoSeconds(pxStr(a.media_position_updated_at))
+    if upd# < 0 then return
+    dt = CreateObject("roDateTime")
+    now# = dt.AsSeconds() + dt.GetMilliseconds() / 1000
+    real = a.media_position + (now# - upd#)
+    modelled = m.castRefPos + m.castRefClock.TotalMilliseconds() / 1000
+    lag = modelled - real
+    print "[hearth cast] speakers trail by "; lag
+    if lag < 0 or lag > 6 then return
+    m.castLag = lag
+    castSetDelay()
+    castAlign()
+    ' once more later, to catch any drift
+    m.castPollN = m.castPollN + 1
+    if m.castPollN < 2
+        m.castPollT.duration = 25
+        m.castPollT.control = "start"
+    end if
 end sub
 
 function castSpeakerPos() as float
