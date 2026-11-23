@@ -121,6 +121,13 @@ function pxTracks(items as object) as object
     return out
 end function
 
+' An image cut to a circle by the NAS helper (real transparency, so no box behind it)
+function pxRound(url as string, size as integer) as string
+    b = CreateObject("roRegistrySection", "hearth").Read("nasUrl")
+    if b = "" then b = "http://192.168.254.41:8765"
+    return b + "/api/round?s=" + size.toStr() + "&u=" + pxEscape(url)
+end function
+
 ' Card for CardRow from an album, artist or playlist
 function pxCard(md as object, size as integer) as object
     sub2 = ""
@@ -133,7 +140,9 @@ function pxCard(md as object, size as integer) as object
     end if
     thumb = md.thumb
     if thumb = invalid then thumb = md.composite
-    return { item: md, title: pxStr(md.title), sub: sub2, image: pxImage(thumb, size, size), progress: 0 }
+    img = pxImage(thumb, size, size)
+    if md.type = "artist" and img <> "" then img = pxRound(img, size)
+    return { item: md, title: pxStr(md.title), sub: sub2, image: img, progress: 0 }
 end function
 
 function pxClock(sec as dynamic) as string

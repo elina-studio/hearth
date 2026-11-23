@@ -28,6 +28,8 @@
     <field id="viewWidth" type="integer" value="1728" />
     <!-- optional image laid over each picture, e.g. a round cut-out for artist photos; set before cards -->
     <field id="maskUri" type="string" />
+    <!-- round artist cards: the images arrive already cut to a circle (see pxRound); this only rounds the focus ring -->
+    <field id="roundCards" type="boolean" value="false" />
     <!-- true in the Music room: gold focus ring only, no moss -->
     <field id="noMoss" type="boolean" value="false" />
     <function name="move" />

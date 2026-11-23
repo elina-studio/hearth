@@ -87,6 +87,7 @@ sub makeSlot(w as integer, h as integer, k as integer)
     bg.width = w
     bg.height = h
     bg.color = "0x1D2418FF"
+    if m.top.roundCards then bg.visible = false
     fb = g.createChild("Label")
     fb.width = w - 30
     fb.height = h - 20
@@ -133,7 +134,7 @@ sub makeSlot(w as integer, h as integer, k as integer)
     ring.translation = [-27, -27]
     ring.width = w + 54
     ring.height = h + 54
-    if m.top.maskUri <> ""
+    if m.top.roundCards
         ' round artist cards: a circle focus ring in gold, not the square rope
         ring.uri = "pkg:/images/music/round-ring.png"
         ring.blendColor = "0xE0B34AFF"

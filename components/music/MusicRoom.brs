@@ -264,7 +264,7 @@ sub build()
             r.title = name
             r.cardWidth = 200
             r.cardHeight = 200
-            if items[0].type = "artist" then r.maskUri = "pkg:/images/music/round-mask.png"
+            if items[0].type = "artist" then r.roundCards = true
             cards = []
             for each md in items
                 cards.push(pxCard(md, 200))
