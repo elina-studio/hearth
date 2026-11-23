@@ -35,8 +35,10 @@ sub init()
     m.state.font = hFont("bold", 28)
     m.hint = m.top.findNode("hint")
     m.hint.font = hFont("regular", 24)
-    m.hint.text = "OK switch sound   ·   Left/Right mood   ·   Up/Down dim   ·   * options   ·   Back leaves"
-    m.mixGroup = m.top.findNode("mix")
+    m.hint.text = "Down or OK  controls   ·   Left/Right  mood   ·   Back  leaves"
+    m.controls = m.top.findNode("controls")
+    m.controls.observeField("request", "onControls")
+    m.yielded = false
     m.drift = m.top.findNode("drift")
     m.still.scaleRotateCenter = [960, 540]
     if m.global.hasField("music") and m.global.music <> invalid then m.global.music.observeField("track", "paintState")
@@ -81,7 +83,7 @@ sub onMood()
         pic = m.clip.art
         if pic = invalid then pic = m.clip.thumb
         m.still.uri = ""
-        if pic <> invalid then m.still.uri = fullStill(pic)
+        if pic <> invalid then m.still.uri = fullStill(pic) else m.still.uri = it.still
         m.credit.text = ""
     end if
     fillScreen(m.clip)
@@ -178,16 +180,12 @@ sub applyMix()
             m.still.visible = true
             m.video.visible = true
             m.video.mute = not soundPref(md)
-            ' music (even paused) holds the player, so stop it first
-            if mp <> invalid and mp.state <> invalid and mp.state <> "none" and mp.state <> "stopped"
-                print "[ambiance] stopping music ("; mp.state; ") so the video can play"
-                mp.command = { cmd: "stop" }
-                startVideoSoon(0.6)
-            else
-                m.video.control = "play"
-            end if
+            ' the TV's own music player would block the video: lend it the screen (speakers keep playing)
+            wasYielded = m.yielded
+            yieldMusic()
+            if m.yielded and not wasYielded then startVideoSoon(0.6) else m.video.control = "play"
         else
-            if mp <> invalid and (mp.state = "playing" or mp.state = "buffering") then mp.command = { cmd: "pause" }
+            yieldMusic()
             showScene(md)
             m.sound.mood = md
             m.sound.on = soundPref(md)
@@ -204,7 +202,7 @@ sub applyMix()
         else
             showScene(md)
         end if
-        if mp <> invalid and mp.state <> "playing" and mp.state <> "buffering" then mp.command = { cmd: "play" }
+        rejoinMusic()
         if mode = "both"
             ' never the Audio node here: it would fight the music for the player
             m.sound.preferSfx = true
@@ -241,45 +239,81 @@ sub cycleMix()
     applyMix()
 end sub
 
-' the switch: three segments, the chosen one filled gold
+' keep the control bar's labels in step
 sub paintMix()
-    lab = ambSoundLabel(m.item)
-    names = [lab.word, "Music", "Both"]
-    icons = [[lab.icon], ["note"], [lab.icon, "note"]]
-    modes = ["fire", "music", "both"]
-    cur = mixMode()
-    m.mixGroup.removeChildrenIndex(m.mixGroup.getChildCount(), 0)
-    pill = m.mixGroup.createChild("Poster")
-    pill.uri = "pkg:/images/amb/mix-pill.png"
-    pill.width = 528
-    pill.height = 80
-    for i = 0 to 2
-        on = (modes[i] = cur)
-        x = 8 + i * 172
-        if on
-            seg = m.mixGroup.createChild("Poster")
-            seg.uri = "pkg:/images/amb/mix-seg.png"
-            seg.width = 168
-            seg.height = 64
-            seg.translation = [x, 8]
-        end if
-        if on then col = "0x1A1408FF" else col = "0xEDE6CAFF"
-        ix = x + 18
-        for each ic in icons[i]
-            p = m.mixGroup.createChild("Poster")
-            p.uri = "pkg:/images/amb/mix-" + ic + ".png"
-            p.width = 32
-            p.height = 32
-            p.translation = [ix, 24]
-            p.blendColor = col
-            ix = ix + 34
+    m.controls.item = m.item
+    m.controls.mode = mixMode()
+    if m.dimIndex = 0 then m.controls.dimText = "Bright" else m.controls.dimText = Int(m.dimLevels[m.dimIndex] * 100).toStr() + "%"
+    if m.sleepMin = 0 then m.controls.timerText = "No timer" else m.controls.timerText = m.sleepMin.toStr() + " min"
+    if m.controls.visible then m.controls.callFunc("paint", invalid)
+end sub
+
+sub openControls()
+    paintMix()
+    m.controls.visible = true
+    m.controls.callFunc("open", invalid)
+    m.hudOut.control = "stop"
+    m.hudTimer.control = "stop"
+    m.hud.opacity = 1
+    paintState()
+end sub
+
+sub closeControls()
+    m.controls.visible = false
+    m.top.setFocus(true)
+    showHud()
+end sub
+
+sub onControls()
+    r = m.controls.request
+    if r = invalid then return
+    if r.act = "close"
+        closeControls()
+    else if r.act = "mix"
+        m.reg.Write("ambMix", r.mode)
+        m.reg.Flush()
+        applyMix()
+    else if r.act = "dim"
+        m.dimIndex = (m.dimIndex + 1) mod 4
+        m.dim.opacity = m.dimLevels[m.dimIndex]
+        m.reg.Write("ambDim", m.dimIndex.toStr())
+        m.reg.Flush()
+        paintMix()
+    else if r.act = "timer"
+        mins = [0, 30, 60, 90]
+        i = 0
+        for k = 0 to 3
+            if mins[k] = m.sleepMin then i = k
         end for
-        l = m.mixGroup.createChild("Label")
-        l.font = hFont("regular", 28)
-        l.color = col
-        l.text = names[i]
-        l.translation = [ix + 6, 20]
-    end for
+        setSleep(mins[(i + 1) mod 4])
+        paintMix()
+    end if
+    paintState()
+end sub
+
+' the TV lends its screen to the video: speakers keep the song (or, with none, it pauses in place)
+sub yieldMusic()
+    mp = musicNode()
+    if mp = invalid then return
+    if m.yielded then return
+    if mp.state = "playing" or mp.state = "buffering" or mp.state = "paused"
+        print "[ambiance] tvYield (music "; mp.state; ")"
+        mp.command = { cmd: "tvYield" }
+        m.yielded = true
+    end if
+end sub
+
+' give the TV back to the music (same spot, in step with the speakers)
+sub rejoinMusic()
+    mp = musicNode()
+    if mp = invalid then return
+    if m.yielded
+        print "[ambiance] tvRejoin"
+        mp.command = { cmd: "tvRejoin" }
+        m.yielded = false
+    else if mp.state <> "playing" and mp.state <> "buffering"
+        mp.command = { cmd: "play" }
+    end if
 end sub
 
 sub startVideoSoon(sec as float)
@@ -302,8 +336,8 @@ sub onVideoState()
         ' -5 "only one playing instance": something (music) still holds the player; stop it and retry once
         if m.video.errorCode = -5 and m.retried5 <> true
             m.retried5 = true
-            mp = m.global.music
-            if mp <> invalid then mp.command = { cmd: "stop" }
+            m.yielded = false
+            yieldMusic()
             m.sound.active = false
             startVideoSoon(1.0)
             return
@@ -497,6 +531,7 @@ sub leave()
     m.scene.running = false
     m.video.control = "stop"
     m.drift.control = "stop"
+    if m.yielded then rejoinMusic()
     m.top.request = { action: "back" }
 end sub
 
@@ -511,20 +546,13 @@ function onKeyEvent(key as string, press as boolean) as boolean
         wake()
         return true
     end if
-    if key = "OK"
-        cycleMix()
-        showHud()
+    if key = "OK" or key = "down"
+        openControls()
     else if key = "left"
         nextMood(-1)
     else if key = "right"
         nextMood(1)
-    else if key = "up" or key = "down"
-        if key = "down" then m.dimIndex = m.dimIndex + 1 else m.dimIndex = m.dimIndex - 1
-        if m.dimIndex < 0 then m.dimIndex = 0
-        if m.dimIndex > 3 then m.dimIndex = 3
-        m.dim.opacity = m.dimLevels[m.dimIndex]
-        m.reg.Write("ambDim", m.dimIndex.toStr())
-        m.reg.Flush()
+    else if key = "up"
         showHud()
     else if key = "options"
         sleepMenu()
