@@ -27,14 +27,14 @@
   body {
     font: 400 16px/1.4 Barlow, system-ui, sans-serif;
     min-height: 100dvh;
-    padding: max(14px, env(safe-area-inset-top)) 16px max(18px, env(safe-area-inset-bottom));
+    padding: max(8px, env(safe-area-inset-top)) 14px max(10px, env(safe-area-inset-bottom));
     background:
       radial-gradient(120% 60% at 50% -10%, #1A2213 0%, transparent 60%),
       var(--bg);
     user-select: none; -webkit-user-select: none;
     overscroll-behavior: none;
   }
-  .wrap { max-width: 440px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+  .wrap { max-width: 440px; margin: 0 auto; display: flex; flex-direction: column; gap: 8px; }
   .caps { font-family: "Barlow Condensed", Barlow, sans-serif; text-transform: uppercase; letter-spacing: .14em; font-weight: 600; }
 
   header { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
@@ -54,17 +54,17 @@
     border-top: 1px solid #8C723233; border-bottom: 1px solid #8C723233; border-radius: 3px; opacity: .8; }
 
   /* ---- typing ---- */
-  .typer { background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
-  .field { display: flex; gap: 8px; align-items: stretch; }
+  .typer { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 8px; display: flex; flex-direction: column; gap: 6px; }
+  .field { display: flex; gap: 6px; align-items: stretch; }
   .field input {
-    flex: 1; min-width: 0; font: 500 21px Barlow, sans-serif; color: var(--gold);
-    background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px;
+    flex: 1; min-width: 0; font: 500 18px Barlow, sans-serif; color: var(--gold);
+    background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 8px 12px;
     outline: none; user-select: text; -webkit-user-select: text;
   }
   .field input::placeholder { color: #B5AF8C77; }
   .field input:focus { border-color: var(--gold-dim); box-shadow: 0 0 0 3px #E0B34A22; }
   .mic {
-    width: 56px; flex: none; border-radius: 12px; border: 1px solid var(--line); background: var(--bg);
+    width: 46px; flex: none; border-radius: 12px; border: 1px solid var(--line); background: var(--bg);
     display: grid; place-items: center; color: var(--gold);
   }
   .mic svg { width: 24px; height: 24px; }
@@ -73,15 +73,21 @@
   @keyframes glow { 50% { box-shadow: 0 0 18px #E0B34A66; } }
   .row { display: flex; gap: 8px; }
   .row > * { flex: 1; }
-  .hint { font-size: 13px; color: var(--muted); min-height: 18px; }
+  .hint { font-size: 13px; color: var(--muted); min-height: 0; }
+  .hint:empty { display: none; }
+  details.more { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 0 8px; }
+  details.more summary { list-style: none; cursor: pointer; padding: 8px 4px; font: 600 13px "Barlow Condensed", sans-serif; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+  details.more summary::-webkit-details-marker { display: none; }
+  details.more[open] summary { color: var(--gold); }
+  details.more .typer { border: 0; padding: 0 0 8px; background: none; }
   .hint a { color: var(--gold); }
   .toggle { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
   .toggle input { accent-color: var(--gold); width: 18px; height: 18px; }
 
   button {
     font-family: "Barlow Condensed", Barlow, sans-serif; text-transform: uppercase; letter-spacing: .12em; font-weight: 600;
-    font-size: 15px; color: var(--text); background: var(--bg2); border: 1px solid var(--line);
-    border-radius: 12px; padding: 12px 8px; touch-action: manipulation; cursor: pointer;
+    font-size: 14px; color: var(--text); background: var(--bg2); border: 1px solid var(--line);
+    border-radius: 12px; padding: 8px 6px; touch-action: manipulation; cursor: pointer;
   }
   button:active, button.held { background: #2a2312; border-color: var(--gold-dim); color: var(--gold); }
   button.gold { background: var(--gold); color: #1a1406; border-color: var(--gold); }
@@ -89,7 +95,7 @@
   button.small { font-size: 12px; padding: 7px 10px; border-radius: 10px; }
 
   /* ---- d-pad ---- */
-  .pad { position: relative; width: min(78vw, 300px); aspect-ratio: 1; margin: 6px auto 0; }
+  .pad { position: relative; width: min(66vw, 34dvh, 280px); aspect-ratio: 1; margin: 2px auto; }
   .ring { position: absolute; inset: 0; border-radius: 50%; background: radial-gradient(circle at 50% 40%, #1B2216, #10140D 70%); border: 1px solid var(--line); box-shadow: inset 0 0 0 10px #0B0E0955, 0 10px 30px #0008; }
   .pad button { position: absolute; border: none; background: transparent; border-radius: 0; color: var(--muted); padding: 0; display: grid; place-items: center; }
   .pad button svg { width: 30px; height: 30px; }
@@ -105,11 +111,13 @@
   }
   .pad .ok:active, .pad .ok.held { background: radial-gradient(circle, #4a3b16, #221b0b); box-shadow: 0 0 24px #E0B34A55; }
 
-  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-  .grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
-  .icon { display: grid; place-items: center; padding: 11px 0; }
-  .icon svg { width: 22px; height: 22px; }
-  .label { display: block; font-size: 11px; color: var(--muted); margin-top: 3px; letter-spacing: .14em; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .icon { display: grid; place-items: center; padding: 7px 0; }
+  .icon svg { width: 20px; height: 20px; }
+  .label { display: block; font-size: 10px; color: var(--muted); margin-top: 1px; letter-spacing: .14em; }
+  .rope { height: 4px; }
+  header .status { flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
   .toast { position: fixed; left: 50%; bottom: max(20px, env(safe-area-inset-bottom)); transform: translateX(-50%) translateY(20px); opacity: 0; transition: .25s;
     background: #2a1a12; border: 1px solid var(--red); color: #ffd9c2; padding: 10px 14px; border-radius: 12px; font-size: 14px; max-width: 90vw; pointer-events: none; }
   .toast.show { opacity: 1; transform: translateX(-50%); }
@@ -143,17 +151,9 @@
       <button id="askBtn">Ask for</button>
       <button id="clearBtn" style="flex:.7">Clear</button>
     </div>
-    <div class="hint" id="hint">Letters show up live in whatever Hearth box has focus.</div>
-    <label class="toggle"><input type="checkbox" id="otherApps"> Type into other apps too (slower, uses the Roku keyboard)</label>
+    <div class="hint" id="hint"></div>
   </section>
 
-  <section class="typer" id="syncSec">
-    <div class="row">
-      <button class="gold" id="syncBtn">Line up the house</button>
-      <label class="toggle" style="flex:1;margin:0"><input type="checkbox" id="syncKeep"> Keep checking</label>
-    </div>
-    <div class="hint" id="syncHint">While music plays on the TV and the speakers, hold the phone where you listen and press this. It hears both and moves the TV for you. Needs the https page.</div>
-  </section>
 
   <div class="rope"></div>
 
@@ -185,6 +185,16 @@
     <button data-key="VolumeUp" data-repeat class="icon" aria-label="Volume up"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M4 9h4l5-4v14l-5-4H4zM17 12h4M19 10v4"/></svg></button>
     <button data-key="Backspace" data-repeat class="icon" aria-label="Delete a letter"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M9 5h11v14H9l-6-7zM12 9l5 6M17 9l-5 6"/></svg></button>
   </div>
+  <details class="more"><summary>More</summary>
+  <label class="toggle"><input type="checkbox" id="otherApps"> Type into other apps too (slower, uses the Roku keyboard)</label>
+  <section class="typer" id="syncSec">
+    <div class="row">
+      <button class="gold" id="syncBtn">Line up the house</button>
+      <label class="toggle" style="flex:1;margin:0"><input type="checkbox" id="syncKeep"> Keep checking</label>
+    </div>
+    <div class="hint" id="syncHint">While music plays on the TV and the speakers, hold the phone where you listen and press this. It hears both and moves the TV for you. Needs the https page.</div>
+  </section>
+  </details>
 </div>
 
 <div class="toast" id="toast"></div>
