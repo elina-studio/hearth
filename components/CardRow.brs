@@ -94,7 +94,7 @@ sub makeSlot(w as integer, h as integer, k as integer)
     fb.wrap = true
     fb.vertAlign = "center"
     fb.horizAlign = "center"
-    fb.font = hFont("caps", 30)
+    fb.font = hFont("bold", 18)
     fb.color = "0xEDE6CAFF"
     p = g.createChild("Poster")
     p.width = w

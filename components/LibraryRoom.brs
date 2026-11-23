@@ -64,7 +64,7 @@ sub buildSlots()
         bg.height = m.ch
         bg.color = "0x1A2016FF"
         fb = g.createChild("Label")
-        fb.font = hFont("caps", 28)
+        fb.font = hFont("bold", 18)
         fb.width = m.cw - 24
         fb.height = m.ch - 24
         fb.translation = [12, 12]

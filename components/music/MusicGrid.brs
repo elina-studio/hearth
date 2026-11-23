@@ -50,7 +50,7 @@ sub makeSlot()
     fb.wrap = true
     fb.vertAlign = "center"
     fb.horizAlign = "center"
-    fb.font = hFont("caps", 28)
+    fb.font = hFont("bold", 18)
     fb.color = "0xEDE6CAFF"
     if m.top.round
         mask = g.createChild("Poster")
