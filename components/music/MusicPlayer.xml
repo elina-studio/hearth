@@ -46,5 +46,6 @@
   <script type="text/brightscript" uri="pkg:/components/music/nas.brs" />
   <script type="text/brightscript" uri="pkg:/components/music/lastfm.brs" />
   <script type="text/brightscript" uri="pkg:/components/music/radio.brs" />
+  <script type="text/brightscript" uri="pkg:/components/music/queue.brs" />
   <script type="text/brightscript" uri="pkg:/components/music/MusicPlayer.brs" />
 </component>

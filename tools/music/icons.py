@@ -40,6 +40,8 @@ ICONS = {
  "wave": '<path d="M4 14v-4M8 18V6M12 15V9M16 20V4M20 13v-2"/>',
  "wifioff": '<path d="M4 9a12 12 0 0 1 16 0M7 12.500a8 8 0 0 1 10 0M10 16a4 4 0 0 1 4 0"/><path d="M3 3l18 18"/>',
  "list": '<path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.500" cy="6" r="1" fill="currentColor"/><circle cx="4.500" cy="12" r="1" fill="currentColor"/><circle cx="4.500" cy="18" r="1" fill="currentColor"/>',
+ "queue": '<path d="M4 6h12M4 12h12M4 18h7"/><path d="M18 14v6l4-3z" fill="currentColor"/>',
+ "close": '<path d="M6 6l12 12M18 6L6 18"/>',
 }
 def svg(name, size=30, color="currentColor", sw=2):
     return f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="{sw}" stroke-linecap="round" stroke-linejoin="round" style="display:block">{ICONS[name]}</svg>'

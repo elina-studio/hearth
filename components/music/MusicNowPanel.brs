@@ -17,7 +17,7 @@ sub init()
     m.scrobText = m.top.findNode("scrobText")
     m.scrobText.font = hFont("regular", 22)
     m.castTop = 0
-    m.names = { prev: "Previous", toggle: "Play", next: "Next", shuffle: "Shuffle", repeat: "Repeat", cover: "Cover", milk: "Visualizer", hearth: "Hearth fire", big: "Big view", library: "Back to the library", cast: "Play in other rooms", like: "Like", dislike: "Dislike" }
+    m.names = { prev: "Previous", toggle: "Play", next: "Next", shuffle: "Shuffle", repeat: "Repeat", cover: "Cover", milk: "Visualizer", hearth: "Hearth fire", big: "Big view", library: "Back to the library", cast: "Play in other rooms", like: "Like", dislike: "Dislike", queue: "Queue" }
     m.r = 0
     m.c = 1
     p = muPlayer()
@@ -131,7 +131,7 @@ sub build()
         setText(m.total, [x + w - 200, 668], 200, "regular", 24)
         ' top row: transport, then Dislike and Like over the last two boxes of the row below; cast moves to the second row
         gap = 76
-        addRow([x, 714], [["prev", "", "prev"], ["play", "", "toggle"], ["next", "", "next"], ["thumbdown", "", "dislike", x + 4 * gap], ["thumbup", "", "like", x + 5 * gap]], 0)
+        addRow([x, 714], [["prev", "", "prev"], ["play", "", "toggle"], ["next", "", "next"], ["thumbdown", "", "dislike", x + 4 * gap], ["thumbup", "", "like", x + 5 * gap], ["queue", "", "queue", x + 6 * gap]], 0)
         addRow([x, 812], [["cast", "", "cast"], ["shuffle", "", "shuffle"], ["repeat", "", "repeat"], ["cover", "", "cover"], ["viz", "", "milk"], ["fire", "", "hearth"], ["expand", "", "big"]], 1)
         setText(m.chipName, [x, 888], w, "regular", 22)
     end if
@@ -338,6 +338,8 @@ sub act(a as string)
             m.r = 2
             m.top.castOpen = true
         end if
+    else if a = "queue"
+        m.top.request = { action: "queue" }
     else if a = "big"
         m.top.request = { action: "musicView", mode: "big" }
     else if a = "library"

@@ -25,6 +25,7 @@ sub onCommand()
     if c.cmd = invalid then return
     cmd = c.cmd
     if castCommand(c) then return
+    if queueCommand(c) then return
     ' the TV's screen is lent to a video and no speaker plays: play/pause only decides what happens on tvRejoin
     if m.tvYielded = true and not castActive() and (cmd = "toggle" or cmd = "play" or cmd = "resume" or cmd = "pause")
         m.tvYieldResume = (cmd <> "pause" and not (cmd = "toggle" and m.tvYieldResume = true))

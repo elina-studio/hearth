@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The full music queue as a side sheet over the right half of the Music room.
+     Up/Down browse what is coming up, OK jumps to that song, * picks a song up (Up/Down move it, OK drops it),
+     Right removes it, and the buttons at the bottom clear the queue or shuffle what is left. Back or Left closes.
+     The room keeps focus and forwards keys: handleKey(key) returns "close" when the sheet should go away. -->
+<component name="QueueSheet" extends="Group">
+  <children>
+    <Poster id="bg" uri="pkg:/images/w/panel-v4.9.png" translation="[-12, -12]" width="934" height="954" blendColor="0x141A11FF" />
+    <Group id="body" />
+  </children>
+  <interface>
+    <function name="open" />
+    <function name="handleKey" />
+  </interface>
+  <script type="text/brightscript" uri="pkg:/source/text.brs" />
+  <script type="text/brightscript" uri="pkg:/source/util.brs" />
+  <script type="text/brightscript" uri="pkg:/components/music/plex.brs" />
+  <script type="text/brightscript" uri="pkg:/components/music/musicui.brs" />
+  <script type="text/brightscript" uri="pkg:/components/music/QueueSheet.brs" />
+</component>
