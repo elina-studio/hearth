@@ -52,10 +52,12 @@ sub runTask()
             ct = invalid
             if d.type = "movie" then ct = "movies"
             ' the person's own footage for the Ambiance room; never a Movies shelf
-            if LCase(toS(d.title, "")) = "ambiance" then ct = "ambiance"
+            ' (found by name, either spelling, or by its folder: .../hearth or .../ambiance)
+            if isAmbiance(d) then ct = "ambiance"
             if d.type = "show" then ct = "tvshows"
             if d.type = "artist" then ct = "music"
             if d.type = "photo" then ct = "photos"
+            print "[plex] library "; d.key; " "; d.title; " type "; d.type; " -> "; ct
             libs.push({ Id: d.key, CollectionType: ct, Name: d.title })
         end for
         out = { Items: libs }
@@ -176,6 +178,19 @@ sub runTask()
     m.top.response = out
     m.top.done = true
 end sub
+
+function isAmbiance(d as object) as boolean
+    t = LCase(toS(d.title, ""))
+    if Instr(1, t, "ambiance") > 0 or Instr(1, t, "ambience") > 0 then return true
+    if d.Location <> invalid
+        for each loc in d.Location
+            p = LCase(toS(loc.path, ""))
+            if Right(p, 1) = "/" then p = Left(p, Len(p) - 1)
+            if Right(p, 7) = "/hearth" or Right(p, 9) = "/ambiance" or Right(p, 9) = "/ambience" then return true
+        end for
+    end if
+    return false
+end function
 
 function toS(v as dynamic, fallback as string) as string
     if v = invalid then return fallback

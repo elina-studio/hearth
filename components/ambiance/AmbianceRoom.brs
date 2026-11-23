@@ -65,14 +65,21 @@ end function
 sub loadClips()
     if m.clipsAsked then return
     libs = m.global.libraries
-    if libs = invalid or libs.ambiance = invalid then return
+    if libs = invalid or libs.ambiance = invalid
+        print "[ambiance] no Plex Ambiance library (yet)"
+        return
+    end if
     m.clipsAsked = true
     hPlex("clips", { section: libs.ambiance }, "onClips")
 end sub
 
 sub onClips(event as object)
     t = hTaskFrom(event)
-    if not t.ok or t.response.Clips = invalid then return
+    if not t.ok or t.response.Clips = invalid
+        print "[ambiance] clips request failed, status "; t.status
+        m.clipsAsked = false
+        return
+    end if
     print "[ambiance] plex clips: "; t.response.Clips.count()
     if t.response.Clips.count() = 0 then return
     items = ambMerge(t.response.Clips)
