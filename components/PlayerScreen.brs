@@ -27,6 +27,8 @@ sub init()
     m.upnext = m.top.findNode("upnext")
     m.upnext.observeField("action", "onUpNextAction")
     m.video.observeField("position", "onPosition")
+    m.skipBtn = m.top.findNode("skip")
+    resetSkip()
     resetUpNext()
     uiInit()
 end sub
@@ -71,6 +73,7 @@ sub onItem(event as object)
     m.media = media
     m.part = part
     setupUpNext(it)
+    setupSkip(it)
     m.streams = hPlayStreams(part)
     m.decision = invalid
     uiOnItem(it)
@@ -526,6 +529,7 @@ end sub
 
 sub onPosition()
     uiOnPosition()
+    updateSkip()
     if m.next = invalid or m.creditsAt = invalid or m.upShown or m.upDismissed or not m.started then return
     if m.finder.visible = true or m.sheet.visible or m.chapters.visible or m.sleepMode = "ep" then return
     if position() >= m.creditsAt then showUpNext()
@@ -601,6 +605,10 @@ end sub
 
 function onKeyEvent(key as string, press as boolean) as boolean
     if not press then return false
+    if key = "OK" and m.skipOn = true and m.skipBtn.visible and not m.ov.visible and not m.sheet.visible and not m.chapters.visible and not m.upnext.visible
+        doSkip()
+        return true
+    end if
     print "[hearth-ui] key "; key; " | ready "; m.ready; " | video "; m.video.state; " | up next "; m.upnext.visible
     if key = "play" and m.upnext.visible
         ' the Up next card has focus; play/pause still controls the video
@@ -613,3 +621,53 @@ function onKeyEvent(key as string, press as boolean) as boolean
     end if
     return uiKey(key)
 end function
+
+' ---------- Skip intro ----------
+' Plex's intro marker (Plex Pass detection). A corner button shows while the marker plays; OK jumps to its end.
+' registry hearth/skipIntro = "off" hides it. Plex has no recap marker, so only intros are handled.
+sub resetSkip()
+    m.skipFrom = invalid
+    m.skipTo = invalid
+    m.skipOn = false
+    m.skipDone = false
+    if m.skipBtn <> invalid then m.skipBtn.callFunc("hide", invalid)
+end sub
+
+sub setupSkip(it as object)
+    resetSkip()
+    if CreateObject("roRegistrySection", "hearth").Read("skipIntro") = "off" then return
+    if it.Type <> "Episode" or it._markers = invalid then return
+    durSec = m.durationMs / 1000
+    for each mk in it._markers
+        if mk.type = "intro" and mk.startTimeOffset <> invalid and mk.endTimeOffset <> invalid
+            a = mk.startTimeOffset / 1000
+            b = mk.endTimeOffset / 1000
+            ' a bad detection (past the first half, or tiny) is ignored
+            if b > a + 5 and b < durSec * 0.5
+                m.skipFrom = a
+                m.skipTo = b
+                print "[hearth-play] intro marker "; Int(a); "-"; Int(b); " s"
+                exit for
+            end if
+        end if
+    end for
+    m.skipOn = (m.skipTo <> invalid)
+end sub
+
+sub updateSkip()
+    if not m.skipOn or m.skipBtn = invalid then return
+    p = position()
+    inside = (p >= m.skipFrom - 1 and p < m.skipTo - 1)
+    if inside and not m.skipDone and not m.ov.visible and not m.sheet.visible and not m.chapters.visible and not m.upnext.visible and m.started
+        if not m.skipBtn.visible then m.skipBtn.callFunc("show", invalid)
+    else if m.skipBtn.visible
+        m.skipBtn.callFunc("hide", invalid)
+    end if
+end sub
+
+sub doSkip()
+    m.skipDone = true
+    m.skipBtn.callFunc("hide", invalid)
+    print "[hearth-play] skip intro to "; Int(m.skipTo); " s"
+    seekTo(m.skipTo)
+end sub

@@ -10,6 +10,7 @@
     <PauseOverlay id="overlay" />
     <ChapterStrip id="chapters" />
     <PlayerSheet id="sheet" />
+    <SkipButton id="skip" />
     <UpNextCard id="upnext" />
     <SubsFinder id="finder" context="player" />
     <SubsAuto id="auto" />

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Corner "Skip intro" button (mockup ideas/04-skip-A-corner-button.png). Not focusable: the player sends OK to it.
+     Set label, then callFunc("show") / callFunc("hide"). -->
+<component name="SkipButton" extends="Group">
+  <children>
+    <Poster id="bg" uri="pkg:/images/w/button-fill-v2.9.png" translation="[1500, 740]" width="332" height="84" blendColor="0xE0B34AFF" />
+    <Poster id="icon" uri="pkg:/images/icons/home-next.png" translation="[1536, 768]" width="30" height="30" blendColor="0x1F1606FF" />
+    <Label id="lab" translation="[1582, 740]" width="240" height="84" vertAlign="center" text="Skip intro" color="0x1F1606FF" />
+    <Label id="hint" translation="[1500, 836]" width="332" horizAlign="center" text="OK to skip" color="0xB5AF8CFF" />
+  </children>
+  <interface>
+    <field id="label" type="string" value="Skip intro" onChange="paint" />
+    <function name="show" />
+    <function name="hide" />
+  </interface>
+  <script type="text/brightscript" uri="pkg:/source/util.brs" />
+  <script type="text/brightscript" uri="pkg:/components/player/SkipButton.brs" />
+</component>
