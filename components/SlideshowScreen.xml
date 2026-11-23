@@ -76,6 +76,7 @@
     <field id="request" type="assocarray" alwaysNotify="true" />
     <function name="onShown" />
   </interface>
+  <script type="text/brightscript" uri="pkg:/source/text.brs" />
   <script type="text/brightscript" uri="pkg:/source/util.brs" />
   <script type="text/brightscript" uri="pkg:/source/photos.brs" />
   <script type="text/brightscript" uri="pkg:/components/SlideshowScreen.brs" />
