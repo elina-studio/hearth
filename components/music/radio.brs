@@ -75,6 +75,7 @@ sub radioStart(c as object)
     m.radio = r
     m.top.radioName = name
     m.top.radioOn = true
+    if kind <> "song" and kind <> "artist" then saveLastPlay("r", kind, pxStr(c.mood), name)
     reg = CreateObject("roRegistrySection", "hearth")
     reg.Write("radioVariety", v.toStr())
     reg.Flush()

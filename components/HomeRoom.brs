@@ -31,6 +31,33 @@ sub init()
     m.top.findNode("reqFoot").font = hFont("regular", 26)
     m.mRings = [m.top.findNode("mRing0"), m.top.findNode("mRing1"), m.top.findNode("mRing2"), m.top.findNode("mRing3"), m.top.findNode("mRing4")]
     m.mDash = [0, 1, 2, 8, 9]
+    m.mRing5 = m.top.findNode("mRing5")
+    m.spkOpen = false
+    m.spkIdx = 0
+    m.spkRows = []
+    m.top.findNode("spkTitle").font = hFont("caps", 20)
+    holder = m.top.findNode("spkRows")
+    for i = 0 to 4
+        bg = holder.createChild("Rectangle")
+        bg.translation = [0, i * 30]
+        bg.width = 364
+        bg.height = 28
+        bg.color = "0x00000000"
+        nm = holder.createChild("Label")
+        nm.translation = [10, i * 30]
+        nm.width = 230
+        nm.height = 28
+        nm.vertAlign = "center"
+        nm.font = hFont("regular", 20)
+        st = holder.createChild("Label")
+        st.translation = [244, i * 30]
+        st.width = 110
+        st.height = 28
+        st.vertAlign = "center"
+        st.horizAlign = "right"
+        st.font = hFont("regular", 18)
+        m.spkRows.push({ bg: bg, nm: nm, st: st })
+    end for
     m.top.findNode("mSpk").font = hFont("regular", 22)
     m.reqRing = m.top.findNode("reqRing")
     m.musicBar = m.top.findNode("musicBar")
@@ -330,6 +357,36 @@ sub showGreeting()
 end sub
 
 ' ---------- Now playing ----------
+function inArr(a as object, v as integer) as boolean
+    return indexOfArr(a, v) >= 0
+end function
+
+function indexOfArr(a as object, v as integer) as integer
+    for i = 0 to a.count() - 1
+        if a[i] = v then return i
+    end for
+    return -1
+end function
+
+' the card's buttons, in left-to-right order
+function musicSeq() as object
+    if musicIdle()
+        if lastPlayed() <> invalid then return [0, 1, 2, 8]
+        return [0, 1, 2]
+    end if
+    return [0, 1, 2, 8, 9]
+end function
+
+' the last thing played, saved by the player: { mode: "c" | "r" | "s", kind, id, label }
+function lastPlayed() as dynamic
+    reg = CreateObject("roRegistrySection", "hearth")
+    v = reg.Read("lastPlay")
+    if v = invalid or v = "" then return invalid
+    p = v.Split("|")
+    if p.count() < 4 then return invalid
+    return { mode: p[0], kind: p[1], id: p[2], label: p[3] }
+end function
+
 function musicIdle() as boolean
     mp = m.global.music
     return mp = invalid or mp.track = invalid or mp.queue = invalid or mp.queue.count() = 0
@@ -339,7 +396,16 @@ end function
 sub idleStart(i as integer)
     mp = m.global.music
     if mp = invalid then return
-    if i = 0
+    lp = lastPlayed()
+    if i = 0 and lp <> invalid
+        if lp.mode = "c"
+            mp.command = { cmd: "playContainer", kind: lp.kind, id: lp.id, shuffle: false, label: lp.label }
+        else if lp.mode = "r"
+            mp.command = { cmd: "radioStart", kind: lp.kind, mood: lp.id, moodName: lp.label }
+        else
+            mp.command = { cmd: "shuffleAll" }
+        end if
+    else if i = 8 or i = 0
         mp.command = { cmd: "shuffleAll" }
     else if i = 1
         mp.command = { cmd: "radioStart", kind: "forgotten" }
@@ -365,6 +431,7 @@ end function
 
 ' ---------- Now playing / Listen now ----------
 sub showMusic()
+    if m.spkOpen = true then drawSpeakers()
     mp = m.global.music
     eb = m.top.findNode("musicEyebrow")
     ti = m.top.findNode("musicTitle")
@@ -388,20 +455,32 @@ sub showMusic()
         else
             when = "Evening"
         end if
-        eb.text = "LISTEN NOW"
-        ti.text = when + " music"
-        su.text = "Shuffle, rediscover, or favourites"
+        lp = lastPlayed()
         art.uri = ""
-        prv.uri = "pkg:/images/music/icons/shuffle.png"
+        if lp <> invalid
+            eb.text = "PICK UP WHERE YOU LEFT OFF"
+            ti.text = lp.label
+            su.text = "OK to play it again"
+            prv.uri = "pkg:/images/icons/home-play.png"
+            lk.uri = "pkg:/images/music/icons/shuffle.png"
+            lk.visible = true
+        else
+            eb.text = "LISTEN NOW"
+            ti.text = when + " music"
+            su.text = "Shuffle, rediscover, or favourites"
+            prv.uri = "pkg:/images/music/icons/shuffle.png"
+            lk.visible = false
+        end if
         tog.uri = "pkg:/images/icons/history.png"
         nxt.uri = "pkg:/images/music/icons/heart.png"
-        lk.visible = false
+        lk.blendColor = "0xEDE6CAFF"
         rd.visible = false
         sp.text = speakerLine()
         m.musicBar.width = 0
         return
     end if
     lk.visible = true
+    lk.uri = "pkg:/images/music/icons/heart.png"
     rd.visible = true
     prv.uri = "pkg:/images/icons/home-prev.png"
     nxt.uri = "pkg:/images/icons/home-next.png"
@@ -431,6 +510,88 @@ sub showMusic()
     if mp.duration > 0 then w = Int(352 * mp.position / mp.duration)
     if w > 352 then w = 352
     m.musicBar.width = w
+end sub
+
+' ---------- the speaker picker, drawn over the card ----------
+sub openSpeakers()
+    mp = m.global.music
+    if mp = invalid then return
+    mp.command = { cmd: "castRefresh" }
+    m.spkOpen = true
+    m.spkIdx = 0
+    m.top.findNode("spkPanel").visible = true
+    m.mRing5.visible = false
+    drawSpeakers()
+end sub
+
+sub closeSpeakers()
+    m.spkOpen = false
+    m.top.findNode("spkPanel").visible = false
+end sub
+
+function speakerItems() as object
+    mp = m.global.music
+    items = []
+    if mp <> invalid and mp.rooms <> invalid then items.append(mp.rooms)
+    items.push({ id: "all", name: "Whole house", kind: "all", on: false, vol: -1 })
+    return items
+end function
+
+sub drawSpeakers()
+    items = speakerItems()
+    if m.spkIdx >= items.count() then m.spkIdx = items.count() - 1
+    top = 0
+    if m.spkIdx > 4 then top = m.spkIdx - 4
+    for i = 0 to 4
+        r = m.spkRows[i]
+        at = top + i
+        if at < items.count()
+            it = items[at]
+            r.nm.visible = true
+            r.st.visible = true
+            r.nm.text = pxStr(it.name)
+            if it.kind = "all"
+                r.st.text = ""
+            else if it.on = true
+                if it.vol <> invalid and it.vol >= 0 then r.st.text = "on · " + it.vol.toStr() + "%" else r.st.text = "on"
+            else
+                r.st.text = "off"
+            end if
+            if it.on = true then r.nm.color = "0xE0B34AFF" else r.nm.color = "0xEDE6CAFF"
+            r.st.color = "0xB5AF8CFF"
+            if at = m.spkIdx then r.bg.color = "0x2E3B22FF" else r.bg.color = "0x00000000"
+        else
+            r.nm.visible = false
+            r.st.visible = false
+            r.bg.color = "0x00000000"
+        end if
+    end for
+end sub
+
+sub speakerKey(key as string)
+    mp = m.global.music
+    items = speakerItems()
+    if key = "back"
+        closeSpeakers()
+        paint()
+        return
+    end if
+    if key = "up"
+        if m.spkIdx > 0 then m.spkIdx = m.spkIdx - 1
+    else if key = "down"
+        if m.spkIdx < items.count() - 1 then m.spkIdx = m.spkIdx + 1
+    else if key = "OK" and mp <> invalid
+        it = items[m.spkIdx]
+        if it.kind = "all" then mp.command = { cmd: "castAll" } else mp.command = { cmd: "castToggle", id: it.id }
+    else if (key = "left" or key = "right") and mp <> invalid
+        it = items[m.spkIdx]
+        if it.kind = "speaker"
+            d = 5
+            if key = "left" then d = -5
+            mp.command = { cmd: "castVolume", id: it.id, delta: d }
+        end if
+    end if
+    drawSpeakers()
 end sub
 
 sub musicCommand(cmd as string)
@@ -828,9 +989,11 @@ sub paint()
             b.icon.blendColor = "0xEDE6CAFF"
         end if
     end for
+    seq = musicSeq()
     for i = 0 to 4
-        m.mRings[i].visible = focused and m.zone = "dash" and m.dash = m.mDash[i] and (i < 3 or not musicIdle())
+        m.mRings[i].visible = focused and m.zone = "dash" and m.dash = m.mDash[i] and inArr(seq, m.mDash[i]) and not m.spkOpen
     end for
+    m.mRing5.visible = focused and m.zone = "dash" and m.dash = 10 and not m.spkOpen
     m.reqRing.visible = focused and m.zone = "dash" and m.dash = 3
     for i = 0 to 2
         m.tCards[i].ring.visible = focused and m.zone = "tonight" and m.tn = i
@@ -892,7 +1055,9 @@ sub activate()
             m.top.request = { action: "play", item: d.item, resume: true }
         end if
     else if m.zone = "dash"
-        if musicIdle()
+        if m.dash = 10
+            openSpeakers()
+        else if musicIdle()
             idleStart(m.dash)
         else if m.dash = 0
             musicCommand("prev")
@@ -968,26 +1133,24 @@ sub moveSide(d as integer)
         end if
     else if m.zone = "dash"
         x = m.dash
-        idle = musicIdle()
-        if d > 0
-            if x = 2
-                if idle then x = 3 else x = 8
-            else if x = 8
-                x = 9
-            else if x = 9
+        seq = musicSeq()
+        if x = 10
+            ' the speaker line has nothing to either side
+        else if d > 0
+            at = indexOfArr(seq, x)
+            if at >= 0 and at < seq.count() - 1
+                x = seq[at + 1]
+            else if at >= 0
                 x = 3
             else if x <= 4 or x = 6
                 x = x + 1
             end if
         else
-            if x = 3
-                if idle then x = 2 else x = 9
-            else if x = 9
-                x = 8
-            else if x = 8
-                x = 2
-            else if x >= 1 and x <= 2
-                x = x - 1
+            at = indexOfArr(seq, x)
+            if at > 0
+                x = seq[at - 1]
+            else if x = 3
+                x = seq[seq.count() - 1]
             else if x = 4 or x = 6
                 x = 3
             else if x = 5 or x = 7
@@ -1009,6 +1172,8 @@ sub moveUp()
     if m.zone = "dash"
         if m.dash = 6 or m.dash = 7
             m.dash = m.dash - 2
+        else if inArr(musicSeq(), m.dash)
+            m.dash = 10
         else
             m.zone = "hero"
         end if
@@ -1026,7 +1191,9 @@ sub moveDown()
     if m.zone = "hero" or m.zone = "tonight"
         m.zone = "dash"
     else if m.zone = "dash"
-        if m.dash = 4 or m.dash = 5
+        if m.dash = 10
+            m.dash = 1
+        else if m.dash = 4 or m.dash = 5
             m.dash = m.dash + 2
         else
             r = firstRow(0)
@@ -1052,6 +1219,10 @@ end function
 function onKeyEvent(key as string, press as boolean) as boolean
     if not press then return false
     if hMediaKey(key) then return false
+    if m.spkOpen
+        speakerKey(key)
+        return true
+    end if
     if key = "back"
         if m.zone <> "hero"
             m.zone = "hero"
@@ -1098,6 +1269,8 @@ sub hideFocus()
     for each r in m.mRings
         r.visible = false
     end for
+    m.mRing5.visible = false
+    closeSpeakers()
     m.reqRing.visible = false
     for each c in m.tCards
         c.ring.visible = false
