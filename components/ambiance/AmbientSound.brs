@@ -33,7 +33,7 @@ sub update()
     prev = m.top.backend
     if not want
         nxt = "off"
-    else if musicPlaying() or m.audioBroken = true
+    else if musicPlaying() or m.top.preferSfx or m.audioBroken = true
         nxt = "sfx"
     else
         nxt = "audio"

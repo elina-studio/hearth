@@ -12,6 +12,7 @@
     <field id="mood" type="string" onChange="update" />
     <field id="on" type="boolean" value="true" onChange="update" />
     <field id="active" type="boolean" value="false" onChange="update" />
+    <field id="preferSfx" type="boolean" value="false" onChange="update" />
     <!-- read-only: "audio", "sfx" or "off" -->
     <field id="backend" type="string" value="off" />
   </interface>
