@@ -277,6 +277,12 @@ class Handler(BaseHTTPRequestHandler):
             pass
         self.send_json(out)
 
+    def do_DELETE(self):
+        path = self.path.split("?")[0]
+        if path.startswith("/px/"):
+            return web.proxy(self, "DELETE", path)
+        self.send_json({"error": "not found"}, 404)
+
     def do_POST(self):
         path = self.path.split("?")[0]
         if path.startswith("/px/"):

@@ -135,7 +135,7 @@ function reveal(el) {
 function setFocus(el) {
   if (focusEl) focusEl.classList.remove('on');
   focusEl = el;
-  if (el) { el.classList.add('on'); reveal(el); if (el.classList.contains('pc2') && el.dataset.i !== undefined && !el.closest('.layer') && typeof LRInfo === 'function') LRInfo(+el.dataset.i); }
+  if (el) { el.classList.add('on'); reveal(el); if (el.classList.contains('pc2') && el.dataset.i !== undefined && !el.closest('.layer') && typeof LRInfo === 'function') LRInfo(+el.dataset.i); if (el.classList.contains('rc') && typeof RQInfo === 'function') RQInfo(+el.dataset.i); if (el.dataset.a === 'rail' && RQ && cur === 'Requests' && RQ.idx !== +el.dataset.i) { RQ.idx = +el.dataset.i; RQ.over = null; RQ.show(); } }
 }
 function firstFocus(root) { const e = $('.fx', root); setFocus(e || null); }
 function move(dir) {
@@ -190,6 +190,7 @@ addEventListener('keydown', e => {
   if (top && top.onKey && top.onKey(e) === true) { e.preventDefault(); return; }
   const k = e.key;
   if (cur === 'Search' && !layers.length && SR && SR.key(e)) { e.preventDefault(); return; }
+  if (cur === 'Requests' && !layers.length && RQ && RQ.cur().key === 'search' && !RQ.over) { if (/^[a-z0-9]$/i.test(k) && !e.ctrlKey && !e.metaKey) { RQ.type(RQ.text + k.toLowerCase()); e.preventDefault(); return; } if (k === 'Backspace' && RQ.text) { RQ.type(RQ.text.slice(0, -1)); e.preventDefault(); return; } }
   if (k.startsWith('Arrow')) { e.preventDefault(); move(k); }
   else if (k === 'Enter' || k === ' ') { if (focusEl) { e.preventDefault(); act(focusEl); } }
   else if (k === 'Escape' || k === 'Backspace' || k === 'BrowserBack' || k === 'GoBack') { e.preventDefault(); back(); }
@@ -202,6 +203,7 @@ addEventListener('keydown', e => {
 function back() {
   { const t = layers[layers.length - 1]; if (t && t.onBack && t.onBack()) return; }
   if (layers.length) { closeLayer(); return; }
+  if (cur === 'Requests' && RQLeave && RQLeave()) return;
   if ((cur === 'Movies' || cur === 'Shows') && LRBack && LRBack()) return;
   if (cur !== 'Home') go('Home');
 }
@@ -260,7 +262,7 @@ function remoteKey(k) {
 
 /* ---------- rooms ---------- */
 const ROOMS = ['Home', 'Shows', 'Movies', 'Music', 'Requests', 'Ambiance', 'Photos', 'Search', 'Test'];
-const LIVE = new Set(['Home', 'Shows', 'Movies', 'Music', 'Ambiance', 'Search', 'Test']);
+const LIVE = new Set(['Home', 'Shows', 'Movies', 'Music', 'Requests', 'Ambiance', 'Search', 'Test']);
 let cur = 'Home', renderTok = 0, autoF = null;
 function drawBar() {
   $('#rooms').innerHTML = ROOMS.map(r => `<div class="fx rm ${r === cur ? 'cur' : ''}" data-a="room" data-r="${r}">${r}<i class="dot"></i></div>`).join('');
@@ -275,13 +277,14 @@ async function go(name, keepFocus) {
     else if (name === 'Music') await roomMusic(room, tok);
     else if (name === 'Movies') await roomLib(room, tok, 'movie');
     else if (name === 'Search') roomSearch(room, tok);
+    else if (name === 'Requests') roomRequests(room, tok);
     else if (name === 'Shows') await roomLib(room, tok, 'show');
     else if (name === 'Ambiance') roomAmbiance(room);
     else if (name === 'Test') await roomTest(room, tok);
     else soon(room, name);
   } catch (e) { if (tok === renderTok) { room.innerHTML = `<div class="msg">Can't reach your library right now.<br>${esc(e.message)}</div>`; } }
   if (tok !== renderTok) return;
-  if (!keepFocus) { const f = $('#room .fx') || $$('#bar .fx').find(x => x.dataset.r === name); setFocus(f); autoF = f; }
+  if (!keepFocus) { const f = $('#room .fx[data-first]') || $('#room .fx') || $$('#bar .fx').find(x => x.dataset.r === name); setFocus(f); autoF = f; }
   else setFocus($$('#bar .fx').find(x => x.dataset.r === name));
 }
 function soon(room, name) {
@@ -1079,6 +1082,295 @@ function searchTyped(text, go) {
   if (cur !== 'Search') { reqSearch = text; go('Search'); } else SR.set(text);
 }
 
+/* ---------- Requests (Overseerr): rail of lists, poster grid, request popup ---------- */
+let RQ = null;
+const OV = '/px/overseerr';
+async function ov(method, path, body) {
+  const r = await fetch(OV + path, { method, headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined });
+  const txt = await r.text(); let j = null; try { j = txt ? JSON.parse(txt) : null; } catch (e) { /* not json */ }
+  if (!r.ok) { const e = new Error((j && j.message) || ('Overseerr said ' + r.status)); e.status = r.status; throw e; }
+  return j || {};
+}
+const tmdb = (p, s) => p ? `https://image.tmdb.org/t/p/${s}${p}` : '';
+const rqChip = (text, icon, tone) => ({ text, icon, tone });
+function rqMediaChip(st) {
+  if (st === 2) return rqChip('Requested', 'clock', 'gold');
+  if (st === 3) return rqChip('Approved', 'stamp', 'gold');
+  if (st === 4) return rqChip('Partly here', 'check', 'olive');
+  if (st === 5) return rqChip('In library', 'check', 'olive');
+  return rqChip('Request', 'plus', 'out');
+}
+function rqDownload(media) {
+  if (!media || !media.downloadStatus || !media.downloadStatus.length) return null;
+  let size = 0, left = 0, secs = 0, allDone = true;
+  for (const d of media.downloadStatus) {
+    size += d.size || 0; left += d.sizeLeft || 0;
+    if (!['completed', 'importpending', 'importing'].includes(String(d.status || '').toLowerCase())) allDone = false;
+    const p = String(d.timeLeft || '').split(':'); if (p.length === 3) secs = Math.max(secs, +p[0] * 3600 + +p[1] * 60 + +p[2]);
+  }
+  const pct = size > 0 ? Math.floor((size - left) * 100 / size) : 0;
+  const stage = allDone || pct >= 100 ? 'importing' : 'downloading';
+  const lt = stage === 'downloading' && secs > 0 ? (secs >= 3600 ? `${secs / 3600 | 0} h ${(secs % 3600) / 60 | 0} min left` : secs >= 60 ? `${secs / 60 | 0} min left` : 'under a minute left') : '';
+  return { pct, stage, left: lt, n: media.downloadStatus.length };
+}
+const rqYear = r => { const d = r.releaseDate || r.firstAirDate || ''; return d.length >= 4 ? d.slice(0, 4) : ''; };
+function rqMediaCard(r) {
+  const st = r.mediaInfo && r.mediaInfo.status != null ? r.mediaInfo.status : -1;
+  const title = r.title || r.name || '';
+  return { kind: 'media', title, image: tmdb(r.posterPath, 'w185'), chip: rqMediaChip(st), progress: -1, data: { id: r.id, mediaType: r.mediaType, title, year: rqYear(r), overview: r.overview, poster: r.posterPath, rating: r.voteAverage, mediaStatus: st } };
+}
+function rqWhen(iso) {
+  if (!iso) return ''; const d = new Date(iso), n = new Date();
+  if (d.toDateString() === n.toDateString()) return 'today at ' + d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+}
+function rqRequestCard(q, info) {
+  const media = q.media, ms = media && media.status != null ? media.status : -1, rs = q.status != null ? q.status : -1, dl = rqDownload(media);
+  let pct = dl ? dl.pct : -1, caption = '', chip, note;
+  if (rs === 1) { caption = 'Waiting for approval'; chip = rqChip('Waiting approval', 'clock', 'out'); note = 'Waiting for approval in Overseerr.'; }
+  else if (rs === 3) { chip = rqChip('Declined', 'warn', 'ember'); note = 'This request was declined in Overseerr.'; }
+  else if (rs === 4) { chip = rqChip('Failed', 'warn', 'ember'); note = "Overseerr couldn't send this to Radarr or Sonarr. Check Overseerr's Requests page."; }
+  else if (ms === 5) { chip = rqChip('Ready · Play', 'play', 'olive'); caption = 'Ready to watch'; note = 'Ready to watch. Press OK to open it.'; }
+  else if (ms === 4) { chip = rqChip('Partly ready', 'play', 'olive'); caption = 'The rest is on the way'; note = 'Some of it is ready to watch; the rest is on the way.'; }
+  else if (dl && dl.stage === 'importing') { chip = rqChip('Importing', 'layers', 'dim'); note = 'Downloaded. Adding it to Plex now.'; caption = 'Adding to Plex'; }
+  else if (dl) { chip = rqChip('Downloading ' + pct + '%', 'down', 'dim'); note = 'Downloading now.'; caption = dl.n > 1 ? dl.n + ' parts coming. ' + dl.left : dl.left; }
+  else { chip = rqChip('Searching', 'search', 'dim'); note = 'Approved. Waiting for a download to start.'; caption = 'Looking for a release'; pct = 0; }
+  const when = rqWhen(q.createdAt); if (when) note = `Requested ${when}. ` + note;
+  const title = info.title || 'Untitled';
+  return { kind: 'media', title, image: tmdb(info.posterPath, 'w185'), chip, progress: pct, caption, active: !!dl || (rs === 2 && ms !== 5), data: { id: info.id, mediaType: info.mediaType, title, year: rqYear(info), overview: info.overview, poster: info.posterPath, rating: info.voteAverage, mediaStatus: ms, requestId: q.id, requestStatus: rs, note, runtime: info.runtime, seasons: info.numberOfSeasons } };
+}
+const rqEyebrow = d => {
+  let e = d.mediaType === 'tv' ? 'SHOW' : 'MOVIE';
+  if (d.year) e += ' · ' + d.year;
+  if (d.runtime > 0) e += ' · ' + (d.runtime >= 60 ? `${d.runtime / 60 | 0}H ${d.runtime % 60}M` : d.runtime + 'M');
+  if (d.seasons > 0) e += ` · ${d.seasons} SEASON${d.seasons > 1 ? 'S' : ''}`;
+  return e;
+};
+const rqRating = v => v > 0 ? (Math.round(v * 10) / 10).toFixed(1) : '';
+function rqSeasons(tv) {
+  const have = {};
+  for (const s of ((tv.mediaInfo && tv.mediaInfo.seasons) || [])) if (s.seasonNumber != null && [5, 2, 3].includes(s.status)) have[s.seasonNumber] = s.status;
+  return (tv.seasons || []).filter(s => s.seasonNumber > 0).map(s => {
+    let info = s.episodeCount != null ? s.episodeCount + ' episodes' : '';
+    info += s.airDate && s.airDate.length >= 4 ? ' · ' + s.airDate.slice(0, 4) : (info ? '' : 'announced');
+    const st = have[s.seasonNumber];
+    return { number: s.seasonNumber, label: 'Season ' + s.seasonNumber, sub: info, tag: st ? (st === 5 ? 'In library' : 'Requested') : '', aired: !!s.airDate };
+  });
+}
+const arrivedWhen = secs => {
+  if (!secs) return { band: '', text: '', today: false };
+  const d = new Date(secs * 1000), n = new Date(); const day = x => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const days = Math.round((day(n) - day(d)) / 86400000);
+  if (days <= 0) return { band: 'TODAY', text: 'today ' + d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }), today: true };
+  if (days === 1) return { band: 'YESTERDAY', text: 'yesterday', today: false };
+  if (days < 7) return { band: d.toLocaleDateString([], { weekday: 'short' }).toUpperCase(), text: d.toLocaleDateString([], { weekday: 'long' }), today: false };
+  const md = d.toLocaleDateString([], { month: 'short', day: 'numeric' }); return { band: md.toUpperCase(), text: md, today: false };
+};
+const RLISTS = [
+  { key: 'search', icon: 'search', name: 'Search', about: 'TYPE A TITLE' },
+  { key: 'new', icon: 'down', name: 'New', about: 'NEWLY DOWNLOADED · NEWEST FIRST' },
+  { key: 'trending', icon: 'spark', name: 'Trending', about: 'TRENDING THIS WEEK', path: '/api/v1/discover/trending' },
+  { key: 'movies', icon: 'film', name: 'Popular movies', about: 'POPULAR MOVIES', path: '/api/v1/discover/movies' },
+  { key: 'tv', icon: 'tv', name: 'Popular shows', about: 'POPULAR SHOWS', path: '/api/v1/discover/tv' },
+  { key: 'upcoming', icon: 'cal', name: 'Coming soon', about: 'MOVIES COMING SOON', path: '/api/v1/discover/movies/upcoming' },
+  { key: 'mine', icon: 'clock', name: 'Your requests', about: "WHAT YOU'VE ASKED FOR" },
+  { key: 'music', icon: 'note', name: 'Music', about: 'LIDARR' }
+];
+const RTABS = [['', 'layers', 'All'], ['movie', 'film', 'Movies'], ['tv', 'tv', 'Shows'], ['music', 'note', 'Music']];
+const ricon = n => `<i class="ic" style="--m:url(img/icons/${n}.png)"></i>`;
+
+function roomRequests(room, tok) {
+  room.innerHTML = `<div class="rr"><div class="rrail" id="rrail">${RLISTS.map((l, i) => `<div class="fx rli" data-a="rail" data-i="${i}">${ricon(l.icon)}<span>${l.name}</span><em></em></div>`).join('')}</div>
+    <div class="rhead"><div class="reb" id="reb"></div><div class="rtt" id="rtt"></div></div>
+    <div class="rtabs" id="rtabs"></div>
+    <div class="rgrid scroll" id="rg"><div class="rgg" id="rgg"></div></div>
+    <div class="rempty" id="rem"></div>
+    <div class="rsearch" id="rs"><div class="skb"><div class="sdisp" id="rsd"></div><div class="srule"></div>
+      <div class="skeys" style="margin-top:20px">${[...KEYCH].map(c => `<div class="fx key" data-a="rqkey" data-c="${c}">${c.toUpperCase()}</div>`).join('')}
+      <div class="fx key wide" data-a="rqkey" data-c=" ">Space</div><div class="fx key wide" data-a="rqkey" data-c="⌫">Delete</div><div class="fx key wide" data-a="rqkey" data-c="⌧">Clear</div></div></div>
+      <div class="rsres"><div class="rsh" id="rsh"></div><div id="rsl"></div></div></div>
+    <div class="rmusic" id="rm">${ricon('note')}<h3>ASK LIDARR FOR AN ARTIST</h3><p>Music requests aren't on the projector yet. Use the TV for those for now.</p></div>
+    <div class="rtoast" id="rto"><span id="rtt2"></span><em id="rth"></em></div></div>`;
+  const S = RQ = RQ && RQ.keep ? Object.assign(RQ, { room }) : { room, idx: 2, cards: {}, details: {}, newTab: 0, newAll: null, text: '', query: '', pending: null, seq: 0, keep: true };
+  S.room = room; S.tok = tok; S.over = null;
+  const $r = s => $(s, room);
+  S.cur = () => RLISTS[S.idx];
+  S.paintRail = () => $$('.rli', room).forEach((e, i) => {
+    e.classList.toggle('cur', i === S.idx);
+    const k = RLISTS[i].key, c = S.cards[k];
+    e.querySelector('em').textContent = c && k !== 'search' && k !== 'music' ? c.length : '';
+  });
+  S.header = (eb, title, rating) => { $r('#reb').innerHTML = esc(eb) + (rating ? `<i class="star">★</i>${esc(rating)}` : ''); $r('#rtt').textContent = (title || '').toUpperCase(); };
+  const chipHTML = ch => ch && ch.text ? `<div class="rchip ${ch.tone}">${ricon(ch.icon)}<span>${esc(ch.text.toUpperCase())}</span></div>` : '';
+  S.cardHTML = (c, i) => {
+    const sq = c.square, mine = S.cur().key === 'mine' && !S.over;
+    return `<div class="fx rc ${mine ? 'mine' : ''}" data-a="rqcard" data-i="${i}"><div class="rim ${sq ? 'sq' : ''}" data-bg="${esc(c.image || '')}"></div><div class="rph ${sq ? 'sq' : ''}">${esc(c.title)}</div>${chipHTML(c.chip)}${c.progress >= 0 ? `<div class="rbar"><i style="width:${Math.max(c.progress > 0 ? 8 : 0, Math.min(100, c.progress))}%"></i></div>` : ''}${c.caption ? `<div class="rcap"><b>${esc(c.title)}</b><span>${esc(c.caption)}</span></div>` : ''}</div>`;
+  };
+  S.show = () => {
+    const l = S.cur(); S.paintRail();
+    const k = l.key, ov_ = S.over;
+    $r('#rs').style.display = k === 'search' && !ov_ ? 'block' : 'none';
+    $r('#rm').style.display = k === 'music' && !ov_ ? 'flex' : 'none';
+    $r('#rg').style.display = (k === 'search' || k === 'music') && !ov_ ? 'none' : 'block';
+    $r('#rtabs').style.display = k === 'new' && !ov_ ? 'flex' : 'none';
+    $r('#rg').style.top = k === 'new' && !ov_ ? '210px' : '140px';
+    $r('#rem').style.top = k === 'new' && !ov_ ? '230px' : '160px';
+    if (k === 'new') $r('#rtabs').innerHTML = RTABS.map(([, ic_, n], i) => `<div class="fx rtab ${i === S.newTab ? 'cur' : ''}" data-a="rtab" data-i="${i}">${ricon(ic_)}<span>${n}</span></div>`).join('');
+    if (ov_) { S.header(ov_.eyebrow, ov_.title); S.draw(ov_.cards); return; }
+    $r('#rem').textContent = '';
+    if (k === 'search') { S.header('SEARCH OVERSEERR', ''); S.paintResults(); return; }
+    if (k === 'music') { S.header('MUSIC · LIDARR', 'Request music'); return; }
+    S.header(l.about, l.name);
+    const cards = S.cards[k];
+    $r('#rem').textContent = '';
+    if (!cards) { $r('#rg #rgg') && ($r('#rgg').innerHTML = ''); $r('#rem').textContent = S.problem || (k === 'new' ? 'Asking Plex…' : 'Asking Overseerr…'); return; }
+    if (k === 'new') { const want = RTABS[S.newTab][0]; S.draw(cards.filter(c => !want || c.data.kind === want)); } else S.draw(cards);
+    if (!cards.length) $r('#rem').textContent = k === 'mine' ? 'No requests yet. Pick something in Trending or Search and press OK.' : k === 'new' ? "Nothing new here yet. Things you request show up here once they've downloaded." : 'Nothing here right now.';
+  };
+  S.draw = cards => {
+    S.shown = cards; const g = $r('#rgg'); g.className = 'rgg' + (S.cur().key === 'mine' && !S.over ? ' mine' : '');
+    g.innerHTML = cards.map(S.cardHTML).join(''); $r('#rg').scrollTop = 0;
+  };
+  S.info = i => {
+    const c = S.shown && S.shown[i]; if (!c) return;
+    if (c.kind === 'plex') { S.header(c.eyebrow, c.title); return; }
+    S.header(rqEyebrow(Object.assign({}, c.data, S.details[c.data.mediaType + c.data.id] ? { runtime: S.details[c.data.mediaType + c.data.id].runtime, seasons: S.details[c.data.mediaType + c.data.id].numberOfSeasons } : {})), c.data.title, rqRating(c.data.rating));
+    clearTimeout(S.dt); S.dt = setTimeout(async () => {
+      const key = c.data.mediaType + c.data.id; if (S.details[key]) return;
+      try { S.details[key] = await ov('GET', `/api/v1/${c.data.mediaType}/${c.data.id}`); if (RQ === S && S.shown === S.shown) S.info(i); } catch (e) { /* ignore */ }
+    }, 400);
+  };
+  S.toastMsg = (text, hint, ms) => { $r('#rtt2').textContent = text; $r('#rth').textContent = hint || ''; $r('#rto').classList.add('show'); clearTimeout(S.tt); if (ms !== 0) S.tt = setTimeout(() => $r('#rto').classList.remove('show'), ms || 4000); };
+  S.load = async () => {
+    for (const l of RLISTS) if (l.path) ov('GET', l.path + '?page=1').then(j => { S.cards[l.key] = (j.results || []).filter(r => r.mediaType === 'movie' || r.mediaType === 'tv').map(rqMediaCard); S.problem = ''; if (RQ === S && S.room === room) { S.paintRail(); if (S.cur().key === l.key && !S.over) S.show(); } }).catch(e => { if (e.status === 401 || e.status === 403 || e.status === 503) S.problem = 'Overseerr is not letting this in (' + e.message + '). Re-send the Overseerr key from the phone.'; else S.problem = "Can't reach Overseerr: " + e.message; if (S.cur().key === l.key) S.show(); });
+    S.loadMine(); S.loadNew();
+  };
+  S.loadMine = async () => {
+    try {
+      const j = await ov('GET', '/api/v1/request?take=20&skip=0&sort=added&filter=all'); const out = [];
+      for (const q of (j.results || [])) {
+        const media = q.media; if (!media || media.tmdbId == null) continue; const kind = media.mediaType || q.type;
+        let d = {}; try { d = await ov('GET', `/api/v1/${kind}/${media.tmdbId}`); } catch (e) { /* title unknown */ }
+        out.push(rqRequestCard(q, { id: media.tmdbId, mediaType: kind, title: d.title || d.name || '', posterPath: d.posterPath, overview: d.overview, releaseDate: d.releaseDate, firstAirDate: d.firstAirDate, voteAverage: d.voteAverage, runtime: d.runtime, numberOfSeasons: d.numberOfSeasons }));
+      }
+      S.cards.mine = out; S.mineActive = out.some(c => c.active);
+      if (RQ === S && S.room === room) { S.paintRail(); if (S.cur().key === 'mine' && !S.over) { const f = document.querySelector('#room .rc.on'); const at = f ? +f.dataset.i : -1; S.show(); if (at >= 0) setFocus($$('.rc', room)[at] || null); } }
+    } catch (e) { /* leave as is */ }
+  };
+  S.loadNew = async () => {
+    try {
+      const mc = await pj('/library/recentlyAdded', { 'X-Plex-Container-Size': 60 }); const seen = new Set(), out = [];
+      for (const it of (mc.Metadata || [])) {
+        if (hiddenItem(it)) continue;
+        const kind = it.type === 'movie' ? 'movie' : (it.type === 'show' || it.type === 'episode' || it.type === 'season') ? 'tv' : it.type === 'album' ? 'music' : ''; if (!kind) continue;
+        const name = it.type === 'episode' ? it.grandparentTitle : it.type === 'season' ? it.parentTitle : it.title; const key = kind + '|' + name; if (seen.has(key)) continue; seen.add(key);
+        const when = arrivedWhen(it.addedAt); const pic = it.type === 'episode' ? it.grandparentThumb : it.type === 'season' ? it.parentThumb : it.thumb;
+        out.push({ kind: 'plex', title: name, image: img(pic, 180, kind === 'music' ? 180 : 270), square: kind === 'music', chip: rqChip(when.band, 'down', when.today ? 'olive' : 'out'), progress: -1, eyebrow: `${kind === 'movie' ? 'MOVIE' : kind === 'tv' ? 'SHOW' : 'ALBUM'}${it.year && kind !== 'music' ? ' · ' + it.year : ''} · ARRIVED ${when.text.toUpperCase()}`, data: { kind, item: it } });
+      }
+      S.cards.new = out; if (RQ === S && S.room === room) { S.paintRail(); if (S.cur().key === 'new' && !S.over) S.show(); }
+    } catch (e) { S.cards.new = []; }
+  };
+  /* search */
+  S.paintResults = () => {
+    $r('#rsd').textContent = S.text || 'Type a title'; $r('#rsd').classList.toggle('ph', !S.text);
+    const r = S.cards.search || []; $r('#rsh').textContent = !S.query ? 'Type a few letters' : !r.length ? `Nothing found for “${S.query}”` : 'Results · ' + r.length;
+    S.shown = r;
+    $r('#rsl').innerHTML = r.slice(0, 6).map((c, i) => `<div class="fx rsrow" data-a="rqcard" data-i="${i}"><div class="rsp" data-bg="${esc(c.image)}"></div><div class="rst"><b>${esc(c.title)}</b><span>${c.data.mediaType === 'tv' ? 'Show' : 'Movie'}${c.data.year ? ' · ' + c.data.year : ''}</span></div>${chipHTML(c.chip)}</div>`).join('');
+  };
+  S.type = t => { S.text = t.slice(0, 40); $r('#rsd').textContent = S.text || 'Type a title'; $r('#rsd').classList.toggle('ph', !S.text); clearTimeout(S.st); S.st = setTimeout(S.runSearch, 500); };
+  S.runSearch = async () => {
+    const q = S.text.trim(); if (q === S.query && S.cards.search) return; S.query = q;
+    if (!q) { S.cards.search = []; S.paintResults(); return; }
+    $r('#rsh').textContent = 'Searching…';
+    try { const j = await ov('GET', '/api/v1/search?query=' + encodeURIComponent(q) + '&page=1'); if (q !== S.query) return; S.cards.search = (j.results || []).filter(r => r.mediaType === 'movie' || r.mediaType === 'tv').map(rqMediaCard); S.paintResults(); }
+    catch (e) { $r('#rsh').textContent = e.message; }
+  };
+  S.sendPending = () => {
+    const p = S.pending; if (!p) return; S.pending = null; clearInterval(S.undoT); $r('#rto').classList.remove('show');
+    ov('POST', '/api/v1/request', p.body).then(() => { S.toastMsg('Requested ' + p.card.data.title); S.loadMine(); })
+      .catch(e => S.toastMsg("Couldn't request " + p.card.data.title, e.message));
+  };
+  S.undo = () => { const p = S.pending; if (!p) return false; S.pending = null; clearInterval(S.undoT); S.paintChip(p.card, p.card.chip); S.toastMsg('Not requested: ' + p.card.data.title); return true; };
+  S.paintChip = (c, chip) => { $$('.rc, .rsrow', room).forEach(e => { const cc = S.shown && S.shown[+e.dataset.i]; if (cc && cc.data && cc.data.id === c.data.id && cc.data.mediaType === c.data.mediaType) { const old = e.querySelector('.rchip'); const h = chipHTML(chip); if (old) old.outerHTML = h; else e.insertAdjacentHTML('beforeend', h); } }); };
+  S.start = (c, seasons) => {
+    if (S.pending) S.sendPending();
+    const body = { mediaType: c.data.mediaType, mediaId: c.data.id }; if (seasons !== undefined) body.seasons = seasons;
+    S.pending = { body, card: c, left: 3 }; S.paintChip(c, rqChip('Requested', 'clock', 'gold'));
+    const tick = () => S.toastMsg(`Requesting ${c.data.title} · ${S.pending.left}`, 'Back to undo', 0); tick();
+    clearInterval(S.undoT); S.undoT = setInterval(() => { if (!S.pending) return clearInterval(S.undoT); S.pending.left--; if (S.pending.left <= 0) S.sendPending(); else tick(); }, 1000);
+  };
+  S.open = async c => {
+    if (!c) return;
+    if (c.kind === 'plex') { const it = c.data.item; if (c.data.kind === 'music') openAlbum(it.ratingKey, it.type === 'album' ? 'album' : it.type).catch(e => toast(e.message)); else openDetail(it.type === 'episode' ? it.grandparentRatingKey : it.type === 'season' ? it.parentRatingKey : it.ratingKey, c.data.kind === 'tv' ? 'show' : 'movie').catch(e => toast(e.message)); return; }
+    const d = c.data, rs = d.requestStatus != null ? d.requestStatus : -1;
+    if (d.mediaStatus === 5 || (rs > 0 && d.mediaStatus === 4 && d.mediaType === 'movie')) return S.openInPlex(d);
+    const key = d.mediaType + d.id;
+    if (!S.details[key] && d.mediaType === 'tv') { S.toastMsg('Opening ' + d.title + '…'); try { S.details[key] = await ov('GET', '/api/v1/tv/' + d.id); } catch (e) { S.toastMsg("Couldn't open " + d.title, e.message); return; } }
+    S.popup(c);
+  };
+  S.openInPlex = async d => {
+    try {
+      const mc = await pj('/hubs/search', { query: d.title, limit: 10 }); const want = d.mediaType === 'tv' ? 'show' : 'movie'; let hit = null;
+      for (const h of (mc.Hub || [])) for (const m of (h.Metadata || [])) if (!hit && m.type === want && (m.title || '').toLowerCase() === d.title.toLowerCase()) hit = m;
+      if (!hit) for (const h of (mc.Hub || [])) for (const m of (h.Metadata || [])) if (!hit && m.type === want) hit = m;
+      if (hit) openDetail(hit.ratingKey, hit.type); else S.toastMsg("Couldn't find " + d.title + ' in Plex yet');
+    } catch (e) { S.toastMsg(e.message); }
+  };
+  S.popup = c => {
+    const d = Object.assign({}, c.data); const x = S.details[d.mediaType + d.id]; if (x) { d.runtime = x.runtime; d.seasons = x.numberOfSeasons; }
+    const items = []; let overview = d.note || d.overview || ''; const rs = d.requestStatus != null ? d.requestStatus : -1;
+    if (rs === 1) items.push({ label: 'Cancel request', icon: 'cancel', tag: 'cancel' });
+    else if (d.mediaStatus === 2 || d.mediaStatus === 3) { if (rs < 0) overview = 'Already requested and on its way. ' + (d.overview || ''); }
+    else if (rs === 3 || rs === 4 || rs < 0) {
+      if (d.mediaType === 'tv') {
+        const ss = x ? rqSeasons(x) : []; let latest = -1; for (const s of ss) if (s.aired && !s.tag && s.number > latest) latest = s.number;
+        items.push({ label: d.mediaStatus === 4 ? 'Request the rest' : 'Request all seasons', icon: 'layers', tag: 'all' });
+        if (latest > 0) items.push({ label: 'Latest season', sub: 'Season ' + latest, icon: 'latest', tag: 's' + latest });
+        items.push({ label: 'Choose seasons…', icon: 'list', tag: 'choose' });
+      } else items.push({ label: 'Request', icon: 'plus', tag: 'movie' });
+    }
+    if (d.mediaStatus === 5 || d.mediaStatus === 4) items.push({ label: 'Open in Plex', icon: 'play', tag: 'plex' });
+    items.push({ label: 'More like this', icon: 'spark', tag: 'like' }, { label: 'Close', icon: 'close', tag: 'back' });
+    S.showPopup(c, { eyebrow: rqEyebrow(d), rating: rqRating(d.rating), title: d.title, overview, poster: tmdb(d.poster, 'w342'), items });
+  };
+  S.choose = c => {
+    const d = c.data, x = S.details[d.mediaType + d.id]; if (!x) return;
+    const items = rqSeasons(x).map(s => ({ label: s.label, sub: s.sub, check: !!s.tag, locked: !!s.tag, right: s.tag, tag: 's' + s.number }));
+    items.push({ label: 'Request 0 seasons', icon: 'plus', tag: 'send' }, { label: 'Cancel', icon: 'close', tag: 'back' });
+    S.showPopup(c, { eyebrow: 'CHOOSE SEASONS', rating: '', title: d.title, overview: '', poster: tmdb(d.poster, 'w342'), items });
+  };
+  S.showPopup = (c, m) => {
+    const L = openLayer('popup', `<div class="rpanel"><div class="rpp" style="background-image:url('${esc(m.poster)}')"></div><div class="rpx"><div class="reb">${esc(m.eyebrow)}${m.rating ? `<i class="star">★</i>${esc(m.rating)}` : ''}</div><div class="rpt">${esc(m.title.toUpperCase())}</div><div class="rpo">${esc(m.overview)}</div>
+      <div class="rpi">${m.items.map(it => `<div class="fx rpb ${it.check ? 'chk' : ''} ${it.locked ? 'locked' : ''} ${it.check ? 'checked' : ''}" data-a="rqpick" data-t="${it.tag}">${it.check ? '<i class="bx"></i>' : (it.icon ? ricon(it.icon) : '')}<span>${esc(it.label)}</span>${it.sub ? `<em>${esc(it.sub)}</em>` : ''}${it.right ? `<u>${esc(it.right)}</u>` : ''}</div>`).join('')}</div><div class="rph2">Back to close</div></div></div>`);
+    L.card = c; L.rq = true;
+  };
+  S.pick = (L, el) => {
+    const a = el.dataset.t, c = L.card, d = c.data;
+    if (el.classList.contains('chk')) {
+      if (el.classList.contains('locked')) return;
+      el.classList.toggle('checked'); const n = $$('.chk.checked:not(.locked)', L.el).length; const send = $('[data-t=send] span', L.el); if (send) send.textContent = `Request ${n} season${n === 1 ? '' : 's'}`; return;
+    }
+    if (a === 'send') { const nums = $$('.chk.checked:not(.locked)', L.el).map(e => +e.dataset.t.slice(1)); if (!nums.length) return; closeLayer(); setTimeout(() => S.start(c, nums), 60); return; }
+    closeLayer();
+    setTimeout(() => {
+      if (a === 'movie') S.start(c); else if (a === 'all') S.start(c, 'all'); else if (/^s\d+$/.test(a)) S.start(c, [+a.slice(1)]);
+      else if (a === 'choose') S.choose(c);
+      else if (a === 'cancel') ov('DELETE', '/api/v1/request/' + d.requestId).then(() => { S.toastMsg('Cancelled ' + d.title); S.loadMine(); }).catch(e => S.toastMsg("Couldn't cancel " + d.title, e.message));
+      else if (a === 'like') ov('GET', `/api/v1/${d.mediaType}/${d.id}/recommendations?page=1`).then(j => { const cards = (j.results || []).map(r => rqMediaCard(Object.assign({ mediaType: d.mediaType }, r))); S.over = { eyebrow: 'MORE LIKE', title: d.title, cards }; S.show(); setFocus($$('.rc', room)[0] || null); }).catch(e => S.toastMsg(e.message));
+      else if (a === 'plex') S.openInPlex(d);
+    }, 60);
+  };
+  S.tab = i => { S.newTab = i; S.show(); };
+  RQLeave = () => { if (S.undo()) return true; if (S.over) { S.over = null; S.show(); setFocus($$('.rc', room)[0] || null); return true; } return false; };
+  RQInfo = i => { if (RQ === S && S.room === room) S.info(i); };
+  S.pollT = setInterval(() => { if (cur !== 'Requests' || RQ !== S) { clearInterval(S.pollT); return; } if (S.cur().key === 'mine' && S.mineActive && !layers.length) S.loadMine(); }, 10000);
+  if (!$('#rg', room)) return;
+  S.show(); S.load();
+  if (reqSearch) { const t = reqSearch; reqSearch = ''; S.idx = 0; S.show(); S.type(t); }
+  const fr = $$('.rli', room)[S.idx]; if (fr) fr.setAttribute('data-first', '1');
+}
+let RQLeave = null, RQInfo = null;
+
 /* ---------- Test room ---------- */
 let testMode = 'auto';
 async function roomTest(room, tok) {
@@ -1163,6 +1455,11 @@ function act(el) {
   else if (a === 'sopen') searchOpen(+d.i);
   else if (a === 'srq') { rememberSearch(SR.term); reqSearch = SR.rows[+d.i].title; go('Requests'); }
   else if (a === 'sask') { rememberSearch(SR.term); reqSearch = SR.term; go('Requests'); }
+  else if (a === 'rail') { RQ.idx = +d.i; RQ.over = null; RQ.show(); setFocus($$('.rc', $('#room'))[0] || $('#room .rsrow') || $('#room .key') || null); }
+  else if (a === 'rqcard') RQ.open(RQ.shown[+d.i]);
+  else if (a === 'rtab') RQ.tab(+d.i);
+  else if (a === 'rqkey') { const c = d.c; if (c === '⌫') RQ.type(RQ.text.slice(0, -1)); else if (c === '⌧') RQ.type(''); else RQ.type(RQ.text + c); }
+  else if (a === 'rqpick') RQ.pick(layers[layers.length - 1], el);
   else if (a === 'mood') openMood(d.m);
   else if (a === 'album') openAlbum(d.k, d.t).catch(e => toast(e.message));
   else if (a === 'mtoggle') M.toggle();
