@@ -55,6 +55,13 @@ end sub
 
 sub onMood()
     md = m.top.mood
+    ' Opened straight from Home before the Ambiance room ever loaded: fetch the Plex clips first,
+    ' so a mood with your own footage plays it instead of the drawn scene.
+    if needClips()
+        m.clipsAsked = true
+        hPlex("clips", { section: m.global.libraries.ambiance }, "onMoodClips")
+        return
+    end if
     it = ambMood(md)
     m.useVideo = ambHasVideo(it)
     if m.useVideo
@@ -348,3 +355,19 @@ function onKeyEvent(key as string, press as boolean) as boolean
     end if
     return true
 end function
+
+function needClips() as boolean
+    if m.clipsAsked = true then return false
+    if m.global.hasField("ambItems") and m.global.ambItems <> invalid and m.global.ambItems.count() > 0 then return false
+    libs = m.global.libraries
+    return libs <> invalid and libs.ambiance <> invalid
+end function
+
+sub onMoodClips(event as object)
+    t = hTaskFrom(event)
+    if t.ok and t.response.Clips <> invalid and t.response.Clips.count() > 0
+        if not m.global.hasField("ambItems") then m.global.addFields({ ambItems: [] })
+        m.global.ambItems = ambMerge(t.response.Clips)
+    end if
+    onMood()
+end sub
