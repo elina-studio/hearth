@@ -50,7 +50,7 @@ sub runTask()
     print "[hearth lidarr] "; method; " "; m.top.path; " -> "; status
     resp = {}
     if text <> invalid and text <> ""
-        parsed = ParseJson(text)
+        parsed = ParseJson(hFixText(text))
         if parsed <> invalid
             if type(parsed) = "roArray" then resp = { Items: parsed } else resp = parsed
         end if

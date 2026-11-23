@@ -260,7 +260,7 @@ function req(method as string, path as string, query as object, body as string, 
         end if
     end if
     parsed = invalid
-    if text <> invalid and text <> "" then parsed = ParseJson(text)
+    if text <> invalid and text <> "" then parsed = ParseJson(hFixText(text))
     return { status: status, body: parsed, text: text }
 end function
 

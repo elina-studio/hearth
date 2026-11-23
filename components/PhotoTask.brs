@@ -212,7 +212,7 @@ function send(method as string, url as string, query as object, token as string)
         if type(msg) = "roUrlEvent"
             status = msg.GetResponseCode()
             text = msg.GetString()
-            if text <> invalid and text <> "" then body = ParseJson(text)
+            if text <> invalid and text <> "" then body = ParseJson(hFixText(text))
         else
             xfer.AsyncCancel()
             status = -1
