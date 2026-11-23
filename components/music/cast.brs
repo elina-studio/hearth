@@ -98,19 +98,30 @@ end sub
 sub onCastService(event as object)
     t = hTaskFrom(event)
     if t.ok
-        if t.tag = "playjoin" then castCatchUp(t.bodyText)
+        if t.tag = "playjoin" or t.tag = "playjoin2" then castCatchUp(t.bodyText)
         return
     end if
-    if t.tag = "playjoin" then t.tag = "play"
-    print "[hearth cast] "; t.path; " failed: "; t.status
-    if t.tag = "join"
+    print "[hearth cast] "; t.path; " failed: "; t.status; " "; t.bodyText
+    ' Music Assistant finds the song by name; an artist or album spelled differently in its library
+    ' (e.g. alt-J tagged with an odd hyphen) makes it fail, so try once more with the title alone
+    if (t.tag = "play" or t.tag = "playjoin") and t.status >= 400
+        req = ParseJson(t.bodyText)
+        if req <> invalid and (req.artist <> invalid or req.album <> invalid)
+            req.delete("artist")
+            req.delete("album")
+            haService("music_assistant", "play_media", req, t.tag + "2")
+            return
+        end if
+    end if
+    if t.tag = "playjoin" or t.tag = "play2" or t.tag = "playjoin2" then tag = "play" else tag = t.tag
+    if tag = "join"
         ' different kinds of speakers can't always be grouped: play on each one instead (not in sync)
         m.castNoJoin = true
         say("These speakers can't be grouped, so they'll play side by side, maybe not quite in step.")
         m.castSeekFrom = m.top.position
         m.castSeekClock = CreateObject("roTimespan")
         castPlayTrack("playjoin")
-    else if t.tag = "play"
+    else if tag = "play"
         if t.status = -1
             say("The speakers are slow to answer. The song may still start there.")
         else if t.status = 0
