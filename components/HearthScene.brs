@@ -139,6 +139,13 @@ sub handle(r as object)
         pushScreen(s)
     else if a = "back"
         popScreen()
+    else if a = "room"
+        ' the rooms bar on a details page: back to the hub, on that room
+        while m.stack.getChildCount() > 1 and topScreen().subtype() <> "HubScreen"
+            popScreen()
+        end while
+        hub = topScreen()
+        if hub <> invalid and hub.subtype() = "HubScreen" then hub.callFunc("remoteGo", { go: "room", text: r.name })
     else if a = "musicView" and r.mode = "artist"
         s = CreateObject("roSGNode", "MusicArtistScreen")
         s.artistId = r.artistId

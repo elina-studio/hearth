@@ -5,7 +5,7 @@
      extras, collection, more like this. Everything scrolls as one page. -->
 <component name="DetailsScreen" extends="Group">
   <children>
-    <Group id="content">
+    <Group id="content" translation="[0, 80]">
       <Poster uri="pkg:/images/w/panel.9.png" translation="[88, 48]" width="224" height="324" blendColor="0x1D2418FF" />
       <Poster id="poster" translation="[100, 60]" width="200" height="300" loadDisplayMode="scaleToZoom" />
       <Group translation="[340, 0]">
@@ -27,6 +27,8 @@
       <Label id="empty" translation="[100, 520]" width="1700" color="0xB5AF8CFF" visible="false" />
       <Group id="below" translation="[100, 0]" />
     </Group>
+    <!-- the rooms bar stays on top while the page scrolls under it -->
+    <RoomBar id="roomBar" />
     <SideSheet id="sheet" />
     <SubsFinder id="finder" />
     <SubsAuto id="auto" />

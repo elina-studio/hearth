@@ -39,7 +39,9 @@ sub init()
 
     m.LIST_TOP = 516
     m.ROW = 124
-    m.offset = 0
+    ' the page sits 80px lower to make room for the rooms bar (RoomBar, 0-120)
+    m.offset = 80
+    m.roomBar = m.top.findNode("roomBar")
     m.zone = "act"
     m.isShow = false
     m.btn = 0
@@ -86,6 +88,7 @@ sub load()
         m.zone = "eps"
     end if
     if it.Type <> "Episode" then fillHeaderBasic(it)
+    if it.Type = "Movie" then m.roomBar.current = "Movies" else m.roomBar.current = "Shows"
     hPlex("item", { id: m.showId, full: true }, "onFull")
 end sub
 
@@ -102,6 +105,7 @@ sub onFull(event as object)
     if not t.ok or t.response.Id = invalid then return
     m.full = t.response
     m.isShow = (m.full.Type = "Series")
+    if m.isShow then m.roomBar.current = "Shows" else m.roomBar.current = "Movies"
     if m.isShow
         m.target = m.full.OnDeck
         hPlex("seasons", { id: m.full.Id }, "onSeasons")
@@ -680,12 +684,12 @@ sub paint()
         h = vb[m.belowSel].rowHeight + 40
     end if
     off = m.offset
-    if m.zone = "act"
-        off = 0
+    if m.zone = "act" or m.zone = "bar"
+        off = 80
     else
-        if top + off < 40 then off = 40 - top
+        if top + off < 130 then off = 130 - top
         if top + h + off > 1050 then off = 1050 - top - h
-        if off > 0 then off = 0
+        if off > 80 then off = 80
     end if
     if off <> m.offset
         m.scroll.control = "stop"
@@ -703,7 +707,28 @@ function onKeyEvent(key as string, press as boolean) as boolean
         m.top.request = { action: "back" }
         return true
     end if
+    if m.zone = "bar"
+        if key = "left" or key = "right"
+            d = 1
+            if key = "left" then d = -1
+            m.roomBar.callFunc("move", d)
+        else if key = "down"
+            m.zone = "act"
+            m.roomBar.focused = false
+        else if key = "OK"
+            ' climb back to the hub and open that room
+            m.top.request = { action: "room", name: m.roomBar.callFunc("chosen", invalid) }
+        end if
+        paint()
+        return true
+    end if
     if m.full = invalid then return true
+    if m.zone = "act" and key = "up"
+        m.zone = "bar"
+        m.roomBar.focused = true
+        paint()
+        return true
+    end if
     if m.zone = "act"
         n = m.actions.count()
         if key = "left" and m.btn > 0

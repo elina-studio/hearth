@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The Home room bar, kept on pages under a room (details), option 1 picked/recommended Nov 23
+     (mockups/details/R1-full-bar.png). Same PNG labels and firefly marks as HubScreen.
+     Up from the page focuses it; Left/Right pick a room; OK asks the scene to go there. -->
+<component name="RoomBar" extends="Group">
+  <children>
+    <Rectangle width="1920" height="120" color="0x0B0E09FF" />
+    <LanternMark translation="[100, 28]" />
+    <Poster id="glow" uri="pkg:/images/w/firefly-glow.png" height="62" />
+    <Group id="labels" />
+    <Poster id="f1" uri="pkg:/images/w/firefly-small.png" width="48" height="48" />
+    <Poster id="f2" uri="pkg:/images/w/firefly-small.png" width="48" height="48" opacity="0.45" />
+    <Poster id="fly" uri="pkg:/images/w/firefly-main.png" width="64" height="64" />
+  </children>
+  <interface>
+    <field id="current" type="string" value="Shows" onChange="paint" />
+    <field id="focused" type="boolean" value="false" onChange="paint" />
+    <field id="index" type="integer" value="-1" />
+    <function name="move" />
+    <function name="chosen" />
+  </interface>
+  <script type="text/brightscript" uri="pkg:/components/details/RoomBar.brs" />
+</component>

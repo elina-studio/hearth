@@ -216,7 +216,12 @@ end sub
 
 '' Phone remote: { go: "search" | "request", text }
 sub remoteGo(r as object)
-    if r.go = "request"
+    if r.go = "room"
+        ' from the rooms bar on a details page: text is the room name
+        showRoom(r.text, true)
+        m.pillIndex = indexOf(r.text)
+        paintPills()
+    else if r.go = "request"
         showRoom("Requests", true)
         m.pillIndex = indexOf("Requests")
         paintPills()
