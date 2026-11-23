@@ -19,24 +19,68 @@ sub init()
     m.buildTimer = m.top.findNode("buildTimer")
     m.buildTimer.observeField("fire", "onBuildTimer")
 
-    m.tabDefs = [["For you", "foryou"], ["Artists", "artists"], ["Albums", "albums"], ["Playlists", "playlists"], ["Request", "request"]]
+    ' tabs are plain words with a gold underline (like Movies and Shows); Request sits apart after a divider
+    m.tabDefs = [["For you", "foryou"], ["Artists", "artists"], ["Albums", "albums"], ["Playlists", "playlists"], ["New", "new"], ["Request", "request"]]
+    m.tabNodes = []
     x = 0
     for each t in m.tabDefs
+        g = m.tabsG.createChild("Group")
         if t[1] = "request"
-            c = m.tabsG.createChild("MusicChip")
-            c.icon = "request"
-            c.text = t[0]
-            c.translation = [x, -3]
-            x = x + c.width + 10
-        else
-            c = m.tabsG.createChild("HearthPill")
-            c.button = true
-            c.text = t[0]
-            c.width = Len(t[0]) * 16 + 56
-            c.translation = [x, 0]
-            x = x + c.width + 10
+            dv = m.tabsG.createChild("Rectangle")
+            dv.translation = [x - 10, 14]
+            dv.width = 2
+            dv.height = 30
+            dv.color = "0xD9A06655"
+            x = x + 24
         end if
+        g.translation = [x, 6]
+        lx = 0
+        ic = invalid
+        if t[1] = "request"
+            ic = g.createChild("Poster")
+            ic.uri = "pkg:/images/music/icons/request.png"
+            ic.width = 28
+            ic.height = 28
+            ic.translation = [0, 6]
+            lx = 38
+        end if
+        l = g.createChild("Label")
+        l.font = hFont("regular", 28)
+        l.text = t[0]
+        l.translation = [lx, 0]
+        w = Int(l.localBoundingRect().width)
+        u = g.createChild("Rectangle")
+        u.translation = [lx, 42]
+        u.width = w
+        u.height = 3
+        u.color = "0xE0B34AFF"
+        u.visible = false
+        g.addFields({ label: l, under: u, icon: ic })
+        m.tabNodes.push(g)
+        x = x + lx + w + 44
     end for
+
+    m.spot = m.top.findNode("spot")
+    m.spotArt = m.top.findNode("spotArt")
+    m.spotEyebrow = m.top.findNode("spotEyebrow")
+    m.spotEyebrow.font = hFont("caps", 26)
+    m.spotTitle = m.top.findNode("spotTitle")
+    m.spotTitle.font = hFont("bold", 50)
+    m.spotSub = m.top.findNode("spotSub")
+    m.spotSub.font = hFont("regular", 26)
+    sc = m.top.findNode("spotChips")
+    m.spotBtns = []
+    bx = 0
+    for each b in [["play", "Play"], ["shuffle", "Shuffle"]]
+        c = sc.createChild("MusicChip")
+        c.icon = b[0]
+        c.text = b[1]
+        c.translation = [bx, 0]
+        bx = bx + c.width + 12
+        m.spotBtns.push(c)
+    end for
+    m.newSpot = false
+    m.spotBtn = 0
 
     m.LET = "#ABCDEFGHIJKLMNOPQRSTUVWXYZ"
     for i = 0 to Len(m.LET) - 1
@@ -255,6 +299,12 @@ sub showTab(i as integer)
     m.shelves.visible = forYou
     m.grid.visible = not forYou
     m.lettersG.visible = (kind = "artists" or kind = "albums")
+    m.spot.visible = false
+    if kind = "new"
+        showNew()
+        paint()
+        return
+    end if
     if forYou
         if m.rows.count() = 0 then m.empty.text = "Loading your music" + Chr(8230)
         paint()
@@ -301,6 +351,10 @@ sub loadLib(kind as string)
     end if
     if kind = "playlists"
         pxApi("/playlists", { playlistType: "audio" }, "onLib", kind)
+        return
+    end if
+    if kind = "new"
+        pxApi("/library/sections/" + s + "/all", { type: "9", sort: "addedAt:desc", "X-Plex-Container-Start": "0", "X-Plex-Container-Size": "60" }, "onLib", kind)
         return
     end if
     if kind = "artists" then ty = "8" else ty = "9"
@@ -376,6 +430,7 @@ end function
 
 function hasContent() as boolean
     if m.tab = 0 then return m.rows.count() > 0
+    if m.tabDefs[m.tab][1] = "new" and m.newItem <> invalid then return true
     lib = curLib()
     return lib <> invalid and lib.cards <> invalid and lib.cards.Count() > 0
 end function
@@ -416,15 +471,29 @@ end function
 ' ---------- focus ----------
 sub paint()
     m.panel.active = (m.focused and m.zone = "panel")
-    for i = 0 to m.tabsG.getChildCount() - 1
-        c = m.tabsG.getChild(i)
-        c.focused = (m.focused and m.zone = "tabs" and i = m.tabSel)
-        if m.tabDefs[i][1] <> "request" then c.current = (i = m.tab)
+    for i = 0 to m.tabNodes.Count() - 1
+        g = m.tabNodes[i]
+        cur = (i = m.tab and m.tabDefs[i][1] <> "request")
+        foc = (m.focused and m.zone = "tabs" and i = m.tabSel)
+        g.under.visible = cur or foc
+        if foc
+            col = "0xE0B34AFF"
+        else if cur
+            col = "0xEDE6CAFF"
+        else
+            col = "0xB5AF8CFF"
+        end if
+        g.label.color = col
+        if g.icon <> invalid then g.icon.blendColor = col
+    end for
+    onNew = (m.tabDefs[m.tab][1] = "new")
+    for i = 0 to m.spotBtns.Count() - 1
+        m.spotBtns[i].focused = (onNew and m.focused and m.zone = "content" and m.newSpot and i = m.spotBtn)
     end for
     for i = 0 to m.rows.count() - 1
         m.rows[i].active = (m.focused and m.zone = "content" and m.tab = 0 and m.row = i)
     end for
-    m.grid.active = (m.focused and m.zone = "content" and m.tab > 0)
+    m.grid.active = (m.focused and m.zone = "content" and m.tab > 0 and not (onNew and m.newSpot))
     if m.tab = 0 and m.rows.count() > 0
         y = 0
         if m.row >= 1 then y = -(m.rows[m.row].translation[1])
@@ -572,6 +641,7 @@ sub tabKey(key as string)
             if here >= 0 then m.letter = here
         else if hasContent()
             m.zone = "content"
+            if m.tabDefs[m.tab][1] = "new" and m.newItem <> invalid then m.newSpot = true
         end if
     else if key = "options"
         muOptions(true)
@@ -607,6 +677,10 @@ sub letterKey(key as string)
 end sub
 
 sub contentKey(key as string)
+    if key = "OK" and m.tabDefs[m.tab][1] = "new" and m.newSpot
+        newKey(key)
+        return
+    end if
     if key = "OK"
         openCard()
         return
@@ -626,6 +700,9 @@ sub contentKey(key as string)
             m.rows[m.row].callFunc("move", 1)
         end if
         return
+    end if
+    if m.tabDefs[m.tab][1] = "new"
+        if newKey(key) then return
     end if
     moved = true
     if key = "up" then moved = m.grid.callFunc("move", 0, -1)
@@ -655,7 +732,7 @@ function slimItems(items as object) as object
     out = []
     for each md in items
         o = {}
-        for each k in ["type", "title", "ratingKey", "parentRatingKey", "parentTitle", "thumb", "composite", "leafCount"]
+        for each k in ["type", "title", "ratingKey", "parentRatingKey", "parentTitle", "thumb", "composite", "leafCount", "addedAt"]
             if md[k] <> invalid then o[k] = md[k]
         end for
         out.push(o)
@@ -674,4 +751,87 @@ function cacheRead(name as string) as object
     if text = "" then text = ReadAsciiFile("tmp:/" + Mid(cachePath(name), 10))
     if text = "" then return invalid
     return ParseJson(hFixText(text))
+end function
+
+' ---------- New: newly downloaded albums, newest first ----------
+' The newest album gets the spotlight card (Play, Shuffle); the rest are tiles that say when they arrived.
+' Albums Hearth asked Lidarr for get a REQUESTED tag.
+sub showNew()
+    lib = m.lib["new"]
+    if lib = invalid or lib.cards = invalid
+        m.grid.cards = []
+        m.newItem = invalid
+        if m.asked = invalid then m.asked = {}
+        if m.asked["new"] <> true or m.loadedFor <> m.askedFor
+            m.asked["new"] = true
+            m.askedFor = m.loadedFor
+            loadLib("new")
+        else
+            m.empty.text = "Loading" + Chr(8230)
+        end if
+        return
+    end if
+    req = muRequested()
+    cards = []
+    for each c in lib.cards
+        md = c.item
+        artist = pxStr(md.parentTitle)
+        c.sub = muWhen(md.addedAt)
+        if artist <> "" then c.sub = artist + "  ·  " + c.sub
+        c.tag = ""
+        if muIsRequested(req, artist, pxStr(md.title)) then c.tag = "REQUESTED"
+        cards.push(c)
+    end for
+    if cards.Count() = 0
+        m.newItem = invalid
+        m.grid.cards = []
+        m.empty.text = lib.note
+        return
+    end if
+    top = cards[0]
+    m.newItem = top.item
+    m.spot.visible = true
+    m.spotArt.uri = top.image
+    when = LCase(muWhen(top.item.addedAt))
+    m.spotEyebrow.text = "JUST ARRIVED  ·  " + UCase(when)
+    m.spotTitle.text = top.title
+    line = pxStr(top.item.parentTitle)
+    if top.item.leafCount <> invalid then line = line + "  ·  " + top.item.leafCount.toStr() + " songs"
+    if top.tag <> "" then line = line + "  ·  Requested"
+    m.spotSub.text = line
+    rest = []
+    for i = 1 to cards.Count() - 1
+        rest.push(cards[i])
+    end for
+    m.grid.translation = [690, 412]
+    m.grid.viewHeight = 518
+    m.grid.round = false
+    if lib.index >= rest.Count() then lib.index = 0
+    m.grid.index = lib.index
+    m.grid.cards = rest
+end sub
+
+' Keys on the New tab. Returns true when handled here.
+function newKey(key as string) as boolean
+    if m.newSpot
+        if key = "left"
+            if m.spotBtn > 0 then m.spotBtn = m.spotBtn - 1 else m.zone = "panel"
+        else if key = "right"
+            if m.spotBtn < m.spotBtns.Count() - 1 then m.spotBtn = m.spotBtn + 1
+        else if key = "up"
+            m.zone = "tabs"
+        else if key = "down"
+            gc = m.grid.cards
+            if gc <> invalid and gc.Count() > 0 then m.newSpot = false
+        else if key = "OK" and m.newItem <> invalid
+            muSend("playContainer", { kind: "album", id: pxStr(m.newItem.ratingKey), shuffle: (m.spotBtn = 1), label: pxStr(m.newItem.title) })
+        end if
+        return true
+    end if
+    if key = "up" and not m.grid.callFunc("move", 0, -1)
+        m.newSpot = true
+        return true
+    end if
+    if key = "up" then return true
+    return false
 end function

@@ -637,6 +637,11 @@ sub requestAlbums(items as object)
     if items.Count() = 1 then what = pxStr(items[0].al.title) else what = items.Count().toStr() + " albums"
     if items.Count() = 0 then what = a.artistName
     m.pendingWhat = what
+    names = []
+    for each x in items
+        names.push(pxStr(x.al.title))
+    end for
+    muMarkRequested(pxStr(a.artistName), names)
     if not owned(a)
         df = m.defaults
         if df = invalid or df.root = invalid or df.quality = invalid or df.metadata = invalid

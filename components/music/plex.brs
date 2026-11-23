@@ -139,3 +139,69 @@ function pxClock(sec as dynamic) as string
     if ss < 10 then t = "0" + t
     return mm.toStr() + ":" + t
 end function
+
+' ---------- albums Hearth asked Lidarr for (registry "hearth" / "musicRequested") ----------
+function muReqKey(artist as string, album as string) as string
+    out = ""
+    s = LCase(artist + "|" + album)
+    for i = 1 to Len(s)
+        c = Mid(s, i, 1)
+        if (c >= "a" and c <= "z") or (c >= "0" and c <= "9") or c = "|" or c = "*" then out = out + c
+    end for
+    return out
+end function
+
+function muRequested() as object
+    raw = CreateObject("roRegistrySection", "hearth").Read("musicRequested")
+    if raw = "" then return {}
+    list = ParseJson(raw)
+    out = {}
+    if type(list) = "roArray"
+        for each k in list
+            out[k] = true
+        end for
+    end if
+    return out
+end function
+
+' album "" means the whole artist
+sub muMarkRequested(artist as string, albums as object)
+    raw = CreateObject("roRegistrySection", "hearth").Read("musicRequested")
+    list = []
+    if raw <> "" then list = ParseJson(raw)
+    if type(list) <> "roArray" then list = []
+    if albums.Count() = 0 then albums = ["*"]
+    for each al in albums
+        list.push(muReqKey(artist, al))
+    end for
+    while list.Count() > 300
+        list.shift()
+    end while
+    reg = CreateObject("roRegistrySection", "hearth")
+    reg.Write("musicRequested", FormatJson(list))
+    reg.Flush()
+end sub
+
+function muIsRequested(req as object, artist as string, album as string) as boolean
+    return req[muReqKey(artist, album)] = true or req[muReqKey(artist, "*")] = true
+end function
+
+' "2 hours ago", "Yesterday", "Tuesday", "Nov 14" from a Plex addedAt (seconds)
+function muWhen(added as dynamic) as string
+    if added = invalid then return ""
+    now = CreateObject("roDateTime")
+    secs = now.AsSeconds() - added
+    if secs < 3600 then return "Just now"
+    if secs < 86400
+        h = Int(secs / 3600)
+        if h = 1 then return "1 hour ago"
+        return h.toStr() + " hours ago"
+    end if
+    d = CreateObject("roDateTime")
+    d.FromSeconds(added)
+    d.ToLocalTime()
+    if secs < 2 * 86400 then return "Yesterday"
+    if secs < 7 * 86400 then return d.GetWeekday()
+    months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    return months[d.GetMonth() - 1] + " " + d.GetDayOfMonth().toStr()
+end function

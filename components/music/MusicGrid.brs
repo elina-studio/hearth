@@ -75,6 +75,18 @@ sub makeSlot()
         cap.horizAlign = "center"
         sub2.visible = false
     end if
+    ' optional gold tag in the cover's corner (card.tag, e.g. "REQUESTED")
+    tagBg = g.createChild("Rectangle")
+    tagBg.translation = [x0 + 10, 10]
+    tagBg.height = 28
+    tagBg.color = "0xE0B34AFF"
+    tagBg.visible = false
+    tagL = g.createChild("Label")
+    tagL.translation = [x0 + 18, 10]
+    tagL.height = 28
+    tagL.vertAlign = "center"
+    tagL.font = hFont("bold", 17)
+    tagL.color = "0x1F1606FF"
     ring = g.createChild("Poster")
     if m.top.round
         ring.uri = "pkg:/images/music/round-ring.png"
@@ -87,7 +99,7 @@ sub makeSlot()
     ring.width = s + 20
     ring.height = s + 20
     ring.visible = false
-    g.addFields({ poster: p, fb: fb, cap: cap, sub2: sub2, ring: ring })
+    g.addFields({ poster: p, fb: fb, cap: cap, sub2: sub2, ring: ring, tagBg: tagBg, tagL: tagL })
 end sub
 
 sub fill(g as object, c as object)
@@ -100,6 +112,12 @@ sub fill(g as object, c as object)
     g.fb.text = UCase(t)
     g.cap.text = t
     if c.sub <> invalid then g.sub2.text = c.sub else g.sub2.text = ""
+    tg = ""
+    if c.tag <> invalid then tg = c.tag
+    g.tagL.text = tg
+    g.tagBg.visible = (tg <> "")
+    g.tagL.visible = (tg <> "")
+    if tg <> "" then g.tagBg.width = Len(tg) * 11 + 18
 end sub
 
 sub paint()
