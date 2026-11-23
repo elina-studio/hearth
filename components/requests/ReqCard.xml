@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- One poster in the Requests grid: poster (or title when there's none), a status chip with an icon, and a download bar. -->
+<!-- One poster in the Requests grid: poster (or title when there's none), a status band across its foot with an icon, and a download bar. -->
 <component name="ReqCard" extends="Group">
   <children>
     <Rectangle id="bg" width="180" height="270" color="0x1D2418FF" />
@@ -11,16 +11,16 @@
       <Label id="tileTitle" translation="[0, 150]" width="180" horizAlign="center" color="0xE0B34AFF" />
       <Label id="tileSub" translation="[14, 190]" width="152" wrap="true" maxLines="2" horizAlign="center" color="0xB5AF8CFF" />
     </Group>
-    <Group id="chip" translation="[0, 282]">
-      <Poster id="chipBg" width="180" height="40" />
+    <Group id="chip" translation="[0, 270]">
+      <Rectangle id="chipBg" width="180" height="40" />
       <Group id="chipInner">
         <Poster id="chipIcon" width="20" height="20" translation="[0, 10]" />
         <Label id="chipText" translation="[26, 0]" height="40" vertAlign="center" />
       </Group>
     </Group>
-    <Rectangle id="track" translation="[0, 332]" width="180" height="8" color="0xFFFFFF1A" visible="false" />
-    <Rectangle id="fill" translation="[0, 332]" height="8" color="0xE0B34AFF" visible="false" />
-    <Poster id="ring" uri="pkg:/images/ring.9.png" blendColor="0xE0B34AFF" translation="[-10, -10]" width="200" height="290" visible="false" />
+    <Rectangle id="track" translation="[0, 318]" width="180" height="8" color="0xFFFFFF1A" visible="false" />
+    <Rectangle id="fill" translation="[0, 318]" height="8" color="0xE0B34AFF" visible="false" />
+    <Poster id="ring" uri="pkg:/images/ring.9.png" blendColor="0xE0B34AFF" translation="[-10, -10]" width="200" height="330" visible="false" />
   </children>
   <interface>
     <field id="card" type="assocarray" onChange="draw" />
