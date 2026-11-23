@@ -262,3 +262,15 @@ function hMossUri(key as string) as string
     kinds = ["1-round-caps", "2-tall-caps", "3-golden-funnels", "4-two-acorns"]
     return "pkg:/images/w/moss-corner-" + kinds[h mod 4] + ".png"
 end function
+
+' Moss hugs the focused box (whimsy spec 4): the art's anchor (110, 55) sits on the box's visible
+' top-right corner (rx, ry); size is half the box width, between 64 and 125
+sub hMossHug(moss as object, rx as integer, ry as integer, boxW as integer)
+    mw = Int(boxW / 2)
+    if mw < 64 then mw = 64
+    if mw > 125 then mw = 125
+    s = mw / 125.0
+    moss.width = mw
+    moss.height = Int(96 * s)
+    moss.translation = [Int(rx - 110 * s), Int(ry - 55 * s)]
+end sub

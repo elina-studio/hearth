@@ -256,9 +256,7 @@ sub buildButtons()
             bg.height = 88
             moss = g.createChild("Poster")
             moss.uri = hMossUri(d.id)
-            moss.width = 125
-            moss.height = 96
-            moss.translation = [24, -66]
+            hMossHug(moss, 84, 0, 72)
             icon = g.createChild("Poster")
             icon.uri = "pkg:/images/player/" + d.icon + ".png"
             icon.width = 36

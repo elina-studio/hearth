@@ -404,7 +404,7 @@ sub paintFocus()
         m.ring.height = e.g.ringH + 40
         m.ring.visible = true
         m.moss.uri = hMossUri(sval(e.it.id))
-        m.moss.translation = [630, e.y - 58]
+        hMossHug(m.moss, 720, e.y, 720)
         m.moss.visible = true
     end if
     ' scroll so the focused item shows

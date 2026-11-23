@@ -84,9 +84,7 @@ sub buildSlots()
         ring.width = m.cw + 20
         ring.height = m.ch + 20
         moss = g.createChild("Poster")
-        moss.width = 125
-        moss.height = 96
-        moss.translation = [m.cw - 101, -56]
+        hMossHug(moss, m.cw + 7, -7, m.cw)
         moss.visible = false
         g.addFields({ bg: bg, fb: fb, pic: pic, bar: bar, ring: ring, moss: moss, at: -1 })
         g.visible = false

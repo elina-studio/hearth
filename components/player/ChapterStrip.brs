@@ -81,9 +81,7 @@ sub build()
         ring.height = 193
         moss = g.createChild("Poster")
         moss.uri = hMossUri("chap" + i.toStr())
-        moss.width = 125
-        moss.height = 96
-        moss.translation = [210, -58]
+        hMossHug(moss, 272, 0, 272)
         m.cells.push({ ring: ring, moss: moss, title: t, prog: done })
         x = x + 292
         if m.top.duration > 0
