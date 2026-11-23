@@ -277,6 +277,7 @@ sub runTask()
     else if op = "subDownload"
         ' Plex downloads in the background; the new stream shows up on the item a few seconds later
         res = req("PUT", m.server + "/library/metadata/" + a.id + "/subtitles", { key: a.key }, m.token)
+        print "[hearth-subs] Plex download request for "; a.key; " -> status "; res.status
     else if op = "refresh"
         ' rescans the item so Plex lists a subtitle file Bazarr just saved next to the video
         res = req("PUT", m.server + "/library/metadata/" + a.id + "/refresh", {}, m.token)
