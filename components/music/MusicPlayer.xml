@@ -5,6 +5,8 @@
   <children>
     <Audio id="audio" notificationInterval="1" />
     <Timer id="report" duration="10" repeat="true" />
+    <Timer id="castTimer" repeat="false" />
+    <Timer id="castClock" duration="1" repeat="true" />
   </children>
   <interface>
     <field id="command" type="assocarray" alwaysNotify="true" onChange="onCommand" />
@@ -21,8 +23,14 @@
     <field id="sectionName" type="string" />
     <field id="libraries" type="array" />
     <field id="message" type="string" alwaysNotify="true" />
+    <!-- other rooms (cast.brs) -->
+    <field id="rooms" type="array" />
+    <field id="castCount" type="integer" value="0" />
+    <field id="castDelay" type="float" value="1.5" />
   </interface>
   <script type="text/brightscript" uri="pkg:/source/util.brs" />
   <script type="text/brightscript" uri="pkg:/components/music/plex.brs" />
+  <script type="text/brightscript" uri="pkg:/source/photos.brs" />
+  <script type="text/brightscript" uri="pkg:/components/music/cast.brs" />
   <script type="text/brightscript" uri="pkg:/components/music/MusicPlayer.brs" />
 </component>

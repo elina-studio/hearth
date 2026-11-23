@@ -4,6 +4,8 @@
      "big": the full-screen Big view (large art and title, one row of chips ending in a Library button).
      "bar": a slim player bar along the bottom of another screen (the artist page), ending in a Big view button.
      Long titles scroll.
+     In the column, the Cast button folds the art away and lists the rooms (castOpen): OK ticks a room,
+     Left/Right sets its volume, and a "TV timing" row nudges when the TV starts. Back folds it up.
      The parent keeps focus and forwards keys: edge = panel.callFunc("handleKey", key) returns "" or an edge
      ("up", "right", "left", "down"). Views and the Big view / Library switch come out through `request`. -->
 <component name="MusicNowPanel" extends="Group">
@@ -21,10 +23,12 @@
     <Label id="total" horizAlign="right" color="0xB5AF8CFF" />
     <Group id="chips" />
     <Label id="chipName" color="0xB5AF8CFF" />
+    <Group id="castList" visible="false" />
   </children>
   <interface>
     <field id="layout" type="string" value="column" onChange="build" />
     <field id="active" type="boolean" value="false" onChange="paint" />
+    <field id="castOpen" type="boolean" value="false" onChange="build" />
     <field id="request" type="assocarray" alwaysNotify="true" />
     <function name="handleKey" />
   </interface>

@@ -9,6 +9,7 @@ sub init()
     m.errors = 0
     m.pending = invalid
     m.lastId = ""
+    castInit()
 end sub
 
 sub say(text as string)
@@ -21,6 +22,24 @@ sub onCommand()
     if c = invalid then return
     if c.cmd = invalid then return
     cmd = c.cmd
+    if castCommand(c) then return
+    ' while speakers play along, pause / resume reach them too
+    hasQueue = (m.top.queue <> invalid and m.top.queue.count() > 0)
+    if castActive() and hasQueue and (cmd = "toggle" or cmd = "pause" or cmd = "play" or cmd = "resume")
+        live = (m.top.state = "playing" or m.top.state = "buffering")
+        if live and (cmd = "toggle" or cmd = "pause")
+            castPause(true)
+            if castTvOn() then m.audio.control = "pause"
+            return
+        else if m.top.state = "paused" and cmd <> "pause" and m.castFresh = true
+            playIndex(m.top.index)
+            return
+        else if m.top.state = "paused" and cmd <> "pause"
+            castPause(false)
+            if castTvOn() then resume()
+            return
+        end if
+    end if
     if cmd = "toggle"
         if m.top.queue = invalid or m.top.queue.count() = 0
             shuffleAll()
@@ -377,8 +396,20 @@ sub playIndex(i as integer, startAt = 0 as float)
     c.addFields({ artist: tr.artist, album: tr.album })
     m.audio.control = "stop"
     m.audio.content = c
-    m.audio.control = "play"
     m.scrobbled = false
+    if castActive()
+        ' the speakers start this song now; the TV follows castDelay later, or keeps quiet
+        m.castFresh = false
+        m.castClock.control = "stop"
+        castPlayTrack()
+        if castTvOn()
+            castStartTv(0)
+        else
+            castStartClock()
+        end if
+        return
+    end if
+    m.audio.control = "play"
 end sub
 
 ' The TV plays one Audio node at a time; if another one took over while we were paused, start again where we were
@@ -406,7 +437,9 @@ end sub
 
 sub restart()
     if m.top.queue = invalid or m.top.queue.count() = 0 then return
-    if m.top.state = "playing" or m.top.state = "paused"
+    if castActive()
+        playIndex(m.top.index)
+    else if m.top.state = "playing" or m.top.state = "paused"
         m.audio.seek = 0
         if m.top.state = "paused" then m.audio.control = "resume"
     else
@@ -416,6 +449,8 @@ end sub
 
 sub onAudioState()
     s = m.audio.state
+    ' the TV is quiet while speakers play: its audio events don't count
+    if castActive() and not castTvOn() then return
     if s = "playing"
         m.errors = 0
         m.top.state = "playing"
@@ -427,19 +462,7 @@ sub onAudioState()
     else if s = "buffering"
         m.top.state = "buffering"
     else if s = "finished"
-        scrobble()
-        timeline("stopped")
-        q = m.top.queue
-        if m.top.repeat = "one"
-            playIndex(m.top.index)
-        else if m.top.index + 1 < q.count()
-            playIndex(m.top.index + 1)
-        else if m.top.repeat = "all"
-            playIndex(0)
-        else
-            m.top.state = "ended"
-            m.report.control = "stop"
-        end if
+        trackFinished()
     else if s = "error"
         m.errors = m.errors + 1
         tr = m.top.track
@@ -455,6 +478,23 @@ sub onAudioState()
         end if
     else if s = "stopped"
         if m.top.state <> "buffering" and m.top.state <> "paused" then m.top.state = "stopped"
+    end if
+end sub
+
+sub trackFinished()
+    scrobble()
+    timeline("stopped")
+    q = m.top.queue
+    if m.top.repeat = "one"
+        playIndex(m.top.index)
+    else if m.top.index + 1 < q.count()
+        playIndex(m.top.index + 1)
+    else if m.top.repeat = "all"
+        playIndex(0)
+    else
+        m.top.state = "ended"
+        m.report.control = "stop"
+        m.castClock.control = "stop"
     end if
 end sub
 

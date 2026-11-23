@@ -524,7 +524,11 @@ function onKeyEvent(key as string, press as boolean) as boolean
     if not press then return false
     if muMediaKey(key) then return true
     if key = "back"
-        toPills()
+        if m.zone = "panel" and m.panel.castOpen
+            m.panel.callFunc("handleKey", key)
+        else
+            toPills()
+        end if
         return true
     end if
     if m.zone = "panel"

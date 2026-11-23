@@ -1,8 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- One GET to Home Assistant (weather). With keepAwake, also counts as remote activity so the TV's screensaver waits. -->
+<!-- One call to Home Assistant: a GET (weather, speaker list) or, with method POST and bodyText, a service call (Music casting).
+     A JSON array reply arrives as response.items. With keepAwake, also counts as remote activity so the TV's screensaver waits. -->
 <component name="HaTask" extends="Task">
   <interface>
     <field id="path" type="string" />
+    <field id="method" type="string" value="GET" />
+    <field id="bodyText" type="string" />
+    <field id="tag" type="string" />
     <field id="keepAwake" type="boolean" value="false" />
     <field id="key" type="string" />
     <field id="status" type="integer" />

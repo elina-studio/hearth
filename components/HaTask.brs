@@ -19,12 +19,19 @@ sub runTask()
             xfer.SetCertificatesFile("common:/certs/ca-bundle.crt")
             xfer.InitClientCertificates()
         end if
-        if xfer.AsyncGetToString()
+        if m.top.method = "POST"
+            xfer.addHeader("Content-Type", "application/json")
+            started = xfer.AsyncPostFromString(m.top.bodyText)
+        else
+            started = xfer.AsyncGetToString()
+        end if
+        if started
             msg = wait(15000, port)
             if type(msg) = "roUrlEvent"
                 status = msg.GetResponseCode()
                 parsed = ParseJson(msg.GetString())
                 if type(parsed) = "roAssociativeArray" then resp = parsed
+                if type(parsed) = "roArray" then resp = { items: parsed }
             else
                 xfer.AsyncCancel()
                 status = -1
