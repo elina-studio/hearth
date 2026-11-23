@@ -168,6 +168,13 @@ class Handler(BaseHTTPRequestHandler):
             self.wfile.write(page)
         elif path == "/api/status":
             self.status()
+        elif path == "/api/keys":
+            # Hearth restores its saved keys from here after a reinstall (file written by tools/remote/save-keys.sh)
+            try:
+                with open(os.path.join(DATA_DIR, "hearth-keys.json")) as fh:
+                    self.send_json(json.load(fh))
+            except (OSError, ValueError):
+                self.send_json({})
         elif path == "/api/lyrics":
             q = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
             g = lambda k: (q.get(k) or [""])[0]

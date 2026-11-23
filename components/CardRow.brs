@@ -146,6 +146,14 @@ sub makeSlot(w as integer, h as integer, k as integer)
     ring.translation = [-27, -27]
     ring.width = w + 54
     ring.height = h + 54
+    if m.top.maskUri <> ""
+        ' round artist cards: a circle focus ring in gold, not the square rope
+        ring.uri = "pkg:/images/music/round-ring.png"
+        ring.blendColor = "0xE0B34AFF"
+        ring.translation = [-10, -10]
+        ring.width = w + 20
+        ring.height = h + 20
+    end if
     ring.visible = false
     moss = g.createChild("Poster")
     moss.visible = false
