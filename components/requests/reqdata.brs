@@ -46,6 +46,41 @@ function rqProgress(media as dynamic) as integer
     return Int((size - left) * 100 / size)
 end function
 
+' Download state from Overseerr's downloadStatus (it relays Radarr/Sonarr's queue).
+' { pct, stage: "downloading"|"importing", left: "9 min left", n: records } or invalid when nothing is queued
+function rqDownload(media as dynamic) as dynamic
+    if media = invalid or media.downloadStatus = invalid or media.downloadStatus.count() = 0 then return invalid
+    pct = rqProgress(media)
+    stage = "downloading"
+    secs = 0
+    allDone = true
+    for each d in media.downloadStatus
+        st = d.status
+        if st = invalid then st = ""
+        if LCase(st) <> "completed" and LCase(st) <> "importpending" and LCase(st) <> "importing" then allDone = false
+        tl = d.timeLeft
+        if tl <> invalid and (Type(tl) = "roString" or Type(tl) = "String")
+            parts = tl.Split(":")
+            if parts.count() = 3
+                v = parts[0].toInt() * 3600 + parts[1].toInt() * 60 + parts[2].toInt()
+                if v > secs then secs = v
+            end if
+        end if
+    end for
+    if allDone or pct >= 100 then stage = "importing"
+    left = ""
+    if stage = "downloading" and secs > 0
+        if secs >= 3600
+            left = Int(secs / 3600).toStr() + " h " + Int((secs mod 3600) / 60).toStr() + " min left"
+        else if secs >= 60
+            left = Int(secs / 60).toStr() + " min left"
+        else
+            left = "under a minute left"
+        end if
+    end if
+    return { pct: pct, stage: stage, left: left, n: media.downloadStatus.count() }
+end function
+
 function rqTitle(r as object) as string
     t = r.title
     if t = invalid then t = r.name
@@ -69,8 +104,12 @@ function rqRequestCard(q as object, info as object) as object
     ms = -1
     if media <> invalid then ms = rqNum(media.status)
     rs = rqNum(q.status)
-    pct = rqProgress(media)
+    dl = rqDownload(media)
+    pct = -1
+    if dl <> invalid then pct = dl.pct
+    caption = ""
     if rs = 1
+        caption = "Waiting for approval"
         chip = rqChip("Waiting approval", "clock", "out")
         note = "Waiting for approval in Overseerr."
     else if rs = 3
@@ -80,17 +119,27 @@ function rqRequestCard(q as object, info as object) as object
         chip = rqChip("Failed", "warn", "ember")
         note = "Overseerr couldn't send this to Radarr or Sonarr. Check Overseerr's Requests page."
     else if ms = 5
-        chip = rqChip("Ready", "play", "olive")
+        chip = rqChip("Ready · Play", "play", "olive")
+        caption = "Ready to watch"
         note = "Ready to watch. Press OK to open it."
     else if ms = 4
         chip = rqChip("Partly ready", "play", "olive")
+        caption = "The rest is on the way"
         note = "Some of it is ready to watch; the rest is on the way."
-    else if pct >= 0
-        chip = rqChip(pct.toStr() + "% downloaded", "down", "gold")
+    else if dl <> invalid and dl.stage = "importing"
+        chip = rqChip("Importing", "layers", "dim")
+        note = "Downloaded. Adding it to Plex now."
+        caption = "Adding to Plex"
+    else if dl <> invalid
+        chip = rqChip("Downloading " + pct.toStr() + "%", "down", "dim")
         note = "Downloading now."
+        caption = dl.left
+        if dl.n > 1 then caption = dl.n.toStr() + " parts coming. " + dl.left
     else
-        chip = rqChip("Approved", "stamp", "gold")
+        chip = rqChip("Searching", "search", "dim")
         note = "Approved. Waiting for a download to start."
+        caption = "Looking for a release"
+        pct = 0
     end if
     when = rqWhen(q.createdAt)
     if when <> "" then note = "Requested " + when + ". " + note
@@ -100,7 +149,7 @@ function rqRequestCard(q as object, info as object) as object
         note = note + " (Overseerr couldn't load this title: error " + info.detailStatus.toStr() + ".)"
     end if
     data = { id: info.id, mediaType: info.mediaType, title: title, year: rqYear(info), overview: info.overview, backdrop: info.backdropPath, poster: info.posterPath, rating: info.voteAverage, mediaStatus: ms, requestId: q.id, requestStatus: rs, note: note, runtime: info.runtime, seasons: info.numberOfSeasons }
-    return { kind: "media", title: title, image: rqImage(info.posterPath, "w185"), chip: chip, progress: pct, data: data }
+    return { kind: "media", title: title, image: rqImage(info.posterPath, "w185"), chip: chip, progress: pct, caption: caption, active: (dl <> invalid or (rs = 2 and ms <> 5)), data: data }
 end function
 
 ' "today at 3:52 PM", "Nov 20"

@@ -18,8 +18,15 @@
         <Label id="chipText" translation="[26, 0]" height="40" vertAlign="center" />
       </Group>
     </Group>
-    <Rectangle id="track" translation="[0, 318]" width="180" height="8" color="0xFFFFFF1A" visible="false" />
-    <Rectangle id="fill" translation="[0, 318]" height="8" color="0xE0B34AFF" visible="false" />
+    <Group id="bar" translation="[0, 318]" visible="false">
+      <Poster id="track" uri="pkg:/images/w/progress-track.9.png" width="180" height="12" />
+      <Group id="clip" translation="[1, 1]" clippingRect="[0, 0, 0, 10]">
+        <Poster uri="pkg:/images/w/progress-fill-body.png" width="1900" height="10" />
+      </Group>
+      <Poster id="tip" uri="pkg:/images/w/progress-fill-tip.png" width="12" height="10" visible="false" />
+    </Group>
+    <Label id="cap" translation="[0, 340]" width="180" height="26" />
+    <Label id="capSub" translation="[0, 368]" width="180" height="26" />
     <Poster id="ring" uri="pkg:/images/ring.9.png" blendColor="0xE0B34AFF" translation="[-10, -10]" width="200" height="330" visible="false" />
   </children>
   <interface>
