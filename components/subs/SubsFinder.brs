@@ -218,6 +218,10 @@ sub onPlexFound(event as object)
     m.plexDone = true
     m.plexRaw = []
     if t.ok and t.response.Items <> invalid then m.plexRaw = t.response.Items
+    m.resultKeys = {}
+    for each r in m.plexRaw
+        m.resultKeys[strOf(r.key)] = true
+    end for
     if not t.ok then print "[hearth-subs] Plex search failed (status "; t.status; ")"
     merge()
 end sub
@@ -334,7 +338,7 @@ sub onPlexDownloaded(event as object)
         failed("Plex couldn't download that one (status " + t.status.toStr() + "). Try another.")
         return
     end if
-    startPolling(12)
+    startPolling(30)
 end sub
 
 sub onBazarrDownloaded(event as object)
@@ -376,8 +380,11 @@ sub onPolled(event as object)
     for each s in streamList(t.response)
         isNew = not m.before.doesExist(strOf(s.id))
         lang = LCase(strOf(s.languageCode))
-        print "[hearth-subs] poll: stream "; strOf(s.id); " "; lang; " "; strOf(s.codec); " key "; strOf(s.key); " new "; isNew; " "; strOf(s.displayTitle)
+        print "[hearth-subs] poll: stream "; strOf(s.id); " "; lang; " "; strOf(s.codec); " key "; strOf(s.key); " transient "; strOf(s.transient); " new "; isNew; " "; strOf(s.displayTitle)
         ' only a new subtitle in the language that was searched counts
+        ' search results can show up on the item as temporary ("transient") streams; only a real file counts
+        if isTrue(s.transient) or strOf(s.transient) = "download" then isNew = false
+        if isNew and m.resultKeys <> invalid and m.resultKeys.doesExist(strOf(s.key)) then isNew = false
         if isNew and (Left(lang, 2) = m.lang or lang = "") then newest = s
     end for
     if newest = invalid then return

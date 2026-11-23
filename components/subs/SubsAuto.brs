@@ -30,6 +30,7 @@ sub go(unused = invalid as dynamic)
     m.item = it
     m.busy = true
     m.before = streamIds(it)
+    m.resultKeys = {}
     if mark.count() = 2 and mark[1] = "busy" and now - last < 120
         print "[hearth-subs] auto: a search for this title is already running; waiting for it"
         m.tries = 40
@@ -60,7 +61,11 @@ sub onPlexFound(event as object)
     t = hTaskFrom(event)
     best = invalid
     bestScore = -1
+    m.resultKeys = {}
     if t.ok and t.response.Items <> invalid
+        for each s in t.response.Items
+            m.resultKeys[strOf(s.key)] = true
+        end for
         for each s in t.response.Items
             if not isTrue(s.forced) and s.key <> invalid
                 ' an exact match for this file beats any download count
@@ -136,7 +141,7 @@ end sub
 
 sub onDownloaded(event as object)
     t = hTaskFrom(event)
-    m.tries = 20
+    m.tries = 30
     m.pollTimer.control = "start"
 end sub
 
@@ -155,7 +160,8 @@ sub onPolled(event as object)
     if not m.busy or not t.ok or t.response = invalid or t.response._media = invalid then return
     newest = invalid
     for each s in streamList(t.response)
-        if not m.before.doesExist(strOf(s.id)) and Left(LCase(strOf(s.languageCode)), 2) = "en" then newest = s
+        real = not isTrue(s.transient) and strOf(s.transient) <> "download" and not m.resultKeys.doesExist(strOf(s.key))
+        if real and not m.before.doesExist(strOf(s.id)) and Left(LCase(strOf(s.languageCode)), 2) = "en" then newest = s
     end for
     if newest = invalid then return
     m.pollTimer.control = "stop"
