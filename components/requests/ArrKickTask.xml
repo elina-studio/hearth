@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- After an Overseerr request: find the title in Radarr or Sonarr and start a search right away,
+     so the download begins now instead of on the next RSS sync. Keys live only in the TV registry. -->
+<component name="ArrKickTask" extends="Task">
+  <interface>
+    <!-- "movie" or "tv" -->
+    <field id="mediaType" type="string" />
+    <field id="tmdbId" type="integer" />
+    <field id="tvdbId" type="integer" />
+    <!-- "all", or season numbers like "1,3" -->
+    <field id="seasons" type="string" />
+    <field id="ok" type="boolean" />
+    <field id="note" type="string" />
+    <field id="done" type="boolean" alwaysNotify="true" />
+  </interface>
+  <script type="text/brightscript" uri="pkg:/components/requests/ArrKickTask.brs" />
+</component>

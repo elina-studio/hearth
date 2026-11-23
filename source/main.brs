@@ -67,6 +67,14 @@ sub saveInput(screen as object, info as object)
         reg.Flush()
         print "[hearth-subs] Bazarr key saved on the TV"
     end if
+    ' Radarr / Sonarr (start downloads right after an Overseerr request): radarrUrl, radarrKey, sonarrUrl, sonarrKey
+    for each k in ["radarrUrl", "radarrKey", "sonarrUrl", "sonarrKey"]
+        if info[k] <> invalid and info[k] <> ""
+            reg.Write(k, info[k])
+            reg.Flush()
+            print "[hearth-arr] saved "; k
+        end if
+    end for
     ' Photos weather: haUrl, haToken, haEntity (source/photos.brs)
     pSaveSettings(info)
 end sub

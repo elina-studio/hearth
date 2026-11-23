@@ -837,6 +837,8 @@ sub onRequested(event as object)
     t = taskFrom(event)
     if t.ok
         flash("check", "Requested " + t.tag, "")
+        ' start the download now: Radarr/Sonarr search immediately
+        hArrKick(t.response)
         loadMine()
         return
     end if

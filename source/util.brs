@@ -297,3 +297,38 @@ sub hMossHug(moss as object, lx as integer, ty as integer, rx as integer, key as
         moss.translation = [Int(rx - 110 * s), Int(ty - 55 * s)]
     end if
 end sub
+
+' After an Overseerr request succeeds: have Radarr/Sonarr search right away (ArrKickTask).
+' r is Overseerr's reply to POST /api/v1/request.
+sub hArrKick(r as object)
+    if r = invalid or r.media = invalid then return
+    t = CreateObject("roSGNode", "ArrKickTask")
+    mt = r.type
+    if mt = invalid then mt = r.media.mediaType
+    if mt = invalid then return
+    t.mediaType = mt
+    if r.media.tmdbId <> invalid then t.tmdbId = r.media.tmdbId
+    if r.media.tvdbId <> invalid then t.tvdbId = r.media.tvdbId
+    nums = []
+    if r.seasons <> invalid
+        for each s in r.seasons
+            if s.seasonNumber <> invalid then nums.push(s.seasonNumber.toStr())
+        end for
+    end if
+    if nums.count() > 0 then t.seasons = nums.join(",") else t.seasons = "all"
+    t.observeField("done", "hArrKicked")
+    if m.hArrTasks = invalid then m.hArrTasks = []
+    m.hArrTasks.push(t)
+    t.control = "RUN"
+end sub
+
+sub hArrKicked(event as object)
+    t = event.getRoSGNode()
+    if m.hArrTasks <> invalid
+        stillRunning = []
+        for each x in m.hArrTasks
+            if not x.isSameNode(t) then stillRunning.push(x)
+        end for
+        m.hArrTasks = stillRunning
+    end if
+end sub

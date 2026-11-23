@@ -480,7 +480,8 @@ sub onRequested(event as object)
     t = event.getRoSGNode()
     m.oTask = invalid
     if t.ok
-        hMessage("Requested", "Overseerr has the request. It shows in the Requests room.")
+        hArrKick(t.response)
+        hMessage("Requested", "Overseerr has the request, and the download search has started.")
     else
         hMessage("Request more seasons", "Overseerr said no (" + t.status.toStr() + ").")
     end if

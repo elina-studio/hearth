@@ -668,7 +668,43 @@ sub onAdded(event as object)
     r = t.response
     d = m.pvData
     if d <> invalid and t.tag = d.token and r <> invalid and r.id <> invalid then d.a.id = r.id
+    ' Lidarr searches a new artist only after it has fetched their albums; nudge it once that's likely done
+    if r <> invalid and r.id <> invalid
+        m.nudgeArtist = r.id
+        nt = m.top.findNode("nudgeTimer")
+        if nt = invalid
+            nt = m.top.createChild("Timer")
+            nt.id = "nudgeTimer"
+            nt.duration = 20
+            nt.observeField("fire", "onNudge")
+        end if
+        nt.control = "stop"
+        nt.control = "start"
+    end if
     done()
+end sub
+
+sub onNudge()
+    if m.nudgeArtist = invalid then return
+    lApi("GET", "/album", { artistId: m.nudgeArtist.toStr() }, invalid, "onNudgeAlbums")
+end sub
+
+' Search now for the monitored albums that have no files yet
+sub onNudgeAlbums(event as object)
+    t = hTaskFrom(event)
+    if not t.ok or t.response = invalid or t.response.Items = invalid then return
+    ids = []
+    for each al in t.response.Items
+        have = 0
+        if al.statistics <> invalid and al.statistics.trackFileCount <> invalid then have = al.statistics.trackFileCount
+        if al.monitored = true and have = 0 then ids.push(al.id)
+    end for
+    print "[hearth lidarr] new artist: searching "; ids.count(); " albums now"
+    if ids.count() > 0 then lApi("POST", "/command", {}, { name: "AlbumSearch", albumIds: ids }, "onNudged")
+end sub
+
+sub onNudged(event as object)
+    hTaskFrom(event)
 end sub
 
 sub onMonitored(event as object)
