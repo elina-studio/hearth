@@ -1,7 +1,7 @@
 ' Home. Focus zones, top to bottom:
 '   "hero"  Resume / From start / Details. Left on the first button or Right on the last steps to the
 '           previous or next of the top 3 Continue items.
-'   "dash"  0 prev, 1 play/pause, 2 next (Now playing), 3 Requests, 4..7 the 2x2 mood tiles
+'   "dash"  0 prev, 1 play/pause, 2 next, 8 like, 9 radio (Now playing; when idle 0 shuffle, 1 rediscover, 2 favourites), 3 Requests, 4..7 the 2x2 mood tiles
 '   "rows"  Next up, then Recently added
 sub init()
     m.content = m.top.findNode("content")
@@ -29,7 +29,9 @@ sub init()
     m.top.findNode("musicTitle").font = hFont("bold", 30)
     m.top.findNode("musicSub").font = hFont("regular", 24)
     m.top.findNode("reqFoot").font = hFont("regular", 26)
-    m.mRings = [m.top.findNode("mRing0"), m.top.findNode("mRing1"), m.top.findNode("mRing2")]
+    m.mRings = [m.top.findNode("mRing0"), m.top.findNode("mRing1"), m.top.findNode("mRing2"), m.top.findNode("mRing3"), m.top.findNode("mRing4")]
+    m.mDash = [0, 1, 2, 8, 9]
+    m.top.findNode("mSpk").font = hFont("regular", 22)
     m.reqRing = m.top.findNode("reqRing")
     m.musicBar = m.top.findNode("musicBar")
 
@@ -64,7 +66,7 @@ sub init()
     m.tasks = {}
     mp = m.global.music
     if mp <> invalid
-        for each f in ["track", "state", "queue", "index", "position"]
+        for each f in ["track", "state", "queue", "index", "position", "rooms", "castCount", "liked", "radioOn"]
             mp.observeField(f, "showMusic")
         end for
     end if
@@ -328,6 +330,40 @@ sub showGreeting()
 end sub
 
 ' ---------- Now playing ----------
+function musicIdle() as boolean
+    mp = m.global.music
+    return mp = invalid or mp.track = invalid or mp.queue = invalid or mp.queue.count() = 0
+end function
+
+' idle: the three buttons start something. 0 shuffle everything, 1 songs not heard lately, 2 favourites
+sub idleStart(i as integer)
+    mp = m.global.music
+    if mp = invalid then return
+    if i = 0
+        mp.command = { cmd: "shuffleAll" }
+    else if i = 1
+        mp.command = { cmd: "radioStart", kind: "forgotten" }
+    else if i = 2
+        mp.command = { cmd: "radioStart", kind: "favs" }
+    end if
+end sub
+
+' the speakers the music is going to: "This TV", "Kitchen", "Kitchen + 1"
+function speakerLine() as string
+    mp = m.global.music
+    if mp = invalid or mp.castCount = invalid or mp.castCount < 1 then return "This TV"
+    names = []
+    for each r in mp.rooms
+        if r.kind <> "tv" and r.on = true then names.push(pxStr(r.name))
+    end for
+    if names.count() = 0 then return "This TV"
+    line = names[0]
+    if names.count() > 1 then line = line + " + " + (names.count() - 1).toStr()
+    if mp.rooms[0].on = true then line = "TV + " + line
+    return line
+end function
+
+' ---------- Now playing / Listen now ----------
 sub showMusic()
     mp = m.global.music
     eb = m.top.findNode("musicEyebrow")
@@ -335,15 +371,40 @@ sub showMusic()
     su = m.top.findNode("musicSub")
     art = m.top.findNode("musicArt")
     tog = m.top.findNode("mToggle")
-    if mp = invalid or mp.track = invalid or mp.queue = invalid or mp.queue.count() = 0
-        eb.text = "MUSIC"
-        ti.text = "Shuffle my music"
-        su.text = "Play starts a random mix"
+    prv = m.top.findNode("mPrev")
+    nxt = m.top.findNode("mNext")
+    lk = m.top.findNode("mLike")
+    rd = m.top.findNode("mRadio")
+    sp = m.top.findNode("mSpk")
+    spi = m.top.findNode("mSpkIcon")
+    if musicIdle()
+        dt = CreateObject("roDateTime")
+        dt.ToLocalTime()
+        h = dt.GetHours()
+        if h < 12
+            when = "Morning"
+        else if h < 18
+            when = "Afternoon"
+        else
+            when = "Evening"
+        end if
+        eb.text = "LISTEN NOW"
+        ti.text = when + " music"
+        su.text = "Shuffle, rediscover, or favourites"
         art.uri = ""
-        tog.uri = "pkg:/images/icons/home-play.png"
+        prv.uri = "pkg:/images/music/icons/shuffle.png"
+        tog.uri = "pkg:/images/icons/history.png"
+        nxt.uri = "pkg:/images/music/icons/heart.png"
+        lk.visible = false
+        rd.visible = false
+        sp.text = speakerLine()
         m.musicBar.width = 0
         return
     end if
+    lk.visible = true
+    rd.visible = true
+    prv.uri = "pkg:/images/icons/home-prev.png"
+    nxt.uri = "pkg:/images/icons/home-next.png"
     tr = mp.track
     if mp.state = "playing"
         eb.text = "NOW PLAYING"
@@ -352,20 +413,23 @@ sub showMusic()
     else
         eb.text = "PAUSED"
     end if
+    if mp.radioOn = true then eb.text = eb.text + " · RADIO"
     if mp.state = "playing" or mp.state = "buffering"
         tog.uri = "pkg:/images/icons/home-pause.png"
     else
         tog.uri = "pkg:/images/icons/home-play.png"
     end if
+    if mp.liked = "like" then lk.blendColor = "0xE0B34AFF" else lk.blendColor = "0xEDE6CAFF"
     ti.text = pxStr(tr.title)
     line = pxStr(tr.artist)
     if tr.album <> invalid and tr.album <> "" then line = line + " · " + tr.album
     su.text = line
+    sp.text = speakerLine()
     u = pxImage(tr.thumb, 180, 180)
     if art.uri <> u then art.uri = u
     w = 0
-    if mp.duration > 0 then w = Int(180 * mp.position / mp.duration)
-    if w > 180 then w = 180
+    if mp.duration > 0 then w = Int(352 * mp.position / mp.duration)
+    if w > 352 then w = 352
     m.musicBar.width = w
 end sub
 
@@ -764,8 +828,8 @@ sub paint()
             b.icon.blendColor = "0xEDE6CAFF"
         end if
     end for
-    for i = 0 to 2
-        m.mRings[i].visible = focused and m.zone = "dash" and m.dash = i
+    for i = 0 to 4
+        m.mRings[i].visible = focused and m.zone = "dash" and m.dash = m.mDash[i] and (i < 3 or not musicIdle())
     end for
     m.reqRing.visible = focused and m.zone = "dash" and m.dash = 3
     for i = 0 to 2
@@ -828,12 +892,20 @@ sub activate()
             m.top.request = { action: "play", item: d.item, resume: true }
         end if
     else if m.zone = "dash"
-        if m.dash = 0
+        if musicIdle()
+            idleStart(m.dash)
+        else if m.dash = 0
             musicCommand("prev")
         else if m.dash = 1
             musicCommand("toggle")
         else if m.dash = 2
             musicCommand("next")
+        else if m.dash = 8
+            mp = m.global.music
+            if mp <> invalid then mp.command = { cmd: "rate", value: "like" }
+        else if m.dash = 9
+            mp = m.global.music
+            if mp <> invalid then mp.command = { cmd: "radioStart", kind: "song" }
         else if m.dash = 3
             m.top.request = { action: "room", name: "Requests" }
         else
@@ -896,10 +968,25 @@ sub moveSide(d as integer)
         end if
     else if m.zone = "dash"
         x = m.dash
+        idle = musicIdle()
         if d > 0
-            if x <= 4 or x = 6 then x = x + 1
+            if x = 2
+                if idle then x = 3 else x = 8
+            else if x = 8
+                x = 9
+            else if x = 9
+                x = 3
+            else if x <= 4 or x = 6
+                x = x + 1
+            end if
         else
-            if x >= 1 and x <= 3
+            if x = 3
+                if idle then x = 2 else x = 9
+            else if x = 9
+                x = 8
+            else if x = 8
+                x = 2
+            else if x >= 1 and x <= 2
                 x = x - 1
             else if x = 4 or x = 6
                 x = 3
@@ -920,7 +1007,7 @@ sub moveUp()
         return
     end if
     if m.zone = "dash"
-        if m.dash >= 6
+        if m.dash = 6 or m.dash = 7
             m.dash = m.dash - 2
         else
             m.zone = "hero"

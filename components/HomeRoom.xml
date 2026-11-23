@@ -49,15 +49,21 @@
         <Poster uri="pkg:/images/icons/home-note.png" translation="[228, 30]" width="28" height="28" blendColor="0xD9A066FF" />
         <Label id="musicEyebrow" translation="[264, 28]" height="32" vertAlign="center" color="0xD9A066FF" />
         <Label id="musicTitle" translation="[228, 64]" width="350" maxLines="1" color="0xEDE6CAFF" />
-        <Label id="musicSub" translation="[228, 108]" width="350" maxLines="1" color="0xB5AF8CFF" />
-        <Poster id="mRing0" uri="pkg:/images/ring-v1.9.png" blendColor="0xE0B34AFF" translation="[216, 158]" width="56" height="56" visible="false" />
-        <Poster id="mRing1" uri="pkg:/images/ring-v2.9.png" blendColor="0xE0B34AFF" translation="[272, 158]" width="56" height="56" visible="false" />
-        <Poster id="mRing2" uri="pkg:/images/ring-v3.9.png" blendColor="0xE0B34AFF" translation="[328, 158]" width="56" height="56" visible="false" />
-        <Poster id="mPrev" uri="pkg:/images/icons/home-prev.png" translation="[228, 170]" width="32" height="32" blendColor="0xEDE6CAFF" />
-        <Poster id="mToggle" uri="pkg:/images/icons/home-play.png" translation="[284, 170]" width="32" height="32" blendColor="0xEDE6CAFF" />
-        <Poster id="mNext" uri="pkg:/images/icons/home-next.png" translation="[340, 170]" width="32" height="32" blendColor="0xEDE6CAFF" />
-        <Rectangle translation="[396, 183]" width="180" height="6" color="0xFFFFFF1F" />
-        <Rectangle id="musicBar" translation="[396, 183]" width="0" height="6" color="0xA3A35AFF" />
+        <Label id="musicSub" translation="[228, 100]" width="350" maxLines="1" color="0xB5AF8CFF" />
+        <Poster id="mSpkIcon" uri="pkg:/images/music/icons/speaker.png" translation="[228, 134]" width="24" height="24" blendColor="0xE0B34AFF" />
+        <Label id="mSpk" translation="[260, 130]" width="320" height="32" vertAlign="center" maxLines="1" color="0xE0B34AFF" />
+        <Poster id="mRing0" uri="pkg:/images/ring-v1.9.png" blendColor="0xE0B34AFF" translation="[216, 162]" width="56" height="56" visible="false" />
+        <Poster id="mRing1" uri="pkg:/images/ring-v2.9.png" blendColor="0xE0B34AFF" translation="[272, 162]" width="56" height="56" visible="false" />
+        <Poster id="mRing2" uri="pkg:/images/ring-v3.9.png" blendColor="0xE0B34AFF" translation="[328, 162]" width="56" height="56" visible="false" />
+        <Poster id="mRing3" uri="pkg:/images/ring-v4.9.png" blendColor="0xE0B34AFF" translation="[384, 162]" width="56" height="56" visible="false" />
+        <Poster id="mRing4" uri="pkg:/images/ring-v5.9.png" blendColor="0xE0B34AFF" translation="[440, 162]" width="56" height="56" visible="false" />
+        <Poster id="mPrev" uri="pkg:/images/icons/home-prev.png" translation="[228, 174]" width="32" height="32" blendColor="0xEDE6CAFF" />
+        <Poster id="mToggle" uri="pkg:/images/icons/home-play.png" translation="[284, 174]" width="32" height="32" blendColor="0xEDE6CAFF" />
+        <Poster id="mNext" uri="pkg:/images/icons/home-next.png" translation="[340, 174]" width="32" height="32" blendColor="0xEDE6CAFF" />
+        <Poster id="mLike" uri="pkg:/images/music/icons/heart.png" translation="[396, 174]" width="32" height="32" blendColor="0xEDE6CAFF" />
+        <Poster id="mRadio" uri="pkg:/images/music/icons/radio.png" translation="[452, 174]" width="32" height="32" blendColor="0xEDE6CAFF" />
+        <Rectangle translation="[228, 218]" width="352" height="6" color="0xFFFFFF1F" />
+        <Rectangle id="musicBar" translation="[228, 218]" width="0" height="6" color="0xA3A35AFF" />
       </Group>
 
       <!-- Requests -->
