@@ -26,7 +26,7 @@ for n in sonarr radarr lidarr overseerr bazarr plex; do [ -n "$(get $n)" ] && ec
 ask() { # name var
   if [ -z "${!2}" ]; then read -r -s -p "Paste the $1 (hidden, Enter to skip): " v; echo; printf -v "$2" '%s' "$v"; fi
 }
-ask "Overseerr API key" OVR; ask "Radarr API key" RAD; ask "Sonarr API key" SON; ask "Lidarr API key" LID; ask "Bazarr API key" BAZ
+ask "Plex token" PLX; ask "Overseerr API key" OVR; ask "Radarr API key" RAD; ask "Sonarr API key" SON; ask "Lidarr API key" LID; ask "Bazarr API key" BAZ
 read -r -s -p "Paste the Home Assistant long-lived token (hidden, Enter to skip): " HAT; echo
 read -r -p "Home Assistant weather entity [weather.home]: " HAE; HAE=${HAE:-weather.home}
 
