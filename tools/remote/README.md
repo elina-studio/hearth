@@ -34,3 +34,15 @@ Roku over ECP and types straight into Hearth's keyboards.
 speakers play the same song, finds how far apart they are, and moves the TV by that much:
 `POST http://<tv>:8060/input?castTrim=<seconds>` (signed). It checks again afterwards and flips direction if the
 first move went the wrong way. "Keep checking" repeats every 40 seconds.
+
+## Hearth for browsers (the projector)
+
+The same helper also serves a browser version of Hearth at `/hearth/` (files in `web/`).
+It reaches Plex and Overseerr through `/px/plex/...` and `/px/overseerr/...`, where the
+helper adds the keys saved in `data/hearth-keys.json` (run `save-keys.sh` first), so the
+page never holds a password.
+
+- Open `https://192.168.254.41:8766/hearth/` on the projector (accept the certificate once;
+  plain `http://192.168.254.41:8765/hearth/` also works if the browser allows it).
+- Ready: Home, Music, Ambiance, Test video. Movies, Shows, Requests, Photos and Search show a
+  placeholder until they are ported.

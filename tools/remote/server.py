@@ -28,6 +28,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import lastfm
 import lyrics
+import web
 
 TV_IP = os.environ.get("TV_IP", "192.168.254.9")
 HTTP_PORT = int(os.environ.get("HTTP_PORT", "8765"))
@@ -155,8 +156,24 @@ class Handler(BaseHTTPRequestHandler):
         n = int(self.headers.get("Content-Length") or 0)
         return self.rfile.read(n) if n else b""
 
+    def do_HEAD(self):
+        path = self.path.split("?")[0]
+        if path.startswith("/px/"):
+            return web.proxy(self, "HEAD", path)
+        self.send_json({"error": "not found"}, 404)
+
     def do_GET(self):
         path = self.path.split("?")[0]
+        if path.startswith("/px/"):
+            return web.proxy(self, "GET", path)
+        if path == "/hearth" or path.startswith("/hearth/"):
+            if path == "/hearth":
+                self.send_response(302)
+                self.send_header("Location", "/hearth/")
+                self.end_headers()
+                return
+            web.serve_static(self, path)
+            return
         if path in ("/", "/index.html"):
             with open(os.path.join(HERE, "index.html"), "rb") as fh:
                 page = fh.read()
@@ -255,6 +272,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = self.path.split("?")[0]
+        if path.startswith("/px/"):
+            return web.proxy(self, "POST", path)
         try:
             if path == "/api/voice":
                 pcm = self.body()
