@@ -8,7 +8,7 @@
     <Video id="video" width="1920" height="1080" visible="false" enableUI="false" loop="true" disableScreenSaver="true" />
     <!-- shown instantly, hidden once the video is actually playing -->
     <Poster id="still" width="1920" height="1080" loadDisplayMode="scaleToZoom" visible="false" />
-    <Label id="note" translation="[96, 80]" width="1200" color="0xEDE6CACC" visible="false" />
+    <Label id="note" translation="[96, 80]" width="1700" color="0xEDE6CACC" visible="false" />
     <Rectangle id="dim" width="1920" height="1080" color="0x000000FF" opacity="0" />
     <Label id="cornerClock" translation="[1524, 60]" width="300" horizAlign="right" color="0xEDE6CA99" visible="false" />
     <Timer id="clockTick" duration="20" repeat="true" />
@@ -37,6 +37,7 @@
     </Animation>
     <Timer id="hudTimer" duration="5" repeat="false" />
     <Timer id="sleepTimer" repeat="false" />
+    <Timer id="focusTick" repeat="true" duration="0.5" />
     <Timer id="videoWatch" repeat="false" duration="10" />
   </children>
   <interface>

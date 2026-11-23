@@ -17,6 +17,10 @@ sub init()
     m.note.font = hFont("regular", 24)
     m.videoWatch = m.top.findNode("videoWatch")
     m.videoWatch.observeField("fire", "onVideoWatch")
+    ' the Video node can take key focus for itself and then Back never reaches this screen: reclaim it twice a second
+    m.focusTick = m.top.findNode("focusTick")
+    m.focusTick.observeField("fire", "refocus")
+    m.focusTick.control = "start"
     m.still = m.top.findNode("still")
     m.dim = m.top.findNode("dim")
     m.dimLevels = [0, 0.25, 0.5, 0.7]
@@ -80,10 +84,12 @@ sub onMood()
     if it <> invalid then m.clip = it.clip
     m.clipRetried = false
     m.retried5 = false
+    m.why = ""
     m.video.control = "stop"
     if m.clip <> invalid
         ' the person's own footage, streamed from their Plex "Ambiance" library
         m.note.visible = false
+        if m.video.getParent() = invalid then m.top.insertChild(m.video, 2)
         m.video.content = clipContent(m.clip, needsConvert(m.clip))
         pic = m.clip.art
         if pic = invalid then pic = m.clip.thumb
@@ -362,15 +368,21 @@ end sub
 ' the video never started (or errored twice): show the still, calm, with a small note; Back always works
 sub videoFailed(why as string)
     print "[ambiance] video gave up: "; why
+    code = why
+    if m.why <> "" then code = m.why + " / " + why
+    info = ""
+    if m.clip <> invalid then info = "  " + toStr0(m.clip.videoCodec) + " " + toStr0(m.clip.width) + "x" + toStr0(m.clip.height) + " " + toStr0(m.clip.container)
     m.videoWatch.control = "stop"
     m.video.control = "stop"
     m.video.visible = false
+    ' take the player out of the screen altogether so it can't hold the remote's focus
+    if m.video.getParent() <> invalid then m.top.removeChild(m.video)
     m.useVideo = false
     m.drift.control = "stop"
     m.still.scale = [1.0, 1.0]
     m.still.translation = [0, 0]
     m.still.visible = true
-    m.note.text = "Video unavailable. Back to leave."
+    m.note.text = "Video unavailable. Back to leave.   [" + code + "]" + info
     m.note.visible = true
     if m.yielded then rejoinMusic()
     refocus()
@@ -382,13 +394,14 @@ sub onVideoWatch()
     if m.video.state = "playing" then return
     print "[ambiance] video start timeout, state "; m.video.state
     if m.clip <> invalid and not m.clipRetried
+        m.why = "first try timed out (" + m.video.state + ")"
         m.clipRetried = true
         m.video.control = "stop"
         m.video.content = clipContent(m.clip, true)
         m.video.control = "play"
-        armWatch(20)
+        armWatch(40)
     else
-        videoFailed("timeout")
+        videoFailed("convert timed out (" + m.video.state + ")")
     end if
 end sub
 
@@ -415,12 +428,13 @@ sub onVideoState()
         end if
         ' a phone clip in a format the TV can't open directly: ask Plex to convert it, once
         if m.clip <> invalid and not m.clipRetried
+            m.why = "first try error " + m.video.errorCode.toStr()
             m.clipRetried = true
             m.video.content = clipContent(m.clip, true)
             m.video.control = "play"
-            armWatch(20)
+            armWatch(40)
         else
-            videoFailed("error " + m.video.errorCode.toStr())
+            videoFailed("error " + m.video.errorCode.toStr() + " " + m.video.errorMsg)
         end if
     end if
     if m.video.state = "playing"
@@ -604,6 +618,7 @@ sub wake()
 end sub
 
 sub leave()
+    m.focusTick.control = "stop"
     m.sleepTimer.control = "stop"
     m.videoWatch.control = "stop"
     m.sound.active = false
@@ -616,6 +631,7 @@ end sub
 
 function onKeyEvent(key as string, press as boolean) as boolean
     if not press then return false
+    print "[ambiance] key "; key
     if key = "back"
         leave()
         return true
