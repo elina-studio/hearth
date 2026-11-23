@@ -104,6 +104,10 @@ sub onCastService(event as object)
         return
     end if
     print "[hearth cast] "; t.path; " failed: "; t.status; " "; t.bodyText
+    if t.tag = "queueadd"
+        m.castQueuedId = ""
+        return
+    end if
     ' Music Assistant finds the song by name; an artist or album spelled differently in its library
     ' (e.g. alt-J tagged with an odd hyphen) makes it fail, so try once more with the title alone
     if (t.tag = "play" or t.tag = "playjoin") and t.status >= 400
@@ -324,9 +328,18 @@ end sub
 
 ' ---------- playing ----------
 ' Called by playIndex while casting: the speakers get the song now, the TV castDelay seconds later.
-sub castPlayTrack(tag = "play" as string)
+' Returns true when the speakers were already on this song (queued ahead, so they never wander off
+' to a song of Music Assistant's own choosing when the last one ends) and nothing was sent.
+function castPlayTrack(tag = "play" as string) as boolean
     tr = m.top.track
-    if tr = invalid then return
+    if tr = invalid then return false
+    if tag = "play" and m.castAdvanced = true and m.castQueuedId = tr.id and m.castQueuedId <> ""
+        m.castQueuedId = ""
+        ' the speakers started it about castDelay seconds ago
+        castMark(m.top.castDelay * 2)
+        return true
+    end if
+    m.castQueuedId = ""
     if m.castNoJoin = true then targets = castOnIds() else targets = [m.castLeader]
     for each id in targets
         data = { entity_id: id, media_id: tr.title, media_type: "track", enqueue: "replace" }
@@ -335,6 +348,25 @@ sub castPlayTrack(tag = "play" as string)
         haService("music_assistant", "play_media", data, tag)
     end for
     if tag = "play" then castMark(0)
+    return false
+end function
+
+' Queue the next song behind this one in Music Assistant, so its own "keep the music going" never
+' picks a song when this one ends (the TV, which trails the speakers, would then be sent to the right one a few seconds late)
+sub castQueueNext()
+    q = m.top.queue
+    i = m.top.index + 1
+    if q = invalid or i >= q.count() or m.top.repeat <> "off" or m.castLeader = "" then return
+    tr = q[i]
+    if m.castQueuedId = tr.id then return
+    if m.castNoJoin = true then targets = castOnIds() else targets = [m.castLeader]
+    for each id in targets
+        data = { entity_id: id, media_id: tr.title, media_type: "track", enqueue: "add" }
+        if tr.artist <> invalid and tr.artist <> "" then data.artist = tr.artist
+        if tr.album <> invalid and tr.album <> "" then data.album = tr.album
+        haService("music_assistant", "play_media", data, "queueadd")
+    end for
+    m.castQueuedId = tr.id
 end sub
 
 ' The speaker answered play_media: skip it to where the TV is now (plus its start-up delay)
@@ -380,6 +412,7 @@ sub onCastPos(event as object)
     if not t.ok or m.castRefClock = invalid then return
     st = t.response
     if st = invalid or st.state <> "playing" or st.attributes = invalid then return
+    castQueueNext()
     a = st.attributes
     if a.media_position = invalid or a.media_position_updated_at = invalid then return
     upd# = castIsoSeconds(pxStr(a.media_position_updated_at))
@@ -394,6 +427,7 @@ sub onCastPos(event as object)
     m.castLag = lag
     castSetDelay()
     castAlign()
+    castQueueNext()
     ' once more later, to catch any drift
     m.castPollN = m.castPollN + 1
     if m.castPollN < 2

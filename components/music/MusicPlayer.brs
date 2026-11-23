@@ -407,8 +407,11 @@ sub playIndex(i as integer, startAt = 0 as float)
         ' the speakers start this song now; the TV follows castDelay later, or keeps quiet
         m.castFresh = false
         m.castClock.control = "stop"
-        castPlayTrack()
-        if castTvOn()
+        already = castPlayTrack()
+        if castTvOn() and already
+            ' the speakers are already part-way into this song: the TV jumps in where they are
+            castStartTv(m.top.castDelay + 0.5)
+        else if castTvOn()
             castStartTv(0)
         else
             castStartClock()
@@ -500,7 +503,10 @@ sub trackFinished()
     if m.top.repeat = "one"
         playIndex(m.top.index)
     else if m.top.index + 1 < q.count()
+        ' the speakers may already be on the next song (castQueueNext)
+        m.castAdvanced = true
         playIndex(m.top.index + 1)
+        m.castAdvanced = false
     else if m.top.repeat = "all"
         playIndex(0)
     else
@@ -526,7 +532,10 @@ sub timeline(state as string)
     if tr = invalid or tr.id = invalid or not pxReady() then return
     if state = "stopped" and m.lastId <> tr.id then return
     m.lastId = tr.id
-    q = { ratingKey: tr.id, key: "/library/metadata/" + tr.id, state: state, time: Int(m.top.position * 1000).toStr(), duration: Int(m.top.duration * 1000).toStr() }
+    ' Plex answers 400 when the time is past the end of the song
+    at = m.top.position
+    if m.top.duration > 0 and at > m.top.duration then at = m.top.duration
+    q = { ratingKey: tr.id, key: "/library/metadata/" + tr.id, state: state, time: Int(at * 1000).toStr(), duration: Int(m.top.duration * 1000).toStr() }
     pxApi("/:/timeline", q, "onReported")
     if state = "stopped" then m.lastId = ""
 end sub

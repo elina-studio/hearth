@@ -55,7 +55,7 @@ sub runTask()
         end if
     end if
     resp = {}
-    if text <> invalid and text <> ""
+    if text <> invalid and (Left(text, 1) = "{" or Left(text, 1) = "[")
         parsed = ParseJson(hFixText(text))
         if parsed <> invalid and type(parsed) = "roAssociativeArray" then resp = parsed
     end if
