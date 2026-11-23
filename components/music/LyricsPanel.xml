@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Small lyrics panel that sits beside the player, over a visualizer, the Ambiance fire, the cover or the Big view.
+     Five lines: the current one in gold, two before and two after, dimmer. Time-coded lyrics follow the song (plus a timing
+     nudge, which also helps when speakers play along); plain lyrics scroll in step with the song's progress.
+     Found by the NAS helper (.lrc next to the song, then LRCLIB) via GET /api/lyrics. Hidden when a song has none.
+     The parent calls stop() when it leaves, toggle() to show/hide, nudge(seconds). -->
+<component name="LyricsPanel" extends="Group">
+  <children>
+    <Poster id="bg" uri="pkg:/images/w/panel-v4.9.png" translation="[-12, -12]" width="784" height="434" blendColor="0x0B0E09C8" />
+    <Group id="rows" />
+    <Label id="timing" translation="[36, 372]" width="688" color="0xB5AF8CFF" />
+    <Timer id="timingTimer" duration="2" repeat="false" />
+  </children>
+  <interface>
+    <field id="active" type="boolean" value="true" />
+    <field id="found" type="boolean" value="false" alwaysNotify="true" />
+    <function name="start" />
+    <function name="stop" />
+    <function name="toggle" />
+    <function name="nudge" />
+    <function name="isOn" />
+  </interface>
+  <script type="text/brightscript" uri="pkg:/source/text.brs" />
+  <script type="text/brightscript" uri="pkg:/source/util.brs" />
+  <script type="text/brightscript" uri="pkg:/components/music/plex.brs" />
+  <script type="text/brightscript" uri="pkg:/components/music/musicui.brs" />
+  <script type="text/brightscript" uri="pkg:/components/music/nas.brs" />
+  <script type="text/brightscript" uri="pkg:/components/music/LyricsPanel.brs" />
+</component>

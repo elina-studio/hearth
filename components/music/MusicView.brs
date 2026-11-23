@@ -27,6 +27,7 @@ sub init()
     m.stripOut = m.top.findNode("stripOut")
     m.stripTimer = m.top.findNode("stripTimer")
     m.stripTimer.observeField("fire", "hideStrip")
+    m.lyrics = m.top.findNode("lyrics")
     m.mix = "both"
     m.preset = 0
     m.sound = invalid
@@ -58,6 +59,13 @@ sub onMode()
     else if mode = "hearth"
         startHearth()
     end if
+    ' lyrics sit over the visualizer and the fire, not over the big cover
+    if mode = "cover"
+        m.lyrics.callFunc("stop", invalid)
+        m.lyrics.visible = false
+    else
+        m.lyrics.callFunc("start", invalid)
+    end if
     showNow()
     ' music is the point of these views: start it if nothing is on
     p = muPlayer()
@@ -86,6 +94,7 @@ sub showNow()
     end if
     mode = m.top.mode
     keys = "Play pauses  ·  Rewind and Fast forward change song  ·  Back closes"
+    if m.top.mode <> "cover" then keys = keys + "  ·  Up shows or hides lyrics"
     if mode = "hearth"
         names = { both: "FIRE + MUSIC", fire: "FIRE ONLY", music: "MUSIC ONLY" }
         m.sEyebrow.text = "HEARTH  ·  " + names[m.mix] + "  ·  " + n.eyebrow
@@ -224,6 +233,7 @@ sub muRestoreFocus()
 end sub
 
 sub leave()
+    m.lyrics.callFunc("stop", invalid)
     if m.sound <> invalid
         m.sound.on = false
         m.sound.active = false
@@ -250,6 +260,16 @@ function onKeyEvent(key as string, press as boolean) as boolean
     end if
     if key = "options"
         if m.top.mode = "hearth" then mixMenu() else muOptions(false)
+        return true
+    end if
+    if key = "up" and m.top.mode <> "cover"
+        muSend("lyricsToggle")
+        showStrip()
+        return true
+    end if
+    if m.top.mode = "hearth" and (key = "left" or key = "right") and muPlayer().lyricsFound
+        if key = "left" then muSend("lyricsNudge", { delta: -0.5 }) else muSend("lyricsNudge", { delta: 0.5 })
+        showStrip()
         return true
     end if
     if m.top.mode = "milk" and (key = "left" or key = "right")

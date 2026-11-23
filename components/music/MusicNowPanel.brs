@@ -13,6 +13,9 @@ sub init()
     m.chips = m.top.findNode("chips")
     m.chipName = m.top.findNode("chipName")
     m.castList = m.top.findNode("castList")
+    m.scrobTick = m.top.findNode("scrobTick")
+    m.scrobText = m.top.findNode("scrobText")
+    m.scrobText.font = hFont("regular", 22)
     m.castTop = 0
     m.names = { prev: "Previous", toggle: "Play", next: "Next", shuffle: "Shuffle", repeat: "Repeat", cover: "Cover", milk: "Visualizer", hearth: "Hearth fire", big: "Big view", library: "Back to the library", cast: "Play in other rooms" }
     m.r = 0
@@ -23,6 +26,7 @@ sub init()
     end for
     p.observeFieldScoped("position", "showTime")
     p.observeFieldScoped("castCount", "showNow")
+    p.observeFieldScoped("lfmState", "showScrob")
     p.observeFieldScoped("rooms", "drawCast")
     p.observeFieldScoped("castDelay", "drawCast")
     build()
@@ -130,6 +134,10 @@ sub build()
         setText(m.chipName, [x, 888], w, "regular", 22)
     end if
     m.track.width = m.barW
+    ' Last.fm: a tick where the song counts (half way), and a word once it has
+    m.scrobTick.translation = [m.track.translation[0] + m.barW / 2 - 2, m.track.translation[1] - 12]
+    m.scrobText.translation = [m.track.translation[0] + m.barW / 2 - 110, m.track.translation[1] + 16]
+    m.scrobText.width = 220
     m.track.visible = false
     m.fill.visible = false
     if m.braid <> invalid then m.top.removeChild(m.braid)
@@ -226,7 +234,27 @@ sub showNow()
     paint()
 end sub
 
+sub showScrob()
+    s = muPlayer().lfmState
+    show = (s <> "off" and (m.top.layout = "column" or m.top.layout = "big") and not m.top.castOpen)
+    m.scrobTick.visible = show
+    m.scrobText.visible = show
+    if s = "counted"
+        m.scrobTick.color = "0xFFE7A0FF"
+        m.scrobText.color = "0xE0B34AFF"
+        m.scrobText.text = "Scrobbled"
+    else if s = "queued"
+        m.scrobTick.color = "0x5E5A44FF"
+        m.scrobText.color = "0xB5AF8CFF"
+        m.scrobText.text = "Last.fm: will retry"
+    else
+        m.scrobTick.color = "0x5E5A44FF"
+        m.scrobText.text = ""
+    end if
+end sub
+
 sub showTime()
+    showScrob()
     p = muPlayer()
     if p.track = invalid
         m.fill.width = 0

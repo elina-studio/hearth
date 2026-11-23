@@ -22,6 +22,9 @@ sub runTask()
         if m.top.method = "POST"
             xfer.addHeader("Content-Type", "application/json")
             started = xfer.AsyncPostFromString(m.top.bodyText)
+        else if m.top.method = "DELETE"
+            xfer.setRequest("DELETE")
+            started = xfer.AsyncPostFromString("")
         else
             started = xfer.AsyncGetToString()
         end if

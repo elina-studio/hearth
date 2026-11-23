@@ -20,7 +20,7 @@ sub init()
     m.buildTimer.observeField("fire", "onBuildTimer")
 
     ' tabs are plain words with a gold underline (like Movies and Shows); Request sits apart after a divider
-    m.tabDefs = [["For you", "foryou"], ["Artists", "artists"], ["Albums", "albums"], ["Playlists", "playlists"], ["New", "new"], ["Request", "request"]]
+    m.tabDefs = [["For you", "foryou"], ["Artists", "artists"], ["Albums", "albums"], ["Playlists", "playlists"], ["New", "new"], ["Radio", "radio"], ["Request", "request"]]
     m.tabNodes = []
     x = 0
     for each t in m.tabDefs
@@ -473,7 +473,7 @@ sub paint()
     m.panel.active = (m.focused and m.zone = "panel")
     for i = 0 to m.tabNodes.Count() - 1
         g = m.tabNodes[i]
-        cur = (i = m.tab and m.tabDefs[i][1] <> "request")
+        cur = (i = m.tab and m.tabDefs[i][1] <> "request" and m.tabDefs[i][1] <> "radio")
         foc = (m.focused and m.zone = "tabs" and i = m.tabSel)
         g.under.visible = cur or foc
         if foc
@@ -622,18 +622,24 @@ function onKeyEvent(key as string, press as boolean) as boolean
     return true
 end function
 
+' Request and Radio open their own screens instead of showing shelves
+function isActionTab(i as integer) as boolean
+    k = m.tabDefs[i][1]
+    return (k = "request" or k = "radio")
+end function
+
 sub tabKey(key as string)
     n = m.tabDefs.Count()
     if key = "up"
         toPills()
     else if key = "left"
         if m.tabSel > 0 then m.tabSel = m.tabSel - 1 else m.zone = "panel"
-        if m.zone = "tabs" and m.tabDefs[m.tabSel][1] <> "request" then showTab(m.tabSel)
+        if m.zone = "tabs" and not isActionTab(m.tabSel) then showTab(m.tabSel)
     else if key = "right"
         if m.tabSel < n - 1 then m.tabSel = m.tabSel + 1
-        if m.tabDefs[m.tabSel][1] <> "request" then showTab(m.tabSel)
-    else if key = "OK" and m.tabDefs[m.tabSel][1] = "request"
-        m.top.request = { action: "musicView", mode: "request" }
+        if not isActionTab(m.tabSel) then showTab(m.tabSel)
+    else if key = "OK" and isActionTab(m.tabSel)
+        m.top.request = { action: "musicView", mode: m.tabDefs[m.tabSel][1] }
     else if key = "down" or key = "OK"
         if m.lettersG.visible and hasContent()
             m.zone = "letters"

@@ -9,7 +9,7 @@ Roku over ECP and types straight into Hearth's keyboards.
 
 ## Install / update (on the NAS)
 
-    ssh -t Elina@192.168.254.41 "mkdir -p /volume1/docker/hearth-remote && rm -rf /tmp/hearth-dl && mkdir /tmp/hearth-dl && cd /tmp/hearth-dl && curl -sL https://github.com/elina-studio/hearth/archive/refs/heads/claude/project-thread-xqh7n7.tar.gz | tar xz && cp hearth-*/tools/remote/* /volume1/docker/hearth-remote/ && cd /volume1/docker/hearth-remote && sudo /usr/local/bin/docker compose up -d --build && sudo /usr/local/bin/docker logs hearth-remote"
+    ssh -t Elina@192.168.254.41 "mkdir -p /volume1/docker/hearth-remote && rm -rf /tmp/hearth-dl && mkdir /tmp/hearth-dl && cd /tmp/hearth-dl && curl -sL https://github.com/elina-studio/hearth/archive/refs/heads/claude/hearth-app.tar.gz | tar xz && cp hearth-*/tools/remote/* /volume1/docker/hearth-remote/ && cd /volume1/docker/hearth-remote && sudo /usr/local/bin/docker compose up -d --build && sudo /usr/local/bin/docker logs hearth-remote"
 
 ## How text reaches Hearth
 
@@ -20,3 +20,10 @@ Roku over ECP and types straight into Hearth's keyboards.
 - `hearthGo=request`: back to the hub, Requests room, Overseerr search for the text
 
 "Type into other apps" sends `Lit_` keypresses instead, for any app's Roku keyboard.
+
+## Lyrics and Last.fm (Music)
+
+- `GET /api/lyrics?artist=&title=&album=&duration=&file=` finds time-coded lyrics: a `.lrc` file next to the song first, then LRCLIB. Cached in `data/lyrics`.
+- Last.fm: Hearth sends plays to `POST /api/lastfm/event`; pairing is on the phone at `/lastfm`. The session key stays in `data/lastfm.json`.
+  Get an API key and secret (free) at https://www.last.fm/api/account/create, then create `/volume1/docker/hearth-remote/.env` with
+  `LASTFM_API_KEY=...` and `LASTFM_API_SECRET=...` and run `sudo docker compose up -d --build`.
