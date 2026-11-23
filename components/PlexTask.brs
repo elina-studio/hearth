@@ -408,7 +408,7 @@ function req(method as string, url as string, query as object, token as string, 
         end if
     end if
     body = invalid
-    if text <> invalid and text <> "" then body = ParseJson(text)
+    if text <> invalid and text <> "" then body = ParseJson(hFixText(text))
     return { status: status, body: body }
 end function
 

@@ -34,7 +34,7 @@ sub runTask()
                 status = msg.GetResponseCode()
                 body = msg.GetString()
                 parsed = invalid
-                if body <> "" then parsed = ParseJson(body)
+                if body <> "" then parsed = ParseJson(hFixText(body))
                 if type(parsed) = "roAssociativeArray" then resp = parsed
                 if type(parsed) = "roArray" then resp = { items: parsed }
             else

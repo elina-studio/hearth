@@ -114,7 +114,7 @@ function fetch(method as string, path as string, query as dynamic, body as dynam
     end if
     data = invalid
     if resp <> invalid and resp <> ""
-        data = ParseJson(resp)
+        data = ParseJson(hFixText(resp))
         if type(data) = "roArray" then data = { results: data }
     end if
     return { status: status, data: data }

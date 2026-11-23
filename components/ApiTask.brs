@@ -66,7 +66,7 @@ sub runTask()
 
     resp = {}
     if text <> invalid and text <> ""
-        parsed = ParseJson(text)
+        parsed = ParseJson(hFixText(text))
         if parsed <> invalid
             if type(parsed) = "roArray"
                 resp = { Items: parsed }

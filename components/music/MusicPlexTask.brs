@@ -56,7 +56,7 @@ sub runTask()
     end if
     resp = {}
     if text <> invalid and text <> ""
-        parsed = ParseJson(text)
+        parsed = ParseJson(hFixText(text))
         if parsed <> invalid and type(parsed) = "roAssociativeArray" then resp = parsed
     end if
     ' shows in the TV's debug log (nc <TV IP> 8085); the token stays out of it

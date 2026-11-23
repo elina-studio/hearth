@@ -672,5 +672,5 @@ function cacheRead(name as string) as object
     text = ReadAsciiFile(cachePath(name))
     if text = "" then text = ReadAsciiFile("tmp:/" + Mid(cachePath(name), 10))
     if text = "" then return invalid
-    return ParseJson(text)
+    return ParseJson(hFixText(text))
 end function
