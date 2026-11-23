@@ -7,6 +7,8 @@
     <field id="path" type="string" />
     <field id="query" type="assocarray" />
     <field id="body" type="assocarray" />
+    <!-- JSON text for POST bodies; an assocarray field can lose the keys' capitals, which Overseerr rejects -->
+    <field id="bodyText" type="string" />
     <field id="tag" type="string" />
     <field id="key" type="string" />
     <field id="status" type="integer" />

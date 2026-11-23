@@ -190,3 +190,23 @@ function rqLatestSeason(list as object) as integer
     end for
     return best
 end function
+
+' The POST /api/v1/request body as JSON text, written by hand so the key names keep their capitals
+' (Overseerr needs "mediaType" and "mediaId" exactly). b: { mediaType, mediaId, seasons: invalid | "all" | [numbers] }
+function rqRequestJson(b as object) as string
+    q = Chr(34)
+    j = "{" + q + "mediaType" + q + ":" + q + b.mediaType + q + "," + q + "mediaId" + q + ":" + b.mediaId.toStr()
+    s = b.seasons
+    if s <> invalid
+        if type(s) = "roString" or type(s) = "String"
+            j = j + "," + q + "seasons" + q + ":" + q + s + q
+        else
+            parts = []
+            for each n in s
+                parts.push(n.toStr())
+            end for
+            j = j + "," + q + "seasons" + q + ":[" + parts.join(",") + "]"
+        end if
+    end if
+    return j + "}"
+end function
