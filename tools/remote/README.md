@@ -27,3 +27,10 @@ Roku over ECP and types straight into Hearth's keyboards.
 - Last.fm: Hearth sends plays to `POST /api/lastfm/event`; pairing is on the phone at `/lastfm`. The session key stays in `data/lastfm.json`.
   Get an API key and secret (free) at https://www.last.fm/api/account/create, then create `/volume1/docker/hearth-remote/.env` with
   `LASTFM_API_KEY=...` and `LASTFM_API_SECRET=...` and run `sudo docker compose up -d --build`.
+
+## Lining up the TV with the house speakers
+
+"Line up the house" (https page only, it needs the microphone) listens for 5 seconds while the TV and the
+speakers play the same song, finds how far apart they are, and moves the TV by that much:
+`POST http://<tv>:8060/input?castTrim=<seconds>` (signed). It checks again afterwards and flips direction if the
+first move went the wrong way. "Keep checking" repeats every 40 seconds.

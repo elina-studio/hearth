@@ -286,6 +286,10 @@ class Handler(BaseHTTPRequestHandler):
                     ecp_post("/keypress/Backspace")
                 for ch in req.get("add", "")[:200]:
                     ecp_post(lit(ch))
+            elif path == "/api/cast":
+                # seconds to move the TV's music by (from the phone's microphone), signed
+                d = max(-6.0, min(6.0, float(req.get("delta", 0))))
+                ecp_post("/input?castTrim=" + ("%.3f" % d))
             elif path == "/api/launch":
                 ecp_post("/launch/dev")
             else:

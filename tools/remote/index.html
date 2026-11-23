@@ -146,6 +146,14 @@
     <label class="toggle"><input type="checkbox" id="otherApps"> Type into other apps too (slower, uses the Roku keyboard)</label>
   </section>
 
+  <section class="typer" id="syncSec">
+    <div class="row">
+      <button class="gold" id="syncBtn">Line up the house</button>
+      <label class="toggle" style="flex:1;margin:0"><input type="checkbox" id="syncKeep"> Keep checking</label>
+    </div>
+    <div class="hint" id="syncHint">While music plays on the TV and the speakers, hold the phone where you listen and press this. It hears both and moves the TV for you. Needs the https page.</div>
+  </section>
+
   <div class="rope"></div>
 
   <div class="grid3">
@@ -309,6 +317,112 @@
     } else if (!j.error) hint.textContent = "Didn't catch that. Try again?";
   }
   mic.addEventListener("click", () => { buzz(); rec ? stopRec() : startRec(); });
+
+  // ---------- line up the TV with the house speakers ----------
+  // Record a few seconds, then find how far the recording trails behind itself: the TV and the
+  // speakers play the same music, so the sound correlates with its own echo at exactly their gap.
+  const sh = $("syncHint");
+  function fft(re, im, inv) {
+    const n = re.length;
+    for (let i = 1, j = 0; i < n; i++) {
+      let bit = n >> 1;
+      for (; j & bit; bit >>= 1) j ^= bit;
+      j ^= bit;
+      if (i < j) { let t = re[i]; re[i] = re[j]; re[j] = t; t = im[i]; im[i] = im[j]; im[j] = t; }
+    }
+    for (let len = 2; len <= n; len <<= 1) {
+      const ang = 2 * Math.PI / len * (inv ? 1 : -1), wr = Math.cos(ang), wi = Math.sin(ang);
+      for (let i = 0; i < n; i += len) {
+        let cr = 1, ci = 0;
+        for (let k = 0; k < len / 2; k++) {
+          const a = i + k, b = a + len / 2;
+          const xr = re[b] * cr - im[b] * ci, xi = re[b] * ci + im[b] * cr;
+          re[b] = re[a] - xr; im[b] = im[a] - xi; re[a] += xr; im[a] += xi;
+          const t = cr * wr - ci * wi; ci = cr * wi + ci * wr; cr = t;
+        }
+      }
+    }
+  }
+  async function listen(seconds) {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const src = ctx.createMediaStreamSource(stream);
+    const proc = ctx.createScriptProcessor(4096, 1, 1);
+    const chunks = [];
+    proc.onaudioprocess = e => chunks.push(new Float32Array(e.inputBuffer.getChannelData(0)));
+    src.connect(proc); proc.connect(ctx.destination);
+    await new Promise(r => setTimeout(r, seconds * 1000));
+    proc.disconnect(); src.disconnect(); stream.getTracks().forEach(t => t.stop());
+    const rate = ctx.sampleRate; ctx.close();
+    return { chunks, rate };
+  }
+  // returns { lag, score } in seconds, or null when the music is too quiet or too different to tell
+  function gap({ chunks, rate }) {
+    let total = 0; chunks.forEach(c => total += c.length);
+    const k = Math.max(1, Math.floor(rate / 8000)), fs = rate / k;
+    const n = Math.floor(total / k), x = new Float64Array(n);
+    let idx = 0, acc = 0, cnt = 0, o = 0;
+    for (const c of chunks) for (let i = 0; i < c.length; i++) {
+      acc += c[i]; if (++cnt === k) { if (o < n) x[o++] = acc / k; acc = 0; cnt = 0; }
+    }
+    // whiten a little so the peak is sharp
+    for (let i = n - 1; i > 0; i--) x[i] -= 0.95 * x[i - 1];
+    let size = 1; while (size < 2 * n) size <<= 1;
+    const re = new Float64Array(size), im = new Float64Array(size);
+    re.set(x); fft(re, im, false);
+    for (let i = 0; i < size; i++) { re[i] = re[i] * re[i] + im[i] * im[i]; im[i] = 0; }
+    fft(re, im, true);
+    const r0 = re[0] / n; if (r0 < 1e-9) return null;
+    const lo = Math.floor(0.03 * fs), hi = Math.min(Math.floor(4 * fs), n - fs);
+    let best = -1, bl = 0, sum = 0, cn = 0;
+    for (let l = lo; l < hi; l++) {
+      const v = Math.abs(re[l] / (n - l)) / r0;
+      sum += v; cn++;
+      if (v > best) { best = v; bl = l; }
+    }
+    const mean = sum / cn;
+    if (best < 0.04 || best < 6 * mean) return null;
+    return { lag: bl / fs, score: best };
+  }
+  let sign = 1, syncBusy = false, keepTimer = null;
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+  async function measure() {
+    sh.textContent = "Listening…";
+    return gap(await listen(5));
+  }
+  async function lineUp() {
+    if (syncBusy) return; syncBusy = true;
+    try {
+      if (!navigator.mediaDevices) { sh.textContent = "The microphone needs the https page (port 8766)."; return; }
+      let a = await measure();
+      if (!a) { sh.textContent = "Couldn't tell. Play music on the TV and the speakers and hold the phone closer."; return; }
+      if (a.lag < 0.03) { sh.textContent = "Already in step (" + Math.round(a.lag * 1000) + " ms)."; return; }
+      for (let tries = 0; tries < 3; tries++) {
+        await api("/api/cast", { delta: sign * a.lag });
+        sh.textContent = "Moved the TV by " + Math.round(a.lag * 1000) + " ms. Checking…";
+        await wait(4000);
+        const b = await measure();
+        if (!b) { sh.textContent = "Moved it, but couldn't check."; return; }
+        if (b.lag < 0.03) { sh.textContent = "In step now (" + Math.round(b.lag * 1000) + " ms apart)."; return; }
+        if (b.lag > a.lag * 0.8) {
+          // that went the wrong way: undo it and go the other way
+          sign = -sign;
+          await api("/api/cast", { delta: sign * b.lag });
+          await wait(4000);
+          const c = await measure();
+          if (!c || c.lag < 0.03) { sh.textContent = "In step now."; return; }
+          a = c;
+        } else a = b;
+      }
+      sh.textContent = "Close, " + Math.round(a.lag * 1000) + " ms apart. Press again to tighten it.";
+    } catch (e) { sh.textContent = "Couldn't use the microphone: " + (e.message || e); }
+    finally { syncBusy = false; }
+  }
+  $("syncBtn").addEventListener("click", lineUp);
+  $("syncKeep").addEventListener("change", e => {
+    clearInterval(keepTimer);
+    if (e.target.checked) { lineUp(); keepTimer = setInterval(lineUp, 40000); }
+  });
 })();
 </script>
 </body>
