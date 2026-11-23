@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- What's playing, with its controls. Two layouts:
+     "column": room B's left column (art, titles, progress, two rows of icon chips with a Big view button).
+     "big": the full-screen Big view (large art and title, one row of chips ending in a Library button).
+     The parent keeps focus and forwards keys: edge = panel.callFunc("handleKey", key) returns "" or an edge
+     ("up", "right", "left", "down"). Views and the Big view / Library switch come out through `request`. -->
+<component name="MusicNowPanel" extends="Group">
+  <children>
+    <Rectangle id="bg" width="620" height="930" color="0xFFFFFF08" />
+    <Rectangle id="artBg" color="0x1D2418FF" />
+    <Poster id="art" loadDisplayMode="scaleToZoom" />
+    <Label id="eyebrow" color="0xD9A066FF" />
+    <Label id="title" maxLines="1" color="0xEDE6CAFF" />
+    <Label id="sub" maxLines="1" color="0xB5AF8CFF" />
+    <Rectangle id="track" height="8" color="0xFFFFFF1A" />
+    <Rectangle id="fill" height="8" color="0xE0B34AFF" />
+    <Label id="elapsed" color="0xB5AF8CFF" />
+    <Label id="total" horizAlign="right" color="0xB5AF8CFF" />
+    <Group id="chips" />
+    <Label id="chipName" color="0xB5AF8CFF" />
+  </children>
+  <interface>
+    <field id="layout" type="string" value="column" onChange="build" />
+    <field id="active" type="boolean" value="false" onChange="paint" />
+    <field id="request" type="assocarray" alwaysNotify="true" />
+    <function name="handleKey" />
+  </interface>
+  <script type="text/brightscript" uri="pkg:/source/util.brs" />
+  <script type="text/brightscript" uri="pkg:/components/music/plex.brs" />
+  <script type="text/brightscript" uri="pkg:/components/music/musicui.brs" />
+  <script type="text/brightscript" uri="pkg:/components/music/MusicNowPanel.brs" />
+</component>

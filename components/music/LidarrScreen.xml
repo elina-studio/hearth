@@ -1,18 +1,36 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Ask Lidarr for music: type an artist, pick one, and Lidarr adds it and starts looking for its albums. -->
+<!-- Request music (layout C): type an artist on the left, pick a match, and the right panel previews them:
+     their albums, each marked In library (Plex has it), Requested (Lidarr is looking) or nothing (missing).
+     "Get the N missing" asks Lidarr for only what you don't have; OK on one album asks for just that one. -->
 <component name="LidarrScreen" extends="Group">
   <children>
     <Rectangle width="1920" height="1080" color="0x0B0E09FF" />
-    <Label id="eyebrow" translation="[96, 60]" color="0xD9A066FF" text="REQUEST MUSIC  ·  LIDARR" />
-    <Label id="hint" translation="[96, 100]" width="1700" color="0xB5AF8CFF" />
-    <HearthKeyboard id="kb" translation="[96, 170]" placeholder="Type an artist" />
-    <Group id="list" translation="[760, 170]" />
-    <Label id="empty" translation="[760, 190]" width="1060" wrap="true" color="0xB5AF8CFF" />
+    <Poster translation="[96, 52]" width="34" height="34" uri="pkg:/images/music/icons/request.png" blendColor="0xD9A066FF" />
+    <Label id="eyebrow" translation="[144, 50]" color="0xD9A066FF" text="REQUEST MUSIC" />
+    <HearthKeyboard id="kb" translation="[96, 110]" placeholder="Type an artist" />
+    <Group id="matches" translation="[96, 836]" />
+    <Rectangle id="panel" translation="[800, 110]" width="1024" height="880" color="0xFFFFFF08" />
+    <Group id="pv" translation="[844, 154]">
+      <Rectangle width="200" height="200" color="0x1D2418FF" />
+      <Poster id="pvArt" width="200" height="200" loadDisplayMode="scaleToZoom" loadWidth="200" loadHeight="200" />
+      <Poster width="200" height="200" uri="pkg:/images/music/round-mask-panel.png" />
+      <Label id="pvName" translation="[236, 0]" width="700" maxLines="1" color="0xEDE6CAFF" />
+      <Label id="pvSub" translation="[236, 84]" width="700" maxLines="1" color="0xB5AF8CFF" />
+      <Group id="pvButtons" translation="[236, 132]" />
+      <Label id="pvAlbumsTitle" translation="[0, 256]" color="0xB5AF8CFF" text="Albums" />
+      <Rectangle translation="[110, 274]" width="826" height="2" color="0xD9A06655" />
+      <Group clippingRect="[-12, 290, 960, 330]">
+        <Group id="pvAlbums" translation="[0, 302]" />
+      </Group>
+      <Label id="pvNote" translation="[0, 640]" width="936" wrap="true" color="0xB5AF8CFF" />
+    </Group>
+    <Label id="empty" translation="[844, 160]" width="936" wrap="true" color="0xB5AF8CFF" />
     <Group id="setup" visible="false" translation="[96, 170]">
       <Label id="setupText" width="1700" wrap="true" color="0xB5AF8CFF" />
     </Group>
-    <Label id="toast" translation="[96, 990]" width="1728" color="0xE0B34AFF" />
+    <Label id="toast" translation="[844, 940]" width="936" color="0xE0B34AFF" />
     <Timer id="debounce" duration="0.6" repeat="false" />
+    <Timer id="pvTimer" duration="0.35" repeat="false" />
     <Timer id="toastTimer" duration="5" repeat="false" />
   </children>
   <interface>
@@ -21,5 +39,7 @@
     <function name="onShown" />
   </interface>
   <script type="text/brightscript" uri="pkg:/source/util.brs" />
+  <script type="text/brightscript" uri="pkg:/components/music/plex.brs" />
+  <script type="text/brightscript" uri="pkg:/components/music/musicui.brs" />
   <script type="text/brightscript" uri="pkg:/components/music/LidarrScreen.brs" />
 </component>
