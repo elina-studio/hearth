@@ -19,6 +19,15 @@ sub uiInit()
     m.forceQuality = invalid
     m.reopenOverlay = false
     m.subs.style = subStyle()
+    m.ear = m.top.findNode("ear")
+    m.earKick = m.top.findNode("earKick")
+    m.earInfo = m.top.findNode("earInfo")
+    m.earHint = m.top.findNode("earHint")
+    m.earKick.font = hFont("caps", 22)
+    m.earInfo.font = hFont("bold", 30)
+    m.earHint.font = hFont("regular", 21)
+    m.earMode = false
+    m.earHits = []
 end sub
 
 ' ---------- per video ----------
@@ -90,6 +99,7 @@ end sub
 ' ---------- keys while no panel has focus ----------
 function uiKey(key as string) as boolean
     if not m.ready then return false
+    if m.earMode then return earKey(key)
     if m.upnext.visible then return false
     st = m.video.state
     if key = "OK" or key = "play"
@@ -292,6 +302,7 @@ sub onSubCues()
     if t = invalid then return
     if t.ok
         m.subs.cues = t.cues
+        if m.subDelay = 0 then m.subDelay = loadSubDelay()
         m.subs.delay = m.subDelay
         m.subMode = "hearth"
         m.video.notificationInterval = 0.1
@@ -468,6 +479,7 @@ sub fillSheet(focusId as string)
         items.push({ kind: "head", icon: "timing", text: "Timing" })
         items.push({ kind: "ruler", id: "delay", value: m.subDelay })
         items.push({ kind: "row", id: "sync", lead: "audio", title: "Sync to the audio", desc: "Bazarr fixes the file for good", chevron: true })
+        if m.subMode = "hearth" then items.push({ kind: "row", id: "ear", lead: "timing", title: "Line up by ear", desc: "Press OK when you hear a line spoken", chevron: true })
     else if k = "eps"
         m.sheet.sheetTitle = "Episodes"
         m.sheet.sheetIcon = "eps"
@@ -665,6 +677,7 @@ sub onSheetAction()
                 m.subDelay = m.subDelay + a.dir * 0.1
                 if Abs(m.subDelay) < 0.05 then m.subDelay = 0
                 m.subs.delay = m.subDelay
+                saveSubDelay()
             else if id = "when"
                 v = optStep("when", hCaptions(), a.dir)
                 reg = CreateObject("roRegistrySection", "hearth")
@@ -677,6 +690,9 @@ sub onSheetAction()
             end if
         else if id = "sync"
             syncSubs()
+            return
+        else if id = "ear"
+            earStart()
             return
         end if
         refreshSheet(id)
@@ -789,6 +805,7 @@ sub onSynced()
         print "[hearth-subs] Bazarr synced the subtitle; reloading it"
         m.subDelay = 0
         m.subs.delay = 0
+        saveSubDelay()
         if m.subStream <> invalid then useHearthSub(m.subStream)
     else
         msg = "Bazarr couldn't sync it (" + toStr(t.error) + ")."
@@ -856,3 +873,101 @@ sub checkSleep()
         leave()
     end if
 end sub
+
+
+' ---------- line up by ear ----------
+' The viewer presses OK the moment a line is heard. For each press: speech time = position - 0.25 s (reaction),
+' the line is the cue whose start is nearest to that, and the delay that would line them up is speech - cue start.
+' The median of the presses is applied live (negative = subtitles earlier, the same sign SubLayer uses).
+function loadSubDelay() as float
+    if m.item = invalid then return 0.0
+    reg = CreateObject("roRegistrySection", "hearthSubDelay")
+    k = toStr(m.item.Id)
+    if reg.Exists(k) then return Val(reg.Read(k))
+    return 0.0
+end function
+
+sub saveSubDelay()
+    if m.item = invalid then return
+    reg = CreateObject("roRegistrySection", "hearthSubDelay")
+    k = toStr(m.item.Id)
+    if Abs(m.subDelay) < 0.05
+        reg.Delete(k)
+    else
+        reg.Write(k, Str(m.subDelay).Trim())
+    end if
+    reg.Flush()
+end sub
+
+sub earStart()
+    cues = m.subs.cues
+    if cues = invalid or cues.count() < 3
+        hMessage("Line up by ear", "Turn on a text subtitle first.")
+        return
+    end if
+    m.reopenOverlay = false
+    closeSheet()
+    m.ov.callFunc("close", invalid)
+    m.subs.lifted = false
+    m.earMode = true
+    m.earHits = []
+    m.ear.visible = true
+    m.video.control = "resume"
+    earRender("")
+    m.top.setFocus(true)
+end sub
+
+function earNearestCue(t as float) as dynamic
+    cues = m.subs.cues
+    lo = 0
+    hi = cues.count() - 1
+    while lo < hi
+        mid = Int((lo + hi) / 2)
+        if cues[mid].s < t then lo = mid + 1 else hi = mid
+    end while
+    best = lo
+    if lo > 0 and Abs(cues[lo - 1].s - t) < Abs(cues[lo].s - t) then best = lo - 1
+    return cues[best]
+end function
+
+sub earRender(note as string)
+    n = m.earHits.count()
+    if n = 0
+        m.earInfo.text = "Press OK the moment you hear a line spoken"
+    else
+        m.earInfo.text = n.toStr() + " heard · " + fmtDelayUi(m.subDelay)
+    end if
+    h = "OK  I heard it     LEFT / RIGHT  nudge 0.1 s     BACK  done"
+    if note <> "" then h = note + "     " + h
+    m.earHint.text = h
+end sub
+
+function earKey(key as string) as boolean
+    if key = "OK"
+        speech = position() - 0.25
+        c = earNearestCue(speech)
+        m.earHits.push(speech - c.s)
+        arr = []
+        for each v in m.earHits
+            arr.push(v)
+        end for
+        arr.sort()
+        m.subDelay = arr[Int(arr.count() / 2)]
+        m.subs.delay = m.subDelay
+        earRender("")
+        return true
+    else if key = "left" or key = "right"
+        d = 0.1
+        if key = "left" then d = -0.1
+        m.subDelay = m.subDelay + d
+        m.subs.delay = m.subDelay
+        earRender("")
+        return true
+    else if key = "back"
+        m.earMode = false
+        m.ear.visible = false
+        saveSubDelay()
+        return true
+    end if
+    return false
+end function

@@ -616,6 +616,7 @@ function onKeyEvent(key as string, press as boolean) as boolean
         return true
     end if
     if key = "back"
+        if m.earMode = true then return earKey("back")
         leave()
         return true
     end if
