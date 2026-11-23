@@ -26,6 +26,9 @@ sub update()
         p.width = w + 24
         p.height = h + 24
     end for
+    v = "-v" + m.top.variant.toStr()
+    m.fill.uri = "pkg:/images/w/button-fill" + v + ".9.png"
+    m.line.uri = "pkg:/images/w/button-outline" + v + ".9.png"
     f = m.top.focused
     m.fill.visible = f
     m.line.visible = not f

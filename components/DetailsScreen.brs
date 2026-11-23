@@ -362,8 +362,11 @@ sub buildActions()
     m.actions = list
     m.actionsBox.removeChildrenIndex(m.actionsBox.getChildCount(), 0)
     x = 0
+    vi = 0
     for each a in list
         b = m.actionsBox.createChild("IconButton")
+        b.variant = (vi mod 6) + 1
+        vi = vi + 1
         b.icon = a.icon
         b.text = a.text
         b.translation = [x, 0]
@@ -453,8 +456,11 @@ sub drawChips()
     if n > 0 then list.push({ icon: "ccx", text: "Find " + n.toStr() + " missing", action: "fetchMissing" })
     m.chips = list
     m.chipsBox.removeChildrenIndex(m.chipsBox.getChildCount(), 0)
+    vi = 2
     for each c in list
         b = m.chipsBox.createChild("IconButton")
+        b.variant = (vi mod 6) + 1
+        vi = vi + 1
         b.icon = c.icon
         b.text = c.text
     end for

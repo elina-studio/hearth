@@ -64,7 +64,7 @@ sub build()
     if m.slotW <> w or m.slotH <> h or m.strip.getChildCount() <> slots
         m.strip.removeChildrenIndex(m.strip.getChildCount(), 0)
         for k = 0 to slots - 1
-            makeSlot(w, h)
+            makeSlot(w, h, k)
         end for
         m.slotW = w
         m.slotH = h
@@ -81,7 +81,7 @@ sub build()
     paint()
 end sub
 
-sub makeSlot(w as integer, h as integer)
+sub makeSlot(w as integer, h as integer, k as integer)
     g = m.strip.createChild("Group")
     bg = g.createChild("Rectangle")
     bg.width = w
@@ -136,18 +136,17 @@ sub makeSlot(w as integer, h as integer)
     ' focus (whimsy spec 4): rough rope-gold line with a soft glow, and moss on the focused card only
     ring = g.createChild("Poster")
     if w = 320 and h = 180
-        ring.uri = "pkg:/images/w/focus-ring-334x194.png"
+        ring.uri = "pkg:/images/w/focus-ring-334x194" + hVar(k) + ".png"
     else if w = 200 and h = 300
-        ring.uri = "pkg:/images/w/focus-ring-214x314.png"
+        ring.uri = "pkg:/images/w/focus-ring-214x314" + hVar(k) + ".png"
     else
-        ring.uri = "pkg:/images/w/focus-ring.9.png"
+        ring.uri = "pkg:/images/w/focus-ring" + hVar(k) + ".9.png"
     end if
     ring.translation = [-27, -27]
     ring.width = w + 54
     ring.height = h + 54
     ring.visible = false
     moss = g.createChild("Poster")
-    hMossHug(moss, w + 7, -7, w)
     moss.visible = false
     g.addFields({ poster: p, fb: fb, bar: bar, clip: clip, tip: tip, cap: cap, sub2: sub2, ring: ring, moss: moss })
 end sub
@@ -171,8 +170,10 @@ sub fillSlot(g as object, c as object, w as integer)
     g.sub2.visible = m.top.showCaption
     g.cap.text = title
     if c.sub <> invalid then g.sub2.text = c.sub else g.sub2.text = ""
-    kinds = ["", "1-round-caps", "2-tall-caps", "3-golden-funnels", "4-two-acorns"]
-    g.moss.uri = "pkg:/images/w/moss-corner-" + kinds[mossKind(c)] + ".png"
+    key = ""
+    if c.item <> invalid and c.item.Id <> invalid then key = c.item.Id.toStr()
+    if key = "" then key = title
+    hMossHug(g.moss, -7, -7, w + 7, key)
 end sub
 
 sub paint()

@@ -255,8 +255,7 @@ sub buildButtons()
             bg.width = 96
             bg.height = 88
             moss = g.createChild("Poster")
-            moss.uri = hMossUri(d.id)
-            hMossHug(moss, 84, 0, 72)
+            hMossHug(moss, 12, 0, 84, d.id)
             icon = g.createChild("Poster")
             icon.uri = "pkg:/images/player/" + d.icon + ".png"
             icon.width = 36
@@ -288,11 +287,11 @@ sub paintButtons()
         focused = (m.zone = "buttons" and k = m.btn)
         filled = focused or b.id = "toggle"
         if filled
-            b.bg.uri = "pkg:/images/w/button-fill.9.png"
+            b.bg.uri = "pkg:/images/w/button-fill" + hVar(k) + ".9.png"
             b.bg.blendColor = m.c.gold
             b.icon.blendColor = m.c.goldInk
         else
-            b.bg.uri = "pkg:/images/w/button-outline.9.png"
+            b.bg.uri = "pkg:/images/w/button-outline" + hVar(k) + ".9.png"
             b.bg.blendColor = "0x404B2DFF"
             b.icon.blendColor = m.c.ink
         end if

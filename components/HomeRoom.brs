@@ -74,11 +74,11 @@ sub buildButtons()
     for i = 0 to 2
         b = holder.createChild("Group")
         b.addFields({ idle: b.createChild("Poster"), fill: b.createChild("Poster"), ring: b.createChild("Poster") })
-        b.idle.uri = "pkg:/images/pill-ring.9.png"
+        b.idle.uri = "pkg:/images/pill-ring" + hVar(i) + ".9.png"
         b.idle.blendColor = "0xB5AF8CAA"
-        b.fill.uri = "pkg:/images/pill.9.png"
+        b.fill.uri = "pkg:/images/pill" + hVar(i) + ".9.png"
         b.fill.blendColor = "0xE0B34AFF"
-        b.ring.uri = "pkg:/images/pill-ring.9.png"
+        b.ring.uri = "pkg:/images/ring" + hVar(i + 3) + ".9.png"
         b.ring.blendColor = "0xEDE6CAFF"
         b.ring.translation = [-7, -7]
         icon = b.createChild("Poster")
@@ -348,8 +348,8 @@ sub buildMoods()
         l.vertAlign = "center"
         l.color = "0xEDE6CAFF"
         ring = g.createChild("Poster")
-        ring.uri = "pkg:/images/ring.9.png"
-        ring.blendColor = "0xE0B34AFF"
+        ring.uri = "pkg:/images/ring" + hVar(i + 1) + ".9.png"
+        ring.blendColor = "0xD9A066FF"
         ring.translation = [-10, -10]
         ring.width = 250
         ring.height = 82

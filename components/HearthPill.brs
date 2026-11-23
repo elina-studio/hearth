@@ -18,6 +18,12 @@ sub update()
     m.label.width = w
     m.label.height = h
     m.label.text = m.top.text
+    if m.top.variant > 0
+        v = hVar(m.top.variant - 1)
+        m.base.uri = "pkg:/images/pill" + v + ".9.png"
+        m.fill.uri = "pkg:/images/pill" + v + ".9.png"
+        m.ring.uri = "pkg:/images/pill-ring" + v + ".9.png"
+    end if
     m.base.visible = m.top.button and not m.top.focused
     m.fill.visible = m.top.focused
     m.ring.visible = m.top.current and not m.top.focused

@@ -266,14 +266,34 @@ function hMossUri(key as string) as string
     return "pkg:/images/w/moss-corner-" + kinds[h mod 4] + ".png"
 end function
 
-' Moss hugs the focused box (whimsy spec 4): the art's anchor (110, 55) sits on the box's visible
-' top-right corner (rx, ry); size is half the box width, between 64 and 125
-sub hMossHug(moss as object, rx as integer, ry as integer, boxW as integer)
-    mw = Int(boxW / 2)
-    if mw < 64 then mw = 64
+' Rough-edge variant suffix for the n-th box in a row or group, so neighbours differ: "-v1" .. "-v6"
+function hVar(n as integer) as string
+    if n < 0 then n = -n
+    return "-v" + ((n mod 6) + 1).toStr()
+end function
+
+' Moss hugs the focused box (whimsy spec 4). (lx, ty) and rx are the box's visible left, top and right.
+' Size is 0.6 x the box width, 80 to 125. Kind is fixed per key (hash mod 4); one key in three gets the
+' top-left corner (anchor 15, 55), the rest top-right (anchor 110, 55).
+sub hMossHug(moss as object, lx as integer, ty as integer, rx as integer, key as string)
+    h = 0
+    for i = 1 to Len(key)
+        h = (h * 31 + Asc(Mid(key, i, 1))) mod 1000003
+    end for
+    kinds = ["1-round-caps", "2-tall-caps", "3-golden-funnels", "4-two-acorns"]
+    left = (h mod 3 = 0)
+    side = ""
+    if left then side = "-left"
+    moss.uri = "pkg:/images/w/moss-corner-" + kinds[h mod 4] + side + ".png"
+    mw = Int((rx - lx) * 0.6)
+    if mw < 80 then mw = 80
     if mw > 125 then mw = 125
     s = mw / 125.0
     moss.width = mw
     moss.height = Int(96 * s)
-    moss.translation = [Int(rx - 110 * s), Int(ry - 55 * s)]
+    if left
+        moss.translation = [Int(lx - 15 * s), Int(ty - 55 * s)]
+    else
+        moss.translation = [Int(rx - 110 * s), Int(ty - 55 * s)]
+    end if
 end sub

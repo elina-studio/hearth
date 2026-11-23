@@ -12,6 +12,8 @@
     <field id="icon" type="string" onChange="update" />
     <field id="text" type="string" onChange="update" />
     <field id="focused" type="boolean" value="false" onChange="update" />
+    <!-- 1-6: which rough-edge variant, so neighbours differ -->
+    <field id="variant" type="integer" value="1" onChange="update" />
     <!-- read back by the parent after update, to lay the row out -->
     <field id="width" type="integer" value="0" />
   </interface>

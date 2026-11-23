@@ -78,13 +78,12 @@ sub buildSlots()
         pic.loadDisplayMode = "scaleToZoom"
         bar = hBraid(g, m.cw, m.ch + 10)
         ring = g.createChild("Poster")
-        ring.uri = "pkg:/images/ring.9.png"
-        ring.blendColor = "0xE0B34AFF"
+        ring.uri = "pkg:/images/ring" + hVar(i) + ".9.png"
+        ring.blendColor = "0xD9A066FF"
         ring.translation = [-10, -10]
         ring.width = m.cw + 20
         ring.height = m.ch + 20
         moss = g.createChild("Poster")
-        hMossHug(moss, m.cw + 7, -7, m.cw)
         moss.visible = false
         g.addFields({ bg: bg, fb: fb, pic: pic, bar: bar, ring: ring, moss: moss, at: -1 })
         g.visible = false
@@ -121,7 +120,7 @@ sub drawGrid()
             if on
                 k = i.toStr()
                 if m.items[i].Id <> invalid then k = m.items[i].Id.toStr()
-                g.moss.uri = hMossUri(k)
+                hMossHug(g.moss, -7, -7, m.cw + 7, k)
             end if
             g.moss.visible = on
         else
@@ -138,10 +137,10 @@ sub buildButtons()
     for i = 0 to 2
         b = holder.createChild("Group")
         idle = b.createChild("Poster")
-        idle.uri = "pkg:/images/pill-ring.9.png"
+        idle.uri = "pkg:/images/pill-ring" + hVar(i) + ".9.png"
         idle.blendColor = "0xB5AF8CAA"
         fill = b.createChild("Poster")
-        fill.uri = "pkg:/images/pill.9.png"
+        fill.uri = "pkg:/images/pill" + hVar(i) + ".9.png"
         fill.blendColor = "0xE0B34AFF"
         icon = b.createChild("Poster")
         icon.width = 24
@@ -650,11 +649,11 @@ sub buildChips()
         l.vertAlign = "center"
         l.translation = [46, 0]
         w = Int(l.localBoundingRect().width) + 66
-        idle.uri = "pkg:/images/pill-ring.9.png"
+        idle.uri = "pkg:/images/pill-ring" + hVar(i) + ".9.png"
         idle.blendColor = "0x5E6450FF"
-        fill.uri = "pkg:/images/pill.9.png"
+        fill.uri = "pkg:/images/pill" + hVar(i) + ".9.png"
         fill.blendColor = "0xE0B34AFF"
-        ring.uri = "pkg:/images/pill-ring.9.png"
+        ring.uri = "pkg:/images/pill-ring" + hVar(i) + ".9.png"
         ring.blendColor = "0xEDE6CAFF"
         ring.translation = [-6, -6]
         for each p in [idle, fill]
@@ -759,7 +758,7 @@ sub buildLetters()
         g = m.lettersG.createChild("Group")
         g.translation = [i * 58, 0]
         bg = g.createChild("Poster")
-        bg.uri = "pkg:/images/pill.9.png"
+        bg.uri = "pkg:/images/pill" + hVar(i) + ".9.png"
         bg.width = 52
         bg.height = 44
         l = g.createChild("Label")

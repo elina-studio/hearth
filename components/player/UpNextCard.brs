@@ -82,12 +82,12 @@ sub paint()
     icons = [m.top.findNode("playIcon"), m.top.findNode("stayIcon")]
     for i = 0 to 1
         if focusOn[i]
-            bgs[i].uri = "pkg:/images/w/button-fill.9.png"
+            bgs[i].uri = "pkg:/images/w/button-fill" + hVar(i) + ".9.png"
             bgs[i].blendColor = c.gold
             labels[i].color = c.goldInk
             icons[i].blendColor = c.goldInk
         else
-            bgs[i].uri = "pkg:/images/w/button-outline.9.png"
+            bgs[i].uri = "pkg:/images/w/button-outline" + hVar(i) + ".9.png"
             bgs[i].blendColor = "0x404B2DFF"
             labels[i].color = c.ink
             icons[i].blendColor = c.ink

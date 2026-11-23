@@ -75,13 +75,12 @@ sub build()
         tm.horizAlign = "right"
         tm.translation = [0, 188]
         ring = g.createChild("Poster")
-        ring.uri = "pkg:/images/w/focus-ring.9.png"
+        ring.uri = "pkg:/images/w/focus-ring" + hVar(i) + ".9.png"
         ring.translation = [-20, -20]
         ring.width = 312
         ring.height = 193
         moss = g.createChild("Poster")
-        moss.uri = hMossUri("chap" + i.toStr())
-        hMossHug(moss, 272, 0, 272)
+        hMossHug(moss, 0, 0, 272, "chap" + i.toStr())
         m.cells.push({ ring: ring, moss: moss, title: t, prog: done })
         x = x + 292
         if m.top.duration > 0
