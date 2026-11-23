@@ -189,6 +189,7 @@ addEventListener('keydown', e => {
   const top = layers[layers.length - 1];
   if (top && top.onKey && top.onKey(e) === true) { e.preventDefault(); return; }
   const k = e.key;
+  if (cur === 'Search' && !layers.length && SR && SR.key(e)) { e.preventDefault(); return; }
   if (k.startsWith('Arrow')) { e.preventDefault(); move(k); }
   else if (k === 'Enter' || k === ' ') { if (focusEl) { e.preventDefault(); act(focusEl); } }
   else if (k === 'Escape' || k === 'Backspace' || k === 'BrowserBack' || k === 'GoBack') { e.preventDefault(); back(); }
@@ -252,14 +253,14 @@ function remoteKey(k) {
       if (typeof j.seq !== 'number') { await new Promise(r => setTimeout(r, 5000)); continue; }
       if (seq < 0) { seq = j.seq; continue; }
       seq = j.seq;
-      for (const c of j.cmds) { if (c.key) remoteKey(c.key); else if (c.text) toast('Search isn\'t on the projector yet'); }
+      for (const c of j.cmds) { if (c.key) remoteKey(c.key); else if (c.text !== undefined) searchTyped(c.text, c.go); }
     } catch (e) { await new Promise(r => setTimeout(r, 3000)); }
   }
 })();
 
 /* ---------- rooms ---------- */
 const ROOMS = ['Home', 'Shows', 'Movies', 'Music', 'Requests', 'Ambiance', 'Photos', 'Search', 'Test'];
-const LIVE = new Set(['Home', 'Shows', 'Movies', 'Music', 'Ambiance', 'Test']);
+const LIVE = new Set(['Home', 'Shows', 'Movies', 'Music', 'Ambiance', 'Search', 'Test']);
 let cur = 'Home', renderTok = 0, autoF = null;
 function drawBar() {
   $('#rooms').innerHTML = ROOMS.map(r => `<div class="fx rm ${r === cur ? 'cur' : ''}" data-a="room" data-r="${r}">${r}<i class="dot"></i></div>`).join('');
@@ -273,6 +274,7 @@ async function go(name, keepFocus) {
     if (name === 'Home') await roomHome(room, tok);
     else if (name === 'Music') await roomMusic(room, tok);
     else if (name === 'Movies') await roomLib(room, tok, 'movie');
+    else if (name === 'Search') roomSearch(room, tok);
     else if (name === 'Shows') await roomLib(room, tok, 'show');
     else if (name === 'Ambiance') roomAmbiance(room);
     else if (name === 'Test') await roomTest(room, tok);
@@ -950,6 +952,133 @@ function playTarget(L, from, tgt) {
   playItem(t.ratingKey, t.type, o).catch(e => toast(e.message));
 }
 
+/* ---------- Search (Hearth keyboard on the left, matches on the right) ---------- */
+let SR = null, vocab = null, vocabP = null, reqSearch = '';
+const normT = s => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+function loadVocab() {
+  if (vocab || vocabP) return vocabP;
+  vocabP = libs().then(async () => {
+    const out = [];
+    for (const d of LIBS) {
+      if (blocked.has(String(d.key)) || !['movie', 'show', 'artist'].includes(d.type)) continue;
+      try { const mc = await pj(`/library/sections/${d.key}/all`, { 'X-Plex-Container-Size': 6000, 'X-Plex-Container-Start': 0 }); for (const m of (mc.Metadata || [])) out.push(m.title); } catch (e) { /* skip */ }
+    }
+    vocab = [...new Set(out)].map(t => [t, normT(t)]);
+    if (SR) SR.vocabReady();
+  }).catch(() => { vocab = []; });
+  return vocabP;
+}
+const recentSearches = () => { try { return JSON.parse(localStorage.getItem('hearth.recent') || '[]'); } catch (e) { return []; } };
+const rememberSearch = t => { t = (t || '').trim(); if (!t) return; try { localStorage.setItem('hearth.recent', JSON.stringify([t].concat(recentSearches().filter(x => x.toLowerCase() !== t.toLowerCase())).slice(0, 5))); } catch (e) { /* ignore */ } };
+const KEYCH = 'abcdefghijklmnopqrstuvwxyz1234567890';
+
+function roomSearch(room, tok) {
+  room.innerHTML = `<div class="sr"><div class="seb">SEARCH</div>
+    <div class="skb"><div class="sdisp" id="sd"></div><div class="srule"></div><div class="schips" id="sc"></div>
+      <div class="skeys" id="sk">${[...KEYCH].map(c => `<div class="fx key" data-a="skey" data-c="${c}">${c.toUpperCase()}</div>`).join('')}
+        <div class="fx key wide" data-a="skey" data-c=" ">${ic('d-plus', 'k')}<span>Space</span></div><div class="fx key wide" data-a="skey" data-c="⌫">${ic('home-x', 'k')}<span>Delete</span></div><div class="fx key wide" data-a="skey" data-c="⌧">${ic('home-x', 'k')}<span>Clear</span></div></div></div>
+    <div class="sres" id="srl"></div><div class="shint" id="sh"></div>
+    <div class="sview scroll" id="sv"><div id="slist"></div></div></div>`;
+  const S = SR = { text: '', seq: 0, rows: [], timer: null, tok, term: '' };
+  const disp = $('#sd', room), chips = $('#sc', room), list = $('#slist', room), label = $('#srl', room), hint = $('#sh', room);
+  S.paintKeyboard = () => {
+    disp.textContent = S.text || ''; disp.classList.toggle('ph', !S.text);
+    if (!S.text) disp.textContent = 'Type a title';
+    const q = normT(S.text);
+    let sug = [];
+    if (vocab && q) {
+      sug = vocab.filter(([t, n]) => n.startsWith(q));
+      if (sug.length < 3) sug = sug.concat(vocab.filter(([t, n]) => !n.startsWith(q) && n.includes(q)));
+      sug = sug.sort((a, b) => a[1].length - b[1].length).slice(0, 3).map(x => x[0]);
+    }
+    chips.innerHTML = sug.map(t => `<div class="fx schip" data-a="spick" data-t="${esc(t)}">${esc(t)}</div>`).join('');
+    $$('#sk .key', room).forEach(k => {
+      const c = k.dataset.c;
+      let dim = false;
+      if (vocab && vocab.length && c.length === 1 && c !== ' ') dim = !vocab.some(([t, n]) => n.startsWith(q + c));
+      k.classList.toggle('dim', dim);
+    });
+  };
+  S.vocabReady = () => S.paintKeyboard();
+  S.set = t => { S.text = t.slice(0, 40); S.paintKeyboard(); clearTimeout(S.timer); S.timer = setTimeout(S.run, 350); };
+  S.key = e => {
+    if (e.key.length === 1 && /[a-z0-9]/i.test(e.key) && !e.ctrlKey && !e.metaKey) { S.set(S.text + e.key.toLowerCase()); return true; }
+    if (e.key === 'Backspace' && S.text) { S.set(S.text.slice(0, -1)); return true; }
+    return false;
+  };
+  const sub = (it, withKind) => {
+    const kinds = { movie: 'Movie', show: 'Show', episode: 'Episode', artist: 'Artist', album: 'Album', track: 'Song' };
+    const p = [];
+    if (withKind && kinds[it.type]) p.push(kinds[it.type]);
+    if (it.type === 'episode') { p.push(it.grandparentTitle); p.push(`S${it.parentIndex} E${it.index}`); }
+    else if (it.type === 'album' || it.type === 'track') { p.push(it.type === 'album' ? it.parentTitle : it.grandparentTitle); if (it.type === 'track' && it.parentTitle) p.push(it.parentTitle); if (it.type === 'album' && it.year) p.push(it.year); }
+    else if (it.type === 'movie' || it.type === 'show') { if (it.year) p.push(it.year); if (it.type === 'show' && it.childCount) p.push(it.childCount === 1 ? '1 season' : it.childCount + ' seasons'); }
+    return p.filter(Boolean).join('  ·  ');
+  };
+  const HEADS = [['movie', 'MOVIES', 'film'], ['show', 'SHOWS', 'tv'], ['episode', 'EPISODES', 'episode'], ['artist', 'ARTISTS', 'artist'], ['album', 'ALBUMS', 'album'], ['track', 'SONGS', 'song']];
+  const rank = (a, q) => a.sort((x, y) => { const f = t => { t = (t.title || '').toLowerCase(); return t === q ? 0 : t.startsWith(q) ? 1 : t.includes(q) ? 2 : 3; }; return f(x) - f(y); });
+  const rowHTML = (it, i, withKind) => {
+    const sq = ['artist', 'album', 'track'].includes(it.type);
+    const pic = sq ? it.thumb : (it.type === 'episode' ? (it.thumb || it.grandparentThumb) : (it.art || it.thumb));
+    const req = it.type === 'show' ? '<div class="fx pill sm rq" data-a="srq" data-i="' + i + '">' + ic('d-plus') + '<span>Request</span></div>' : '';
+    return `<div class="fx srow" data-a="sopen" data-i="${i}"><div class="sth ${sq ? 'sq' : ''}" data-bg="${img(pic, sq ? 144 : 256, sq ? 144 : 144)}"></div><div class="stx"><div class="st">${esc(it.title)}</div>${sub(it, withKind) ? `<div class="ss">${esc(sub(it, withKind))}</div>` : ''}</div>${req}</div>`;
+  };
+  const head = (t, i) => `<div class="shd">${ic('d-' + (i === 'search' ? 'info' : 'film'), 'hi')}<span>${t}</span><b></b></div>`;
+  const idle = () => {
+    S.rows = []; label.textContent = ''; hint.textContent = ''; const rs = recentSearches();
+    list.innerHTML = rs.length ? `<div class="shd"><span>RECENT SEARCHES</span><b></b></div>` + rs.map(t => `<div class="fx srow rec" data-a="srecent" data-t="${esc(t)}"><div class="stx"><div class="st">${esc(t)}</div></div></div>`).join('') : '';
+    hint.textContent = rs.length ? '' : 'Type a title. Matches appear as you go.';
+  };
+  S.run = async () => {
+    const term = S.text.trim(); const my = ++S.seq;
+    if (!term) { idle(); return; }
+    S.term = term;
+    if (!S.rows.length) { list.innerHTML = ''; label.textContent = ''; hint.textContent = 'Looking…'; }
+    const find = async q => { const mc = await pj('/hubs/search', { query: q, limit: 20, includeCollections: 0 }); const out = []; for (const h of (mc.Hub || [])) for (const m of (h.Metadata || [])) if (!hiddenItem(m)) out.push(m); return out; };
+    let found = [], tried = term;
+    try {
+      found = await find(term);
+      if (!found.length && term.length >= 3) { tried = term.slice(0, -1).trim(); found = await find(tried); }
+    } catch (e) { if (my === S.seq) { list.innerHTML = ''; label.textContent = ''; hint.textContent = "Couldn't reach Plex. Check the server is on, then type again."; } return; }
+    if (my !== S.seq || R_not_here()) return;
+    const q = tried.toLowerCase(); const rows = []; let html = '';
+    const flat = tried !== term;
+    if (flat) {
+      label.textContent = `NOTHING FOR "${term.toUpperCase()}"`;
+      if (found.length) { html += `<div class="shd"><span>SHOWING "${esc(tried.toUpperCase())}"</span><b></b></div>`; for (const it of rank(found, q).slice(0, 12)) { rows.push(it); html += rowHTML(it, rows.length - 1, true); } }
+    } else {
+      for (const [t, h] of HEADS) {
+        const g = found.filter(x => x.type === t); if (!g.length) continue;
+        html += `<div class="shd">${ic('d-' + ({ movie: 'film', show: 'film', episode: 'film', artist: 'people', album: 'layers', track: 'heart' }[t]), 'hi')}<span>${h}</span><b></b></div>`;
+        for (const it of rank(g, q).slice(0, 8)) { rows.push(it); html += rowHTML(it, rows.length - 1, false); }
+      }
+      label.textContent = rows.length === 1 ? '1 MATCH' : rows.length ? rows.length + ' MATCHES' : `NOTHING FOR "${term.toUpperCase()}"`;
+    }
+    html += `<div class="shd"><span>NOT IN YOUR LIBRARY?</span><b></b></div><div class="fx srow" data-a="sask"><div class="sth ask">${ic('d-plus', 'k')}</div><div class="stx"><div class="st">Ask Overseerr for "${esc(term)}"</div><div class="ss">Movies and shows</div></div></div>`;
+    S.rows = rows; hint.textContent = ''; list.innerHTML = html; $('#sv', room).scrollTop = 0;
+    // "Request" only on a show Overseerr says is not fully in the library
+    if (rows.some(r => r.type === 'show')) {
+      fetch('/px/overseerr/api/v1/search?query=' + encodeURIComponent(term) + '&page=1').then(r => r.json()).then(j => {
+        if (my !== S.seq) return;
+        $$('.rq', list).forEach(b => { const it = rows[+b.dataset.i]; const m = (j.results || []).find(x => x.mediaType === 'tv' && (x.name || '').toLowerCase() === (it.title || '').toLowerCase()); if (m && !(m.mediaInfo && m.mediaInfo.status === 5)) b.style.display = 'flex'; });
+      }).catch(() => {});
+    }
+  };
+  const R_not_here = () => cur !== 'Search';
+  idle(); S.paintKeyboard(); loadVocab();
+  if (reqSearch) { const t = reqSearch; reqSearch = ''; S.set(t); }
+}
+function searchOpen(i) {
+  const it = SR.rows[i]; if (!it) return; rememberSearch(SR.term);
+  if (it.type === 'episode') openDetail(it.grandparentRatingKey, 'show', { want: { season: it.parentIndex, id: it.ratingKey } }).catch(e => toast(e.message));
+  else if (it.type === 'movie' || it.type === 'show') openDetail(it.ratingKey, it.type).catch(e => toast(e.message));
+  else if (it.type === 'track') { M.playList([it], 0, false); toast('Playing'); }
+  else openAlbum(it.ratingKey, it.type).catch(e => toast(e.message));
+}
+function searchTyped(text, go) {
+  if (cur !== 'Search') { reqSearch = text; go('Search'); } else SR.set(text);
+}
+
 /* ---------- Test room ---------- */
 let testMode = 'auto';
 async function roomTest(room, tok) {
@@ -1028,6 +1157,12 @@ function act(el) {
   else if (a === 'season') { const L = layers[layers.length - 1]; L.sIdx = +d.i; L.loadEps().then(() => { L.drawTabs(); L.drawEps(); setFocus($$('.stab', L.el)[L.sIdx]); }); }
   else if (a === 'shuffle') { const L = layers[layers.length - 1]; const e = L.eps[Math.random() * L.eps.length | 0]; playTarget(L, 0, e); }
   else if (a === 'clip') playItem(d.k, 'clip', { from: 0 }).catch(e => toast(e.message));
+  else if (a === 'skey') { const c = d.c; if (c === '⌫') SR.set(SR.text.slice(0, -1)); else if (c === '⌧') SR.set(''); else SR.set(SR.text + c); }
+  else if (a === 'spick') SR.set(d.t);
+  else if (a === 'srecent') SR.set(d.t);
+  else if (a === 'sopen') searchOpen(+d.i);
+  else if (a === 'srq') { rememberSearch(SR.term); reqSearch = SR.rows[+d.i].title; go('Requests'); }
+  else if (a === 'sask') { rememberSearch(SR.term); reqSearch = SR.term; go('Requests'); }
   else if (a === 'mood') openMood(d.m);
   else if (a === 'album') openAlbum(d.k, d.t).catch(e => toast(e.message));
   else if (a === 'mtoggle') M.toggle();
