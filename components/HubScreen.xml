@@ -4,8 +4,21 @@
   <children>
     <Group id="roomHolder" translation="[0, 150]" />
     <Rectangle id="topShade" width="1920" height="150" color="0x0B0E09E6" />
-    <LanternMark translation="[100, 50]" />
-    <LayoutGroup id="pills" translation="[164, 57]" layoutDirection="horiz" itemSpacings="[8]" />
+    <LanternMark translation="[100, 28]" />
+    <!-- room bar (whimsy spec 2-3): pre-rendered DW Pica caps labels centred on 960; the settled room gets a glow,
+         the firefly and two small friends; on the bar one firefly follows focus -->
+    <Poster id="flyGlow" uri="pkg:/images/w/firefly-glow.png" height="62" />
+    <Group id="pills" />
+    <Poster id="flyFriend1" uri="pkg:/images/w/firefly-small.png" width="48" height="48" />
+    <Poster id="flyFriend2" uri="pkg:/images/w/firefly-small.png" width="48" height="48" opacity="0.45" />
+    <Poster id="flyMain" uri="pkg:/images/w/firefly-main.png" width="64" height="64" />
+    <Animation id="flyMove" duration="0.18" easeFunction="outQuad">
+      <Vector2DFieldInterpolator id="flyTo" key="[0.0, 1.0]" fieldToInterp="flyMain.translation" />
+    </Animation>
+    <Animation id="friendsIn" duration="0.25" easeFunction="linear">
+      <FloatFieldInterpolator id="f1In" key="[0.0, 1.0]" keyValue="[0.0, 1.0]" fieldToInterp="flyFriend1.opacity" />
+      <FloatFieldInterpolator id="f2In" key="[0.0, 1.0]" keyValue="[0.0, 0.45]" fieldToInterp="flyFriend2.opacity" />
+    </Animation>
     <!-- clock B "twig and sprig": time in Cinzel, a short wild twig with two leaves, one steady firefly,
          then a fine gold weather icon and the weather in a book serif. All right-aligned to x 1824. -->
     <Label id="clock" translation="[1700, 12]" color="0xEDE6CAFF" />

@@ -6,9 +6,12 @@
   <children>
     <Group id="content">
       <!-- a short hero band (about a quarter of the screen); its art fades into the night on the left -->
-      <Rectangle translation="[96, 0]" width="1728" height="250" color="0x141A11FF" />
-      <Poster id="heroArt" translation="[96, 0]" width="1728" height="250" loadDisplayMode="scaleToZoom" />
-      <Poster uri="pkg:/images/fade-left.png" translation="[96, 0]" width="1150" height="250" />
+      <!-- rough-edged hero panel (whimsy spec 6); the art is cut to the same rough edge with a mask -->
+      <Poster uri="pkg:/images/w/panel-hero-1728x250.png" translation="[84, -12]" width="1752" height="274" />
+      <MaskGroup maskUri="pkg:/images/w/panel-1728x250.png" maskSize="[1752, 274]" maskOffset="[84, -12]">
+        <Poster id="heroArt" translation="[96, 0]" width="1728" height="250" loadDisplayMode="scaleToZoom" opacity="0.85" />
+        <Poster uri="pkg:/images/fade-left.png" translation="[96, 0]" width="1150" height="250" />
+      </MaskGroup>
 
       <Label id="greeting" translation="[96, 0]" visible="false" color="0xD9A066FF" />
       <Label id="heroEyebrow" translation="[136, 20]" width="1300" color="0xE0B34AFF" />
@@ -65,11 +68,11 @@
         <Group id="moodTiles" translation="[28, 70]" />
       </Group>
 
-      <CardRow id="nextUp" translation="[96, 540]" title="Next up" />
-      <CardRow id="latest" translation="[96, 880]" title="Recently added" />
-      <CardRow id="musicRow" translation="[96, 1220]" title="Music · new albums" cardWidth="240" cardHeight="240" />
-      <CardRow id="reqRow" translation="[96, 1560]" title="Requests" cardWidth="200" cardHeight="300" />
-      <CardRow id="photoRow" translation="[96, 1900]" title="Photos · lately" />
+      <CardRow id="nextUp" translation="[96, 540]" title="Next up" icon="pkg:/images/icons/home-play.png" countNoun="to watch" seed="0" />
+      <CardRow id="latest" translation="[96, 880]" title="Recently added" icon="pkg:/images/icons/home-flame.png" countNoun="new" seed="1" />
+      <CardRow id="musicRow" translation="[96, 1220]" title="Music · new albums" icon="pkg:/images/icons/home-note.png" countNoun="albums" seed="2" cardWidth="240" cardHeight="240" />
+      <CardRow id="reqRow" translation="[96, 1560]" title="Requests" icon="pkg:/images/icons/home-down.png" countNoun="requests" seed="3" cardWidth="200" cardHeight="300" />
+      <CardRow id="photoRow" translation="[96, 1900]" title="Photos · lately" icon="pkg:/images/icons/home-cal.png" countNoun="photos" seed="0" />
     </Group>
     <Animation id="scroll" duration="0.22" easeFunction="outQuad">
       <Vector2DFieldInterpolator id="scrollTo" key="[0.0, 1.0]" fieldToInterp="content.translation" />

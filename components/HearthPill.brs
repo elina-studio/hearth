@@ -3,7 +3,7 @@ sub init()
     m.fill = m.top.findNode("fill")
     m.ring = m.top.findNode("ring")
     m.label = m.top.findNode("label")
-    m.label.font = hFont("bold", 30)
+    m.label.font = hFont("bold", 26)
     update()
 end sub
 

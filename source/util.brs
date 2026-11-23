@@ -7,8 +7,12 @@ end function
 
 function hFont(kind as string, size as integer) as object
     f = CreateObject("roSGNode", "Font")
-    if kind = "bold"
-        f.uri = "pkg:/fonts/AtkinsonHyperlegible-Bold.ttf"
+    ' final font set (whimsy spec): HearthSans = Ysabeau Bold with tall digits, for titles, caps kickers,
+    ' card titles and buttons; Atkinson stays for small meta; Fell italic for section headers; DW Pica for rooms
+    if kind = "bold" or kind = "caps"
+        f.uri = "pkg:/fonts/HearthSans-Bold.ttf"
+    else if kind = "pica"
+        f.uri = "pkg:/fonts/IMFellDWPicaSC.ttf"
     else if kind = "fell"
         f.uri = "pkg:/fonts/IMFellEnglish-Italic.ttf"
     else if kind = "clock"
@@ -16,8 +20,6 @@ function hFont(kind as string, size as integer) as object
         f.uri = "pkg:/fonts/Cinzel-SemiBold.ttf"
     else if kind = "book"
         f.uri = "pkg:/fonts/EBGaramond-Regular.ttf"
-    else if kind = "caps"
-        f.uri = "pkg:/fonts/BarlowCondensed-Bold.ttf"
     else
         f.uri = "pkg:/fonts/AtkinsonHyperlegible-Regular.ttf"
     end if
@@ -218,3 +220,45 @@ sub hToggleCaptions()
     if reg.Read("captions") = "on" then reg.Write("captions", "off") else reg.Write("captions", "on")
     reg.Flush()
 end sub
+
+' ---------- whimsy spec pieces shared by grids ----------
+' A 12px braid progress bar under a card: call hBraidSet to show a percentage
+function hBraid(parent as object, w as integer, y as integer) as object
+    bar = parent.createChild("Group")
+    bar.translation = [0, y]
+    brTrack = bar.createChild("Poster")
+    brTrack.uri = "pkg:/images/w/progress-track.9.png"
+    brTrack.width = w
+    brTrack.height = 12
+    brClip = bar.createChild("Group")
+    brClip.translation = [1, 1]
+    brBody = brClip.createChild("Poster")
+    brBody.uri = "pkg:/images/w/progress-fill-body.png"
+    brBody.width = 1900
+    brBody.height = 10
+    brTip = bar.createChild("Poster")
+    brTip.uri = "pkg:/images/w/progress-fill-tip.png"
+    brTip.width = 12
+    brTip.height = 10
+    bar.addFields({ clip: brClip, tip: brTip, w: w })
+    return bar
+end function
+
+sub hBraidSet(bar as object, amount as float)
+    bar.visible = amount > 0
+    if amount <= 0 then return
+    fillW = Int((bar.w - 2) * amount / 100)
+    if fillW < 15 then fillW = 15
+    bar.clip.clippingRect = [0, 0, fillW - 12, 10]
+    bar.tip.translation = [1 + fillW - 12, 1]
+end sub
+
+' The corner moss for a card, the same one every time for the same key
+function hMossUri(key as string) as string
+    h = 0
+    for i = 1 to Len(key)
+        h = (h * 31 + Asc(Mid(key, i, 1))) mod 1000003
+    end for
+    kinds = ["1-round-caps", "2-tall-caps", "3-golden-funnels", "4-two-acorns"]
+    return "pkg:/images/w/moss-corner-" + kinds[h mod 4] + ".png"
+end function

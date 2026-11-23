@@ -76,22 +76,19 @@ sub buildSlots()
         pic.width = m.cw
         pic.height = m.ch
         pic.loadDisplayMode = "scaleToZoom"
-        track = g.createChild("Rectangle")
-        track.translation = [0, m.ch + 8]
-        track.width = m.cw
-        track.height = 6
-        track.color = "0xFFFFFF1F"
-        fill = g.createChild("Rectangle")
-        fill.translation = [0, m.ch + 8]
-        fill.height = 6
-        fill.color = "0xA3A35AFF"
+        bar = hBraid(g, m.cw, m.ch + 10)
         ring = g.createChild("Poster")
         ring.uri = "pkg:/images/ring.9.png"
         ring.blendColor = "0xE0B34AFF"
         ring.translation = [-10, -10]
         ring.width = m.cw + 20
         ring.height = m.ch + 20
-        g.addFields({ bg: bg, fb: fb, pic: pic, track: track, fill: fill, ring: ring, at: -1 })
+        moss = g.createChild("Poster")
+        moss.width = 125
+        moss.height = 96
+        moss.translation = [m.cw - 101, -56]
+        moss.visible = false
+        g.addFields({ bg: bg, fb: fb, pic: pic, bar: bar, ring: ring, moss: moss, at: -1 })
         g.visible = false
         m.slots.push(g)
     end for
@@ -113,19 +110,22 @@ sub drawGrid()
                 if it.genreName <> invalid
                     g.fb.text = UCase(it.genreName)
                     g.pic.uri = ""
-                    g.track.visible = false
-                    g.fill.visible = false
+                    g.bar.visible = false
                 else
                     g.fb.text = UCase(hTitle(it))
                     g.pic.uri = hImageAny(it, ["Primary"], 180)
-                    pct = hPercent(it)
-                    g.track.visible = pct > 0
-                    g.fill.visible = pct > 0
-                    g.fill.width = Int(m.cw * pct / 100)
+                    hBraidSet(g.bar, hPercent(it))
                 end if
             end if
             g.visible = true
-            g.ring.visible = (m.focused and m.zone = "grid" and i = m.index)
+            on = (m.focused and m.zone = "grid" and i = m.index)
+            g.ring.visible = on
+            if on
+                k = i.toStr()
+                if m.items[i].Id <> invalid then k = m.items[i].Id.toStr()
+                g.moss.uri = hMossUri(k)
+            end if
+            g.moss.visible = on
         else
             g.visible = false
             g.at = -1

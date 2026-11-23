@@ -1,10 +1,25 @@
 sub init()
     m.names = ["Home", "Shows", "Movies", "Music", "Requests", "Ambiance", "Photos", "Search"]
     m.pillsGroup = m.top.findNode("pills")
-    for each n in m.names
-        p = m.pillsGroup.createChild("HearthPill")
-        p.text = n
+    ' x and width of each pre-rendered label PNG (2px side padding), from the whimsy spec
+    m.tabX = [280, 420, 578, 750, 899, 1111, 1332, 1504]
+    m.tabW = [101, 120, 133, 110, 174, 182, 134, 136]
+    for i = 0 to m.names.count() - 1
+        p = m.pillsGroup.createChild("Poster")
+        p.translation = [m.tabX[i], 42]
+        p.width = m.tabW[i]
+        p.height = 44
+        p.loadDisplayMode = "noScale"
     end for
+    m.flyGlow = m.top.findNode("flyGlow")
+    m.flyMain = m.top.findNode("flyMain")
+    m.flyFriend1 = m.top.findNode("flyFriend1")
+    m.flyFriend2 = m.top.findNode("flyFriend2")
+    m.flyMove = m.top.findNode("flyMove")
+    m.flyTo = m.top.findNode("flyTo")
+    m.friendsIn = m.top.findNode("friendsIn")
+    m.flyAt = -1
+    m.settledAt = -1
     m.roomHolder = m.top.findNode("roomHolder")
     m.clock = m.top.findNode("clock")
     m.clock.font = hFont("clock", 54)
@@ -33,6 +48,7 @@ sub init()
     m.zone = "room"
     loadLibraries()
     showRoom("Home", false)
+    paintPills()
 end sub
 
 sub onShown(unused as dynamic)
@@ -141,11 +157,41 @@ sub showRoom(name as string, focus as boolean)
 end sub
 
 sub paintPills()
+    ci = indexOf(m.current)
     for i = 0 to m.pillsGroup.getChildCount() - 1
         p = m.pillsGroup.getChild(i)
-        p.current = (m.names[i] = m.current)
-        p.focused = (m.zone = "pills" and i = m.pillIndex)
+        state = "dim"
+        if i = ci then state = "current"
+        if m.zone = "pills" and i = m.pillIndex then state = "focused"
+        p.uri = "pkg:/images/w/room-" + LCase(m.names[i]) + "-" + state + ".png"
     end for
+    ' the settled room: glow plus two small friends (they fade in when a room is entered)
+    left = m.tabX[ci] + 2
+    right = m.tabX[ci] + m.tabW[ci] - 2
+    m.flyGlow.translation = [left - 24, 34]
+    m.flyGlow.width = right - left + 48
+    if m.zone = "pills" and m.pillIndex <> ci then m.flyGlow.opacity = 0.6 else m.flyGlow.opacity = 1.0
+    m.flyFriend1.translation = [right - 10, 19]
+    m.flyFriend2.translation = [left - 36, 55]
+    if m.settledAt <> ci
+        m.settledAt = ci
+        m.friendsIn.control = "stop"
+        m.flyFriend1.opacity = 0
+        m.flyFriend2.opacity = 0
+        m.friendsIn.control = "start"
+    end if
+    ' one firefly: under the focused label on the bar, else under the settled room
+    fi = ci
+    if m.zone = "pills" then fi = m.pillIndex
+    target = [m.tabX[fi] + Int(m.tabW[fi] / 2) - 32, 64]
+    if m.flyAt < 0
+        m.flyMain.translation = target
+    else if m.flyAt <> fi
+        m.flyMove.control = "stop"
+        m.flyTo.keyValue = [m.flyMain.translation, target]
+        m.flyMove.control = "start"
+    end if
+    m.flyAt = fi
 end sub
 
 sub toPills()

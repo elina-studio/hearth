@@ -11,9 +11,9 @@ sub init()
     m.greeting = m.top.findNode("greeting")
     m.greeting.font = hFont("fell", 38)
     m.heroEyebrow = m.top.findNode("heroEyebrow")
-    m.heroEyebrow.font = hFont("caps", 26)
+    m.heroEyebrow.font = hFont("caps", 24)
     m.heroTitle = m.top.findNode("heroTitle")
-    m.heroTitle.font = hFont("caps", 76)
+    m.heroTitle.font = hFont("caps", 70)
     m.heroProgress = m.top.findNode("heroProgress")
     m.heroBar = m.top.findNode("heroBar")
     m.heroLeft = m.top.findNode("heroLeft")
@@ -24,9 +24,9 @@ sub init()
     m.pgText.font = hFont("regular", 24)
 
     for each id in ["musicEyebrow", "reqEyebrow", "moodEyebrow"]
-        m.top.findNode(id).font = hFont("caps", 26)
+        m.top.findNode(id).font = hFont("caps", 24)
     end for
-    m.top.findNode("musicTitle").font = hFont("bold", 34)
+    m.top.findNode("musicTitle").font = hFont("bold", 30)
     m.top.findNode("musicSub").font = hFont("regular", 24)
     m.top.findNode("reqFoot").font = hFont("regular", 26)
     m.mRings = [m.top.findNode("mRing0"), m.top.findNode("mRing1"), m.top.findNode("mRing2")]
@@ -341,7 +341,7 @@ sub buildMoods()
         shade.height = 62
         shade.color = "0x0A0D08A6"
         l = g.createChild("Label")
-        l.font = hFont("caps", 30)
+        l.font = hFont("caps", 24)
         l.text = names[i]
         l.translation = [18, 0]
         l.height = 62
