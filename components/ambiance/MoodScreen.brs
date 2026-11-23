@@ -73,6 +73,7 @@ sub onMood()
         m.sound.active = false
         m.clip = it.clip
         m.clipRetried = false
+        m.retried5 = false
         if m.clip <> invalid
             ' the person's own footage, streamed from their Plex "Ambiance" library
             m.video.content = clipContent(m.clip, false)
@@ -91,12 +92,22 @@ sub onMood()
         m.still.visible = true
         m.video.visible = true
         m.video.mute = not soundPref(md)
-        m.video.control = "play"
+        fillScreen(m.clip)
+        ' the TV plays one thing at a time: music (even paused) holds the player, so stop it first
+        mp = m.global.music
+        if mp <> invalid and mp.state <> invalid and mp.state <> "none" and mp.state <> "stopped"
+            print "[ambiance] stopping music ("; mp.state; ") so the video can play"
+            mp.command = { cmd: "stop" }
+            startVideoSoon(0.6)
+        else
+            m.video.control = "play"
+        end if
         m.credit.text = it.credit
     else
         ' no footage in this build: the drawn scene and its generated sound
         m.video.control = "stop"
         m.video.visible = false
+        fillScreen(invalid)
         m.still.visible = false
         m.scene.visible = true
         m.scene.mood = md
@@ -141,10 +152,55 @@ function fullStill(path as string) as string
     return m.global.plexServer + "/photo/:/transcode?width=1280&height=720&minSize=1&upscale=1&url=" + hEscape(path) + "&X-Plex-Token=" + m.global.plexServerToken
 end function
 
+' Size the video so it covers the whole screen whatever its shape (crop, never black bars):
+' the picture is scaled to the screen's longer side and centred, the overflow falls off-screen.
+sub fillScreen(clip as dynamic)
+    w = 1920.0
+    h = 1080.0
+    ar = 0.0
+    if clip <> invalid
+        if clip.width <> invalid and clip.height <> invalid and clip.height > 0 then ar = clip.width / clip.height
+        if ar = 0 and clip.aspect <> invalid then ar = Val(clip.aspect.toStr())
+    end if
+    if ar > 0
+        if ar > w / h
+            w = 1080.0 * ar
+        else
+            h = 1920.0 / ar
+        end if
+    end if
+    m.video.width = Int(w)
+    m.video.height = Int(h)
+    m.video.translation = [Int((1920 - w) / 2), Int((1080 - h) / 2)]
+    print "[ambiance] video rect "; Int(w); "x"; Int(h); " (clip aspect "; ar; ")"
+end sub
+
+sub startVideoSoon(sec as float)
+    t = CreateObject("roSGNode", "Timer")
+    t.duration = sec
+    t.repeat = false
+    t.observeField("fire", "startVideoNow")
+    m.startTimer = t
+    t.control = "start"
+end sub
+
+sub startVideoNow()
+    if m.useVideo and not m.asleep then m.video.control = "play"
+end sub
+
 sub onVideoState()
     print "[ambiance] video state "; m.video.state
     if m.video.state = "error"
-        print "[ambiance] video error: "; m.video.errorMsg
+        print "[ambiance] video error: "; m.video.errorCode; " "; m.video.errorMsg
+        ' -5 "only one playing instance": something (music) still holds the player; stop it and retry once
+        if m.video.errorCode = -5 and m.retried5 <> true
+            m.retried5 = true
+            mp = m.global.music
+            if mp <> invalid then mp.command = { cmd: "stop" }
+            m.sound.active = false
+            startVideoSoon(1.0)
+            return
+        end if
         ' a phone clip in a format the TV can't open directly: ask Plex to convert it, once
         if m.clip <> invalid and not m.clipRetried
             m.clipRetried = true

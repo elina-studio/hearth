@@ -118,7 +118,7 @@ sub runTask()
                 f = toS(part.file, "")
                 bits = f.split("/")
                 if bits.count() > 0 then f = bits[bits.count() - 1]
-                clips.push({ Id: md.ratingKey, Name: toS(md.title, f), file: f, key: part.key, container: toS(med.container, ""), videoCodec: toS(med.videoCodec, ""), thumb: md.thumb, art: md.art, duration: md.duration })
+                clips.push({ Id: md.ratingKey, Name: toS(md.title, f), file: f, key: part.key, container: toS(med.container, ""), videoCodec: toS(med.videoCodec, ""), thumb: md.thumb, art: md.art, duration: md.duration, width: med.width, height: med.height, aspect: med.aspectRatio })
             end if
         end for
         out = { Clips: clips }
