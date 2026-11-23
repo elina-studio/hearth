@@ -156,6 +156,10 @@ sub runTask()
         verb = "/:/scrobble"
         if op = "unplayed" then verb = "/:/unscrobble"
         res = req("GET", m.server + verb, { key: a.id, identifier: "com.plexapp.plugins.library" }, m.token)
+    else if op = "decision"
+        ' ask Plex what it would do with a playback request (copy or convert each stream), without starting it
+        res = req("GET", m.server + "/video/:/transcode/universal/decision?" + a.query, {}, m.token)
+        out = decisionSummary(res.body)
     else if op = "timeline"
         q = { ratingKey: a.id, key: "/library/metadata/" + a.id, state: a.state, time: a.time, duration: a.duration, identifier: "com.plexapp.plugins.library" }
         res = req("GET", m.server + "/:/timeline", q, m.token)
@@ -362,6 +366,28 @@ function pickServers(body as dynamic, token as string) as object
             if tok = invalid then tok = token
             out.push({ name: r.name, owned: (r.owned = true), token: tok, urls: urls })
         end if
+    end for
+    return out
+end function
+
+' Plex's playback decision, flattened: { general, video, audio, subtitle } where each stream says copy, transcode or burn
+function decisionSummary(body as dynamic) as object
+    out = { general: "", video: "", audio: "", subtitle: "", videoCodec: "", audioCodec: "", subtitleCodec: "" }
+    if body = invalid or body.MediaContainer = invalid then return out
+    mc = body.MediaContainer
+    if mc.generalDecisionText <> invalid then out.general = mc.generalDecisionText
+    if mc.transcodeDecisionText <> invalid then out.general = out.general + " / " + mc.transcodeDecisionText
+    if mc.Metadata = invalid or mc.Metadata.count() = 0 then return out
+    md = mc.Metadata[0]
+    if md.Media = invalid or md.Media.count() = 0 or md.Media[0].Part = invalid or md.Media[0].Part.count() = 0 then return out
+    pt = md.Media[0].Part[0]
+    if pt.Stream = invalid then return out
+    for each s in pt.Stream
+        d = toS(s.decision, "copy")
+        cd = toS(s.codec, "")
+        if s.streamType = 1 then out.video = d : out.videoCodec = cd
+        if s.streamType = 2 then out.audio = d : out.audioCodec = cd
+        if s.streamType = 3 then out.subtitle = d : out.subtitleCodec = cd
     end for
     return out
 end function

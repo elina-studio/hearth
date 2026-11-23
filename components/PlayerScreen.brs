@@ -1,4 +1,5 @@
-' Plays a Plex movie or episode. Direct play when the TV can handle the file, otherwise a Plex HLS transcode.
+' Plays a Plex movie or episode. Plays the file as-is when the TV can decode it; otherwise Plex remuxes it
+' to HLS and converts only what the TV can't take (usually just the audio). See playback.brs.
 ' Captions: Plex sidecar files (including Bazarr's) plus anything embedded; * opens the captions picker.
 sub init()
     m.capsPref = ""
@@ -24,19 +25,6 @@ sub start()
     hPlex("item", { id: it.Id }, "onItem")
 end sub
 
-function canPlay(media as object) as boolean
-    di = CreateObject("roDeviceInfo")
-    c = LCase(toStr(media.container))
-    v = LCase(toStr(media.videoCodec))
-    a = LCase(toStr(media.audioCodec))
-    okC = (c = "mp4" or c = "m4v" or c = "mov" or c = "mkv")
-    okV = (v = "h264")
-    if v = "hevc" or v = "h265" then okV = (di.CanDecodeVideo({ Codec: "hevc" }).result = true)
-    if v = "vp9" then okV = (di.CanDecodeVideo({ Codec: "vp9" }).result = true)
-    okA = (a = "aac" or a = "mp3" or a = "ac3" or a = "eac3" or a = "flac" or a = "opus" or a = "")
-    return okC and okV and okA
-end function
-
 function toStr(v as dynamic) as string
     if v = invalid then return ""
     return v.toStr()
@@ -59,25 +47,76 @@ sub onItem(event as object)
     m.durationMs = 0
     if media.duration <> invalid then m.durationMs = media.duration
 
+    m.media = media
+    m.part = part
+    m.streams = hPlayStreams(part)
+    m.session = m.global.deviceId + "-" + Rnd(100000).toStr()
+    hPlayLogCaps()
+    chk = hPlayDirectCheck(media, m.streams)
+    print "[hearth-play] "; hTitle(it); " | "; toStr(media.container); " "; toStr(media.videoCodec); " "; toStr(media.height); "p "; toStr(media.audioCodec); " | sub "; subDesc()
+    if chk.ok
+        print "[hearth-play] plan: direct play (no Plex conversion)"
+        m.mode = "direct"
+        buildContent()
+    else
+        print "[hearth-play] needs Plex because of "; chk.why; "; asking Plex for a remux"
+        m.mode = "hls"
+        m.hlsSubs = "none"
+        ' an embedded text caption Plex picked can ride along in the remux; image captions (PGS/VobSub) would force a burn-in
+        if m.streams.embeddedTextSub and hCaptions() <> "off" then m.hlsSubs = "auto"
+        askDecision()
+    end if
+end sub
+
+function subDesc() as string
+    if m.streams.sub = invalid then return "none picked"
+    d = toStr(m.streams.sub.codec)
+    if m.streams.sub.key <> invalid then d = d + " (file)" else d = d + " (embedded)"
+    return d
+end function
+
+sub askDecision()
+    hPlex("decision", { query: hPlayHlsQuery(m.item.Id, m.startSec, m.hlsSubs, m.session, m.global.plexServerToken) }, "onDecision")
+end sub
+
+sub onDecision(event as object)
+    t = hTaskFrom(event)
+    d = t.response
+    if t.ok and d <> invalid
+        print "[hearth-play] Plex says: video "; d.video; " ("; d.videoCodec; "), audio "; d.audio; " ("; d.audioCodec; "), captions "; d.subtitle; " ("; d.subtitleCodec; ") | "; d.general
+        ' never let a caption cost a full video convert: drop the embedded caption and ask again
+        if m.hlsSubs <> "none" and (d.video = "transcode" or d.subtitle = "burn")
+            print "[hearth-play] that caption would force a video convert; retrying without it (sidecar files still work)"
+            m.hlsSubs = "none"
+            askDecision()
+            return
+        end if
+        if d.video = "transcode" then print "[hearth-play] WARNING: Plex will convert the video on the NAS CPU; this file may stutter"
+    else
+        print "[hearth-play] Plex decision check failed (status "; t.status; "); starting the remux anyway"
+    end if
+    buildContent()
+end sub
+
+sub buildContent()
+    it = m.item
+    server = m.global.plexServer
+    token = m.global.plexServerToken
     content = CreateObject("roSGNode", "ContentNode")
     content.title = hTitle(it)
     if it.Type = "Episode" then content.secondaryTitle = hSubtitle(it)
-    if canPlay(media)
-        content.url = server + part.key + "?X-Plex-Token=" + token
-        if LCase(toStr(media.container)) = "mkv" then content.streamFormat = "mkv" else content.streamFormat = "mp4"
+    if m.mode = "direct"
+        content.url = server + m.part.key + "?X-Plex-Token=" + token
+        if LCase(toStr(m.media.container)) = "mkv" then content.streamFormat = "mkv" else content.streamFormat = "mp4"
         content.playStart = m.startSec
         m.offset = 0
     else
-        q = "path=" + hEscape("/library/metadata/" + it.Id) + "&mediaIndex=0&partIndex=0&protocol=hls&fastSeek=1"
-        q = q + "&directPlay=0&directStream=1&directStreamAudio=1&videoResolution=1920x1080&maxVideoBitrate=20000"
-        q = q + "&offset=" + Int(m.startSec).toStr() + "&subtitles=none&session=" + m.global.deviceId + "-" + Rnd(100000).toStr()
-        q = q + "&X-Plex-Client-Identifier=" + hEscape(m.global.deviceId) + "&X-Plex-Product=Hearth&X-Plex-Platform=Roku&X-Plex-Token=" + token
-        q = q + "&X-Plex-Client-Profile-Extra=" + hEscape("add-transcode-target(type=videoProfile&context=streaming&protocol=hls&container=mpegts&videoCodec=h264&audioCodec=aac,ac3)")
-        content.url = server + "/video/:/transcode/universal/start.m3u8?" + q
+        content.url = server + "/video/:/transcode/universal/start.m3u8?" + hPlayHlsQuery(it.Id, m.startSec, m.hlsSubs, m.session, token)
         content.streamFormat = "hls"
         content.playStart = 0
         m.offset = m.startSec
     end if
+    part = m.part
 
     ' sidecar caption files Plex knows about (Bazarr's downloads show up here)
     subs = []
@@ -153,6 +192,16 @@ sub onState()
     else if s = "finished"
         leave()
     else if s = "error"
+        if m.mode = "direct" and not m.started
+            ' the TV refused the file after all: let Plex repackage it instead
+            print "[hearth-play] direct play failed ("; m.video.errorCode; " "; m.video.errorMsg; "); falling back to a Plex remux"
+            m.video.control = "stop"
+            m.mode = "hls"
+            m.hlsSubs = "none"
+            m.ready = false
+            askDecision()
+            return
+        end if
         msg = m.video.errorMsg
         if msg = invalid or msg = "" then msg = "The video stopped with an error."
         fail(msg + " (" + m.video.errorCode.toStr() + ")")
