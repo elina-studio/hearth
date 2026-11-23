@@ -59,6 +59,29 @@ function pPhotoUrl(item as object, w as integer, h as integer, fill = false as b
     return m.global.plexServer + "/photo/:/transcode?width=" + w.toStr() + "&height=" + h.toStr() + "&minSize=" + minSize + "&upscale=1&url=" + hEscape(item.path) + "&X-Plex-Token=" + m.global.plexServerToken
 end function
 
+' Swap typographic characters the TV fonts don't have for plain ones,
+' e.g. "Anti‐Pioneer" (U+2010 hyphen) drew as a box
+function pPlainText(s as string) as string
+    swaps = [[8208, "-"], [8209, "-"], [8210, "-"], [8211, "-"], [8212, " - "], [8213, " - "], [8722, "-"], [173, ""], [8203, ""], [160, " "], [8239, " "], [8201, " "], [8216, "'"], [8217, "'"], [8218, "'"], [8242, "'"], [8220, Chr(34)], [8221, Chr(34)], [8222, Chr(34)], [8243, Chr(34)], [8230, "..."]]
+    for each sw in swaps
+        s = s.Replace(Chr(sw[0]), sw[1])
+    end for
+    return s
+end function
+
+' Home Assistant weather state to one of the eight gold clock icons (same as Home)
+function pWxIcon(s as string) as string
+    k = "cloudy"
+    if s = "sunny" then k = "clear"
+    if s = "clear-night" then k = "night"
+    if s = "partlycloudy" then k = "partlycloudy"
+    if s = "rainy" or s = "pouring" or s = "snowy-rainy" then k = "rain"
+    if s = "snowy" or s = "hail" then k = "snow"
+    if s = "fog" then k = "fog"
+    if s = "lightning" or s = "lightning-rainy" then k = "storm"
+    return "pkg:/images/clock/w-" + k + ".png"
+end function
+
 ' Start a PhotoTask (see PhotoTask.brs). cb takes the event.
 function pPhotos(op as string, args as object, cb as string, tag = "" as string) as object
     t = CreateObject("roSGNode", "PhotoTask")

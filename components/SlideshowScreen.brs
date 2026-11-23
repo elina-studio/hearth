@@ -10,11 +10,13 @@ sub init()
     m.front = 1 ' index of the layer on screen; the first photo goes to the other one
     m.prefetch = m.top.findNode("prefetch")
     m.clock = m.top.findNode("clock")
-    m.clock.font = hFont("bold", 120)
+    m.clock.font = hFont("clock", 72)
+    m.clockFly = m.top.findNode("clockFly")
+    m.wxIcon = m.top.findNode("wxIcon")
     m.date = m.top.findNode("date")
-    m.date.font = hFont("fell", 48)
+    m.date.font = hFont("fell", 36)
     m.weather = m.top.findNode("weather")
-    m.weather.font = hFont("regular", 32)
+    m.weather.font = hFont("book", 28)
     m.album = m.top.findNode("album")
     m.album.font = hFont("caps", 28)
     m.caption = m.top.findNode("caption")
@@ -24,9 +26,12 @@ sub init()
     m.captionGroup = m.top.findNode("captionGroup")
     m.captionFade = m.top.findNode("captionFade")
     m.nowPlaying = m.top.findNode("nowPlaying")
-    m.top.findNode("npEyebrow").font = hFont("caps", 24)
+    npEyebrow = m.top.findNode("npEyebrow")
+    npEyebrow.font = hFont("caps", 24)
+    ' the note icon sits just left of the eyebrow (the ♪ character isn't in the fonts)
+    m.top.findNode("npIcon").translation = [1824 - npEyebrow.localBoundingRect().width - 34, 940]
     m.npTitle = m.top.findNode("npTitle")
-    m.npTitle.font = hFont("regular", 28)
+    m.npTitle.font = hFont("book", 30)
     m.pausedBadge = m.top.findNode("paused")
     m.top.findNode("pausedText").font = hFont("bold", 32)
     m.status = m.top.findNode("status")
@@ -351,6 +356,10 @@ sub tick()
     mm = mi.toStr()
     if mi < 10 then mm = "0" + mm
     m.clock.text = h12.toStr() + ":" + mm
+    ' right-align by measuring, so the firefly can sit just left of the time
+    w = m.clock.localBoundingRect().width
+    m.clock.translation = [1824 - w, 48]
+    m.clockFly.translation = [1824 - w - 40, 86]
     m.date.text = dt.GetWeekday() + " " + dt.GetDayOfMonth().toStr() + " " + pMonthName(dt.GetMonth())
 end sub
 
@@ -358,6 +367,7 @@ sub loadWeather()
     c = pCfg()
     if c.haToken = ""
         m.weather.text = ""
+        layoutWeather()
         return
     end if
     pHa("/api/states/" + c.haEntity, "onWeather")
@@ -367,14 +377,25 @@ sub onWeather(event as object)
     t = pTaskFrom(event)
     if not t.ok or t.response.state = invalid
         m.weather.text = ""
+        layoutWeather()
         return
     end if
+    m.wxIcon.uri = pWxIcon(t.response.state)
     s = pWeatherWord(t.response.state)
     a = t.response.attributes
     if a <> invalid and a.temperature <> invalid
         s = Int(a.temperature + 0.5).toStr() + "° · " + s
     end if
     m.weather.text = s
+    layoutWeather()
+end sub
+
+' Weather line: gold icon, then text, right-aligned to 1824
+sub layoutWeather()
+    w = m.weather.localBoundingRect().width
+    m.weather.translation = [1824 - w, 232]
+    m.wxIcon.translation = [1824 - w - 38, 238]
+    m.wxIcon.visible = (m.weather.text <> "" and m.wxIcon.uri <> "")
 end sub
 
 ' Only while music is actually playing
@@ -387,7 +408,7 @@ sub showMusic()
     t = mp.track.title
     if t = invalid then t = ""
     if mp.track.artist <> invalid and mp.track.artist <> "" then t = t + " · " + mp.track.artist
-    m.npTitle.text = t
+    m.npTitle.text = pPlainText(t)
     m.nowPlaying.visible = (t <> "")
 end sub
 
