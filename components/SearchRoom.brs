@@ -190,6 +190,7 @@ sub onFound(event as object)
     m.showingRecent = false
     setRows(rows)
     checkSeasons()
+    checkMusic()
 end sub
 
 ' Feedback #23: only offer "Request" on a show when Overseerr says it isn't fully in the library
@@ -306,7 +307,7 @@ sub setRows(rows as object)
         else
             r.y = y
             if r.kind = "recent" then r.h = 64 else r.h = 92
-            if r.kind = "item" and (r.item.Type = "Series" or r.item.Type = "artist")
+            if r.kind = "item" and (r.item.Type = "Series" or r.item.Type = "artist" or r.item.Type = "album")
                 r.more = "Request"
             end if
             r.node = makeRow(r)
@@ -441,8 +442,8 @@ function makeRow(r as object) as object
             pl.font = hFont("bold", 24)
             pl.text = r.more
             r.pill = pill
-            ' shows: hidden until Overseerr says seasons are missing (see checkSeasons)
-            pill.visible = (r.item.Type <> "Series")
+            ' hidden until Overseerr (shows) or Lidarr (music) says something is missing
+            pill.visible = false
             textW = textW - pw - 24
         end if
         tl = g.createChild("Label")
@@ -515,7 +516,9 @@ sub openRow()
         if r.item.Type = "Series"
             m.top.request = { action: "room", name: "Requests", search: rowTitle(r.item) }
         else
-            m.top.request = { action: "musicView", mode: "request", term: rowTitle(r.item) }
+            artist = rowTitle(r.item)
+            if r.item.Type = "album" and r.item.ArtistName <> invalid then artist = r.item.ArtistName
+            m.top.request = { action: "musicView", mode: "request", term: artist }
         end if
         return
     end if
@@ -650,3 +653,108 @@ function onKeyEvent(key as string, press as boolean) as boolean
     paint()
     return true
 end function
+
+' ---------- Lidarr: "Request" on artists and albums only when tracks are missing ----------
+' Lidarr's statistics.percentOfTracks < 100, or not in Lidarr at all, counts as missing.
+
+sub checkMusic()
+    if m.reg.Read("lidarrKey") = "" then return
+    if m.lidarr = invalid then m.lidarr = { artists: invalid, albums: {}, loading: false }
+    if m.lidarr.artists = invalid
+        if not m.lidarr.loading
+            m.lidarr.loading = true
+            lTask("/artist", {}, "onLidarrArtists", "artists")
+        end if
+        return
+    end if
+    for i = 0 to m.rows.count() - 1
+        r = m.rows[i]
+        if r.pill <> invalid and (r.item.Type = "artist" or r.item.Type = "album") then judgeMusic(i)
+    end for
+end sub
+
+sub lTask(path as string, query as object, cb as string, tag as string)
+    t = CreateObject("roSGNode", "LidarrTask")
+    t.method = "GET"
+    t.path = path
+    t.query = query
+    t.tag = tag
+    if m.oTasks = invalid then m.oTasks = {}
+    k = "l" + Rnd(1000000).toStr()
+    t.key = k
+    m.oTasks[k] = t
+    t.observeField("done", cb)
+    t.control = "RUN"
+end sub
+
+function lidarrDone(event as object) as object
+    t = event.getRoSGNode()
+    if t.key <> invalid then m.oTasks.delete(t.key)
+    return t
+end function
+
+function pct(x as object) as float
+    if x.statistics = invalid or x.statistics.percentOfTracks = invalid then return 0
+    return x.statistics.percentOfTracks
+end function
+
+sub onLidarrArtists(event as object)
+    t = lidarrDone(event)
+    m.lidarr.loading = false
+    if not t.ok or t.response = invalid or t.response.Items = invalid then return
+    a = {}
+    for each x in t.response.Items
+        if x.artistName <> invalid then a[LCase(x.artistName)] = { id: x.id, pct: pct(x) }
+    end for
+    m.lidarr.artists = a
+    checkMusic()
+end sub
+
+sub judgeMusic(i as integer)
+    r = m.rows[i]
+    it = r.item
+    if it.Type = "artist"
+        name = rowTitle(it)
+    else
+        name = it.ArtistName
+        if name = invalid then name = ""
+    end if
+    a = m.lidarr.artists[LCase(name)]
+    if a = invalid
+        showPill(i) ' not in Lidarr yet: requesting adds it
+        return
+    end if
+    if it.Type = "artist"
+        if a.pct < 100 then showPill(i)
+        return
+    end if
+    key = a.id.toStr()
+    albums = m.lidarr.albums[key]
+    if albums = invalid
+        if m.lidarr.albums[key + "_loading"] = invalid
+            m.lidarr.albums[key + "_loading"] = true
+            lTask("/album", { artistId: key }, "onLidarrAlbums", key)
+        end if
+        return
+    end if
+    got = albums[LCase(rowTitle(it))]
+    if got = invalid or got < 100 then showPill(i)
+end sub
+
+sub onLidarrAlbums(event as object)
+    t = lidarrDone(event)
+    if not t.ok or t.response = invalid or t.response.Items = invalid then return
+    al = {}
+    for each x in t.response.Items
+        if x.title <> invalid then al[LCase(x.title)] = pct(x)
+    end for
+    m.lidarr.albums[t.tag] = al
+    checkMusic()
+end sub
+
+sub showPill(i as integer)
+    if i < m.rows.count() and m.rows[i].pill <> invalid
+        m.rows[i].pill.visible = true
+        paint()
+    end if
+end sub
