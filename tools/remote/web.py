@@ -85,9 +85,32 @@ def proxy(h, method, path):
     if not secret:
         h.send_json({"error": "no key saved for %s (run save-keys.sh)" % segs[2]}, 503)
         return
-    rest = "/" + (segs[3] if len(segs) > 3 else "")
+    rest = "/" + urllib.parse.unquote(segs[3] if len(segs) > 3 else "")
     query = urllib.parse.parse_qsl(parts.query, keep_blank_values=True)
-    headers = {"Accept": h.headers.get("Accept", "*/*")}
+    is_pic = kind == "plex" and method == "GET" and rest.startswith("/photo/:/transcode")
+    headers = {"Accept": "*/*" if is_pic else h.headers.get("Accept", "*/*")}
+    cache_file = None
+    if is_pic:
+        # Plex resizes each picture on demand, which is slow for a page of posters; keep the result on the NAS
+        import hashlib
+        cdir = os.path.join(DATA_DIR, "img")
+        try:
+            os.makedirs(cdir, exist_ok=True)
+        except OSError:
+            cdir = None
+        if cdir:
+            key = hashlib.sha1(urllib.parse.urlencode(sorted(q for q in query if q[0] != "X-Plex-Token")).encode()).hexdigest()
+            cache_file = os.path.join(cdir, key + ".jpg")
+            if os.path.isfile(cache_file) and os.path.getsize(cache_file) > 0:
+                with open(cache_file, "rb") as fh:
+                    data = fh.read()
+                h.send_response(200)
+                h.send_header("Content-Type", "image/jpeg")
+                h.send_header("Content-Length", str(len(data)))
+                h.send_header("Cache-Control", "max-age=604800")
+                h.end_headers()
+                h.wfile.write(data)
+                return
     if kind == "plex":
         query = [(k, v) for k, v in query if k != "X-Plex-Token"] + [("X-Plex-Token", secret)]
         headers["X-Plex-Client-Identifier"] = "hearth-projector"
@@ -110,6 +133,24 @@ def proxy(h, method, path):
     except Exception as e:
         h.send_json({"error": "can't reach %s: %s" % (segs[2], e)}, 502)
         return
+    if cache_file and r.status == 200:
+        data = r.read()
+        conn.close()
+        ctype = r.getheader("Content-Type") or "image/jpeg"
+        if data and ctype.startswith("image/"):
+            try:
+                with open(cache_file + ".tmp", "wb") as fh:
+                    fh.write(data)
+                os.replace(cache_file + ".tmp", cache_file)
+            except OSError:
+                pass
+        h.send_response(200)
+        h.send_header("Content-Type", ctype)
+        h.send_header("Content-Length", str(len(data)))
+        h.send_header("Cache-Control", "max-age=604800")
+        h.end_headers()
+        h.wfile.write(data)
+        return
     h.send_response(r.status)
     for name in ("Content-Type", "Content-Length", "Content-Range", "Accept-Ranges", "Cache-Control", "ETag", "Last-Modified"):
         v = r.getheader(name)
@@ -130,3 +171,36 @@ def proxy(h, method, path):
         pass  # the player moved on (a seek); normal
     finally:
         conn.close()
+
+
+# ---------------------------------------------------------------- phone remote -> projector page
+# The projector page long-polls /api/pj/poll; the phone remote posts keys with {"to": "projector"}.
+import threading
+
+_cv = threading.Condition()
+_pj = {"seq": 0, "cmds": [], "seen": 0.0}
+
+
+def pj_push(cmd):
+    with _cv:
+        _pj["seq"] += 1
+        _pj["cmds"].append((_pj["seq"], cmd))
+        _pj["cmds"] = _pj["cmds"][-50:]
+        _cv.notify_all()
+
+
+def pj_poll(since):
+    """Wait up to ~25 s for commands newer than `since`. Returns {"seq": n, "cmds": [...]}."""
+    with _cv:
+        _pj["seen"] = time.time()
+        if since < 0:
+            return {"seq": _pj["seq"], "cmds": []}
+        end = time.time() + 25
+        while _pj["seq"] <= since and time.time() < end:
+            _cv.wait(timeout=max(0.1, end - time.time()))
+        _pj["seen"] = time.time()
+        return {"seq": _pj["seq"], "cmds": [c for s, c in _pj["cmds"] if s > since]}
+
+
+def pj_online():
+    return time.time() - _pj["seen"] < 40

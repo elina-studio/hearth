@@ -129,7 +129,8 @@
       <span class="caps">Hearth</span>
     </div>
     <div class="status"><span class="dot" id="dot"></span><span id="statusText">Looking for the TV…</span>
-      <button class="small open" id="openBtn">Open</button></div>
+      <button class="small open" id="openBtn">Open</button>
+      <button class="small show" id="tgtBtn" title="Switch between the TV and the projector">TV</button></div>
   </header>
 
   <section class="typer">
@@ -198,7 +199,11 @@
     const t = $("toast"); t.textContent = msg; t.classList.add("show");
     clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove("show"), 3500);
   }
+  // The phone drives either the Roku TV or the projector page. Keys and typed text go to the chosen one.
+  let target = "tv";
+  try { target = localStorage.getItem("hearth.target") === "projector" ? "projector" : "tv"; } catch (e) {}
   async function api(path, body, raw) {
+    if (!raw && target === "projector" && (path === "/api/key" || path === "/api/text")) body = Object.assign({}, body, { to: "projector" });
     try {
       const r = await fetch(path, { method: "POST", headers: raw ? { "Content-Type": "application/octet-stream" } : { "Content-Type": "application/json" }, body: raw ? body : JSON.stringify(body || {}) });
       const j = await r.json();
@@ -260,12 +265,22 @@
     try {
       const s = await (await fetch("/api/status")).json();
       const dot = $("dot"), txt = $("statusText"), open = $("openBtn");
+      if (target === "projector") {
+        dot.className = "dot " + (s.projector ? "on" : "off");
+        txt.textContent = s.projector ? "Projector is on" : "Projector page isn't open";
+        open.classList.remove("show");
+        $("tgtBtn").textContent = "Projector";
+        window.__https = s.httpsPort;
+        return;
+      }
+      $("tgtBtn").textContent = "TV";
       dot.className = "dot " + (!s.tv ? "off" : s.hearth ? "on" : "other");
       txt.textContent = !s.tv ? "TV not answering" : s.hearth ? "Hearth is on" : (s.app || "TV on");
       open.classList.toggle("show", s.tv && !s.hearth);
       window.__https = s.httpsPort;
     } catch (e) { $("dot").className = "dot off"; $("statusText").textContent = "Server offline"; }
   }
+  $("tgtBtn").onclick = () => { buzz(); target = target === "tv" ? "projector" : "tv"; try { localStorage.setItem("hearth.target", target); } catch (e) {} toast("Now controlling the " + (target === "tv" ? "TV" : "projector")); status(); };
   $("openBtn").onclick = async () => { buzz(); await api("/api/launch"); setTimeout(status, 1500); };
   status(); setInterval(status, 5000);
   document.addEventListener("visibilitychange", status);

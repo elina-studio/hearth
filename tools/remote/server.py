@@ -183,6 +183,13 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Content-Length", str(len(page)))
             self.end_headers()
             self.wfile.write(page)
+        elif path == "/api/pj/poll":
+            q = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            try:
+                since = int((q.get("since") or ["-1"])[0])
+            except ValueError:
+                since = -1
+            self.send_json(web.pj_poll(since))
         elif path == "/api/status":
             self.status()
         elif path == "/api/round":
@@ -254,7 +261,7 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def status(self):
-        out = {"tv": False, "app": "", "hearth": False, "httpsPort": HTTPS_PORT}
+        out = {"tv": False, "app": "", "hearth": False, "httpsPort": HTTPS_PORT, "projector": web.pj_online()}
         try:
             _, xml = ecp("GET", "/query/active-app", timeout=2)
             out["tv"] = True
@@ -288,6 +295,15 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/api/lastfm/disconnect":
                 lastfm.disconnect()
                 return self.send_json({"ok": True})
+            if req.get("to") == "projector" and path in ("/api/key", "/api/text"):
+                # the phone is driving the projector page instead of the Roku
+                if path == "/api/key":
+                    if req.get("key", "") not in KEYS:
+                        return self.send_json({"error": "unknown key"}, 400)
+                    web.pj_push({"key": req["key"]})
+                else:
+                    web.pj_push({"text": req.get("text", "")[:200], "go": req.get("go", "")})
+                return self.send_json({"ok": True, "online": web.pj_online()})
             if path == "/api/key":
                 key = req.get("key", "")
                 if key not in KEYS:

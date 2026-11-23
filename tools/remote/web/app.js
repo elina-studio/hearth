@@ -85,14 +85,31 @@ function cardOf(md) {
 }
 function cardHTML(md) {
   const c = cardOf(md);
-  return `<div class="fx card" data-a="play" data-k="${md.ratingKey}" data-t="${md.type}"><div class="img" style="background-image:url('${img(c.pic, 480, 270)}')"><div class="ph">${esc(c.title)}</div>${c.prog ? `<div class="braid"><i style="width:${c.prog}%"></i></div>` : ''}</div><div class="t">${esc(c.title)}</div><div class="s">${esc(c.sub)}</div></div>`;
+  return `<div class="fx card" data-a="play" data-k="${md.ratingKey}" data-t="${md.type}"><div class="img" data-bg="${img(c.pic, 320, 180)}"><div class="ph">${esc(c.title)}</div>${c.prog ? `<div class="braid"><i style="width:${c.prog}%"></i></div>` : ''}</div><div class="t">${esc(c.title)}</div><div class="s">${esc(c.sub)}</div></div>`;
 }
 function albumHTML(md) {
   const t = md.type === 'artist' ? 'Artist' : md.type === 'playlist' ? `${md.leafCount || ''} songs` : (md.parentTitle || '');
   const pic = md.thumb || md.composite;
-  return `<div class="fx alb" data-a="album" data-k="${md.ratingKey}" data-t="${md.type}"><div class="im" style="background-image:url('${img(pic, 360, 360)}')"></div><div class="t">${esc(md.title)}</div><div class="s">${esc(t)}</div></div>`;
+  return `<div class="fx alb" data-a="album" data-k="${md.ratingKey}" data-t="${md.type}"><div class="im" data-bg="${img(pic, 240, 240)}"></div><div class="t">${esc(md.title)}</div><div class="s">${esc(t)}</div></div>`;
 }
 const hd = (t, small) => `<div class="hd">${esc(t)}${small ? `<small>${esc(small)}</small>` : ''}</div>`;
+
+/* ---------- pictures load as they come into view ---------- */
+// Plex resizes every picture on demand, so asking for a whole page at once is slow. Load what is on screen (and a bit beyond).
+const io = window.IntersectionObserver ? new IntersectionObserver(es => {
+  for (const e of es) {
+    if (!e.isIntersecting) continue;
+    const u = e.target.dataset.bg;
+    if (u) { e.target.style.backgroundImage = `url("${u}")`; delete e.target.dataset.bg; }
+    io.unobserve(e.target);
+  }
+}, { rootMargin: '500px' }) : null;
+new MutationObserver(() => {
+  $$('[data-bg]').forEach(el => {
+    if (el._o) return; el._o = 1;
+    if (io) io.observe(el); else { el.style.backgroundImage = `url("${el.dataset.bg}")`; }
+  });
+}).observe(stage, { childList: true, subtree: true });
 
 /* ---------- focus and navigation ---------- */
 let focusEl = null;
@@ -180,6 +197,56 @@ function back() {
 }
 document.addEventListener('click', e => { const el = e.target.closest('[data-a]'); if (el) { setFocus(el); act(el); } });
 document.addEventListener('mouseover', e => { const el = e.target.closest('.fx'); if (el && el !== focusEl && (!layers.length || layers[layers.length - 1].el.contains(el))) setFocus(el); });
+
+/* ---------- mouse pointer ---------- */
+// The projector's own remote moves a pointer instead of pressing arrows, so everything also works by pointing:
+// click opens, the wheel scrolls, resting the pointer at a row's ends or the page's top and bottom scrolls too.
+let mx = -1, my = -1;
+document.addEventListener('mousemove', e => { mx = e.clientX; my = e.clientY; const L = layers[layers.length - 1]; if (L && L.onMouse) L.onMouse(); });
+document.addEventListener('wheel', e => {
+  e.preventDefault();
+  const row = e.target.closest && e.target.closest('.row');
+  if (row && (Math.abs(e.deltaX) > Math.abs(e.deltaY) || e.shiftKey)) { row.scrollLeft += e.deltaX || e.deltaY; return; }
+  const top = layers[layers.length - 1];
+  const sc = (e.target.closest && e.target.closest('.scroll,.tl')) || $('.scroll', top ? top.el : $('#room'));
+  if (sc) sc.scrollTop += e.deltaY;
+}, { passive: false });
+setInterval(() => {
+  if (mx < 0 || layers.length && layers[layers.length - 1].el.classList.contains('player')) return;
+  const el = document.elementFromPoint(mx, my); if (!el || !el.closest) return;
+  const row = el.closest('.row');
+  if (row) { const r = row.getBoundingClientRect(); if (mx - r.left < 90 * K) row.scrollLeft -= 24; else if (r.right - mx < 90 * K) row.scrollLeft += 24; }
+  const sc = el.closest('.scroll,.tl');
+  if (sc) { const r = sc.getBoundingClientRect(); if (my - r.top < 50 * K) sc.scrollTop -= 22; else if (r.bottom - my < 60 * K) sc.scrollTop += 22; }
+}, 40);
+
+/* ---------- the phone remote drives this page too ---------- */
+// The NAS helper keeps a small queue; this page asks it for new button presses and plays them as key presses.
+const REMOTE_KEYS = { Up: 'ArrowUp', Down: 'ArrowDown', Left: 'ArrowLeft', Right: 'ArrowRight', Select: 'Enter', Enter: 'Enter', Back: 'Escape', Play: ' ', Rev: 'MediaRewind', Fwd: 'MediaFastForward', InstantReplay: 'MediaRewind', Backspace: 'Backspace' };
+function remoteKey(k) {
+  if (k === 'Home') { while (layers.length) { const L = layers.pop(); try { L.close && L.close(); } catch (e) { /* ignore */ } L.el.remove(); } history.go(-(history.state && history.state.n || 0)); go('Home'); return; }
+  if (k === 'Info') { const L = layers[layers.length - 1]; if (L && L.toggleStats) L.toggleStats(); return; }
+  if (k === 'VolumeUp' || k === 'VolumeDown' || k === 'VolumeMute') {
+    const media = [aud, ...$$('video'), ...layers.map(l => l.sfx).filter(Boolean)];
+    for (const m of media) { if (k === 'VolumeMute') m.muted = !m.muted; else m.volume = Math.max(0, Math.min(1, m.volume + (k === 'VolumeUp' ? .1 : -.1))); }
+    toast(k === 'VolumeMute' ? 'Mute toggled' : 'Volume ' + Math.round(aud.volume * 100) + '%'); return;
+  }
+  const key = REMOTE_KEYS[k]; if (!key) return;
+  window.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }));
+}
+(async function remoteLoop() {
+  let seq = -1;
+  for (;;) {
+    try {
+      const r = await fetch('/api/pj/poll?since=' + seq, { cache: 'no-store' });
+      const j = await r.json();
+      if (typeof j.seq !== 'number') { await new Promise(r => setTimeout(r, 5000)); continue; }
+      if (seq < 0) { seq = j.seq; continue; }
+      seq = j.seq;
+      for (const c of j.cmds) { if (c.key) remoteKey(c.key); else if (c.text) toast('Search isn\'t on the projector yet'); }
+    } catch (e) { await new Promise(r => setTimeout(r, 3000)); }
+  }
+})();
 
 /* ---------- rooms ---------- */
 const ROOMS = ['Home', 'Shows', 'Movies', 'Music', 'Requests', 'Ambiance', 'Photos', 'Search', 'Test'];
@@ -368,7 +435,7 @@ async function openAlbum(id, type) {
   const rows = kids.map((t, n) => `<div class="fx trk" data-a="mtrack" data-n="${n}"><b>${t.index || n + 1}</b><span>${esc(t.title)}</span><em>${t.duration ? Math.floor(t.duration / 60000) + ':' + String(Math.floor(t.duration / 1000) % 60).padStart(2, '0') : ''}</em></div>`).join('');
   const L = openLayer('sheet', `<div class="in"><div class="cov" style="background-image:url('${img(meta.thumb || meta.composite, 720, 720)}')"></div>
     <div style="position:relative;flex:1"><h2>${esc(meta.title || '')}</h2><div class="ar">${esc(meta.parentTitle || meta.leafCount && meta.leafCount + ' songs' || '')}</div>
-    <div style="display:flex;gap:16px;margin-bottom:22px"><div class="fx chip live" data-a="sheetplay">▶ Play</div><div class="fx chip" data-a="sheetshuf">Shuffle</div></div>
+    <div style="display:flex;gap:16px;margin-bottom:22px"><div class="fx chip live" data-a="sheetplay">▶ Play</div><div class="fx chip" data-a="sheetshuf">Shuffle</div><div class="fx chip" data-a="back">‹ Back</div></div>
     <div style="position:absolute;left:0;right:0;top:150px;bottom:0;overflow:hidden" class="tl-wrap"><div class="tl scroll" style="padding:6px 0 80px">${rows}</div></div></div></div>`);
   L.kids = kids;
 }
@@ -417,6 +484,7 @@ async function openMood(mood) {
   L.mood = mood; L.timer = mood === 'lightsout' ? 30 : 0; L.soundOn = true; L.ui = true;
   L.show = () => { L.el.classList.add('ui'); L.ui = true; clearTimeout(L.hideT); L.hideT = setTimeout(() => { L.el.classList.remove('ui'); L.ui = false; }, 5000); };
   L.show();
+  L.onMouse = () => L.show();
   L.sfx = null;
   const sn = SOUND[mood];
   if (sn) { L.sfx = new Audio(`sound/${sn}.mp3`); L.sfx.loop = true; L.sfx.volume = .7; L.sfx.play().catch(() => toast('Press a key to start the sound')); }
@@ -523,7 +591,7 @@ async function playItem(rk, type, o) {
   if (mode === 'auto') mode = canDirect(media) ? 'direct' : 'hls1080';
   const session = 'hp' + Date.now().toString(36);
   const sub = full.type === 'episode' ? `${full.grandparentTitle} · S${full.parentIndex} E${full.index}` : (full.year || '');
-  const L = openLayer('player', `<video id="pv" playsinline></video><div class="stats" id="pst"></div><div class="pov show" id="pov"><h3>${esc(full.type === 'episode' ? full.title : full.title)}</h3><div class="sub">${esc(sub)}</div><div class="tm"><span id="pcur">0:00</span><div class="tr"><i id="pbar"></i></div><span id="pdur">${fmt(dur)}</span></div></div><div class="msg" id="pmsg" style="display:none"></div>`, {
+  const L = openLayer('player', `<video id="pv" playsinline></video><div class="stats" id="pst"></div><div class="pov show" id="pov"><h3>${esc(full.type === 'episode' ? full.title : full.title)}</h3><div class="sub">${esc(sub)}</div><div class="tm"><span id="pcur">0:00</span><div class="tr"><i id="pbar"></i></div><span id="pdur">${fmt(dur)}</span></div><div class="pbtns"><div class="fx chip" data-a="back">‹ Back</div><div class="fx chip" data-a="pseek" data-d="-10">⏪ 10s</div><div class="fx chip live" data-a="ppp">Play / Pause</div><div class="fx chip" data-a="pseek" data-d="30">30s ⏩</div><div class="fx chip" data-a="pstats">Stats</div></div></div><div class="msg" id="pmsg" style="display:none"></div>`, {
     onKey(e) {
       const v = L.v, k = e.key;
       if (k === ' ' || k === 'Enter' || k === 'MediaPlayPause') { v.paused ? v.play() : v.pause(); L.hud(); return true; }
@@ -538,7 +606,19 @@ async function playItem(rk, type, o) {
   $('#pst', L.el).style.display = L.stats ? 'block' : 'none';
   L.hud = () => { const p = $('#pov', L.el); p.classList.add('show'); clearTimeout(L.ht); L.ht = setTimeout(() => { if (!v.paused) p.classList.remove('show'); }, 3500); };
   L.pos = () => L.base + (v.currentTime || 0);
-  L.seek = d => { const t = Math.max(0, Math.min(dur - 2, L.pos() + d)); if (L.mode === 'direct' || L.hls || CAP.hlsNative) { if (L.mode === 'direct') v.currentTime = t; else v.currentTime = t - L.base; } L.hud(); };
+  L.seekTo = t => {
+    t = Math.max(0, Math.min(dur - 2, t));
+    if (L.mode === 'direct') v.currentTime = t;
+    else if (t < L.base || t - L.base > (v.duration || 0) - 2 || Math.abs(t - L.pos()) > 120) load(L.mode, t); // restart the converted stream there
+    else v.currentTime = t - L.base;
+    L.hud();
+  };
+  L.seek = d => L.seekTo(L.pos() + d);
+  L.onMouse = () => L.hud();
+  L.toggle = () => { v.paused ? v.play() : v.pause(); L.hud(); };
+  L.toggleStats = () => { const s = $('#pst', L.el); L.stats = !L.stats; s.style.display = L.stats ? 'block' : 'none'; };
+  v.addEventListener('click', () => L.toggle());
+  $('.tr', L.el).addEventListener('click', e => { const r = e.currentTarget.getBoundingClientRect(); L.seekTo(dur * (e.clientX - r.left) / r.width); });
   const msg = t => { const m = $('#pmsg', L.el); m.style.display = t ? 'flex' : 'none'; m.textContent = t || ''; };
   const load = (m, at) => {
     if (L.hls) { L.hls.destroy(); L.hls = null; }
@@ -597,7 +677,14 @@ async function roomTest(room, tok) {
     list = (all.Metadata || []).filter(m => (m.type === 'movie' || m.type === 'episode') && !hiddenItem(m)).slice(0, 10);
   } catch (e) { /* offline */ }
   if (tok !== renderTok) return;
-  const modes = [['auto', 'Automatic'], ['direct', 'Direct play'], ['hls1080', 'Converted 1080p'], ['hls720', 'Converted 720p'], ['hlsforce', 'Always convert']];
+  let picT = 'no titles to test with';
+  if (list[0]) {
+    const t0 = performance.now();
+    try { const r = await fetch(img(cardOf(list[0]).pic, 320, 180)); const b = await r.blob(); picT = `HTTP ${r.status} · ${(b.size / 1024) | 0} KB · ${((performance.now() - t0) / 1000).toFixed(1)} s`; }
+    catch (e) { picT = 'failed: ' + e.message; }
+  }
+  cap.push(['Poster picture test', picT]);
+  const modes =[['auto', 'Automatic'], ['direct', 'Direct play'], ['hls1080', 'Converted 1080p'], ['hls720', 'Converted 720p'], ['hlsforce', 'Always convert']];
   room.innerHTML = `<div class="scroll"><div class="hd" style="margin-top:20px">This projector</div>${tbl(rows)}${hd('What it can decode')}${tbl(cap)}
     ${hd('Play a test', 'pick how, then a title')}<div class="row" id="tmodes" style="gap:14px;margin-bottom:26px">${modes.map(([m, n]) => `<div class="fx chip ${m === testMode ? 'live' : ''}" data-a="tmode" data-m="${m}">${n}</div>`).join('')}</div>
     <div class="row">${list.map(m => cardHTML(m).replace('data-a="play"', 'data-a="testplay"')).join('') || '<div class="msg" style="position:static;font-size:34px;padding:30px 0">Plex is not answering</div>'}</div>
@@ -624,7 +711,10 @@ function act(el) {
   else if (a === 'mmusic') M.toggle();
   else if (a === 'mnextsong') M.next();
   else if (a === 'mtimer') { const L = layers[layers.length - 1]; const o = [0, 15, 30, 60]; L.timer = o[(o.indexOf(L.timer) + 1) % o.length]; el.textContent = 'Timer: ' + (L.timer ? L.timer + ' min' : 'off'); L.setTimer(); }
-  else if (a === 'mleave') closeLayer();
+  else if (a === 'mleave' || a === 'back') closeLayer();
+  else if (a === 'pseek') { const L = layers[layers.length - 1]; L.seek(+d.d); }
+  else if (a === 'ppp') layers[layers.length - 1].toggle();
+  else if (a === 'pstats') layers[layers.length - 1].toggleStats();
 }
 
 /* ---------- start ---------- */
