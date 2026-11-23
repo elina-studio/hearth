@@ -554,6 +554,8 @@ end function
 
 function infoItems() as object
     md = m.media
+    if md = invalid then md = {}
+    if m.streams = invalid then m.streams = {}
     d = m.decision
     items = []
     vcodec = UCase(toStr(md.videoCodec))
@@ -561,7 +563,7 @@ function infoItems() as object
     if m.streams.audio <> invalid then acodec = UCase(toStr(m.streams.audio.codec))
     h = toStr(md.height)
     mbps = ""
-    if md.bitrate <> invalid then mbps = Str(Int(md.bitrate / 100) / 10).Trim()
+    if md.bitrate <> invalid then mbps = Str(Int(Val(toStr(md.bitrate)) / 100) / 10).Trim()
     ch = "2.0"
     if m.streams.audio <> invalid then ch = chName(m.streams.audio.channels)
     kick = "Direct play"

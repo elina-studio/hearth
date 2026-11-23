@@ -28,11 +28,11 @@ sub onTitle()
     if m.top.sheetIcon <> "" then m.top.findNode("icon").uri = "pkg:/images/player/" + m.top.sheetIcon + ".png"
 end sub
 
-function lbl(parent as object, text as string, font as object, color as string, x as integer, y as integer, w = 0 as integer) as object
+function lbl(parent as object, text as dynamic, font as object, color as dynamic, x as integer, y as integer, w = 0 as integer) as object
     l = parent.createChild("Label")
     l.font = font
     l.color = color
-    l.text = text
+    l.text = sval(text)
     l.translation = [x, y]
     if w > 0
         l.width = w
@@ -41,13 +41,13 @@ function lbl(parent as object, text as string, font as object, color as string, 
     return l
 end function
 
-function pic(parent as object, uri as string, x as integer, y as integer, w as integer, h as integer, tint = "" as string) as object
+function pic(parent as object, uri as string, x as integer, y as integer, w as integer, h as integer, tint = invalid as dynamic) as object
     p = parent.createChild("Poster")
     p.uri = uri
     p.translation = [x, y]
     p.width = w
     p.height = h
-    if tint <> "" then p.blendColor = tint
+    if tint <> invalid and sval(tint) <> "" then p.blendColor = tint
     return p
 end function
 
@@ -261,8 +261,9 @@ function drawItem(g as object, it as object) as integer
             s = it.steps[i]
             bx = g.createChild("Poster")
             bx.uri = "pkg:/images/w/button-outline.9.png"
-            bx.blendColor = m.c.gold
-            if i = 1 then bx.blendColor = m.c.rope
+            stepTint = m.c.gold
+            if i = 1 then stepTint = m.c.rope
+            bx.blendColor = stepTint
             bx.translation = [20 - 12, y - 12]
             bx.width = 724
             bx.height = 96
@@ -271,7 +272,7 @@ function drawItem(g as object, it as object) as integer
             fill.width = 690
             fill.height = 62
             fill.translation = [25, y + 5]
-            pic(g, "pkg:/images/player/" + sval(s.icon) + ".png", 40, y + 21, 30, 30, bx.blendColor)
+            pic(g, "pkg:/images/player/" + sval(s.icon) + ".png", 40, y + 21, 30, 30, stepTint)
             lbl(g, sval(s.title), hFont("bold", 22), m.c.ink, 84, y + 8, 610)
             lbl(g, sval(s.desc), hFont("regular", 18), m.c.muted, 84, y + 38, 610)
             if i < it.steps.count() - 1 then pic(g, "pkg:/images/icons/home-down.png", 358, y + 74, 22, 22, "0x6E4526FF")
