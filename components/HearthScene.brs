@@ -121,8 +121,11 @@ sub handle(r as object)
     else if a = "play"
         ' the TV plays one stream at a time: a paused Audio node still holds it, so music stops for video
         m.music.command = { cmd: "stop" }
+        ' the next queued episode replaces the player that just finished
+        if r.replace = true and topScreen() <> invalid and topScreen().subtype() = "PlayerScreen" then popScreen()
         s = CreateObject("roSGNode", "PlayerScreen")
         s.resume = (r.resume = true)
+        if r.queue <> invalid then s.queue = r.queue
         s.item = r.item
         pushScreen(s)
     else if a = "slideshow"

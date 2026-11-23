@@ -131,10 +131,82 @@ sub runTask()
         end for
         out = { Names: names }
     else if op = "item"
-        ' includeMarkers: intro and credits times (Plex Pass detection), for skip intro and Up next
-        res = req("GET", m.server + "/library/metadata/" + a.id, { includeMarkers: "1" }, m.token)
+        ' markers: intro and credits times (Plex Pass detection), for skip intro and Up next; chapters for the player
+        q = { includeMarkers: "1", includeChapters: "1" }
+        ' the details page wants extras (trailers), outside ids (Overseerr), and the show's next episode
+        if a.full = true then q = { includeExtras: "1", includeGuids: "1", includeOnDeck: "1", includeConcerts: "0", includeMarkers: "1", includeChapters: "1" }
+        res = req("GET", m.server + "/library/metadata/" + a.id, q, m.token)
         list = metas(res.body)
-        if list.count() > 0 then out = norm(list[0])
+        if list.count() > 0
+            out = norm(list[0])
+            if a.full = true then addDetails(out, list[0])
+        end if
+    else if op = "seasons"
+        res = req("GET", m.server + "/library/metadata/" + a.id + "/children", {}, m.token)
+        ss = []
+        for each md in metas(res.body)
+            if md.type = "season"
+                idx = md.index
+                if idx = invalid then idx = 0
+                ss.push({ Id: md.ratingKey, index: idx, title: toS(md.title, "Season " + idx.toStr()), total: md.leafCount, watched: md.viewedLeafCount, thumb: md.thumb })
+            end if
+        end for
+        out = { Items: ss }
+    else if op = "seasonEpisodes"
+        ' a season's episodes with what the list shows: date, file flags (hevc = converts on this TV)
+        res = req("GET", m.server + "/library/metadata/" + a.id + "/children", {}, m.token)
+        eps = []
+        for each md in metas(res.body)
+            it = norm(md)
+            it.aired = toS(md.originallyAvailableAt, "")
+            it.flags = mediaFlags(md)
+            it.delete("_media")
+            eps.push(it)
+        end for
+        out = { Items: eps }
+    else if op = "collection"
+        res = req("GET", m.server + "/library/collections/" + a.id + "/children", {}, m.token)
+        out = { Items: normAll(metas(res.body)) }
+    else if op = "person"
+        ' titles in your libraries with this actor (movie and show libraries)
+        res = req("GET", m.server + "/library/sections", {}, m.token)
+        items = []
+        for each d in dirs(res.body)
+            if (d.type = "movie" or d.type = "show") and not isAmbiance(d)
+                r2 = req("GET", m.server + "/library/sections/" + d.key + "/all", { actor: a.id.toStr(), "X-Plex-Container-Size": "40" }, m.token)
+                for each it in normAll(metas(r2.body))
+                    items.push(it)
+                end for
+            end if
+        end for
+        out = { Items: items }
+    else if op = "rate"
+        ' 0-10 (stars x2); -1 clears
+        res = req("PUT", m.server + "/:/rate", { key: a.id, identifier: "com.plexapp.plugins.library", rating: a.rating.toStr() }, m.token)
+    else if op = "playedMany" or op = "unplayedMany"
+        verb = "/:/scrobble"
+        if op = "unplayedMany" then verb = "/:/unscrobble"
+        for each id in a.ids
+            res = req("GET", m.server + verb, { key: id, identifier: "com.plexapp.plugins.library" }, m.token)
+        end for
+    else if op = "setAudio"
+        res = req("PUT", m.server + "/library/parts/" + a.part.toStr(), { audioStreamID: a.stream.toStr(), allParts: "1" }, m.token)
+    else if op = "matches"
+        q = { manual: "1" }
+        if a.title <> invalid then q.title = a.title
+        if a.year <> invalid then q.year = a.year.toStr()
+        res = req("GET", m.server + "/library/metadata/" + a.id + "/matches", q, m.token, 45000)
+        found = []
+        if res.body <> invalid and res.body.MediaContainer <> invalid and res.body.MediaContainer.SearchResult <> invalid
+            for each r in res.body.MediaContainer.SearchResult
+                found.push({ guid: r.guid, name: toS(r.name, ""), year: r.year, score: r.score })
+            end for
+        end if
+        out = { Items: found }
+    else if op = "match"
+        q = { guid: a.guid, name: a.name }
+        if a.year <> invalid then q.year = a.year.toStr()
+        res = req("PUT", m.server + "/library/metadata/" + a.id + "/match", q, m.token, 45000)
     else if op = "episodes"
         res = req("GET", m.server + "/library/metadata/" + a.id + "/allLeaves", {}, m.token)
         out = { Items: normAll(metas(res.body)) }
@@ -179,6 +251,7 @@ sub runTask()
         end if
         out = { Items: items }
     else if op = "played" or op = "unplayed"
+        ' works for an episode, a whole season or a whole show
         verb = "/:/scrobble"
         if op = "unplayed" then verb = "/:/unscrobble"
         res = req("GET", m.server + verb, { key: a.id, identifier: "com.plexapp.plugins.library" }, m.token)
@@ -458,7 +531,124 @@ function norm(md as object) as object
     it._img = img
     if md.Media <> invalid then it._media = md.Media
     if md.Marker <> invalid then it._markers = md.Marker
+    if md.Chapter <> invalid then it._chapters = md.Chapter
     return it
+end function
+
+' Extra fields for the details page, from a full item fetch (includeExtras/includeGuids/includeOnDeck).
+sub addDetails(it as object, md as object)
+    it.Ratings = ratings(md)
+    it.UserRating = md.userRating
+    it.Studio = md.studio
+    it.Aired = toS(md.originallyAvailableAt, "")
+    it.LeafCount = md.leafCount
+    it.ViewedLeafCount = md.viewedLeafCount
+    people = []
+    if md.Role <> invalid
+        for each r in md.Role
+            people.push({ id: r.id, name: toS(r.tag, ""), role: toS(r.role, ""), thumb: r.thumb })
+        end for
+    end if
+    if md.Director <> invalid
+        for each r in md.Director
+            people.push({ id: r.id, name: toS(r.tag, ""), role: "Director", thumb: r.thumb, crew: true })
+        end for
+    end if
+    if md.Writer <> invalid
+        for each r in md.Writer
+            if people.count() < 60 then people.push({ id: r.id, name: toS(r.tag, ""), role: "Writer", thumb: r.thumb, crew: true })
+        end for
+    end if
+    it.People = people
+    cols = []
+    if md.Collection <> invalid
+        for each c in md.Collection
+            cols.push({ id: c.id, name: toS(c.tag, "") })
+        end for
+    end if
+    it.Collections = cols
+    ids = {}
+    if type(md.Guid) = "roArray"
+        for each g in md.Guid
+            if type(g) = "roAssociativeArray"
+                bits = toS(g.id, "").split("://")
+                if bits.count() = 2 then ids[bits[0]] = bits[1]
+            end if
+        end for
+    end if
+    it.Ids = ids
+    extras = []
+    if md.Extras <> invalid and md.Extras.Metadata <> invalid
+        for each x in md.Extras.Metadata
+            e = norm(x)
+            e.Type = "Extra"
+            e.subtype = toS(x.subtype, "")
+            e._img = { Primary: x.thumb, Thumb: x.thumb, Backdrop: x.art }
+            e.delete("_media")
+            extras.push(e)
+        end for
+    end if
+    it.Extras = extras
+    if md.OnDeck <> invalid and md.OnDeck.Metadata <> invalid and md.OnDeck.Metadata.count() > 0
+        od = norm(md.OnDeck.Metadata[0])
+        od.delete("_media")
+        it.OnDeck = od
+    end if
+    if md.Location <> invalid and md.Location.count() > 0 then it.Folder = toS(md.Location[0].path, "")
+end sub
+
+' IMDb / TMDB / Rotten Tomatoes scores, whichever Plex has: [{ label, text }]
+function ratings(md as object) as object
+    out = []
+    seen = {}
+    list = []
+    ' ParseJson keys can be read case-blind on some firmware, so "Rating" (list) and "rating" (number) are told apart by type
+    if type(md.Rating) = "roArray" then list = md.Rating
+    if list.count() = 0
+        if md.rating <> invalid and type(md.rating) <> "roArray" then list.push({ image: toS(md.ratingImage, ""), value: md.rating, type: "critic" })
+        if md.audienceRating <> invalid then list.push({ image: toS(md.audienceRatingImage, ""), value: md.audienceRating, type: "audience" })
+    end if
+    for each r in list
+        img = LCase(toS(r.image, ""))
+        v = r.value
+        if v <> invalid
+            label = ""
+            text = ""
+            if Instr(1, img, "imdb") > 0
+                label = "IMDb" : text = fmt1(v)
+            else if Instr(1, img, "rottentomatoes") > 0
+                if r.type = "audience" then label = "Audience" else label = "Critics"
+                text = Int(v * 10 + 0.5).toStr() + "%"
+            else if Instr(1, img, "themoviedb") > 0
+                label = "TMDB" : text = fmt1(v)
+            else if Instr(1, img, "thetvdb") > 0
+                label = "TVDB" : text = fmt1(v)
+            end if
+            if label <> "" and seen[label] = invalid
+                seen[label] = true
+                out.push({ label: label, text: text })
+            end if
+        end if
+    end for
+    return out
+end function
+
+function fmt1(v as dynamic) as string
+    n = Int(v * 10 + 0.5)
+    return (n \ 10).toStr() + "." + (n mod 10).toStr()
+end function
+
+' Small per-file flags for list rows: { hevc, res, audio }
+function mediaFlags(md as object) as object
+    f = { hevc: false, res: "", audio: "" }
+    if md.Media <> invalid and md.Media.count() > 0
+        med = md.Media[0]
+        vc = LCase(toS(med.videoCodec, ""))
+        f.hevc = (vc = "hevc" or vc = "h265")
+        f.res = toS(med.videoResolution, "")
+        f.audio = toS(med.audioCodec, "")
+    end if
+    return f
 end function
 
 ' Servers this account can use, best connection first: local plain http, then the rest.
