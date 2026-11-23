@@ -216,7 +216,15 @@ sub runPending(p as object)
     pxApi(p.path, p.query, "onTracks", p.tag)
 end sub
 
+sub saveLastPlay(mode as string, kind as string, id as string, label as string)
+    reg = CreateObject("roRegistrySection", "hearth")
+    clean = label.Replace("|", " ")
+    reg.Write("lastPlay", mode + "|" + kind + "|" + id + "|" + clean)
+    reg.Flush()
+end sub
+
 sub shuffleAll()
+    saveLastPlay("s", "all", "", "Shuffle my music")
     say("Shuffling your music")
     withSection({ path: "", query: { type: "10", sort: "random", "X-Plex-Container-Start": "0", "X-Plex-Container-Size": "150" }, label: "", tag: "all" })
 end sub
@@ -252,6 +260,7 @@ end sub
 sub playContainer(kind as string, id as string, shuffle as boolean, label as dynamic)
     path = containerPath(kind, id)
     if path = "" then return
+    if label <> invalid and label <> "" then saveLastPlay("c", kind, id, label)
     withSection({ path: path, query: {}, label: label, shuffle: shuffle, tag: kind })
 end sub
 

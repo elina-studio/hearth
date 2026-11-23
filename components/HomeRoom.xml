@@ -64,6 +64,13 @@
         <Poster id="mRadio" uri="pkg:/images/music/icons/radio.png" translation="[452, 174]" width="32" height="32" blendColor="0xEDE6CAFF" />
         <Rectangle translation="[228, 218]" width="352" height="6" color="0xFFFFFF1F" />
         <Rectangle id="musicBar" translation="[228, 218]" width="0" height="6" color="0xA3A35AFF" />
+        <Poster id="mRing5" uri="pkg:/images/ring-v6.9.png" blendColor="0xE0B34AFF" translation="[212, 122]" width="380" height="48" visible="false" />
+        <Group id="spkPanel" translation="[212, 12]" visible="false">
+          <Rectangle width="380" height="206" color="0x141A11FF" />
+          <Poster uri="pkg:/images/music/icons/speaker.png" translation="[16, 12]" width="24" height="24" blendColor="0xE0B34AFF" />
+          <Label id="spkTitle" translation="[48, 8]" height="32" vertAlign="center" color="0xE0B34AFF" text="PLAY ON" />
+          <Group id="spkRows" translation="[8, 44]" />
+        </Group>
       </Group>
 
       <!-- Requests -->
