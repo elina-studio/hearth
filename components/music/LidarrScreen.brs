@@ -80,15 +80,21 @@ sub showSetup(problem as string)
     m.matches.removeChildrenIndex(m.matches.getChildCount(), 0)
     m.empty.text = ""
     q = Chr(34)
+    nl = Chr(10)
     lines = []
+    lines.push("ONE-TIME SETUP: CONNECT LIDARR")
+    lines.push("")
     if problem <> "" then lines.push(problem) : lines.push("")
-    lines.push("Hearth needs Lidarr's API key once. With Hearth open on the TV, paste this into Terminal on your Mac:")
+    lines.push("Requests go through Lidarr, which needs its key. You only do this once; after that this screen never comes back.")
+    lines.push("")
+    lines.push("1.  Leave this screen open on the TV.")
+    lines.push("2.  On your Mac, open Terminal and paste the command from the Music thread in Hearth's project (it's also below).")
+    lines.push("3.  Type your NAS password when it asks. This screen switches to Request by itself.")
     lines.push("")
     lines.push("KEY=$(ssh -t Elina@192.168.254.41 " + q + "sudo /usr/local/bin/docker exec lidarr cat /config/config.xml" + q + " | sed -n 's/.*<ApiKey>\(.*\)<\/ApiKey>.*/\1/p' | tr -d '\r'); curl -X POST -G --data-urlencode " + q + "lidarrKey=$KEY" + q + " http://192.168.254.9:8060/input")
     lines.push("")
-    lines.push("It asks for your NAS password, then this screen opens by itself. The key stays on the TV.")
-    lines.push("Press Back to leave.")
-    m.setupText.text = lines.join(Chr(10))
+    lines.push("The key stays on the TV. Press Back to leave.")
+    m.setupText.text = lines.join(nl)
     m.setup.visible = true
 end sub
 
@@ -96,9 +102,12 @@ end sub
 function lApi(method as string, path as string, query as object, body as dynamic, cb as string, tag = "" as string) as object
     t = CreateObject("roSGNode", "LidarrTask")
     t.method = method
+    ' query and body go across as text: assocarray keys lose their capitals crossing into a Task,
+    ' and Lidarr wants foreignArtistId, addOptions, albumsToMonitor... exactly as written
+    qs = pxQuery(query)
+    if qs <> "" then path = path + "?" + qs
     t.path = path
-    t.query = query
-    if body <> invalid then t.body = body
+    if body <> invalid then t.bodyText = FormatJson(body)
     t.tag = tag
     t.observeField("done", cb)
     if m.hTasks = invalid then m.hTasks = {}

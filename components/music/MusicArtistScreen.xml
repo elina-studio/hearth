@@ -12,7 +12,7 @@
     <Label id="sub" translation="[244, 126]" width="760" maxLines="1" color="0xB5AF8CFF" />
     <Group id="buttons" translation="[0, 72]" />
     <Rectangle translation="[96, 198]" width="1728" height="2" color="0xD9A06655" />
-    <Group clippingRect="[60, 216, 600, 790]">
+    <Group clippingRect="[60, 216, 600, 720]">
       <Group id="albums" translation="[96, 230]" />
     </Group>
     <Group id="pane" translation="[680, 230]">
@@ -23,9 +23,10 @@
       <Group id="aButtons" translation="[0, 43]" />
       <Rectangle id="divider" translation="[572, 180]" width="2" height="580" color="0xD9A06622" />
       <Group id="songs" translation="[0, 180]" />
-      <Label id="page" translation="[0, 762]" width="1144" horizAlign="right" color="0xB5AF8CFF" />
+      <Label id="page" translation="[0, 636]" width="1144" horizAlign="right" color="0xB5AF8CFF" />
     </Group>
-    <Label id="toast" translation="[96, 1020]" width="1728" color="0xE0B34AFF" />
+    <MusicNowPanel id="bar" layout="bar" translation="[0, 950]" />
+    <Label id="toast" translation="[680, 900]" width="1144" color="0xE0B34AFF" />
     <Timer id="toastTimer" duration="4" repeat="false" />
   </children>
   <interface>

@@ -5,7 +5,7 @@
     <field id="method" type="string" value="GET" />
     <field id="path" type="string" />
     <field id="query" type="assocarray" />
-    <field id="body" type="assocarray" />
+    <field id="bodyText" type="string" />
     <field id="tag" type="string" />
     <field id="key" type="string" />
     <field id="status" type="integer" />

@@ -25,8 +25,14 @@ end function
 function pxApi(path as string, query as object, cb as string, tag = "" as string, method = "GET" as string) as object
     t = CreateObject("roSGNode", "MusicPlexTask")
     t.method = method
-    t.url = pxServer() + path
-    t.query = query
+    ' the query is built here, not passed as an assocarray: keys lose their capitals crossing into a Task
+    ' (X-Plex-Container-Size would arrive as x-plex-container-size and Plex would ignore it)
+    url = pxServer() + path
+    qs = pxQuery(query)
+    if qs <> ""
+        if Instr(1, url, "?") > 0 then url = url + "&" + qs else url = url + "?" + qs
+    end if
+    t.url = url
     t.tag = tag
     t.observeField("done", cb)
     if m.hTasks = invalid then m.hTasks = {}
@@ -35,6 +41,17 @@ function pxApi(path as string, query as object, cb as string, tag = "" as string
     t.key = key
     t.control = "RUN"
     return t
+end function
+
+function pxQuery(q as object) as string
+    if q = invalid or q.Keys().Count() = 0 then return ""
+    parts = []
+    for each k in q
+        v = q[k]
+        if type(v) <> "roString" and type(v) <> "String" then v = v.toStr()
+        parts.push(k + "=" + hEscape(v))
+    end for
+    return parts.join("&")
 end function
 
 ' Metadata (or Directory) array from a finished task, or []

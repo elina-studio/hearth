@@ -42,16 +42,18 @@ sub update()
     m.badgeL.text = badge
     m.badgeL.height = h
     if text <> "" then m.badgeL.translation = [ix + ic + 12 + Len(text) * 15 + 8, 0] else m.badgeL.translation = [ix + ic + 4, 0]
+    ' focused: a warm gold glow with a gold ring, and the icon and word stay white so they read on the TV
     f = m.top.focused
     m.base.visible = not f
     m.fill.visible = f
-    m.ring.visible = m.top.on and not f
+    m.fill.blendColor = "0xE0B34A80"
+    m.ring.visible = f or m.top.on
     if f
-        c = "0x1F1606FF"
+        c = "0xFFFFFFFF"
     else if m.top.on
         c = "0xE0B34AFF"
     else
-        c = "0xEDE6CAFF"
+        c = "0xFFFFFFFF"
     end if
     m.icon.blendColor = c
     m.label.color = c
