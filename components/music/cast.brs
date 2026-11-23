@@ -6,11 +6,13 @@
 ' itself, started castDelay seconds after the speakers are told to play; "TV timing" nudges that.
 '
 ' rooms: [{ id, name, sub, kind: "tv" | "speaker", on, vol (0-100, -1 = unknown) }], the TV first.
-' Commands (music.command): castRefresh, castToggle {id}, castVolume {id, delta}, castAll, castNudge {delta}, castResync.
+' Commands (music.command): castRefresh, castToggle {id}, castVolume {id, delta}, castAll, castNudge {delta} (moves the TV at once), castResync (lines the TV up now).
 
 sub castInit()
     m.castTimer = m.top.findNode("castTimer")
     m.castTimer.observeField("fire", "onCastTimer")
+    m.castAlignTimer = m.top.findNode("castAlign")
+    m.castAlignTimer.observeField("fire", "castAlign")
     m.castClock = m.top.findNode("castClock")
     m.castClock.observeField("fire", "onCastClock")
     d = CreateObject("roRegistrySection", "hearth").Read("castDelay")
@@ -57,8 +59,11 @@ function castCommand(c as object) as boolean
         reg = CreateObject("roRegistrySection", "hearth")
         reg.Write("castDelay", d.toStr())
         reg.Flush()
+        ' line the TV up right away (after a short pause, so a run of presses seeks once)
+        m.castAlignTimer.control = "stop"
+        m.castAlignTimer.control = "start"
     else if cmd = "castResync"
-        if castActive() and m.top.queue <> invalid and m.top.queue.count() > 0 then playIndex(m.top.index)
+        castAlign()
     else
         return false
     end if
@@ -277,10 +282,9 @@ sub castPlayTrack(tag = "play" as string)
         if tr.album <> invalid and tr.album <> "" then data.album = tr.album
         haService("music_assistant", "play_media", data, tag)
     end for
+    if tag = "play" then castMark(0)
 end sub
 
-' at = 0: the song is starting everywhere, so the TV waits castDelay seconds for the speakers.
-' at > 0: the TV joins mid-song at that point (the speakers run castDelay behind our clock).
 ' The speaker answered play_media: skip it to where the TV is now (plus its start-up delay)
 sub castCatchUp(body as string)
     if m.castSeekClock = invalid then return
@@ -289,14 +293,40 @@ sub castCatchUp(body as string)
     at = m.castSeekFrom + m.castSeekClock.TotalMilliseconds() / 1000 + m.top.castDelay
     if m.top.duration > 0 and at > m.top.duration - 2 then return
     haService("media_player", "media_seek", { entity_id: req.entity_id, seek_position: Int(at * 10) / 10 })
+    castMark(at)
 end sub
+
+' Where the speakers are: we told them to be at pos just now, and they get there castDelay later.
+' So at any moment they're at refPos + (time since) - castDelay, and that's where the TV belongs.
+sub castMark(pos as float)
+    m.castRefPos = pos
+    m.castRefClock = CreateObject("roTimespan")
+end sub
+
+function castSpeakerPos() as float
+    if m.castRefClock = invalid then return -1
+    return m.castRefPos + m.castRefClock.TotalMilliseconds() / 1000 - m.top.castDelay
+end function
+
+' Seek the TV to where the speakers are now. TV timing presses land here, so the TV moves while you listen.
+sub castAlign()
+    if not castActive() or not castTvOn() or m.audio.state <> "playing" then return
+    at = castSpeakerPos()
+    if at < 0.5 then return
+    if m.top.duration > 0 and at > m.top.duration - 1 then return
+    m.audio.seek = at
+end sub
+
+' at = 0: the song is starting everywhere, so the TV waits castDelay seconds for the speakers.
+' at > 0: the TV joins mid-song, where the speakers are.
 
 sub castStartTv(at as float)
     c = m.audio.content
     if c = invalid then return
     m.castTimer.control = "stop"
     if at > 0
-        at = at - m.top.castDelay + 0.5
+        spk = castSpeakerPos()
+        if spk > 0 then at = spk else at = at - m.top.castDelay + 0.5
         if at < 0.1 then at = 0.1
         m.audio.control = "stop"
         c.playStart = at
@@ -334,6 +364,7 @@ sub castPause(paused as boolean)
     for each id in targets
         if paused then haService("media_player", "media_pause", { entity_id: id }) else haService("media_player", "media_play", { entity_id: id })
     end for
+    if not paused then castMark(m.top.position)
     if not castTvOn()
         if paused
             m.castClock.control = "stop"

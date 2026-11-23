@@ -293,7 +293,7 @@ sub act(a as string)
         else
             muSend("castRefresh")
             m.castTop = 0
-            m.r = 1
+            m.r = 2
             m.top.castOpen = true
         end if
     else if a = "big"
@@ -313,13 +313,12 @@ sub muRestoreFocus()
 end sub
 
 ' ---------- the room list (castOpen) ----------
-' m.r: 0 = the chip row, 1..n = the rooms and then "TV timing", n + 1 = Whole house
+' m.r: 0 = the chip row, 1 = "TV timing", 2..n = the rooms, n + 1 = Whole house
 
 function castItems() as object
-    items = []
+    items = [{ id: "timing", name: "TV timing", kind: "timing", on: false, vol: -1 }]
     rooms = muPlayer().rooms
     if rooms <> invalid then items.append(rooms)
-    items.push({ id: "timing", name: "TV timing", kind: "timing", on: false, vol: -1 })
     return items
 end function
 
@@ -487,7 +486,7 @@ sub drawCast()
     if m.top.active and m.r >= 1 and m.r <= n
         it = items[m.r - 1]
         if it.kind = "timing"
-            hint = "Left/Right: TV starts sooner or later. OK: play this song again in step."
+            hint = "Left/Right moves the TV earlier or later right away, so you can line it up by ear."
         else if it.kind = "speaker"
             hint = "OK: add or remove. Left/Right: volume."
         else

@@ -1,2 +1,4 @@
 HearthSans is Ysabeau (c) Christian Thalmann, SIL Open Font License 1.1, renamed with lining figures as default.
 IM FELL DW Pica SC (c) Igino Marini, SIL OFL 1.1.
+HearthText = Atkinson Hyperlegible (c) 2020 Braille Institute of America, SIL OFL 1.1, with Greek and Cyrillic letters from Ysabeau added (tools/fonts/add_cyrillic.py).
+HearthFell = IM FELL English Italic (c) Igino Marini, SIL OFL 1.1, with Greek and Cyrillic letters from Ysabeau added, slanted.

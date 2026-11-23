@@ -14,14 +14,14 @@ function hFont(kind as string, size as integer) as object
     else if kind = "pica"
         f.uri = "pkg:/fonts/IMFellDWPicaSC.ttf"
     else if kind = "fell"
-        f.uri = "pkg:/fonts/IMFellEnglish-Italic.ttf"
+        f.uri = "pkg:/fonts/HearthFell-Italic.ttf"
     else if kind = "clock"
         ' clock digits (whimsy clock B); swap here when the app-wide font set is picked
         f.uri = "pkg:/fonts/Cinzel-SemiBold.ttf"
     else if kind = "book"
         f.uri = "pkg:/fonts/EBGaramond-Regular.ttf"
     else
-        f.uri = "pkg:/fonts/AtkinsonHyperlegible-Regular.ttf"
+        f.uri = "pkg:/fonts/HearthText-Regular.ttf"
     end if
     f.size = size
     return f
