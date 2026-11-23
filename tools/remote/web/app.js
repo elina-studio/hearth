@@ -135,7 +135,7 @@ function reveal(el) {
 function setFocus(el) {
   if (focusEl) focusEl.classList.remove('on');
   focusEl = el;
-  if (el) { el.classList.add('on'); reveal(el); }
+  if (el) { el.classList.add('on'); reveal(el); if (el.classList.contains('pc2') && el.dataset.i !== undefined && !el.closest('.layer') && typeof LRInfo === 'function') LRInfo(+el.dataset.i); }
 }
 function firstFocus(root) { const e = $('.fx', root); setFocus(e || null); }
 function move(dir) {
@@ -179,6 +179,7 @@ addEventListener('popstate', () => {
   if (!L) return;
   try { L.close && L.close(); } catch (e) { /* fine */ }
   L.el.remove(); syncCover();
+  { const t = layers[layers.length - 1]; if (t && t.onShown) t.onShown(); }
   if (L.prev && document.contains(L.prev)) setFocus(L.prev); else firstFocus(layers.length ? layers[layers.length - 1].el : $('#room'));
 });
 history.replaceState({ n: 0 }, '');
@@ -199,6 +200,7 @@ addEventListener('keydown', e => {
 });
 function back() {
   if (layers.length) { closeLayer(); return; }
+  if ((cur === 'Movies' || cur === 'Shows') && LRBack && LRBack()) return;
   if (cur !== 'Home') go('Home');
 }
 document.addEventListener('click', e => { const el = e.target.closest('[data-a]'); if (el) { setFocus(el); act(el); } });
@@ -256,7 +258,7 @@ function remoteKey(k) {
 
 /* ---------- rooms ---------- */
 const ROOMS = ['Home', 'Shows', 'Movies', 'Music', 'Requests', 'Ambiance', 'Photos', 'Search', 'Test'];
-const LIVE = new Set(['Home', 'Music', 'Ambiance', 'Test']);
+const LIVE = new Set(['Home', 'Shows', 'Movies', 'Music', 'Ambiance', 'Test']);
 let cur = 'Home', renderTok = 0, autoF = null;
 function drawBar() {
   $('#rooms').innerHTML = ROOMS.map(r => `<div class="fx rm ${r === cur ? 'cur' : ''}" data-a="room" data-r="${r}">${r}<i class="dot"></i></div>`).join('');
@@ -269,6 +271,8 @@ async function go(name, keepFocus) {
   try {
     if (name === 'Home') await roomHome(room, tok);
     else if (name === 'Music') await roomMusic(room, tok);
+    else if (name === 'Movies') await roomLib(room, tok, 'movie');
+    else if (name === 'Shows') await roomLib(room, tok, 'show');
     else if (name === 'Ambiance') roomAmbiance(room);
     else if (name === 'Test') await roomTest(room, tok);
     else soon(room, name);
@@ -278,7 +282,7 @@ async function go(name, keepFocus) {
   else setFocus($$('#bar .fx').find(x => x.dataset.r === name));
 }
 function soon(room, name) {
-  room.innerHTML = `<div class="soon"><img src="img/lantern.png" alt=""><h2>${esc(name)} is coming to the projector</h2><p>Home, Music, Ambiance and the video test are ready first. Movies, Shows, Requests, Photos and Search follow once playback is confirmed here.</p></div>`;
+  room.innerHTML = `<div class="soon"><img src="img/lantern.png" alt=""><h2>${esc(name)} is coming to the projector</h2><p>Home, Movies, Shows, Music, Ambiance and the video test are ready. Requests, Photos and Search are next.</p></div>`;
 }
 
 /* ---------- Home ---------- */
@@ -656,6 +660,231 @@ async function playItem(rk, type, o) {
   L.hud(); setFocus(null);
 }
 
+/* ---------- Movies and Shows (same layout as the Roku: info strip, tabs, poster grid; Ledger details) ---------- */
+const ic = (n, c) => `<i class="ic ${c || ''}" style="--m:url(img/icons/${n}.png)"></i>`;
+const mins = ms => ms ? Math.max(1, Math.round(ms / 60000)) : 0;
+const runtime = ms => { const m = mins(ms); return m >= 60 ? `${m / 60 | 0} h ${m % 60} m` : `${m} m`; };
+const LS = {};
+let LR = null, LRInfo = null, LRBack = null;
+const SORTS = [['A to Z', 'titleSort'], ['Recently added', 'addedAt:desc'], ['Newest first', 'originallyAvailableAt:desc'], ['Top rated', 'audienceRating:desc']];
+const LTABS = ['Continue', 'New', 'Unwatched', 'A to Z', 'Genres'];
+const LETTERS = '#ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+const letterOf = it => { const c = ((it.titleSort || it.title || '')[0] || '#').toUpperCase(); const p = LETTERS.indexOf(c); return p < 1 ? 0 : p; };
+const posterOf = md => md.type === 'episode' ? (md.grandparentThumb || md.thumb) : md.thumb;
+const titleOf = md => md.type === 'episode' ? (md.grandparentTitle || md.title) : md.title;
+
+async function roomLib(room, tok, type) {
+  await libs();
+  const lib = LIBS.find(d => d.type === type && !blocked.has(String(d.key)));
+  if (!lib) { room.innerHTML = `<div class="msg">No ${type === 'movie' ? 'movies' : 'shows'} library in Plex yet.</div>`; return; }
+  const S = LS[type] || (LS[type] = { tab: 0, sort: 0, unw: false, genre: null, decade: '', cache: {} });
+  S.genreOpen = null;
+  room.innerHTML = `<div class="lr"><div class="le" id="le"></div><div class="lt" id="lt"></div><div class="lo" id="lo"></div><div class="lb" id="lb"></div>
+    <div class="la" id="la"></div><div class="lfade"></div>
+    <div class="ltabs" id="ltabs">${LTABS.map((n, i) => `<div class="fx ltab" data-a="ltab" data-i="${i}">${n}</div>`).join('')}</div>
+    <div class="lcount" id="lc"></div><div class="lchips" id="lchips"></div><div class="lletters" id="lletters"></div>
+    <div class="gclip scroll" id="lg"><div class="gg" id="gg"></div></div><div class="lempty" id="lempty"></div></div>`;
+  const R = LR = { type, lib, S, items: [], cur: null, tok };
+  const gg = $('#gg', room), lg = $('#lg', room);
+  const az = () => LTABS[S.tab] === 'A to Z' && !S.genreOpen;
+  const lettersOn = () => az() && S.sort === 0;
+
+  R.paintTabs = () => $$('.ltab', room).forEach((t, i) => t.classList.toggle('cur', i === S.tab));
+  R.paintChips = () => {
+    const box = $('#lchips', room); box.style.display = az() ? 'flex' : 'none';
+    if (!az()) { $('#lletters', room).style.display = 'none'; return; }
+    const spec = [[SORTS[S.sort][0], 'home-sort', S.sort > 0, 'sort'], ['Unwatched', 'home-check', S.unw, 'unw'], [S.genre ? S.genre.title : 'Genre', 'home-filter', !!S.genre, 'genre'], [S.decade ? S.decade + 's' : 'Decade', 'home-cal', !!S.decade, 'decade'], ['Clear', 'home-x', false, 'clear']];
+    box.innerHTML = spec.map(([t, i, on, k]) => `<div class="fx pill sm ${on ? 'act' : ''}" data-a="lchip" data-k="${k}">${ic(i)}<span>${esc(t)}</span></div>`).join('');
+    const lt = $('#lletters', room); lt.style.display = lettersOn() ? 'flex' : 'none';
+    lg.style.top = lettersOn() ? '388px' : '330px';
+    if (lettersOn()) lt.innerHTML = [...LETTERS].map((c, i) => `<div class="fx lch ${R.firstAt && R.firstAt[i] >= 0 ? '' : 'dim'}" data-a="lletter" data-i="${i}">${c}</div>`).join('');
+    else lg.style.top = '330px';
+  };
+  R.info = i => {
+    const it = R.items[i]; if (!it) return; R.cur = it;
+    if (it.genreName) { $('#le', room).textContent = 'GENRE'; $('#lt', room).textContent = it.genreName.toUpperCase(); $('#lo', room).textContent = `OK shows everything in ${it.genreName}.`; $('#la', room).style.backgroundImage = ''; $('#lb', room).innerHTML = ''; return; }
+    const bits = [];
+    if (it.type === 'episode') bits.push(`S${it.parentIndex} E${it.index}`);
+    if (it.year) bits.push(it.year);
+    if (it.duration && it.type !== 'show') bits.push(runtime(it.duration).toUpperCase());
+    if (it.contentRating) bits.push(it.contentRating);
+    $('#le', room).textContent = bits.join(' · ').toUpperCase();
+    $('#lt', room).textContent = titleOf(it).toUpperCase();
+    $('#lo', room).textContent = it.summary || '';
+    const u = img(it.art || it.grandparentArt || it.thumb, 356, 200);
+    $('#la', room).style.backgroundImage = u ? `url("${u}")` : '';
+    const b = [];
+    if (it.type === 'show') b.push(['detail', 'Open', 'home-play']);
+    else { b.push([it.viewOffset ? 'resume' : 'play', it.viewOffset ? 'Resume' : 'Play', 'home-play']); b.push(['detail', 'Details', 'home-info']); }
+    $('#lb', room).innerHTML = b.map(([a, t, i]) => `<div class="fx pill" data-a="lbtn" data-b="${a}">${ic(i)}<span>${t}</span></div>`).join('');
+  };
+  LRInfo = i => { if (LR === R) R.info(i); };
+  R.draw = items => {
+    R.items = items; R.firstAt = new Array(27).fill(-1);
+    if (lettersOn()) items.forEach((it, i) => { const k = letterOf(it); if (R.firstAt[k] < 0) R.firstAt[k] = i; });
+    gg.innerHTML = items.map((it, i) => it.genreName
+      ? `<div class="fx pc2 gen" data-a="open" data-i="${i}"><div class="ph">${esc(it.genreName)}</div></div>`
+      : `<div class="fx pc2" data-a="open" data-i="${i}"><div class="im" data-bg="${img(posterOf(it), 180, 270)}"></div><div class="ph">${esc(titleOf(it))}</div>${it.viewOffset && it.duration ? `<div class="braid"><i style="width:${Math.min(100, it.viewOffset / it.duration * 100)}%"></i></div>` : ''}</div>`).join('');
+    lg.scrollTop = 0;
+    $('#lempty', room).textContent = items.length ? '' : (S.genreOpen ? `Nothing in ${S.genreOpen}.` : 'Nothing here yet.');
+    $('#lc', room).textContent = items.length ? `${items.length} ${LTABS[S.tab] === 'Genres' && !S.genreOpen ? 'genres' : 'titles'}` : '';
+    R.paintChips();
+    if (items.length) R.info(0); else { $('#le', room).textContent = ''; $('#lt', room).textContent = ''; $('#lo', room).textContent = ''; $('#lb', room).innerHTML = ''; $('#la', room).style.backgroundImage = ''; }
+  };
+  const sec = `/library/sections/${lib.key}`;
+  const getAll = async p => ((await pj(sec + '/all', Object.assign({ 'X-Plex-Container-Start': 0 }, p))).Metadata || []).filter(m => !hiddenItem(m));
+  R.load = async () => {
+    R.paintTabs(); R.paintChips();
+    const name = LTABS[S.tab];
+    const key = name === 'A to Z' ? `az|${S.sort}|${S.unw}|${S.genre && S.genre.key}|${S.decade}` : name;
+    if (S.cache[key]) { R.draw(S.cache[key]); return; }
+    R.items = []; gg.innerHTML = ''; $('#lempty', room).textContent = 'Loading…'; $('#lc', room).textContent = '';
+    let items = [];
+    try {
+      if (name === 'Continue') items = ((await pj(sec + '/onDeck', { 'X-Plex-Container-Size': 45 })).Metadata || []).filter(m => !hiddenItem(m));
+      else if (name === 'New') items = await getAll({ sort: 'addedAt:desc', 'X-Plex-Container-Size': 45 });
+      else if (name === 'Unwatched') { items = await getAll({ unwatched: 1, 'X-Plex-Container-Size': 400 }); for (let i = items.length - 1; i > 0; i--) { const j = Math.random() * (i + 1) | 0; [items[i], items[j]] = [items[j], items[i]]; } items = items.slice(0, 90); }
+      else if (name === 'A to Z') { const p = { sort: SORTS[S.sort][1], 'X-Plex-Container-Size': 3000 }; if (S.unw) p.unwatched = 1; if (S.genre) p.genre = S.genre.key; if (S.decade) p.decade = S.decade; items = await getAll(p); }
+      else items = ((await pj(sec + '/genre')).Directory || []).map(g => ({ genreName: g.title, genreKey: g.key }));
+    } catch (e) { if (R.tok === renderTok) $('#lempty', room).textContent = "Can't reach your library: " + e.message; return; }
+    if (R !== LR || R.tok !== renderTok) return;
+    S.cache[key] = items; R.draw(items);
+  };
+  R.openGenre = async g => {
+    S.genreOpen = g.genreName; $('#lempty', room).textContent = 'Loading ' + g.genreName + '…'; gg.innerHTML = '';
+    R.paintChips();
+    try { const items = await getAll({ genre: g.genreKey, sort: 'titleSort', 'X-Plex-Container-Size': 500 }); R.draw(items); $('#lc', room).textContent = `${g.genreName} · ${items.length}`; } catch (e) { $('#lempty', room).textContent = e.message; }
+  };
+  LRBack = () => { if (S.genreOpen) { S.genreOpen = null; R.load().then(() => setFocus($$('.pc2', room)[0] || null)); return true; } return false; };
+  R.pickList = (title, labels, cb) => {
+    const L = openLayer('sheet pick', `<div class="in" style="flex-direction:column"><h2>${esc(title)}</h2><div class="pgrid scroll" style="position:relative;flex:1;overflow:hidden;padding:20px 0 80px">${labels.map((l, i) => `<div class="fx chip" data-a="pickopt" data-i="${i}">${esc(l)}</div>`).join('')}</div></div>`);
+    L.cb = cb;
+  };
+  await R.load();
+}
+
+function openItem(i) {
+  const it = LR.items[i]; if (!it) return;
+  if (it.genreName) return LR.openGenre(it);
+  if (it.type === 'episode') return openDetail(it.grandparentRatingKey, 'show', { want: { season: it.parentIndex, id: it.ratingKey } }).catch(e => toast(e.message));
+  return openDetail(it.ratingKey, it.type).catch(e => toast(e.message));
+}
+
+const seasonLabel = s => s.index === 0 ? 'SPECIALS' : 'SEASON ' + s.index;
+const hhmm = ms => new Date(Date.now() + ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+async function openDetail(id, type, opt) {
+  opt = opt || {};
+  const L = openLayer('page det', '<div class="scroll dscroll" id="dsc"><div class="dpage" id="dp"><div class="msg" style="position:relative;height:500px">Loading…</div></div></div>');
+  L.id = id; L.want = opt.want || null; L.btn = 0;
+  L.load = async () => {
+    const md = (await pj('/library/metadata/' + L.id, { includeOnDeck: 1, includeExtras: 1, includeRelated: 1 })).Metadata?.[0];
+    if (!md) throw new Error('Plex has no such title');
+    L.md = md; L.isShow = md.type === 'show';
+    L.extras = (md.Extras && md.Extras.Metadata) || [];
+    L.target = L.isShow ? (md.OnDeck && md.OnDeck.Metadata && md.OnDeck.Metadata[0]) || null : md;
+    if (L.isShow) {
+      const seasons = ((await pj(`/library/metadata/${md.ratingKey}/children`)).Metadata || []);
+      L.seasons = seasons.filter(s => s.index > 0).concat(seasons.filter(s => s.index === 0));
+      const want = L.want ? L.want.season : (L.target ? L.target.parentIndex : null);
+      let pick = L.seasons.findIndex(s => s.index === want);
+      if (pick < 0) pick = L.seasons.findIndex(s => s.index > 0 && (s.viewedLeafCount || 0) < (s.leafCount || 0));
+      L.sIdx = pick < 0 ? 0 : pick;
+      await L.loadEps();
+    } else L.eps = [];
+    L.full = L.target && (L.target.Media ? L.target : (await pj('/library/metadata/' + L.target.ratingKey)).Metadata?.[0]) || L.target;
+    L.render();
+    $$('.ep', L.el).length; L.focusInit();
+    pj(`/library/metadata/${md.ratingKey}/similar`).then(mc => L.below('More like this', 'heart', 'tall', (mc.Metadata || []).filter(x => !hiddenItem(x)))).catch(() => {});
+  };
+  L.loadEps = async () => {
+    const s = L.seasons[L.sIdx]; if (!s) { L.eps = []; return; }
+    L.eps = ((await pj(`/library/metadata/${s.ratingKey}/children`)).Metadata || []).filter(e => !hiddenItem(e));
+    let sel = -1;
+    if (L.want) { sel = L.eps.findIndex(e => e.ratingKey === L.want.id); L.want = null; }
+    if (sel < 0 && L.target) sel = L.eps.findIndex(e => e.ratingKey === L.target.ratingKey);
+    if (sel < 0) sel = L.eps.findIndex(e => !e.viewCount);
+    L.epSel = Math.max(0, sel);
+    if (!L.target && L.eps[L.epSel]) { L.target = L.eps[L.epSel]; }
+  };
+  L.tags = () => {
+    const out = []; const md = L.md;
+    const ratings = (md.Rating || []);
+    for (const r of ratings) { const k = /imdb/.test(r.image || '') ? 'IMDb' : /rottentomatoes/.test(r.image || '') ? (/audience/.test(r.image) ? 'Audience' : 'Tomatometer') : (r.type === 'audience' ? 'Audience' : 'Critics'); out.push(`<span class="rt"><em>${k.toUpperCase()}</em><b>${esc(/rotten/.test(r.image || '') ? Math.round(r.value * 10) + '%' : r.value)}</b></span>`); }
+    if (!ratings.length && md.audienceRating) out.push(`<span class="rt"><em>AUDIENCE</em><b>${md.audienceRating}</b></span>`);
+    const tf = L.full, media = tf && tf.Media && tf.Media[0];
+    if (media) {
+      const part = media.Part && media.Part[0], st = (part && part.Stream) || [];
+      const tag = (t, k, i) => `<span class="tg ${k || ''}">${i ? ic(i) : ''}${esc(t)}</span>`;
+      const res = { '4k': '4K', '1080': '1080p', '720': '720p', '480': '480p', sd: 'SD' }[media.videoResolution] || (media.videoResolution ? media.videoResolution + 'p' : '');
+      if (res) out.push(tag(res, 'gold'));
+      const vc = (media.videoCodec || '').toLowerCase(); out.push(tag({ h264: 'H.264', hevc: 'HEVC', av1: 'AV1', vc1: 'VC-1', mpeg4: 'MPEG-4' }[vc] || vc.toUpperCase()));
+      const v = st.find(s => s.streamType === 1);
+      if (v && /dolby vision|dovi/i.test(v.displayTitle || '')) out.push(tag('Dolby Vision')); else if (v && /hdr/i.test(v.displayTitle || '')) out.push(tag('HDR'));
+      const au = st.find(s => s.streamType === 2 && s.selected) || st.find(s => s.streamType === 2);
+      if (au) out.push(tag(`${(au.codec || '').toUpperCase().replace('EAC3', 'DD+').replace('AC3', 'DD')} ${au.channels === 6 ? '5.1' : au.channels === 8 ? '7.1' : au.channels === 2 ? '2.0' : (au.channels || '')}`.trim()));
+      const subs = st.filter(s => s.streamType === 3);
+      const en = subs.some(s => (s.languageCode || '').startsWith('en'));
+      out.push(tag(en ? 'English subs' : (subs.length ? subs.length + ' subs' : 'No subs'), en ? '' : 'warn', en ? '' : 'd-ccx'));
+      if (canDirect(media)) out.push(`<span class="tg green">${ic('d-leaf')}Plays directly</span>`);
+      else if (vc === 'hevc') out.push(tag('Will convert to 720p', '', 'd-wand')); else out.push(tag('Converts to play', '', 'd-wand'));
+    }
+    return out.join('');
+  };
+  L.render = () => {
+    const md = L.md, tgt = L.target;
+    const kick = L.isShow ? `SHOWS  ›  ${md.title.toUpperCase()}${tgt && tgt.type === 'episode' ? `  ›  ${tgt.viewOffset ? 'CONTINUE' : 'NEXT UP'} S${tgt.parentIndex} E${tgt.index}` : ''}` : `MOVIES  ›  ${md.title.toUpperCase()}${md.studio ? '  ›  ' + md.studio.toUpperCase() : ''}`;
+    const parts = [md.year, md.contentRating, (md.Genre || []).slice(0, 2).map(g => g.tag).join(', ')];
+    if (L.isShow && md.childCount) parts.push(md.childCount === 1 ? '1 season' : md.childCount + ' seasons');
+    if (tgt && tgt.duration) { parts.push(runtime(tgt.duration)); parts.push('ends ' + hhmm(tgt.duration - (tgt.viewOffset || 0))); }
+    const acts = [];
+    if (tgt) {
+      const resume = tgt.viewOffset > 0 && !tgt.viewCount; const ep = L.isShow && tgt.type === 'episode' ? ` S${tgt.parentIndex} E${tgt.index}` : '';
+      if (resume) { acts.push(['play', 'Resume' + ep, 'resume']); acts.push(['restart', 'From start', 'restart']); } else acts.push(['play', 'Play' + ep, 'restart']);
+    }
+    const trailer = L.extras.find(x => x.subtype === 'trailer'); if (trailer) acts.push(['film', 'Trailer', 'trailer:' + trailer.ratingKey]);
+    const allW = L.isShow ? !((md.leafCount || 0) - (md.viewedLeafCount || 0)) : !!md.viewCount;
+    acts.push(allW ? ['checkc', 'Watched', 'unwatch'] : ['eye', 'Mark watched', 'watch']);
+    L.acts = acts;
+    const people = (md.Role || []).slice(0, 24);
+    $('#dp', L.el).innerHTML = `<div class="dhead"><div class="dpanel"></div><div class="dposter" style="background-image:url('${img(md.thumb, 200, 300)}')"></div>
+      <div class="dtxt"><div class="dk">${ic('d-back')}<span>${esc(kick)}</span></div><div class="dtitle">${esc(md.title.toUpperCase())}</div><div class="dmeta">${esc(parts.filter(Boolean).join('  ·  '))}</div>
+      <div class="dtags">${L.tags()}</div><div class="dov">${esc(md.summary || '')}</div>
+      <div class="dacts">${acts.map(([i, t, a]) => `<div class="fx ib" data-a="dact" data-d="${a}">${ic('d-' + i)}${t ? `<span>${esc(t)}</span>` : ''}</div>`).join('')}</div></div></div>
+      ${L.isShow ? `<div class="dtabs" id="dtabs"></div><div id="deps"></div>` : ''}<div id="dbelow"></div>`;
+    if (L.isShow) { L.drawTabs(); L.drawEps(); }
+    if (people.length) L.below('Cast & crew', 'people', 'person', people);
+    if (L.extras.length) L.below('Extras', 'film', 'wide', L.extras);
+  };
+  L.drawTabs = () => {
+    $('#dtabs', L.el).innerHTML = `<div class="stabs">${L.seasons.map((s, i) => { const done = s.leafCount && s.viewedLeafCount >= s.leafCount; return `<div class="fx stab ${i === L.sIdx ? 'cur' : ''} ${done ? 'done' : ''}" data-a="season" data-i="${i}">${i === L.sIdx || s.index === 0 ? esc(seasonLabel(s)) : s.index}${done ? ic('d-check', 'tick') : ''}</div>`; }).join('')}</div><div class="schips">${L.eps.length ? `<div class="fx ib" data-a="shuffle">${ic('d-shuffle')}<span>Shuffle</span></div>` : ''}</div>`;
+  };
+  L.drawEps = () => {
+    $('#deps', L.el).innerHTML = L.eps.map((e, i) => {
+      const meta = [e.duration ? runtime(e.duration) : '', e.originallyAvailableAt ? new Date(e.originallyAvailableAt + 'T12:00:00').toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }) : '', e.viewOffset && !e.viewCount && e.duration ? mins(e.duration - e.viewOffset) + ' min left' : ''].filter(Boolean).join('  ·  ');
+      const m0 = e.Media && e.Media[0], conv = m0 && (m0.videoCodec || '').toLowerCase() === 'hevc' && !CAP.hevc;
+      return `<div class="fx ep" data-a="ep" data-i="${i}"><div class="en">${e.index || ''}</div><div class="eth" data-bg="${img(e.thumb, 184, 104)}">${e.viewOffset && e.duration ? `<div class="braid"><i style="width:${Math.min(100, e.viewOffset / e.duration * 100)}%"></i></div>` : ''}</div>
+        <div class="etx"><div class="et">${esc(e.title)}</div><div class="es">${esc(e.summary || '')}</div><div class="em">${esc(meta)}</div></div><div class="est">${conv ? '<span class="tg">' + ic('d-wand') + 'To 720p</span>' : ''}${e.viewCount ? ic('d-checkc', 'ok') : ''}</div></div>`;
+    }).join('') || '<div class="lempty" style="position:relative;padding:30px 0">No episodes in this season yet.</div>';
+  };
+  L.below = (title, icon, kind, list) => {
+    const box = $('#dbelow', L.el); if (!box || !list.length) return;
+    const card = x => {
+      if (kind === 'person') return `<div class="fx pcard"><div class="pim" data-bg="${img(x.thumb, 160, 240)}"><div class="ph">${esc((x.tag || '').split(' ').map(w => w[0]).join('').slice(0, 2))}</div></div><div class="t">${esc(x.tag)}</div><div class="s">${esc(x.role || '')}</div></div>`;
+      if (kind === 'wide') return `<div class="fx card" data-a="clip" data-k="${x.ratingKey}"><div class="img" data-bg="${img(x.thumb, 320, 180)}"><div class="ph">${esc(x.title)}</div></div><div class="t">${esc(x.title)}</div><div class="s">${esc(x.subtype || '')}</div></div>`;
+      return `<div class="fx pc2 tallc" data-a="detail" data-k="${x.ratingKey}" data-t="${x.type}"><div class="im" data-bg="${img(x.thumb, 200, 300)}"></div><div class="ph">${esc(x.title)}</div></div>`;
+    };
+    box.insertAdjacentHTML('beforeend', `<div class="hd">${ic('d-' + icon, 'hic')}${esc(title)}<small>${list.length}</small></div><div class="row">${list.map(card).join('')}</div>`);
+  };
+  L.focusInit = () => { const b = $$('.ib', L.el)[0]; if (L.want === null && L.isShow && L.eps.length && opt.want) setFocus($$('.ep', L.el)[L.epSel]); else setFocus(b || null); };
+  L.onShown = () => { const keep = L.eps && L.eps[L.epSel]; if (keep) L.want = { season: L.seasons[L.sIdx].index, id: keep.ratingKey }; L.load().catch(() => {}); };
+  await L.load();
+  return L;
+}
+function playTarget(L, from, tgt) {
+  const t = tgt || L.target; if (!t) { toast('Nothing to play yet'); return; }
+  playItem(t.ratingKey, t.type, from != null ? { from } : {}).catch(e => toast(e.message));
+}
+
 /* ---------- Test room ---------- */
 let testMode = 'auto';
 async function roomTest(room, tok) {
@@ -704,6 +933,30 @@ function act(el) {
   else if (a === 'play') playItem(d.k, d.t, d.from != null ? { from: +d.from } : {}).catch(e => toast(e.message));
   else if (a === 'testplay') playItem(d.k, d.t, { mode: testMode, stats: true, from: 0 }).catch(e => toast(e.message));
   else if (a === 'tmode') { testMode = d.m; $$('#tmodes .chip').forEach(c => c.classList.toggle('live', c === el)); toast('Mode: ' + el.textContent); }
+  else if (a === 'detail') openDetail(d.k, d.t).catch(e => toast(e.message));
+  else if (a === 'open') openItem(+d.i);
+  else if (a === 'ltab') { const S = LR.S; S.tab = +d.i; S.genreOpen = null; LR.load(); }
+  else if (a === 'lbtn') { const it = LR.cur; if (!it) return; if (d.b === 'detail') openItem(LR.items.indexOf(it)); else playItem(it.ratingKey, it.type, {}).catch(e => toast(e.message)); }
+  else if (a === 'lchip') {
+    const S = LR.S, k = d.k;
+    if (k === 'sort') { S.sort = (S.sort + 1) % SORTS.length; LR.load(); }
+    else if (k === 'unw') { S.unw = !S.unw; LR.load(); }
+    else if (k === 'clear') { S.sort = 0; S.unw = false; S.genre = null; S.decade = ''; LR.load(); }
+    else if (k === 'genre') pj(`/library/sections/${LR.lib.key}/genre`).then(mc => { const g = mc.Directory || []; LR.pickList('Genre', ['Any genre'].concat(g.map(x => x.title)), i => { S.genre = i ? { key: g[i - 1].key, title: g[i - 1].title } : null; LR.load(); }); }).catch(e => toast(e.message));
+    else LR.pickList('Decade', ['Any decade', '2020s', '2010s', '2000s', '1990s', '1980s', '1970s', '1960s', '1950s'], i => { S.decade = i ? String(2030 - i * 10) : ''; LR.load(); });
+  }
+  else if (a === 'lletter') { const i = LR.firstAt[+d.i]; if (i >= 0) { const g = $$('.pc2', $('#room'))[i]; $('#lg').scrollTop = Math.floor(i / 9) * 291; setFocus(g); } }
+  else if (a === 'pickopt') { const L = layers[layers.length - 1]; const cb = L.cb; closeLayer(); cb(+d.i); }
+  else if (a === 'dact') {
+    const L = layers[layers.length - 1], k = d.d;
+    if (k === 'resume') playTarget(L); else if (k === 'restart') playTarget(L, 0);
+    else if (k.startsWith('trailer:')) playItem(k.slice(8), 'clip', { from: 0 }).catch(e => toast(e.message));
+    else if (k === 'watch' || k === 'unwatch') fetch(`${PX}/:/${k === 'watch' ? 'scrobble' : 'unscrobble'}?key=${L.md.ratingKey}&identifier=com.plexapp.plugins.library`).then(() => { toast(k === 'watch' ? 'Marked watched' : 'Marked unwatched'); L.load(); }).catch(() => toast('Plex did not answer'));
+  }
+  else if (a === 'ep') { const L = layers[layers.length - 1]; L.epSel = +d.i; playTarget(L, null, L.eps[+d.i]); }
+  else if (a === 'season') { const L = layers[layers.length - 1]; L.sIdx = +d.i; L.loadEps().then(() => { L.drawTabs(); L.drawEps(); setFocus($$('.stab', L.el)[L.sIdx]); }); }
+  else if (a === 'shuffle') { const L = layers[layers.length - 1]; const e = L.eps[Math.random() * L.eps.length | 0]; playTarget(L, 0, e); }
+  else if (a === 'clip') playItem(d.k, 'clip', { from: 0 }).catch(e => toast(e.message));
   else if (a === 'mood') openMood(d.m);
   else if (a === 'album') openAlbum(d.k, d.t).catch(e => toast(e.message));
   else if (a === 'mtoggle') M.toggle();
