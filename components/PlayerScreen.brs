@@ -21,6 +21,10 @@ sub init()
     m.finder.observeField("closed", "onFinderClosed")
     m.finder.observeField("result", "onFinderResult")
     m.reloadSubs = false
+    m.upnext = m.top.findNode("upnext")
+    m.upnext.observeField("action", "onUpNextAction")
+    m.video.observeField("position", "onPosition")
+    resetUpNext()
 end sub
 
 sub onShown(unused as dynamic)
@@ -62,6 +66,7 @@ sub onItem(event as object)
 
     m.media = media
     m.part = part
+    setupUpNext(it)
     m.streams = hPlayStreams(part)
     m.session = m.global.deviceId + "-" + Rnd(100000).toStr()
     hPlayLogCaps()
@@ -211,7 +216,11 @@ sub onState()
     else if s = "paused" and m.started
         report("paused")
     else if s = "finished"
-        leave()
+        if m.next <> invalid and autoplayOn()
+            playNext()
+        else
+            leave()
+        end if
     else if s = "error"
         if m.video.errorCode = -5 and not m.retried5
             ' "only one playing instance": the music (or a mood's sound) still held the player; stop it and try again
@@ -284,6 +293,7 @@ end sub
 
 sub leave()
     if m.leaving then return
+    m.upnext.callFunc("halt", invalid)
     m.leaving = true
     m.tick.control = "stop"
     if m.started
@@ -415,10 +425,119 @@ sub restoreFocus()
     if m.failed = true then leave() else m.video.setFocus(true)
 end sub
 
+' ---------- Up next and autoplay ----------
+' Episodes only. The card appears at Plex's credits marker (Plex Pass credits detection), otherwise 40 s
+' before the end. It counts down 15 s and plays the next episode; autoplay off (registry hearth/autoplay)
+' shows the card without the countdown. Watch credits (or Back) hides it; the next episode still follows
+' when the video ends unless autoplay is off.
+sub resetUpNext()
+    m.next = invalid
+    m.creditsAt = invalid
+    m.upShown = false
+    m.upDismissed = false
+    m.playingNext = false
+end sub
+
+function autoplayOn() as boolean
+    return CreateObject("roRegistrySection", "hearth").Read("autoplay") <> "off"
+end function
+
+sub setupUpNext(it as object)
+    resetUpNext()
+    if it.Type <> "Episode" or it.SeriesId = invalid then return
+    durSec = m.durationMs / 1000
+    if it._markers <> invalid
+        ' the last credits marker is the one at the end (some shows have a mid-episode credits roll too)
+        for each mk in it._markers
+            if mk.type = "credits" and mk.startTimeOffset <> invalid
+                at = mk.startTimeOffset / 1000
+                if at > durSec * 0.5 and (m.creditsAt = invalid or at > m.creditsAt) then m.creditsAt = at
+            end if
+        end for
+    end if
+    if m.creditsAt = invalid and durSec > 120
+        lead = 40
+        if durSec < 900 then lead = 20
+        m.creditsAt = durSec - lead
+        print "[hearth-play] no credits marker; Up next at "; Int(m.creditsAt); " s (end minus "; lead; ")"
+    else if m.creditsAt <> invalid
+        print "[hearth-play] credits marker at "; Int(m.creditsAt); " s"
+    end if
+    hPlex("nextEp", { show: it.SeriesId, id: it.Id }, "onNextEp")
+end sub
+
+sub onNextEp(event as object)
+    t = hTaskFrom(event)
+    n = t.response
+    if not t.ok or n = invalid or n.Id = invalid
+        print "[hearth-play] no next episode (last one, or Plex didn't say)"
+        return
+    end if
+    m.next = n
+    print "[hearth-play] next up: "; hSubtitle(n)
+end sub
+
+sub onPosition()
+    if m.next = invalid or m.creditsAt = invalid or m.upShown or m.upDismissed or not m.started then return
+    if m.finder.visible = true then return
+    if position() >= m.creditsAt then showUpNext()
+end sub
+
+sub showUpNext()
+    m.upShown = true
+    m.upnext.autoplay = autoplayOn()
+    m.upnext.item = m.next
+    m.upnext.callFunc("begin", invalid)
+    m.upnext.setFocus(true)
+end sub
+
+sub onUpNextAction()
+    a = m.upnext.action
+    if a = "play"
+        playNext()
+    else if a = "dismiss"
+        m.upDismissed = true
+        m.upnext.callFunc("halt", invalid)
+        m.video.setFocus(true)
+    end if
+end sub
+
+' Saves this episode as watched, then plays the next one in the same player.
+sub playNext()
+    if m.playingNext or m.next = invalid then return
+    m.playingNext = true
+    nxt = m.next
+    m.upnext.callFunc("halt", invalid)
+    m.tick.control = "stop"
+    if m.started
+        hPlex("timeline", { id: m.item.Id, state: "stopped", time: m.durationMs.toStr(), duration: m.durationMs.toStr() }, "onReported")
+        hPlex("played", { id: m.item.Id }, "onReported")
+    end if
+    m.video.control = "stop"
+    m.ready = false
+    m.started = false
+    m.subApplied = false
+    m.retried5 = false
+    m.hlsLight = false
+    m.offset = 0
+    m.status.text = "Lighting the lantern..."
+    m.status.visible = true
+    m.video.setFocus(true)
+    print "[hearth-play] autoplay: "; hSubtitle(nxt)
+    ' carry on where the next episode was left, if it was started before
+    m.top.resume = true
+    m.top.item = nxt
+end sub
+
 function onKeyEvent(key as string, press as boolean) as boolean
     if not press then return false
     if key = "back"
         leave()
+        return true
+    end if
+    if key = "play" and m.upnext.visible
+        ' the Up next card has focus; play/pause still controls the video
+        if m.video.state = "paused" then m.video.control = "resume" else m.video.control = "pause"
         return true
     end if
     if key = "options" and m.ready

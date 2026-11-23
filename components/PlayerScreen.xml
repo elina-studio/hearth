@@ -6,6 +6,7 @@
     <Video id="video" width="1920" height="1080" enableUI="true" />
     <Label id="status" translation="[96, 980]" width="1728" color="0xB5AF8CFF" text="Lighting the lantern..." />
     <Timer id="tick" duration="10" repeat="true" />
+    <UpNextCard id="upnext" />
     <SubsFinder id="finder" context="player" />
   </children>
   <interface>

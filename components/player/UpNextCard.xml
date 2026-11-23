@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Up next card shown when the credits start (mockup player/upnext-countdown.png).
+     Set item (the next episode) and autoplay, then callFunc("begin"). It counts down `seconds` and sets
+     action = "play" at zero (autoplay on) or when Play now is pressed; "dismiss" for Watch credits / Back. -->
+<component name="UpNextCard" extends="Group">
+  <children>
+    <Poster id="panel" uri="pkg:/images/w/panel.9.png" translation="[1112, 608]" width="724" height="384" blendColor="0x11170EFF" opacity="0.95" />
+    <Poster id="nextIcon" uri="pkg:/images/icons/home-next.png" translation="[1160, 655]" width="30" height="30" blendColor="0xE0B34AFF" />
+    <Label id="head" translation="[1204, 640]" text="Up next" color="0xEDE6CAFF" />
+    <Label id="rolling" translation="[1460, 652]" width="330" horizAlign="right" text="CREDITS ROLLING" color="0xB5AF8CFF" />
+    <Rectangle id="thumbBg" translation="[1160, 716]" width="256" height="144" color="0x1A2214FF" />
+    <Poster id="thumb" translation="[1160, 716]" width="256" height="144" loadDisplayMode="scaleToZoom" />
+    <Label id="kicker" translation="[1440, 720]" width="350" color="0xE0B34AFF" />
+    <Label id="title" translation="[1440, 750]" width="350" maxLines="2" wrap="true" color="0xEDE6CAFF" />
+    <Label id="meta" translation="[1440, 832]" width="350" color="0xB5AF8CFF" />
+    <Group id="btnPlay" translation="[1160, 886]">
+      <Poster id="playBg" translation="[-12, -12]" width="254" height="84" />
+      <Poster id="playIcon" uri="pkg:/images/icons/home-play.png" translation="[24, 15]" width="30" height="30" />
+      <Label id="playLabel" translation="[64, 0]" height="60" vertAlign="center" text="Play now" />
+      <Label id="count" translation="[176, 0]" width="40" height="60" vertAlign="center" horizAlign="right" />
+    </Group>
+    <Group id="btnStay" translation="[1412, 886]">
+      <Poster id="stayBg" translation="[-12, -12]" width="252" height="84" />
+      <Poster id="stayIcon" uri="pkg:/images/icons/home-left.png" translation="[22, 17]" width="26" height="26" />
+      <Label id="stayLabel" translation="[58, 0]" height="60" vertAlign="center" text="Watch credits" />
+    </Group>
+    <Group id="bar" translation="[1160, 958]" />
+    <Timer id="tick" duration="0.25" repeat="true" />
+  </children>
+  <interface>
+    <field id="item" type="assocarray" />
+    <field id="autoplay" type="boolean" value="true" onChange="paint" />
+    <field id="seconds" type="integer" value="15" />
+    <field id="action" type="string" alwaysNotify="true" />
+    <function name="begin" />
+    <function name="halt" />
+  </interface>
+  <script type="text/brightscript" uri="pkg:/source/util.brs" />
+  <script type="text/brightscript" uri="pkg:/components/player/UpNextCard.brs" />
+</component>

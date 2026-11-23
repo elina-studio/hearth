@@ -131,12 +131,26 @@ sub runTask()
         end for
         out = { Names: names }
     else if op = "item"
-        res = req("GET", m.server + "/library/metadata/" + a.id, {}, m.token)
+        ' includeMarkers: intro and credits times (Plex Pass detection), for skip intro and Up next
+        res = req("GET", m.server + "/library/metadata/" + a.id, { includeMarkers: "1" }, m.token)
         list = metas(res.body)
         if list.count() > 0 then out = norm(list[0])
     else if op = "episodes"
         res = req("GET", m.server + "/library/metadata/" + a.id + "/allLeaves", {}, m.token)
         out = { Items: normAll(metas(res.body)) }
+    else if op = "nextEp"
+        ' the episode after a.id in the show (a.show), across seasons; specials (season 0) are skipped
+        res = req("GET", m.server + "/library/metadata/" + a.show + "/allLeaves", {}, m.token)
+        list = metas(res.body)
+        hit = false
+        for each md in list
+            if hit and md.parentIndex <> invalid and md.parentIndex > 0
+                out = norm(md)
+                out.delete("_media")
+                exit for
+            end if
+            if md.ratingKey = a.id then hit = true
+        end for
     else if op = "similar"
         res = req("GET", m.server + "/library/metadata/" + a.id + "/similar", { "X-Plex-Container-Size": "12" }, m.token)
         list = metas(res.body)
@@ -443,6 +457,7 @@ function norm(md as object) as object
     it.UserData = ud
     it._img = img
     if md.Media <> invalid then it._media = md.Media
+    if md.Marker <> invalid then it._markers = md.Marker
     return it
 end function
 
