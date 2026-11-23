@@ -125,7 +125,11 @@ function makePanel(i as integer) as object
     num.text = nn
     p.num = num
     t = g.createChild("Label")
-    t.font = hFont("caps", 92)
+    ' your own clips can have long names: step the size down so they stay on one line
+    size = 92
+    if Len(it.title) > 10 then size = 66
+    if Len(it.title) > 15 then size = 52
+    t.font = hFont("caps", size)
     t.translation = [40, 76]
     t.width = m.W - 60
     t.text = UCase(it.title)
