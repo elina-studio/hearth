@@ -82,6 +82,30 @@ sub runTask()
         if a.section <> invalid then path = "/library/sections/" + a.section + "/recentlyAdded"
         res = req("GET", m.server + path, q, m.token)
         out = { Items: dedupe(metas(res.body)) }
+    else if op = "arrived"
+        ' Newly downloaded: what just landed in the movie, show and music libraries (never Ambiance or Photos),
+        ' newest first. Shows come back as seasons or episodes; norm turns both into their show.
+        res = req("GET", m.server + "/library/sections", {}, m.token)
+        all = []
+        for each d in dirs(res.body)
+            if (d.type = "movie" or d.type = "show" or d.type = "artist") and not isAmbiance(d)
+                r2 = req("GET", m.server + "/library/sections/" + d.key + "/recentlyAdded", { "X-Plex-Container-Start": "0", "X-Plex-Container-Size": toS(a.limit, "30") }, m.token)
+                for each md in metas(r2.body)
+                    if md.type <> "track" then all.push(md)
+                end for
+            end if
+        end for
+        ' newest first (simple insertion sort; at most ~90 items)
+        for i = 1 to all.count() - 1
+            x = all[i]
+            j = i - 1
+            while j >= 0 and toN(all[j].addedAt) < toN(x.addedAt)
+                all[j + 1] = all[j]
+                j = j - 1
+            end while
+            all[j + 1] = x
+        end for
+        out = { Items: dedupe(all) }
     else if op = "list"
         q = { "X-Plex-Container-Start": "0", "X-Plex-Container-Size": toS(a.limit, "300") }
         if a.sort <> invalid then q.sort = a.sort
@@ -346,6 +370,11 @@ function isAmbiance(d as object) as boolean
     return false
 end function
 
+function toN(v as dynamic) as integer
+    if v = invalid then return 0
+    return v
+end function
+
 function toS(v as dynamic, fallback as string) as string
     if v = invalid then return fallback
     return v.toStr()
@@ -464,7 +493,7 @@ end function
 
 function norm(md as object) as object
     t = md.type
-    it = { Id: md.ratingKey, Name: md.title, Overview: md.summary, ProductionYear: md.year, OfficialRating: md.contentRating, LibraryId: md.librarySectionID }
+    it = { Id: md.ratingKey, Name: md.title, Overview: md.summary, ProductionYear: md.year, OfficialRating: md.contentRating, LibraryId: md.librarySectionID, AddedAt: md.addedAt }
     img = { Primary: md.thumb, Thumb: invalid, Backdrop: md.art }
     ' cast and director for the details page (only present on a full item fetch)
     if md.Role <> invalid
@@ -491,6 +520,7 @@ function norm(md as object) as object
         it.Type = "Series"
         it.Id = md.parentRatingKey
         it.Name = md.parentTitle
+        it.SeasonIndex = md.index
         if md.parentThumb <> invalid then img.Primary = md.parentThumb
     else if t = "episode"
         it.Type = "Episode"

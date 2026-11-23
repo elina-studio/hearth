@@ -11,6 +11,7 @@
         <Label id="rating" color="0xD9A066FF" />
         <Label id="title" translation="[0, 34]" width="1280" maxLines="1" color="0xEDE6CAFF" />
       </Group>
+      <Group id="tabs" translation="[540, 128]" visible="false" />
       <Group id="gridClip" translation="[540, 140]" clippingRect="[-14, -14, 1310, 800]">
         <Group id="grid" />
       </Group>

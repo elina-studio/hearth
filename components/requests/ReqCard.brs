@@ -32,6 +32,21 @@ sub draw()
         if t = invalid then t = ""
         fb.text = UCase(t)
     end if
+    ' album covers are square: centred in the poster frame, title under them
+    if c.square = true
+        m.poster.height = 180
+        m.poster.translation = [0, 30]
+        fb.translation = [12, 214]
+        fb.height = 50
+        fb.font = hFont("regular", 20)
+        fb.text = t
+    else
+        m.poster.height = 270
+        m.poster.translation = [0, 0]
+        fb.translation = [12, 10]
+        fb.height = 250
+        fb.font = hFont("caps", 30)
+    end if
     m.poster.uri = ""
     onLoad()
     drawChip(c.chip)
