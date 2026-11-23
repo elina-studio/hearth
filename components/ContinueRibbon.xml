@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- "Continue" ribbon (mockup ideas/C2-ribbon-play-key.png): slides up over any room when Play is pressed with
+     nothing playing. Not focusable: HearthScene sends it the next Play press. Set info = { kicker, title, meta, thumb, pct },
+     then callFunc("show") / callFunc("hide"). -->
+<component name="ContinueRibbon" extends="Group">
+  <children>
+    <Group id="box" translation="[0, 1080]">
+      <Poster id="panel" uri="pkg:/images/w/panel-v3.9.png" translation="[88, 0]" width="1744" height="134" blendColor="0x141A11FF" />
+      <Poster id="thumb" translation="[124, 18]" width="160" height="98" loadDisplayMode="scaleToZoom" />
+      <Label id="kicker" translation="[308, 14]" width="900" color="0xE0B34AFF" />
+      <Label id="title" translation="[308, 42]" width="1000" color="0xEDE6CAFF" />
+      <Label id="meta" translation="[850, 88]" width="620" color="0xB5AF8CFF" />
+      <Poster id="btn" uri="pkg:/images/w/button-fill-v2.9.png" translation="[1500, 36]" width="288" height="62" blendColor="0xE0B34AFF" />
+      <Poster id="icon" uri="pkg:/images/icons/home-play.png" translation="[1526, 52]" width="30" height="30" blendColor="0x1F1606FF" />
+      <Label id="lab" translation="[1572, 36]" width="200" height="62" vertAlign="center" text="Press Play" color="0x1F1606FF" />
+    </Group>
+    <Timer id="hideTimer" duration="10" repeat="false" />
+    <Animation id="slide" duration="0.25" easeFunction="outQuad">
+      <Vector2DFieldInterpolator id="slideTo" key="[0.0, 1.0]" keyValue="[[0, 1080], [0, 910]]" fieldToInterp="box.translation" />
+    </Animation>
+  </children>
+  <interface>
+    <field id="info" type="assocarray" onChange="paint" />
+    <field id="shown" type="boolean" value="false" />
+    <function name="show" />
+    <function name="hide" />
+  </interface>
+  <script type="text/brightscript" uri="pkg:/source/util.brs" />
+  <script type="text/brightscript" uri="pkg:/components/ContinueRibbon.brs" />
+</component>
