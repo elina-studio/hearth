@@ -100,7 +100,7 @@ end sub
 ' then season and episode numbers.
 function findIds(a as object) as object
     file = baseName(a.file)
-    if a.movie = true
+    if isTrue(a.movie)
         res = req("GET", "/api/movies", { start: "0", length: "-1" }, "", 30000)
         if res.status = 401 then return { error: "badkey", status: 401 }
         if res.body = invalid or res.body.data = invalid then return { error: "unreachable", status: res.status }
@@ -109,7 +109,7 @@ function findIds(a as object) as object
         end for
         ' fall back to the title and year
         for each mv in res.body.data
-            if mv.title <> invalid and LCase(mv.title) = LCase(a.title) and (a.year = invalid or mv.year = invalid or mv.year = a.year.toStr()) then return { kind: "movie", movie: mv.radarrId }
+            if mv.title <> invalid and LCase(mv.title) = LCase(a.title) and (a.year = invalid or mv.year = invalid or sameNum(mv.year, a.year)) then return { kind: "movie", movie: mv.radarrId }
         end for
         return { error: "notfound", status: 404 }
     end if
@@ -138,13 +138,13 @@ function findIds(a as object) as object
         if ep.path <> invalid and LCase(baseName(ep.path)) = LCase(file) then return { kind: "episode", series: seriesId, episode: ep.sonarrEpisodeId }
     end for
     for each ep in res.body.data
-        if ep.season = a.season and ep.episode = a.episode then return { kind: "episode", series: seriesId, episode: ep.sonarrEpisodeId }
+        if sameNum(ep.season, a.season) and sameNum(ep.episode, a.episode) then return { kind: "episode", series: seriesId, episode: ep.sonarrEpisodeId }
     end for
     return { error: "notfound", status: 404 }
 end function
 
 function missing(a as object) as object
-    if a.movie = true
+    if isTrue(a.movie)
         ids = findIds(a)
         if ids.error <> invalid then return { status: ids.status, error: ids.error, out: {} }
         res = req("GET", "/api/movies", { "radarrid[]": ids.movie.toStr() }, "", 30000)
@@ -196,8 +196,8 @@ end function
 function lang(l as object) as object
     hi = "False"
     forced = "False"
-    if l.hi = true then hi = "True"
-    if l.forced = true then forced = "True"
+    if isTrue(l.hi) then hi = "True"
+    if isTrue(l.forced) then forced = "True"
     name = l.name
     if name = invalid then name = l.code2
     return { code2: l.code2, name: name, hi: hi, forced: forced }
@@ -298,11 +298,36 @@ function syncSub(a as object) as object
 end function
 
 function tf(v as dynamic) as string
-    if v = true then return "True"
+    if isTrue(v) then return "True"
     return "False"
 end function
 
 function toStr(v as dynamic) as string
     if v = invalid then return ""
     return v.toStr()
+end function
+
+' Type-safe checks: Plex and Bazarr send flags as true, 1, "1" or "True" depending on the field
+' and server version, and BrightScript can't compare a string with a boolean or a number.
+function isTrue(v as dynamic) as boolean
+    t = type(v)
+    if t = "Boolean" or t = "roBoolean" then return v
+    if t = "Integer" or t = "roInteger" or t = "LongInteger" or t = "Float" or t = "Double" then return v <> 0
+    if t = "String" or t = "roString"
+        s = LCase(v)
+        return s = "1" or s = "true" or s = "yes"
+    end if
+    return false
+end function
+
+function numOf(v as dynamic) as integer
+    t = type(v)
+    if t = "Integer" or t = "roInteger" or t = "LongInteger" or t = "Float" or t = "Double" or t = "roFloat" then return Int(v)
+    if t = "String" or t = "roString" then return Int(Val(v))
+    return -1
+end function
+
+function sameNum(a as dynamic, b as dynamic) as boolean
+    x = numOf(a)
+    return x >= 0 and x = numOf(b)
 end function

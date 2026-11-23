@@ -148,15 +148,16 @@ sub loadTracks()
     if part = invalid or part.Stream = invalid then return
     for each s in part.Stream
         if s.streamType = 3
-            name = s.displayTitle
-            if name = invalid or name = "" then name = s.language
-            if name = invalid or name = "" then name = "Unknown"
+            name = strOf(s.displayTitle)
+            if name = "" then name = strOf(s.language)
+            if name = "" then name = "Unknown"
             where = "In the file"
             if s.key <> invalid then where = "Subtitle file"
-            if s.codec <> invalid then where = where + " · " + LCase(s.codec)
-            if s.forced = true then where = where + " · forced"
-            row = { kind: "track", stream: s, name: name, detail: where, on: (s.selected = true) }
-            if s.title <> invalid and s.title <> "" and Instr(1, name, s.title) = 0 then row.name = name + " · " + s.title
+            if strOf(s.codec) <> "" then where = where + " · " + LCase(strOf(s.codec))
+            if isTrue(s.forced) then where = where + " · forced"
+            row = { kind: "track", stream: s, name: name, detail: where, on: isTrue(s.selected) }
+            st = strOf(s.title)
+            if st <> "" and Instr(1, name, st) = 0 then row.name = name + " · " + st
             if row.on then m.tracks[0].on = false
             m.tracks.push(row)
         end if
@@ -241,18 +242,19 @@ sub merge()
     plex = []
     if m.src <> "bazarr" and m.plexRaw <> invalid
         for each s in m.plexRaw
-            name = s.title
-            if name = invalid or name = "" then name = s.displayTitle
-            if name = invalid then name = "Subtitle"
-            prov = s.providerTitle
-            if prov = invalid or prov = "" then prov = "OpenSubtitles"
-            score = -1
-            if s.score <> invalid then score = Int(Val(s.score.toStr()))
+            name = strOf(s.title)
+            if name = "" then name = strOf(s.displayTitle)
+            if name = "" then name = "Subtitle"
+            prov = strOf(s.providerTitle)
+            if prov = "" then prov = "OpenSubtitles"
+            score = numOf(s.score)
+            ' Plex's scores aren't percentages (2895 for a good one), so they're not shown as a score
+            if score > 100 then score = -1
             tags = []
-            if s.hearingImpaired = true or s.hearingImpaired = 1 or s.hearingImpaired = "1" then tags.push("HI")
-            if s.forced = true or s.forced = 1 or s.forced = "1" then tags.push("forced")
-            if s.perfectMatch = true or s.perfectMatch = 1 or s.perfectMatch = "1" then tags.push("exact match")
-            if s.downloaded = true or s.downloaded = 1 or s.downloaded = "1" then tags.push("already here")
+            if isTrue(s.hearingImpaired) then tags.push("HI")
+            if isTrue(s.forced) then tags.push("forced")
+            if isTrue(s.perfectMatch) then tags.push("exact match")
+            if isTrue(s.downloaded) then tags.push("already here")
             plex.push({ from: "plex", key: s.key, name: name, provider: "Plex · " + prov, score: score, tags: tags })
         end for
     end if
@@ -260,27 +262,26 @@ sub merge()
     bzRest = []
     if m.src <> "plex" and m.bzRaw <> invalid
         for each s in m.bzRaw
-            lang = ""
-            if s.language <> invalid then lang = LCase(s.language)
-            hi = (s.hearing_impaired = "True")
+            lang = LCase(strOf(s.language))
+            hi = isTrue(s.hearing_impaired)
             keep = (Left(lang, 2) = m.lang)
             if m.hi = "no" and hi then keep = false
             if m.hi = "only" and not hi then keep = false
             if keep
-                name = invalid
-                if s.release_info <> invalid and s.release_info.count() > 0 then name = s.release_info[0]
-                if name = invalid or name = "" then name = "Subtitle from " + s.provider
+                name = ""
+                if type(s.release_info) = "roArray" and s.release_info.count() > 0 then name = strOf(s.release_info[0])
+                if name = "" then name = "Subtitle from " + strOf(s.provider)
                 tags = []
                 if hi then tags.push("HI")
-                if s.forced = "True" then tags.push("forced")
-                if s.matches <> invalid
+                if isTrue(s.forced) then tags.push("forced")
+                if type(s.matches) = "roArray"
                     for each mt in s.matches
-                        if mt = "hash" then tags.unshift("hash match")
+                        if strOf(mt) = "hash" then tags.unshift("hash match")
                     end for
                     if tags.count() < 3 and s.matches.count() > 0 then tags.push(s.matches.count().toStr() + " matches")
                 end if
-                score = 0
-                if s.score <> invalid then score = s.score
+                score = numOf(s.score)
+                if score < 0 then score = 0
                 r = { from: "bazarr", provider: s.provider, subtitle: s.subtitle, hi: s.hearing_impaired, forced: s.forced, name: name, score: score, tags: tags }
                 if score >= 90 then bzTop.push(r) else bzRest.push(r)
             end if
@@ -360,8 +361,7 @@ sub onPolled(event as object)
     newest = invalid
     for each s in streamList(t.response)
         if not m.before.doesExist(s.id.toStr())
-            lang = ""
-            if s.languageCode <> invalid then lang = LCase(s.languageCode)
+            lang = LCase(strOf(s.languageCode))
             if newest = invalid or Left(lang, 2) = m.lang then newest = s
         end if
     end for
@@ -537,9 +537,9 @@ sub paint()
             focused = (m.zone = "list" and idx = m.sel)
             node.ring.visible = focused
             node.ring.blendColor = m.c.rope
-            node.bg.visible = focused or (m.tab = 0 and r.on = true)
+            node.bg.visible = focused or (m.tab = 0 and isTrue(r.on))
             if m.tab = 0
-                node.tick.visible = (r.on = true)
+                node.tick.visible = isTrue(r.on)
                 node.title.translation = [72, 16]
                 node.title.text = r.name
                 node.detail.translation = [72, 60]
@@ -687,4 +687,37 @@ function nextOf(list as object, v as string) as string
         if list[k] = v then return list[(k + 1) mod list.count()]
     end for
     return list[0]
+end function
+
+' Type-safe checks: Plex and Bazarr send flags as true, 1, "1" or "True" depending on the field
+' and server version, and BrightScript can't compare a string with a boolean or a number.
+function isTrue(v as dynamic) as boolean
+    t = type(v)
+    if t = "Boolean" or t = "roBoolean" then return v
+    if t = "Integer" or t = "roInteger" or t = "LongInteger" or t = "Float" or t = "Double" then return v <> 0
+    if t = "String" or t = "roString"
+        s = LCase(v)
+        return s = "1" or s = "true" or s = "yes"
+    end if
+    return false
+end function
+
+function numOf(v as dynamic) as integer
+    t = type(v)
+    if t = "Integer" or t = "roInteger" or t = "LongInteger" or t = "Float" or t = "Double" or t = "roFloat" then return Int(v)
+    if t = "String" or t = "roString" then return Int(Val(v))
+    return -1
+end function
+
+function sameNum(a as dynamic, b as dynamic) as boolean
+    x = numOf(a)
+    return x >= 0 and x = numOf(b)
+end function
+
+function strOf(v as dynamic) as string
+    t = type(v)
+    if t = "String" or t = "roString" then return v
+    if v = invalid then return ""
+    if t = "Integer" or t = "roInteger" or t = "LongInteger" or t = "Float" or t = "Double" or t = "Boolean" or t = "roBoolean" then return v.toStr()
+    return ""
 end function
