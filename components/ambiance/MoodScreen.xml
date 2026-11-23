@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- A mood, full screen. OK = sound switch (fire / music / both), Left/Right = next mood, * = sound and sleep timer, Back = leave. -->
+<!-- A mood, full screen. Down or OK = control bar (music, sound switch, dim, timer), Left/Right = next mood, * = sound and sleep timer, Back = leave. -->
 <component name="MoodScreen" extends="Group">
   <children>
     <MoodScene id="scene" />
@@ -18,9 +18,8 @@
       <Label id="hint" translation="[1000, 976]" width="824" horizAlign="right" color="0xB5AF8CFF" />
       <Label id="credit" translation="[1000, 1030]" width="824" horizAlign="right" color="0xB5AF8C99" />
       <Label id="clock" translation="[1524, 900]" width="300" horizAlign="right" color="0xEDE6CAFF" />
-      <!-- the sound switch (OK cycles): Fire / Music / Both -->
-      <Group id="mix" translation="[1296, 760]" />
     </Group>
+    <MoodControls id="controls" visible="false" />
     <Rectangle id="night" width="1920" height="1080" color="0x000000FF" opacity="0" />
     <Animation id="hudIn" duration="0.4" easeFunction="outQuad">
       <FloatFieldInterpolator key="[0.0, 1.0]" keyValue="[0.0, 1.0]" fieldToInterp="hud.opacity" />

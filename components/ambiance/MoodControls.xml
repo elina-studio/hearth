@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The mood screen's control bar (layout A): music (prev / play-pause / next, TV timing),
+     the sound switch (Fire / Music / Both), dim and the sleep timer. Left/Right move, OK chooses,
+     Up or Back closes. Asks MoodScreen to do things through request. -->
+<component name="MoodControls" extends="Group">
+  <children>
+    <Group id="row" translation="[96, 850]" />
+  </children>
+  <interface>
+    <field id="item" type="assocarray" />
+    <field id="mode" type="string" />
+    <field id="dimText" type="string" />
+    <field id="timerText" type="string" />
+    <field id="request" type="assocarray" alwaysNotify="true" />
+    <function name="open" />
+    <function name="paint" />
+  </interface>
+  <script type="text/brightscript" uri="pkg:/source/util.brs" />
+  <script type="text/brightscript" uri="pkg:/components/ambiance/ambianceData.brs" />
+  <script type="text/brightscript" uri="pkg:/components/ambiance/MoodControls.brs" />
+</component>
