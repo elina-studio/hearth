@@ -121,12 +121,18 @@ function hPlayHlsQuery(itemId as string, startSec as dynamic, subs as string, se
     if di.CanDecodeAudio({ Codec: "eac3" }).result = true then acodecs = acodecs + ",eac3"
     res = "1920x1080"
     if hPlayMaxHeight() >= 2160 then res = "3840x2160"
+    quality = "&videoQuality=100&maxVideoBitrate=200000"
+    if m.hlsLight
+        ' Plex has to convert the video anyway: 720p at 3 Mbps is what the DS923+ CPU can keep up with in real time
+        res = "1280x720"
+        quality = "&videoQuality=60&maxVideoBitrate=3000"
+    end if
     extra = "add-transcode-target(type=videoProfile&context=streaming&protocol=hls&container=mpegts&videoCodec=" + vcodecs + "&audioCodec=" + acodecs + ")"
     if Instr(1, vcodecs, "hevc") > 0 then extra = extra + "+append-transcode-target-codec(type=videoProfile&context=streaming&protocol=hls&videoCodec=hevc)"
     extra = extra + "+add-transcode-target-audio-codec(type=videoProfile&context=streaming&protocol=hls&audioCodec=" + acodecs + ")"
     q = "path=" + hEscape("/library/metadata/" + itemId) + "&mediaIndex=0&partIndex=0&protocol=hls&fastSeek=1&copyts=1"
     ' copy video whenever possible; the LAN can carry a full-quality file, so don't trigger a convert for size
-    q = q + "&directPlay=0&directStream=1&directStreamAudio=1&videoQuality=100&videoResolution=" + res + "&maxVideoBitrate=200000"
+    q = q + "&directPlay=0&directStream=1&directStreamAudio=1&videoResolution=" + res + quality
     q = q + "&offset=" + Int(startSec).toStr() + "&subtitles=" + subs + "&session=" + hEscape(session)
     q = q + "&X-Plex-Client-Identifier=" + hEscape(m.global.deviceId) + "&X-Plex-Product=Hearth&X-Plex-Platform=Roku&X-Plex-Token=" + token
     q = q + "&X-Plex-Client-Profile-Extra=" + hEscape(extra)

@@ -11,6 +11,7 @@ sub init()
     m.video.observeField("state", "onState")
     m.video.observeField("availableSubtitleTracks", "applyEmbeddedSub")
     m.retried5 = false
+    m.hlsLight = false
     m.subApplied = false
     m.leaving = false
     m.started = false
@@ -94,7 +95,14 @@ sub onDecision(event as object)
             askDecision()
             return
         end if
-        if d.video = "transcode" then print "[hearth-play] WARNING: Plex will convert the video on the NAS CPU; this file may stutter"
+        if d.video = "transcode" and not m.hlsLight
+            ' a full convert at 1080p is more than the NAS CPU can do in real time (stuck loading); ask for 720p instead
+            print "[hearth-play] Plex must convert the video; asking for 720p at 3 Mbps so the NAS keeps up"
+            m.hlsLight = true
+            askDecision()
+            return
+        end if
+        if d.video = "transcode" then print "[hearth-play] converting video to 720p on the NAS CPU"
     else
         print "[hearth-play] Plex decision check failed (status "; t.status; "); starting the remux anyway"
     end if
