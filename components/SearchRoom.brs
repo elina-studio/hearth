@@ -39,6 +39,7 @@ sub init()
     m.sel = 0
     m.offset = 0
     m.zone = "kb"
+    m.onPill = false
     m.active = false
     m.seq = 0
 
@@ -241,6 +242,7 @@ sub setRows(rows as object)
     m.focusable = []
     m.sel = 0
     m.offset = 0
+    m.onPill = false
     y = 0
     for i = 0 to rows.count() - 1
         r = rows[i]
@@ -253,6 +255,9 @@ sub setRows(rows as object)
         else
             r.y = y
             if r.kind = "recent" then r.h = 64 else r.h = 92
+            if r.kind = "item" and (r.item.Type = "Series" or r.item.Type = "artist")
+                if r.item.Type = "Series" then r.more = "More seasons" else r.more = "More albums"
+            end if
             r.node = makeRow(r)
             m.focusable.push(i)
             y = y + r.h + 10
@@ -362,16 +367,41 @@ function makeRow(r as object) as object
         end if
         top = 12
         if r.subText = "" then top = 26
+        textW = 1064 - textX - 20
+        if r.more <> invalid
+            ' feedback #23: a "More seasons" / "More albums" pill at the row's right end (Right reaches it)
+            pw = Len(r.more) * 14 + 92
+            pill = g.createChild("Group")
+            pill.translation = [1064 - pw - 18, 18]
+            pb = pill.createChild("Poster")
+            pb.uri = "pkg:/images/pill.9.png"
+            pb.width = pw
+            pb.height = 56
+            pi = pill.createChild("Poster")
+            pi.uri = "pkg:/images/icons/plus.png"
+            pi.width = 28
+            pi.height = 28
+            pi.translation = [22, 14]
+            pl = pill.createChild("Label")
+            pl.translation = [60, 0]
+            pl.width = pw - 72
+            pl.height = 56
+            pl.vertAlign = "center"
+            pl.font = hFont("bold", 24)
+            pl.text = r.more
+            r.pill = pill
+            textW = textW - pw - 24
+        end if
         tl = g.createChild("Label")
         tl.translation = [textX, top]
-        tl.width = 1064 - textX - 20
+        tl.width = textW
         tl.font = hFont("bold", 30)
         tl.color = "0xEDE6CAFF"
         tl.text = title
         if r.subText <> ""
             sl = g.createChild("Label")
             sl.translation = [textX, top + 42]
-            sl.width = 1064 - textX - 20
+            sl.width = textW
             sl.font = hFont("regular", 22)
             sl.color = "0xB5AF8CFF"
             sl.text = r.subText
@@ -407,6 +437,9 @@ function subtitle(it as object, withKind as boolean) as string
         if t = "album" and it.ProductionYear <> invalid then parts.push(it.ProductionYear.toStr())
     else if t = "Movie" or t = "Series"
         if it.ProductionYear <> invalid then parts.push(it.ProductionYear.toStr())
+        if t = "Series" and it.SeasonCount <> invalid
+            if it.SeasonCount = 1 then parts.push("1 season") else parts.push(it.SeasonCount.toStr() + " seasons")
+        end if
     end if
     return parts.join("  ·  ")
 end function
@@ -424,6 +457,15 @@ end function
 sub openRow()
     if m.focusable.count() = 0 then return
     r = m.rows[m.focusable[m.sel]]
+    if m.onPill and r.pill <> invalid
+        rememberSearch(m.term)
+        if r.item.Type = "Series"
+            m.top.request = { action: "room", name: "Requests", search: rowTitle(r.item) }
+        else
+            m.top.request = { action: "musicView", mode: "request", term: rowTitle(r.item) }
+        end if
+        return
+    end if
     if r.kind = "recent"
         m.kb.text = r.text ' the keyboard's text change runs the search
         return
@@ -456,7 +498,16 @@ end sub
 sub paint()
     m.kb.active = (m.active and m.zone = "kb")
     for i = 0 to m.focusable.count() - 1
-        m.rows[m.focusable[i]].node.visible = (m.active and m.zone = "results" and i = m.sel)
+        r = m.rows[m.focusable[i]]
+        here = (m.active and m.zone = "results" and i = m.sel)
+        r.node.visible = here and not (m.onPill and r.pill <> invalid)
+        if r.pill <> invalid
+            lit = here and m.onPill
+            if lit then r.pill.getChild(0).blendColor = "0xE0B34AFF" else r.pill.getChild(0).blendColor = "0x2A2410FF"
+            if lit then c = "0x1F1606FF" else c = "0xE0B34AFF"
+            r.pill.getChild(1).blendColor = c
+            r.pill.getChild(2).color = c
+        end if
     end for
     ' keep the focused row, and its group heading, inside the viewport
     if m.focusable.count() > 0
@@ -522,11 +573,19 @@ function onKeyEvent(key as string, press as boolean) as boolean
         m.kb.callFunc("handleKey", key)
         return true
     end if
+    hasPill = (m.rows[m.focusable[m.sel]].pill <> invalid)
     if key = "up"
+        m.onPill = false
         if m.sel > 0 then m.sel = m.sel - 1 else m.zone = "kb"
     else if key = "down"
+        m.onPill = false
         if m.sel < m.focusable.count() - 1 then m.sel = m.sel + 1
+    else if key = "right"
+        if hasPill then m.onPill = true
+    else if key = "left" and m.onPill
+        m.onPill = false
     else if key = "left" or key = "back"
+        m.onPill = false
         m.zone = "kb"
     else if key = "OK"
         openRow()
