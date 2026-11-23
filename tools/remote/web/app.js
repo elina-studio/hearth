@@ -32,7 +32,9 @@ function tick() {
   const d = new Date();
   $('#clk').textContent = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
   $('#dat').textContent = d.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' });
+  const w = $('#clk').offsetWidth; $('#cfly').style.left = (1824 - w - 34) + 'px';
 }
+if (document.fonts) document.fonts.ready.then(() => tick());
 tick(); setInterval(tick, 20000);
 for (let i = 0; i < 9; i++) {
   const f = document.createElement('i'); f.className = 'ff';
@@ -135,6 +137,7 @@ function reveal(el) {
 function setFocus(el) {
   if (focusEl) focusEl.classList.remove('on');
   focusEl = el;
+  mossOn(el); barFlies();
   if (el) { el.classList.add('on'); reveal(el); if (el.classList.contains('pc2') && el.dataset.i !== undefined && !el.closest('.layer') && typeof LRInfo === 'function') LRInfo(+el.dataset.i); if (el.classList.contains('rc') && typeof RQInfo === 'function') RQInfo(+el.dataset.i); if (el.dataset.a === 'rail' && RQ && cur === 'Requests' && RQ.idx !== +el.dataset.i) { RQ.idx = +el.dataset.i; RQ.over = null; RQ.show(); } }
 }
 function firstFocus(root) { const e = $('.fx', root); setFocus(e || null); }
@@ -264,8 +267,41 @@ function remoteKey(k) {
 const ROOMS = ['Home', 'Shows', 'Movies', 'Music', 'Requests', 'Ambiance', 'Photos', 'Search', 'Test'];
 const LIVE = new Set(['Home', 'Shows', 'Movies', 'Music', 'Requests', 'Ambiance', 'Photos', 'Search', 'Test']);
 let cur = 'Home', renderTok = 0, autoF = null;
+const RBX = { Home: [280, 101], Shows: [420, 121], Movies: [578, 133], Music: [750, 111], Requests: [899, 174], Ambiance: [1111, 182], Photos: [1332, 134], Search: [1504, 136] };
 function drawBar() {
-  $('#rooms').innerHTML = ROOMS.map(r => `<div class="fx rm ${r === cur ? 'cur' : ''}" data-a="room" data-r="${r}">${r}<i class="dot"></i></div>`).join('');
+  $('#rooms').innerHTML = ROOMS.map(r => `<div class="fx rm ${RBX[r] ? '' : 'tst'} ${r === cur ? 'cur' : ''}" data-a="room" data-r="${r}">${RBX[r] ? '' : r}</div>`).join('')
+    + '<img class="bf" id="bglow" src="img/w/firefly-glow.png" alt=""><img class="bf" id="bf1" src="img/w/firefly-small.png" width="48" height="48" alt=""><img class="bf" id="bf2" src="img/w/firefly-small.png" width="48" height="48" style="opacity:.45" alt=""><img class="bf" id="bfly" src="img/w/firefly-main.png" width="64" height="64" alt="">';
+  barFlies();
+}
+// the firefly marks of the Roku room bar: glow and a friend on the current room, the main one under the focused room
+function barFlies() {
+  const g = $('#bglow'); if (!g) return;
+  const ci = RBX[cur] ? cur : null; if (!ci) { g.style.display = $('#bf1').style.display = $('#bf2').style.display = $('#bfly').style.display = 'none'; return; }
+  const fo = focusEl && focusEl.classList && focusEl.classList.contains('rm') && RBX[focusEl.dataset.r] ? focusEl.dataset.r : ci;
+  const [x, w] = RBX[ci], l = x + 2, r = x + w - 2;
+  Object.assign(g.style, { display: '', left: (l - 24) + 'px', width: (r - l + 48) + 'px', opacity: fo !== ci ? .6 : 1 });
+  Object.assign($('#bf1').style, { display: '', left: (r - 10) + 'px', top: '19px' });
+  Object.assign($('#bf2').style, { display: '', left: (l - 36) + 'px', top: '55px' });
+  Object.assign($('#bfly').style, { display: '', left: (RBX[fo][0] + Math.floor(RBX[fo][1] / 2) - 32) + 'px', top: '64px' });
+}
+// moss hugs the focused card (whimsy spec 4), the same kind every time for the same card
+const MOSSK = ['1-round-caps', '2-tall-caps', '3-golden-funnels', '4-two-acorns'];
+function mossOn(el) {
+  $$('.moss').forEach(m => m.remove());
+  if (!el || !el.matches('.card,.pc2,.rc,.ptile,.cc,.rsrow .rsp')) return;
+  const key = el.dataset.k || el.dataset.i || el.textContent.slice(0, 20) || 'x';
+  let h = 0; for (const ch of String(key)) h = (h * 31 + ch.charCodeAt(0)) % 1000003;
+  const left = h % 3 === 0;
+  const box = el.querySelector('.img,.im,.rim,.pti') || el;
+  const bw = box.offsetWidth || 180;
+  let mw = Math.max(80, Math.min(125, Math.floor((bw + 14) * .6)));
+  const sc = mw / 125;
+  const im = document.createElement('img'); im.className = 'moss';
+  im.src = `img/w/moss-corner-${MOSSK[h % 4]}${left ? '-left' : ''}.png`;
+  im.style.width = mw + 'px'; im.style.height = Math.floor(96 * sc) + 'px';
+  im.style.top = Math.floor(-7 - 55 * sc) + 'px';
+  im.style.left = (left ? Math.floor(-7 - 15 * sc) : Math.floor(bw + 7 - 110 * sc)) + 'px';
+  el.appendChild(im);
 }
 async function go(name, keepFocus) {
   if (PH) PH.stop();
