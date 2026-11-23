@@ -85,7 +85,7 @@ end function
 
 ' Generic track from Plex track metadata: what the player, the rooms and the views use
 function pxTrack(md as object) as object
-    tr = { id: pxStr(md.ratingKey), title: pxStr(md.title), album: pxStr(md.parentTitle), albumId: pxStr(md.parentRatingKey), artistId: pxStr(md.grandparentRatingKey), url: "", format: "mp3", duration: 0, file: "" }
+    tr = { id: pxStr(md.ratingKey), title: pxStr(md.title), album: pxStr(md.parentTitle), albumId: pxStr(md.parentRatingKey), artistId: pxStr(md.grandparentRatingKey), url: "", format: "mp3", duration: 0, file: "", rating: 0 }
     artist = md.originalTitle
     if artist = invalid or artist = "" then artist = md.grandparentTitle
     tr.artist = pxStr(artist)
@@ -94,6 +94,7 @@ function pxTrack(md as object) as object
     if thumb = invalid then thumb = md.grandparentThumb
     tr.thumb = pxStr(thumb)
     if md.duration <> invalid then tr.duration = md.duration / 1000
+    if md.userRating <> invalid then tr.rating = md.userRating
     if md.Media = invalid or md.Media.count() = 0 or md.Media[0].Part = invalid or md.Media[0].Part.count() = 0 then return tr
     media = md.Media[0]
     part = media.Part[0]
