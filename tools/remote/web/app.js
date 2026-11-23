@@ -172,7 +172,7 @@ function openLayer(cls, html, handlers) {
   return L;
 }
 // While a full-screen layer is open, the pages underneath stop drawing (and the fireflies stop moving)
-function syncCover() { stage.classList.toggle('cover', layers.some(l => /player|mood/.test(l.el.className))); }
+function syncCover() { stage.classList.toggle('cover', layers.some(l => /player|mood|slide/.test(l.el.className))); }
 function closeLayer() { if (layers.length) history.back(); }
 addEventListener('popstate', () => {
   const L = layers.pop();
@@ -262,12 +262,13 @@ function remoteKey(k) {
 
 /* ---------- rooms ---------- */
 const ROOMS = ['Home', 'Shows', 'Movies', 'Music', 'Requests', 'Ambiance', 'Photos', 'Search', 'Test'];
-const LIVE = new Set(['Home', 'Shows', 'Movies', 'Music', 'Requests', 'Ambiance', 'Search', 'Test']);
+const LIVE = new Set(['Home', 'Shows', 'Movies', 'Music', 'Requests', 'Ambiance', 'Photos', 'Search', 'Test']);
 let cur = 'Home', renderTok = 0, autoF = null;
 function drawBar() {
   $('#rooms').innerHTML = ROOMS.map(r => `<div class="fx rm ${r === cur ? 'cur' : ''}" data-a="room" data-r="${r}">${r}<i class="dot"></i></div>`).join('');
 }
 async function go(name, keepFocus) {
+  if (PH) PH.stop();
   cur = name; drawBar();
   const tok = ++renderTok;
   const room = $('#room'); room.innerHTML = '';
@@ -278,6 +279,7 @@ async function go(name, keepFocus) {
     else if (name === 'Movies') await roomLib(room, tok, 'movie');
     else if (name === 'Search') roomSearch(room, tok);
     else if (name === 'Requests') roomRequests(room, tok);
+    else if (name === 'Photos') await roomPhotos(room, tok);
     else if (name === 'Shows') await roomLib(room, tok, 'show');
     else if (name === 'Ambiance') roomAmbiance(room);
     else if (name === 'Test') await roomTest(room, tok);
@@ -1371,6 +1373,162 @@ function roomRequests(room, tok) {
 }
 let RQLeave = null, RQInfo = null;
 
+/* ---------- Photos: the window, albums, and the slideshow ---------- */
+let PH = null;
+const photoPath = md => { const p = md.Media && md.Media[0] && md.Media[0].Part && md.Media[0].Part[0]; return (p && p.key) || md.thumb || ''; };
+const isPhotoMd = md => md.type === 'photo' && md.Media && md.Media.length > 0;
+const normPhoto = md => {
+  if (isPhotoMd(md)) {
+    const t = ((md.title || '') + ' ' + photoPath(md)).toLowerCase(); if (t.includes('screenshot')) return null;
+    const m0 = md.Media[0];
+    return { type: 'photo', id: md.ratingKey, name: md.title, path: photoPath(md), w: m0.width, h: m0.height, fav: md.userRating >= 10, date: md.originallyAvailableAt || (md.year ? String(md.year) : '') };
+  }
+  if (md.type === 'photo' || md.type === 'photoalbum' || (md.key || '').includes('/children')) return { type: 'album', id: md.ratingKey, name: md.title, path: md.thumb, count: md.leafCount != null ? md.leafCount : md.childCount };
+  return null;
+};
+const photoCaption = it => { if (!it || !it.date) return ''; const d = it.date; if (d.length >= 7) { const mo = +d.slice(5, 7); const names = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']; if (mo >= 1 && mo <= 12) return names[mo - 1] + ' ' + d.slice(0, 4); } return d.slice(0, 4); };
+const imgFit = (p, w, h) => p ? `${PX}/photo/:/transcode?width=${w}&height=${h}&minSize=0&upscale=1&url=${encodeURIComponent(p)}` : '';
+const thousands = n => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+const PREF = (k, d) => { try { return localStorage.getItem('hearth.' + k) || d; } catch (e) { return d; } };
+const SETPREF = (k, v) => { try { localStorage.setItem('hearth.' + k, v); } catch (e) { /* ignore */ } };
+const shiftDay = (day, d) => { const t = new Date(day + 'T12:00:00Z'); t.setUTCDate(t.getUTCDate() + d); return t.toISOString().slice(0, 10); };
+async function photoQuery(op, a) {
+  const sec = `/library/sections/${photoLib.key}/all`;
+  const keep = mc => (mc.Metadata || mc.Directory || []).map(normPhoto).filter(Boolean);
+  if (op === 'albums') { const mc = await pj(sec); return [].concat(mc.Directory || [], mc.Metadata || []).map(normPhoto).filter(x => x && x.type === 'album'); }
+  if (op === 'random') return keep(await pj(sec, { type: 13, sort: 'random', 'X-Plex-Container-Start': 0, 'X-Plex-Container-Size': a.limit || 60 })).filter(x => x.type === 'photo');
+  if (op === 'ordered') return keep(await pj(sec, { type: 13, sort: 'originallyAvailableAt:asc', 'X-Plex-Container-Start': a.start || 0, 'X-Plex-Container-Size': a.limit || 60 })).filter(x => x.type === 'photo');
+  if (op === 'favourites') return keep(await pj(sec, { type: 13, 'userRating>>': 9, sort: 'originallyAvailableAt:asc', 'X-Plex-Container-Start': 0, 'X-Plex-Container-Size': 500 })).filter(x => x.type === 'photo');
+  if (op === 'count') { const mc = await pj(sec, Object.assign({ type: 13, 'X-Plex-Container-Start': 0, 'X-Plex-Container-Size': 0 }, a || {})); return mc.totalSize != null ? mc.totalSize : (mc.size || 0); }
+  if (op === 'onthisday') {
+    const now = new Date(), mo = String(now.getMonth() + 1).padStart(2, '0'), dd = String(now.getDate()).padStart(2, '0'), out = [];
+    const years = []; for (let y = now.getFullYear() - 25; y < now.getFullYear(); y++) years.push(y);
+    const res = await Promise.all(years.map(y => { const day = `${y}-${mo}-${dd}`; return pj(sec, { type: 13, 'originallyAvailableAt>>': shiftDay(day, -1), 'originallyAvailableAt<<': shiftDay(day, 1), 'X-Plex-Container-Start': 0, 'X-Plex-Container-Size': 50 }).then(mc => keep(mc).filter(x => x.type === 'photo' && (x.date || '').slice(0, 10) === day)).catch(() => []); }));
+    res.forEach(r => out.push(...r)); return out.slice(0, a && a.enough ? a.enough : 200);
+  }
+  if (op === 'album') {
+    const kids = (await pj(`/library/metadata/${a.id}/children`)).Metadata || []; const out = [];
+    for (const md of kids) { const it = normPhoto(md); if (!it) continue; if (it.type === 'photo') out.push(it); else if (out.length < 500) { try { for (const m2 of ((await pj(`/library/metadata/${it.id}/children`)).Metadata || [])) { const i2 = normPhoto(m2); if (i2 && i2.type === 'photo') out.push(i2); } } catch (e) { /* skip */ } } }
+    return out;
+  }
+  return [];
+}
+
+async function roomPhotos(room, tok) {
+  await libs();
+  if (!photoLib) { room.innerHTML = '<div class="soon"><img src="img/lantern.png" alt=""><h2>No photos yet</h2><p>Add your photos folder to Plex as a Photos library. Each folder inside it becomes an album here.</p></div>'; return; }
+  const win = document.createElement('div'); win.id = 'pwin'; win.innerHTML = '<div class="pw a"></div><div class="pw b"></div><div class="pshade"></div>'; stage.insertBefore(win, $('#bar'));
+  room.innerHTML = `<div class="phr"><div class="peb"><i class="ic" style="--m:url(img/icons/d-layers.png)"></i><span id="pe">THE WINDOW</span></div><div class="ptt" id="pt">YOUR PHOTOS</div>
+    <div class="pbtns2" id="pb"></div><div class="palh" id="pah" style="display:none">ALBUMS</div><div class="palrow scroll" id="pal"><div class="palin" id="pali"></div></div><div class="pnote" id="pn"></div></div>`;
+  const S = PH = { win, front: 'b', photos: [], pos: -1, tok, sum: { total: 0, fav: 0, otd: 0 } };
+  S.stop = () => { clearInterval(S.t); win.remove(); if (PH === S) PH = null; };
+  const buttons = () => {
+    const b = [['', 'home-play', 'Start the slideshow']]; if (S.sum.otd > 0) b.push(['@onthisday', 'home-cal', 'On this day']); if (S.sum.fav > 0) b.push(['@favourites', 'home-sort', 'Favourites · ' + S.sum.fav]);
+    $('#pb', room).innerHTML = b.map(([id, i, t]) => `<div class="fx pill big" data-a="pshow" data-id="${id}" data-n="${esc(id === '@onthisday' ? 'On this day' : id === '@favourites' ? 'Favourites' : '')}">${ic(i)}<span>${esc(t)}</span></div>`).join('');
+    if (!$('.fx.on', room) && cur === 'Photos' && !layers.length && !focusEl) setFocus($('#pb .fx', room));
+  };
+  const next = () => {
+    if (!S.photos.length || cur !== 'Photos') return;
+    S.pos = (S.pos + 1) % S.photos.length; const it = S.photos[S.pos];
+    const back = S.front === 'a' ? $('.pw.b', win) : $('.pw.a', win), front = S.front === 'a' ? $('.pw.a', win) : $('.pw.b', win);
+    const u = img(it.path, 1280, 720); const im = new Image();
+    im.onload = () => { back.style.backgroundImage = `url("${u}")`; back.style.opacity = 1; front.style.opacity = 0; S.front = S.front === 'a' ? 'b' : 'a'; $('#pt', room).textContent = (photoCaption(it) || 'Your photos').toUpperCase(); };
+    im.src = u;
+  };
+  buttons(); setFocus($('#pb .fx', room)); autoF = focusEl;
+  photoQuery('count').then(n => { S.sum.total = n; if (n) $('#pe', room).textContent = 'THE WINDOW · ' + thousands(n) + ' PHOTOS'; else $('#pn', room).textContent = 'Add your photos folder to Plex as a Photos library.'; }).catch(e => { $('#pn', room).textContent = "Can't reach Plex: " + e.message; });
+  photoQuery('count', { 'userRating>>': 9 }).then(n => { S.sum.fav = n; buttons(); }).catch(() => {});
+  photoQuery('onthisday', { enough: 1 }).then(l => { S.sum.otd = l.length; buttons(); }).catch(() => {});
+  photoQuery('albums').then(list => {
+    if (!list.length) return; $('#pah', room).style.display = 'block';
+    $('#pali', room).innerHTML = list.map((a, i) => `<div class="fx ptile" data-a="pshow" data-id="${a.id}" data-n="${esc(a.name)}"><div class="pti" data-bg="${img(a.path, 272, 172)}"></div><div class="ptn">${esc(a.name)}</div><div class="pts">${a.count == null ? 'Album' : a.count === 1 ? '1 photo' : thousands(a.count) + ' photos'}</div></div>`).join('');
+  }).catch(() => {});
+  photoQuery('random', { limit: 30 }).then(all => { S.photos = all.filter(p => !p.w || !p.h || p.w >= p.h); if (!S.photos.length) S.photos = all; if (S.photos.length) { next(); S.t = setInterval(next, 12000); } }).catch(() => {});
+}
+
+function openSlideshow(albumId, albumName) {
+  const L = openLayer('slide', `<div class="sl"><div class="sla" id="sla"><div class="slb"></div><div class="slp"></div><div class="slp2"></div></div><div class="sla" id="slb"><div class="slb"></div><div class="slp"></div><div class="slp2"></div></div>
+    <div class="slshade"></div><div class="sclk"><div class="sct" id="sct"></div><img class="sctw" src="img/twig.png" alt=""><div class="scd" id="scd"></div></div>
+    <div class="scap"><div class="sca" id="sca"></div><div class="scc" id="scc"></div><div class="scs" id="scs"></div></div>
+    <div class="snp" id="snp"></div><div class="spause" id="spause">❚❚  Paused</div><div class="sstat" id="sstat">Opening the window…</div>
+    <div class="shint" id="shint">◀ ▶ Photos &nbsp; OK Pause &nbsp; ▼ Options &nbsp; Back Close</div><div class="sopt" id="sopt"></div></div>`, {
+    onKey(e) {
+      const k = e.key;
+      if (L.opt) { if (k === 'Escape' || k === 'Backspace') { L.closeOpt(); return true; } return false; }
+      if (k === 'ArrowRight') { L.step(1); return true; }
+      if (k === 'ArrowLeft') { L.step(-1); return true; }
+      if (k === 'Enter' || k === ' ') { L.setPaused(!L.paused); return true; }
+      if (k === 'ArrowDown') { L.openOpt(); return true; }
+      return false;
+    }
+  });
+  const el = L.el; L.queue = []; L.nextI = 0; L.history = []; L.back = 0; L.offset = 0; L.paused = false; L.front = 1; L.loading = false; L.id = albumId; L.name = albumName || '';
+  L.seconds = +PREF('photoSeconds', '8') || 8; L.order = PREF('photoOrder', 'shuffle');
+  const layersEl = [$('#sla', el), $('#slb', el)];
+  $('#sca', el).textContent = L.name ? L.name.toUpperCase() : 'ALL PHOTOS';
+  const portrait = it => it && it.w && it.h && it.h > it.w * 1.05;
+  const tick = () => { const n = new Date(); $('#sct', el).textContent = n.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); $('#scd', el).textContent = n.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' }); };
+  tick(); L.ct = setInterval(tick, 20000);
+  L.fetch = async () => {
+    if (L.loading) return; L.loading = true;
+    try {
+      let list;
+      if (L.id === '@favourites') list = await photoQuery('favourites');
+      else if (L.id === '@onthisday') { if (!L.queue.length) $('#sstat', el).textContent = 'Looking back through the years…'; list = await photoQuery('onthisday', {}); }
+      else if (L.id) list = await photoQuery('album', { id: L.id });
+      else if (L.order === 'order') { list = await photoQuery('ordered', { start: L.offset, limit: 60 }); if (!list.length && L.offset > 0) { L.offset = 0; list = await photoQuery('ordered', { start: 0, limit: 60 }); } else L.offset += 60; }
+      else list = await photoQuery('random', { limit: 60 });
+      if (!list.length && !L.queue.length) { $('#sstat', el).textContent = L.id === '@onthisday' ? 'No photos from this day in past years.' : 'No photos found. Press Back.'; L.loading = false; return; }
+      if (L.id && L.id !== '@favourites' && L.id !== '@onthisday' && L.order !== 'order') list.sort(() => Math.random() - .5);
+      else if (!L.id && L.order !== 'order') { /* already random from Plex */ }
+      L.queue = L.queue.slice(L.nextI).concat(list); L.nextI = 0;
+      if (L.fresh === undefined) { L.fresh = true; L.show(1); }
+    } catch (e) { $('#sstat', el).textContent = "Can't get photos from Plex (" + e.message + '). Press Back.'; }
+    L.loading = false;
+  };
+  L.peek = () => {
+    if (L.nextI >= L.queue.length) return null;
+    const a = L.queue[L.nextI]; if (portrait(a) && L.nextI + 1 < L.queue.length && portrait(L.queue[L.nextI + 1])) return [a, L.queue[L.nextI + 1]];
+    return [a];
+  };
+  L.show = dir => {
+    let slide;
+    if (dir < 0) { if (L.back + 1 >= L.history.length) return; L.back++; slide = L.history[L.history.length - 1 - L.back]; }
+    else if (L.back > 0) { L.back--; slide = L.history[L.history.length - 1 - L.back]; }
+    else { slide = L.peek(); if (!slide) { L.fetch(); return; } L.nextI += slide.length; L.history.push(slide); if (L.history.length > 30) L.history.shift(); if (L.queue.length - L.nextI < 12) L.fetch(); }
+    L.draw(slide);
+  };
+  L.step = d => { L.show(d); L.restartTimer(); };
+  L.draw = slide => {
+    const to = 1 - L.front, a = layersEl[to], b = layersEl[L.front];
+    const pair = slide.length === 2;
+    const ps = $$('.slp', a).concat($$('.slp2', a)); const p1 = $('.slp', a), p2 = $('.slp2', a), bk = $('.slb', a);
+    const u1 = pair ? img(slide[0].path, 960, 1080) : imgFit(slide[0].path, 1920, 1080);
+    const pre = new Image();
+    const go_ = () => {
+      p1.style.backgroundImage = `url("${u1}")`; p1.className = 'slp' + (pair ? ' half' : '');
+      if (pair) { p2.style.backgroundImage = `url("${img(slide[1].path, 960, 1080)}")`; p2.style.display = 'block'; } else p2.style.display = 'none';
+      bk.style.backgroundImage = pair ? '' : `url("${img(slide[0].path, 96, 54)}")`;
+      a.style.opacity = 1; b.style.opacity = 0; L.front = to; $('#sstat', el).textContent = '';
+      const it = slide[0]; $('#scc', el).textContent = pair ? '' : photoCaption(it); $('#scs', el).textContent = !pair && it.fav ? '★ FAVOURITE' : ''; L.cur = slide;
+    };
+    pre.onload = go_; pre.onerror = () => { L.show(1); }; pre.src = u1;
+  };
+  L.restartTimer = () => { clearInterval(L.at); if (!L.paused) L.at = setInterval(() => L.show(1), L.seconds * 1000); };
+  L.setPaused = p => { L.paused = p; $('#spause', el).style.display = p ? 'block' : 'none'; L.restartTimer(); };
+  L.npTick = setInterval(() => { const t = M.cur && M.cur(); const np = $('#snp', el); if (!np) return; np.innerHTML = t && M.playing ? `<em>NOW PLAYING</em><span>${esc(t.title)}</span>` : ''; }, 2000);
+  L.openOpt = () => {
+    const secs = [5, 8, 12, 20, 30], cur_ = L.cur && L.cur[0];
+    $('#sopt', el).innerHTML = `<h4>Options</h4><div class="fx chip" data-a="soptsec">Time per photo: ${L.seconds} s</div><div class="fx chip" data-a="soptorder">Order: ${L.order === 'order' ? 'Oldest first' : 'Shuffle'}</div>${cur_ && L.cur.length === 1 ? `<div class="fx chip ${cur_.fav ? 'live' : ''}" data-a="soptfav">${cur_.fav ? '★ Favourite (tap to remove)' : '☆ Make favourite'}</div>` : ''}<div class="fx chip" data-a="soptclose">Close</div>`;
+    $('#sopt', el).style.display = 'flex'; L.opt = true; clearInterval(L.at); setFocus($('#sopt .fx', el));
+  };
+  L.closeOpt = () => { $('#sopt', el).style.display = 'none'; L.opt = false; L.restartTimer(); setFocus(null); };
+  L.onBack = () => { if (L.opt) { L.closeOpt(); return true; } return false; };
+  L.secs = [5, 8, 12, 20, 30];
+  L.close = () => { clearInterval(L.at); clearInterval(L.ct); clearInterval(L.npTick); };
+  L.fetch().then(() => L.restartTimer()); setFocus(null);
+  return L;
+}
 /* ---------- Test room ---------- */
 let testMode = 'auto';
 async function roomTest(room, tok) {
@@ -1460,6 +1618,11 @@ function act(el) {
   else if (a === 'rtab') RQ.tab(+d.i);
   else if (a === 'rqkey') { const c = d.c; if (c === '⌫') RQ.type(RQ.text.slice(0, -1)); else if (c === '⌧') RQ.type(''); else RQ.type(RQ.text + c); }
   else if (a === 'rqpick') RQ.pick(layers[layers.length - 1], el);
+  else if (a === 'pshow') openSlideshow(d.id, d.n);
+  else if (a === 'soptsec') { const L = layers[layers.length - 1]; L.seconds = L.secs[(L.secs.indexOf(L.seconds) + 1) % L.secs.length]; SETPREF('photoSeconds', L.seconds); el.textContent = 'Time per photo: ' + L.seconds + ' s'; }
+  else if (a === 'soptorder') { const L = layers[layers.length - 1]; L.order = L.order === 'order' ? 'shuffle' : 'order'; SETPREF('photoOrder', L.order); el.textContent = 'Order: ' + (L.order === 'order' ? 'Oldest first' : 'Shuffle') + ' (next batch)'; }
+  else if (a === 'soptfav') { const L = layers[layers.length - 1]; const it = L.cur && L.cur[0]; if (!it) return; const want = it.fav ? -1 : 10; fetch(`${PX}/:/rate?key=${it.id}&identifier=com.plexapp.plugins.library&rating=${want}`).then(() => { it.fav = !it.fav; el.textContent = it.fav ? '★ Favourite (tap to remove)' : '☆ Make favourite'; el.classList.toggle('live', it.fav); $('#scs', L.el).textContent = it.fav ? '★ FAVOURITE' : ''; }).catch(() => toast('Plex did not answer')); }
+  else if (a === 'soptclose') layers[layers.length - 1].closeOpt();
   else if (a === 'mood') openMood(d.m);
   else if (a === 'album') openAlbum(d.k, d.t).catch(e => toast(e.message));
   else if (a === 'mtoggle') M.toggle();
