@@ -298,8 +298,8 @@ end sub
 
 ' Where the speakers are: we told them to be at pos just now, and they get there castDelay later.
 ' So at any moment they're at refPos + (time since) - castDelay, and that's where the TV belongs.
-sub castMark(pos as float)
-    m.castRefPos = pos
+sub castMark(atPos as float)
+    m.castRefPos = atPos
     m.castRefClock = CreateObject("roTimespan")
 end sub
 
