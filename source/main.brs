@@ -45,6 +45,8 @@ sub saveInput(screen as object, info as object)
     if info.overseerrKey <> invalid and info.overseerrKey <> ""
         reg.Write("overseerrKey", info.overseerrKey)
         reg.Flush()
+        ' clear first so Requests notices (and says "key saved") even when the same key is sent again
+        g.overseerrKey = ""
         g.overseerrKey = info.overseerrKey
     end if
     ' Lidarr (music requests): lidarrUrl, lidarrKey
