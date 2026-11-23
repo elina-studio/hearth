@@ -6,9 +6,14 @@
     <Rectangle id="topShade" width="1920" height="150" color="0x0B0E09E6" />
     <LanternMark translation="[100, 50]" />
     <LayoutGroup id="pills" translation="[164, 57]" layoutDirection="horiz" itemSpacings="[8]" />
-    <Label id="clock" translation="[1524, 52]" width="300" horizAlign="right" color="0xEDE6CAFF" />
-    <Label id="weather" translation="[1524, 98]" width="300" horizAlign="right" color="0xB5AF8CFF" />
-    <Label id="buildTag" translation="[1524, 128]" width="300" horizAlign="right" color="0xB5AF8C66" />
+    <!-- clock B "twig and sprig": time in Cinzel, a short wild twig with two leaves, one steady firefly,
+         then a fine gold weather icon and the weather in a book serif. All right-aligned to x 1824. -->
+    <Label id="clock" translation="[1700, 12]" color="0xEDE6CAFF" />
+    <Poster id="clockFly" uri="pkg:/images/firefly.png" width="16" height="16" translation="[1660, 40]" />
+    <Poster uri="pkg:/images/clock/twig.png" translation="[1629, 56]" width="200" height="56" />
+    <Poster id="wxIcon" translation="[1500, 100]" width="28" height="28" blendColor="0xE0B34AFF" visible="false" />
+    <Label id="weather" translation="[1540, 96]" height="36" vertAlign="center" color="0xB5AF8CFF" />
+    <Label id="buildTag" translation="[1524, 136]" width="300" horizAlign="right" color="0xB5AF8C55" />
     <Timer id="clockTimer" duration="20" repeat="true" />
     <Timer id="weatherTimer" duration="900" repeat="true" />
     <Timer id="previewTimer" duration="0.33" repeat="false" />

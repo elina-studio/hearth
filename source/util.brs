@@ -11,6 +11,11 @@ function hFont(kind as string, size as integer) as object
         f.uri = "pkg:/fonts/AtkinsonHyperlegible-Bold.ttf"
     else if kind = "fell"
         f.uri = "pkg:/fonts/IMFellEnglish-Italic.ttf"
+    else if kind = "clock"
+        ' clock digits (whimsy clock B); swap here when the app-wide font set is picked
+        f.uri = "pkg:/fonts/Cinzel-SemiBold.ttf"
+    else if kind = "book"
+        f.uri = "pkg:/fonts/EBGaramond-Regular.ttf"
     else if kind = "caps"
         f.uri = "pkg:/fonts/BarlowCondensed-Bold.ttf"
     else

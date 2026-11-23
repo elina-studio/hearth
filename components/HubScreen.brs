@@ -7,11 +7,13 @@ sub init()
     end for
     m.roomHolder = m.top.findNode("roomHolder")
     m.clock = m.top.findNode("clock")
-    m.clock.font = hFont("bold", 40)
+    m.clock.font = hFont("clock", 54)
+    m.clockFly = m.top.findNode("clockFly")
     m.weather = m.top.findNode("weather")
-    m.weather.font = hFont("regular", 26)
+    m.weather.font = hFont("book", 26)
+    m.wxIcon = m.top.findNode("wxIcon")
     m.buildTag = m.top.findNode("buildTag")
-    m.buildTag.font = hFont("regular", 18)
+    m.buildTag.font = hFont("regular", 16)
     m.buildTag.text = "build " + CreateObject("roAppInfo").GetValue("build_version")
     ' weather from Home Assistant (same settings as the photo slideshow), refreshed every 15 minutes
     wt = m.top.findNode("weatherTimer")
@@ -53,7 +55,32 @@ sub tick()
     mm = mi.toStr()
     if mi < 10 then mm = "0" + mm
     m.clock.text = h12.toStr() + ":" + mm
+    ' right-align to 1824 by measuring, so the firefly can sit just left of the time
+    w = m.clock.localBoundingRect().width
+    m.clock.translation = [1824 - w, 12]
+    m.clockFly.translation = [1824 - w - 34, 40]
 end sub
+
+' Lays out the weather line: icon, then text, right-aligned to 1824
+sub layoutWeather()
+    w = m.weather.localBoundingRect().width
+    m.weather.translation = [1824 - w, 96]
+    m.wxIcon.translation = [1824 - w - 38, 100]
+    m.wxIcon.visible = (m.weather.text <> "" and m.wxIcon.uri <> "")
+end sub
+
+' Home Assistant condition to one of the eight clock icons
+function wxIconFor(s as string) as string
+    k = "cloudy"
+    if s = "sunny" then k = "clear"
+    if s = "clear-night" then k = "night"
+    if s = "partlycloudy" then k = "partlycloudy"
+    if s = "rainy" or s = "pouring" or s = "snowy-rainy" then k = "rain"
+    if s = "snowy" or s = "hail" then k = "snow"
+    if s = "fog" then k = "fog"
+    if s = "lightning" or s = "lightning-rainy" then k = "storm"
+    return "pkg:/images/clock/w-" + k + ".png"
+end function
 
 sub loadLibraries()
     hPlex("libraries", {}, "onLibraries")
@@ -247,6 +274,7 @@ sub loadWeather()
     c = pCfg()
     if c.haToken = ""
         m.weather.text = ""
+        layoutWeather()
         return
     end if
     pHa("/api/states/" + c.haEntity, "onWeather")
@@ -256,7 +284,10 @@ sub onWeather(event as object)
     t = pTaskFrom(event)
     if not t.ok or t.response.state = invalid then return
     s = pWeatherWord(t.response.state)
+    s = UCase(Left(s, 1)) + Mid(s, 2)
     a = t.response.attributes
-    if a <> invalid and a.temperature <> invalid then s = Int(a.temperature + 0.5).toStr() + "° · " + s
+    if a <> invalid and a.temperature <> invalid then s = s + ", " + Int(a.temperature + 0.5).toStr() + "°"
+    m.wxIcon.uri = wxIconFor(t.response.state)
     m.weather.text = s
+    layoutWeather()
 end sub
