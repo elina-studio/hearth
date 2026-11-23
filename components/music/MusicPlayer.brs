@@ -10,6 +10,8 @@ sub init()
     m.pending = invalid
     m.lastId = ""
     castInit()
+    lfmInit()
+    radioInit()
 end sub
 
 sub say(text as string)
@@ -94,6 +96,18 @@ sub onCommand()
         moreLikeThis()
     else if cmd = "search"
         searchAndPlay(c)
+    else if cmd = "love"
+        lfmLove()
+    else if cmd = "lfmReload"
+        lfmReload()
+    else if cmd = "radioStart"
+        radioStart(c)
+    else if cmd = "radioStop"
+        radioStop()
+    else if cmd = "radioNope"
+        radioNope()
+    else if cmd = "radioVariety"
+        radioVariety(c.delta)
     else if cmd = "setShuffle"
         setShuffle(c.value = true)
     else if cmd = "cycleRepeat"
@@ -261,6 +275,10 @@ end sub
 sub onTracks(event as object)
     t = hTaskFrom(event)
     m.top.busy = false
+    if t.tag = "radioGo"
+        radioRefill()
+        return
+    end if
     if t.tag = "search"
         playSearchHit(t)
         return
@@ -318,6 +336,7 @@ end sub
 
 sub load(tracks as object, start as dynamic, shuffle as boolean, label as dynamic)
     if tracks = invalid or tracks.count() = 0 then return
+    radioDetach()
     if start = invalid then start = 0
     m.original = invalid
     if shuffle
@@ -388,6 +407,7 @@ sub playIndex(i as integer, startAt = 0 as float)
     if i < 0 then i = 0
     if i >= q.count() then i = q.count() - 1
     tr = q[i]
+    radioLeaving(tr)
     timeline("stopped")
     m.top.index = i
     m.top.track = tr
@@ -402,6 +422,7 @@ sub playIndex(i as integer, startAt = 0 as float)
     m.audio.control = "stop"
     m.audio.content = c
     m.scrobbled = false
+    if startAt = 0 then lfmTrackStart()
     if castActive()
         ' the speakers start this song now; the TV follows castDelay later, or keeps quiet
         m.castFresh = false

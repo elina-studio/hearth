@@ -28,10 +28,21 @@
     <field id="rooms" type="array" />
     <field id="castCount" type="integer" value="0" />
     <field id="castDelay" type="float" value="1.5" />
+    <!-- Last.fm (lastfm.brs): off | idle | now | counted | queued -->
+    <field id="lfmState" type="string" value="off" />
+    <!-- a lyrics panel is open on this screen / found lyrics for this song (LyricsPanel) -->
+    <field id="lyricsActive" type="boolean" value="false" />
+    <field id="lyricsFound" type="boolean" value="false" />
+    <!-- Radio (radio.brs): false | true, and its seed name -->
+    <field id="radioOn" type="boolean" value="false" />
+    <field id="radioName" type="string" />
   </interface>
   <script type="text/brightscript" uri="pkg:/source/util.brs" />
   <script type="text/brightscript" uri="pkg:/components/music/plex.brs" />
   <script type="text/brightscript" uri="pkg:/source/photos.brs" />
   <script type="text/brightscript" uri="pkg:/components/music/cast.brs" />
+  <script type="text/brightscript" uri="pkg:/components/music/nas.brs" />
+  <script type="text/brightscript" uri="pkg:/components/music/lastfm.brs" />
+  <script type="text/brightscript" uri="pkg:/components/music/radio.brs" />
   <script type="text/brightscript" uri="pkg:/components/music/MusicPlayer.brs" />
 </component>

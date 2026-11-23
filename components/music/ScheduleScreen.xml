@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Music schedules (Morning, Evening): a form on the left and a picture of the volume on the right.
+     Save writes a Home Assistant automation named "Hearth: morning music" / "Hearth: evening music" through HA's config API
+     (the same haUrl / haToken the casting uses). Home Assistant runs it, so it plays with the TV off. -->
+<component name="ScheduleScreen" extends="Group">
+  <children>
+    <Rectangle width="1920" height="1080" color="0x0B0E09FF" />
+    <Label id="title" translation="[100, 130]" color="0xEDE6CAFF" />
+    <Rectangle translation="[560, 166]" width="300" height="3" color="0x6E4526FF" />
+    <Group id="rows" translation="[100, 210]" />
+    <Group id="btns" translation="[100, 868]" />
+    <Label id="gTitle" translation="[1020, 130]" color="0xE0B34AFF" text="WHAT YOU WILL HEAR" />
+    <Rectangle translation="[1020, 190]" width="800" height="420" color="0x141A11FF" />
+    <Group id="graph" translation="[1050, 210]" />
+    <Label id="gA" translation="[1050, 572]" width="300" color="0xB5AF8CFF" />
+    <Label id="gB" translation="[1520, 572]" width="270" horizAlign="right" color="0xB5AF8CFF" />
+    <Label id="gMax" translation="[1052, 196]" width="300" color="0xEDE6CAFF" />
+    <Label id="gText" translation="[1020, 640]" width="800" wrap="true" color="0xB5AF8CFF" />
+    <Label id="note" translation="[1020, 860]" width="800" wrap="true" color="0xE0B34AFF" />
+    <Timer id="enableTimer" duration="3" repeat="false" />
+  </children>
+  <interface>
+    <field id="request" type="assocarray" alwaysNotify="true" />
+    <function name="onShown" />
+  </interface>
+  <script type="text/brightscript" uri="pkg:/source/text.brs" />
+  <script type="text/brightscript" uri="pkg:/source/util.brs" />
+  <script type="text/brightscript" uri="pkg:/components/music/plex.brs" />
+  <script type="text/brightscript" uri="pkg:/components/music/musicui.brs" />
+  <script type="text/brightscript" uri="pkg:/components/music/ScheduleScreen.brs" />
+</component>

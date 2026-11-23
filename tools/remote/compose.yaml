@@ -13,6 +13,12 @@ services:
       WHISPER_PORT: "10300"
       WHISPER_LANG: en
       CERT_SAN: IP:192.168.254.41,DNS:localhost
+      PUBLIC_URL: http://192.168.254.41:8765
+      LASTFM_API_KEY: ${LASTFM_API_KEY:-}      # from the .env file next to this one (see README)
+      LASTFM_API_SECRET: ${LASTFM_API_SECRET:-}
+      MUSIC_ROOT: /volume1
     volumes:
-      - ./data:/data            # the self-made HTTPS certificate
+      - ./data:/data            # HTTPS certificate, lyrics cache, Last.fm session
+      - /volume1/music:/volume1/music:ro            # .lrc lyrics files next to songs
+      - /volume1/plex/plex/music:/volume1/plex/plex/music:ro
     restart: unless-stopped
