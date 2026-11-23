@@ -96,6 +96,8 @@ sub onCommand()
         moreLikeThis()
     else if cmd = "search"
         searchAndPlay(c)
+    else if cmd = "rate"
+        rateTrack(c.value)
     else if cmd = "love"
         lfmLove()
     else if cmd = "lfmReload"
@@ -422,6 +424,7 @@ sub playIndex(i as integer, startAt = 0 as float)
     m.audio.control = "stop"
     m.audio.content = c
     m.scrobbled = false
+    likedFrom(tr)
     if startAt = 0 then lfmTrackStart()
     if castActive()
         ' the speakers start this song now; the TV follows castDelay later, or keeps quiet
@@ -560,5 +563,52 @@ sub scrobble()
 end sub
 
 sub onReported(event as object)
+    hTaskFrom(event)
+end sub
+
+' ---------- like / dislike: saved as the song's Plex rating (Plexamp-style: like = 10, dislike = 2; pressing again clears) ----------
+sub likedFrom(tr as object)
+    r = tr.rating
+    v = ""
+    if r <> invalid and r >= 8 then v = "like"
+    if r <> invalid and r > 0 and r <= 2 then v = "dislike"
+    m.top.liked = v
+end sub
+
+sub rateTrack(which as dynamic)
+    tr = m.top.track
+    if tr = invalid or tr.id = invalid or tr.id = "" then return
+    if not pxReady()
+        say("Sign in to Plex first.")
+        return
+    end if
+    cur = m.top.liked
+    if which = cur
+        newRating = -1
+        newState = ""
+    else if which = "like"
+        newRating = 10
+        newState = "like"
+    else
+        newRating = 2
+        newState = "dislike"
+    end if
+    pxApi("/:/rate", { key: tr.id, identifier: "com.plexapp.plugins.library", rating: newRating.toStr() }, "onRated", "", "PUT")
+    q = m.top.queue
+    if q <> invalid and m.top.index < q.Count()
+        if newRating < 0 then q[m.top.index].rating = 0 else q[m.top.index].rating = newRating
+    end if
+    m.top.liked = newState
+    if newState = "like"
+        say("Liked " + tr.title)
+    else if newState = "dislike"
+        ' a dislike is also "not this one": skip it and keep it out for a month (as in the radio)
+        radioNope()
+    else
+        say("Rating cleared")
+    end if
+end sub
+
+sub onRated(event as object)
     hTaskFrom(event)
 end sub

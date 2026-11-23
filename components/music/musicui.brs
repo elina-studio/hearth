@@ -38,6 +38,7 @@ function muNow() as object
     sub2 = tr.artist
     if tr.album <> "" then sub2 = sub2 + "  ·  " + tr.album
     e = e + "  ·  " + (p.index + 1).toStr() + " OF " + p.queue.count().toStr()
+    if p.liked = "like" then e = e + "  ·  LIKED"
     return { eyebrow: e, title: tr.title, sub: sub2, track: tr }
 end function
 

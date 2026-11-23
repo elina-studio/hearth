@@ -29,6 +29,8 @@
     <field id="castCount" type="integer" value="0" />
     <field id="castDelay" type="float" value="1.5" />
     <!-- Last.fm (lastfm.brs): off | idle | now | counted | queued -->
+    <!-- Plex rating of this song: "like" (8 to 10 stars), "dislike" (up to 2), or "" -->
+    <field id="liked" type="string" value="" />
     <field id="lfmState" type="string" value="off" />
     <!-- a lyrics panel is open on this screen / found lyrics for this song (LyricsPanel) -->
     <field id="lyricsActive" type="boolean" value="false" />
