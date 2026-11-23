@@ -133,6 +133,17 @@ sub refresh(unused = invalid as dynamic)
     if m.rows.count() = 0 and m.tab = 0 then m.empty.text = "Loading your music" + Chr(8230)
     m.results = {}
     m.hubOrder = []
+    if m.rows.count() = 0
+        c = cacheRead("foryou")
+        if c <> invalid and c.results <> invalid and c.hubOrder <> invalid
+            m.results = c.results
+            m.hubOrder = c.hubOrder
+            build()
+            m.results = {}
+            m.hubOrder = []
+        end if
+    end if
+    m.builtOnce = false
     m.waiting = 3
     m.builtOnce = false
     m.buildTimer.control = "stop"
@@ -145,6 +156,13 @@ end sub
 sub arrived()
     m.waiting = m.waiting - 1
     if m.waiting <= 0 or m.builtOnce then build()
+    if m.waiting = 0 and m.failed = invalid
+        slim = {}
+        for each k in m.results
+            slim[k] = slimItems(m.results[k])
+        end for
+        cacheWrite("foryou", { hubOrder: m.hubOrder, results: slim })
+    end if
 end sub
 
 sub onBuildTimer()
@@ -269,7 +287,17 @@ sub loadLib(kind as string)
         m.empty.text = "Sign in to Plex first."
         return
     end if
-    m.empty.text = "Loading" + Chr(8230)
+    c = cacheRead(kind)
+    if c <> invalid and c.items <> invalid
+        lib = { cards: [], index: 0, note: "", starts: c.starts }
+        for each md in c.items
+            lib.cards.push(pxCard(md, 180))
+        end for
+        m.lib[kind] = lib
+        if m.tabDefs[m.tab][1] = kind then showTab(m.tab)
+    else
+        m.empty.text = "Loading" + Chr(8230)
+    end if
     if kind = "playlists"
         pxApi("/playlists", { playlistType: "audio" }, "onLib", kind)
         return
@@ -283,15 +311,23 @@ sub onLib(event as object)
     t = hTaskFrom(event)
     kind = t.tag
     cards = []
-    for each md in pxItems(t)
+    items = pxItems(t)
+    for each md in items
         cards.push(pxCard(md, 180))
     end for
+    if t.ok and items.Count() > 0
+        if m.pendingCache = invalid then m.pendingCache = {}
+        m.pendingCache[kind] = slimItems(items)
+        saveLib(kind)
+    end if
     note = ""
     if not t.ok then note = "Couldn't load from Plex (error " + t.status.toStr() + ")." else if cards.Count() = 0 then note = "Nothing here yet."
     lib = m.lib[kind]
     if lib = invalid then lib = { starts: invalid }
+    keepIndex = 0
+    if lib.index <> invalid and lib.index < cards.Count() then keepIndex = lib.index
     lib.cards = cards
-    lib.index = 0
+    lib.index = keepIndex
     lib.note = note
     m.lib[kind] = lib
     if m.tabDefs[m.tab][1] = kind then showTab(m.tab)
@@ -317,7 +353,20 @@ sub onLetters(event as object)
     if lib = invalid then lib = { cards: invalid, index: 0, note: "" }
     lib.starts = starts
     m.lib[kind] = lib
+    if m.startsCache = invalid then m.startsCache = {}
+    m.startsCache[kind] = starts
+    saveLib(kind)
     paint()
+end sub
+
+' once both the list and its letters are in, keep them for next time
+sub saveLib(kind as string)
+    if m.pendingCache = invalid or m.pendingCache[kind] = invalid then return
+    starts = invalid
+    if m.startsCache <> invalid then starts = m.startsCache[kind]
+    if kind <> "playlists" and starts = invalid then return
+    cacheWrite(kind, { items: m.pendingCache[kind], starts: starts })
+    m.pendingCache.Delete(kind)
 end sub
 
 function curLib() as object
@@ -590,3 +639,34 @@ sub contentKey(key as string)
     lib = curLib()
     if lib <> invalid then lib.index = m.grid.index
 end sub
+
+' ---------- cache: the room draws what it showed last time at once, then refreshes from Plex ----------
+' Kept in cachefs: (survives restarts when the TV has room), falling back to tmp: (this session only).
+function cachePath(name as string) as string
+    return "cachefs:/hearth-music-" + muPlayer().section + "-" + name + ".json"
+end function
+
+function slimItems(items as object) as object
+    out = []
+    for each md in items
+        o = {}
+        for each k in ["type", "title", "ratingKey", "parentRatingKey", "parentTitle", "thumb", "composite", "leafCount"]
+            if md[k] <> invalid then o[k] = md[k]
+        end for
+        out.push(o)
+    end for
+    return out
+end function
+
+sub cacheWrite(name as string, data as object)
+    text = FormatJson(data)
+    if text = "" then return
+    if not WriteAsciiFile(cachePath(name), text) then WriteAsciiFile("tmp:/" + Mid(cachePath(name), 10), text)
+end sub
+
+function cacheRead(name as string) as object
+    text = ReadAsciiFile(cachePath(name))
+    if text = "" then text = ReadAsciiFile("tmp:/" + Mid(cachePath(name), 10))
+    if text = "" then return invalid
+    return ParseJson(text)
+end function

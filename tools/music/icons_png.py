@@ -3,5 +3,5 @@
 import os, json
 from icons import ICONS, svg
 here = os.path.dirname(os.path.abspath(__file__))
-pages = {n: f'<html><body style="margin:0;background:transparent">{svg(n,48,"#ffffff",2)}</body></html>' for n in ICONS}
+pages = {n: f'<html><body style="margin:0;background:transparent;color:#ffffff">{svg(n,48,"#ffffff",2)}</body></html>' for n in ICONS}
 json.dump(pages, open(os.path.join(here, 'icons.json'), 'w'))

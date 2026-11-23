@@ -32,7 +32,7 @@ sub runTask()
         xfer.setRequest(method)
         xfer.addHeader("Content-Type", "application/json")
         body = ""
-        if m.top.body <> invalid and m.top.body.Keys().Count() > 0 then body = FormatJson(m.top.body)
+        if m.top.bodyText <> invalid then body = m.top.bodyText
         started = xfer.AsyncPostFromString(body)
     end if
     status = 0

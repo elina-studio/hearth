@@ -1,5 +1,6 @@
 sub init()
     m.bg = m.top.findNode("bg")
+    m.rule = m.top.findNode("rule")
     m.artBg = m.top.findNode("artBg")
     m.art = m.top.findNode("art")
     m.eyebrow = m.top.findNode("eyebrow")
@@ -26,7 +27,33 @@ end sub
 sub build()
     m.chips.removeChildrenIndex(m.chips.getChildCount(), 0)
     m.grid = []
-    if m.top.layout = "big"
+    m.rule.visible = false
+    if m.top.layout = "bar"
+        ' 1920 x 130 along the bottom of a screen
+        m.bg.visible = true
+        m.bg.width = 1920
+        m.bg.height = 130
+        m.bg.color = "0x141A11FF"
+        m.rule.visible = true
+        m.artSize = 100
+        place(m.artBg, [96, 15], 100, 100)
+        place(m.art, [96, 15], 100, 100)
+        x = 224
+        w = 560
+        setText(m.eyebrow, [x, 14], w, "caps", 22)
+        setText(m.title, [x, 40], w, "bold", 30)
+        setText(m.sub, [x, 80], w, "regular", 22)
+        m.barX = x
+        m.barW = w
+        m.track.translation = [x, 116]
+        m.fill.translation = [x, 116]
+        m.track.height = 6
+        m.fill.height = 6
+        setText(m.elapsed, [x + w + 16, 104], 120, "regular", 20)
+        m.total.visible = false
+        addRow([860, 23], [["prev", "", "prev"], ["play", "", "toggle"], ["next", "", "next"], ["shuffle", "", "shuffle"], ["repeat", "", "repeat"], ["", "", "sep"], ["expand", "Big view", "big"]], 0)
+        setText(m.chipName, [1560, 50], 300, "regular", 22)
+    else if m.top.layout = "big"
         m.bg.visible = false
         m.artSize = 600
         place(m.artBg, [96, 110], 600, 600)
@@ -66,8 +93,8 @@ sub build()
         m.fill.translation = [x, 652]
         setText(m.elapsed, [x, 668], 200, "regular", 24)
         setText(m.total, [x + w - 200, 668], 200, "regular", 24)
-        addRow([x, 714], [["prev", "", "prev"], ["play", "", "toggle"], ["next", "", "next"], ["expand", "Big view", "big"]], 0)
-        addRow([x, 812], [["shuffle", "", "shuffle"], ["repeat", "", "repeat"], ["cover", "", "cover"], ["viz", "", "milk"], ["fire", "", "hearth"]], 1)
+        addRow([x, 714], [["prev", "", "prev"], ["play", "", "toggle"], ["next", "", "next"]], 0)
+        addRow([x, 812], [["shuffle", "", "shuffle"], ["repeat", "", "repeat"], ["cover", "", "cover"], ["viz", "", "milk"], ["fire", "", "hearth"], ["expand", "", "big"]], 1)
         setText(m.chipName, [x, 888], w, "regular", 22)
     end if
     m.track.width = m.barW
@@ -83,7 +110,12 @@ end sub
 
 sub setText(l as object, xy as object, w as integer, kind as string, size as integer)
     l.translation = xy
-    l.width = w
+    if l.subtype() = "ScrollingLabel"
+        l.maxWidth = w
+        l.height = size + 12
+    else
+        l.width = w
+    end if
     l.font = hFont(kind, size)
 end sub
 
@@ -161,6 +193,7 @@ sub showTime()
     if d > 0 then m.fill.width = m.barW * p.position / d else m.fill.width = 0
     m.elapsed.text = pxClock(p.position)
     m.total.text = pxClock(d)
+    if m.top.layout = "bar" then m.elapsed.text = pxClock(p.position) + " / " + pxClock(d)
 end sub
 
 sub paint()
