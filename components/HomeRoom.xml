@@ -14,8 +14,8 @@
       </MaskGroup>
 
       <Label id="greeting" translation="[96, 0]" visible="false" color="0xD9A066FF" />
-      <Label id="heroEyebrow" translation="[136, 20]" width="1300" color="0xE0B34AFF" />
-      <Label id="heroTitle" translation="[136, 48]" width="1300" maxLines="1" color="0xEDE6CAFF" />
+      <Label id="heroEyebrow" translation="[136, 20]" width="600" color="0xE0B34AFF" />
+      <Label id="heroTitle" translation="[136, 48]" width="700" maxLines="1" color="0xEDE6CAFF" />
       <Group id="heroProgress" translation="[136, 136]">
         <Rectangle width="300" height="6" color="0xFFFFFF26" />
         <Rectangle id="heroBar" width="0" height="6" color="0xE0B34AFF" />
@@ -24,11 +24,21 @@
       <Group id="buttons" translation="[136, 164]" />
 
       <!-- which of the 3 Continue items is showing -->
-      <Group id="pager" translation="[0, 206]">
+      <Group id="pager" translation="[0, 24]">
         <Poster id="pgLeft" uri="pkg:/images/icons/home-left.png" width="30" height="30" blendColor="0xB5AF8CFF" />
         <Group id="dots" />
         <Poster id="pgRight" uri="pkg:/images/icons/home-right.png" width="30" height="30" blendColor="0xB5AF8CFF" />
         <Label id="pgText" height="30" vertAlign="center" color="0xB5AF8CFF" />
+      </Group>
+
+
+      <!-- Tonight: three picks (a short episode, a film, a playlist) inline with Continue, right of a thin divider -->
+      <Group id="tonight" translation="[870, 0]" visible="false">
+        <Poster uri="pkg:/images/tile-v2.9.png" blendColor="0x0B0E09C8" translation="[-44, 6]" width="1002" height="238" />
+        <Poster uri="pkg:/images/icons/icon-moon.png" translation="[0, 12]" width="28" height="28" blendColor="0xE0B34AFF" />
+        <Label id="tnTitle" translation="[42, 6]" height="40" vertAlign="center" color="0xEDE6CAFF" text="Tonight" />
+        <Label id="tnNote" translation="[608, 10]" width="300" height="32" vertAlign="center" horizAlign="right" color="0xB5AF8CFF" />
+        <Group id="tnCards" translation="[0, 58]" />
       </Group>
 
       <!-- Now playing -->

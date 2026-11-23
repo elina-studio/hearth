@@ -42,6 +42,7 @@ sub init()
     end for
 
     buildButtons()
+    buildTonight()
     buildMoods()
     buildReqLines()
 
@@ -52,6 +53,11 @@ sub init()
     m.heroIndex = 0
     m.heroItems = []
     m.offline = false
+    m.tn = 0
+    m.tBump = 0
+    m.tMovies = []
+    m.tLists = []
+    m.tData = []
     m.resume = []
     m.next = []
     m.new = []
@@ -65,6 +71,179 @@ sub init()
     showGreeting()
     showMusic()
     refresh(invalid)
+end sub
+
+' ---------- Tonight: a short episode, a film and a playlist picked for the time of day ----------
+sub buildTonight()
+    m.tCards = []
+    m.top.findNode("tnTitle").font = hFont("fell", 34)
+    m.top.findNode("tnNote").font = hFont("regular", 20)
+    holder = m.top.findNode("tnCards")
+    icons = ["episode", "film", "home-note"]
+    for i = 0 to 2
+        g = holder.createChild("Group")
+        g.translation = [i * 316, 0]
+        back = g.createChild("Rectangle")
+        back.width = 296
+        back.height = 90
+        back.color = "0x1C2418FF"
+        art = g.createChild("Poster")
+        art.width = 296
+        art.height = 90
+        art.loadDisplayMode = "scaleToZoom"
+        ic = g.createChild("Poster")
+        ic.uri = "pkg:/images/icons/" + icons[i] + ".png"
+        ic.width = 22
+        ic.height = 22
+        ic.translation = [0, 102]
+        ic.blendColor = "0xE0B34AFF"
+        kick = g.createChild("Label")
+        kick.font = hFont("caps", 17)
+        kick.translation = [30, 100]
+        kick.height = 26
+        kick.vertAlign = "center"
+        kick.color = "0xE0B34AFF"
+        ttl = g.createChild("Label")
+        ttl.font = hFont("bold", 24)
+        ttl.translation = [0, 128]
+        ttl.width = 296
+        ttl.maxLines = 1
+        ttl.color = "0xEDE6CAFF"
+        ring = g.createChild("Poster")
+        ring.uri = "pkg:/images/ring" + hVar(i + 2) + ".9.png"
+        ring.blendColor = "0xD9A066FF"
+        ring.translation = [-10, -10]
+        ring.width = 316
+        ring.height = 176
+        ring.visible = false
+        g.addFields({ art: art, kick: kick, ttl: ttl, ring: ring })
+        g.visible = false
+        m.tCards.push(g)
+    end for
+end sub
+
+sub onTonightMovies(event as object)
+    t = hTaskFrom(event)
+    m.tMovies = []
+    if t.ok and t.response.Items <> invalid then m.tMovies = t.response.Items
+    pickTonight()
+end sub
+
+sub onTonightLists(event as object)
+    t = hTaskFrom(event)
+    m.tLists = pxItems(t)
+    pickTonight()
+end sub
+
+function tnMinutes(item as object) as integer
+    if item = invalid or item.RunTimeTicks = invalid then return 0
+    return Int(item.RunTimeTicks / 600000000)
+end function
+
+function tnLen(min as integer) as string
+    if min >= 60
+        r = min mod 60
+        if r = 0 then return Int(min / 60).toStr() + " h"
+        return Int(min / 60).toStr() + " h " + r.toStr()
+    end if
+    return min.toStr() + " min"
+end function
+
+function tnPlayed(item as object) as boolean
+    return item.UserData <> invalid and item.UserData.Played = true
+end function
+
+' One pick of each kind. Time of day sets the length budget; the date and time bucket seed the choice, so the
+' same three stay all evening and change tomorrow.
+sub pickTonight()
+    t = CreateObject("roDateTime")
+    t.toLocalTime()
+    h = t.getHours()
+    dow = t.getDayOfWeek()
+    late = (h >= 22 or h < 5)
+    bucket = 0
+    note = "Morning"
+    if late
+        bucket = 3
+        note = "Late evening"
+    else if h >= 17
+        bucket = 2
+        note = "Evening"
+    else if h >= 11
+        bucket = 1
+        note = "Afternoon"
+    end if
+    epMax = 45
+    if bucket = 2 then epMax = 35
+    if late then epMax = 25
+    movieMax = 180
+    if late or (bucket = 2 and dow <= 4) then movieMax = 100
+    seed = t.getYear() * 372 + t.getMonth() * 31 + t.getDayOfMonth() + bucket * 7 + m.tBump
+
+    out = []
+    ' a short episode: next up, unwatched, within the budget (else the shortest one there is)
+    c = []
+    shortest = invalid
+    for each it in m.next
+        mins = tnMinutes(it)
+        if it.Type = "Episode" and mins > 0 and not tnPlayed(it)
+            if mins <= epMax then c.push(it)
+            if shortest = invalid or mins < tnMinutes(shortest) then shortest = it
+        end if
+    end for
+    if c.count() = 0 and shortest <> invalid then c.push(shortest)
+    if c.count() > 0
+        it = c[seed mod c.count()]
+        card = hCard(it, "wide")
+        out.push({ kind: "ep", item: it, title: card.title, kick: "A QUICK ONE · " + UCase(tnLen(tnMinutes(it))), image: card.image })
+    end if
+    ' a film that fits tonight
+    c = []
+    for each it in m.tMovies
+        mins = tnMinutes(it)
+        if it.Type = "Movie" and mins > 0 and mins <= movieMax and not tnPlayed(it) then c.push(it)
+    end for
+    if c.count() > 0
+        it = c[(seed * 3 + 1) mod c.count()]
+        card = hCard(it, "wide")
+        out.push({ kind: "film", item: it, title: card.title, kick: "A FILM · " + UCase(tnLen(tnMinutes(it))), image: card.image })
+    end if
+    ' a playlist: calm ones for evening and late
+    c = []
+    calm = []
+    rx = CreateObject("roRegex", "calm|quiet|soft|sleep|wind|chill|night|evening|ambient|relax|mellow|lull", "i")
+    for each md in m.tLists
+        if md.leafCount <> invalid and md.leafCount > 0
+            c.push(md)
+            if rx.isMatch(pxStr(md.title)) then calm.push(md)
+        end if
+    end for
+    if bucket >= 2 and calm.count() > 0 then c = calm
+    if c.count() > 0
+        md = c[(seed * 5 + 2) mod c.count()]
+        mins = 0
+        if md.duration <> invalid then mins = Int(md.duration / 60000)
+        k = "A PLAYLIST"
+        if mins > 0 then k = k + " · " + UCase(tnLen(mins))
+        th = md.composite
+        if th = invalid then th = md.thumb
+        out.push({ kind: "list", item: md, title: pxStr(md.title), kick: k, image: pxImage(th, 300, 300) })
+    end if
+    m.tData = out
+    m.top.findNode("tnNote").text = note
+    for i = 0 to 2
+        g = m.tCards[i]
+        if i < out.count()
+            g.art.uri = out[i].image
+            g.kick.text = out[i].kick
+            g.ttl.text = out[i].title
+            g.visible = true
+        else
+            g.visible = false
+        end if
+    end for
+    m.top.findNode("tonight").visible = out.count() > 0
+    if m.tn >= out.count() then m.tn = 0
 end sub
 
 ' ---------- hero buttons ----------
@@ -369,7 +548,9 @@ sub refresh(unused as dynamic)
     if libs <> invalid
         if libs.music <> invalid then hPlex("latest", { section: libs.music, limit: 16 }, "onMusicRow")
         if libs.photos <> invalid then hPlex("latest", { section: libs.photos, limit: 16 }, "onPhotoRow")
+        if libs.movies <> invalid then hPlex("latest", { section: libs.movies, limit: 60 }, "onTonightMovies")
     end if
+    pxApi("/playlists", { playlistType: "audio" }, "onTonightLists", "tonight")
 end sub
 
 sub onMusicRow(event as object)
@@ -417,6 +598,7 @@ sub onNextUp(event as object)
     if t.ok then m.next = t.response.Items
     fillRow(m.nextUp, m.next)
     pickHero()
+    pickTonight()
 end sub
 
 sub onLatest(event as object)
@@ -541,15 +723,12 @@ sub showPager()
         x = x + d.width + 12
     end for
     nxt = m.heroItems[(m.heroIndex + 1) mod n].item
-    m.pgText.text = (m.heroIndex + 1).toStr() + " of " + n.toStr() + " · next: " + hTitle(nxt)
-    ' lay out right to left so the line ends at the right margin
-    tw = Int(m.pgText.localBoundingRect().width)
-    right = 1794
-    m.pgText.translation = [right - tw, 0]
-    m.top.findNode("pgRight").translation = [right - tw - 44, 0]
+    ' just the dots now (the Tonight picks sit to the right): they end at the divider
+    m.pgText.visible = false
+    m.top.findNode("pgRight").visible = false
+    m.top.findNode("pgLeft").visible = false
     dw = x - 12
-    m.dots.translation = [right - tw - 58 - dw, 0]
-    m.top.findNode("pgLeft").translation = [right - tw - 72 - dw - 30, 0]
+    m.dots.translation = [776 - dw, 0]
 end sub
 
 sub stepHero(d as integer)
@@ -589,6 +768,9 @@ sub paint()
         m.mRings[i].visible = focused and m.zone = "dash" and m.dash = i
     end for
     m.reqRing.visible = focused and m.zone = "dash" and m.dash = 3
+    for i = 0 to 2
+        m.tCards[i].ring.visible = focused and m.zone = "tonight" and m.tn = i
+    end for
     for i = 0 to 3
         m.moodRings[i].visible = focused and m.zone = "dash" and m.dash = i + 4
     end for
@@ -636,6 +818,15 @@ sub activate()
         else
             m.top.request = { action: "details", item: item }
         end if
+    else if m.zone = "tonight"
+        if m.tn >= m.tData.count() then return
+        d = m.tData[m.tn]
+        if d.kind = "list"
+            mp = m.global.music
+            if mp <> invalid then mp.command = { cmd: "playContainer", kind: "playlist", id: pxStr(d.item.ratingKey), shuffle: false, label: d.title }
+        else
+            m.top.request = { action: "play", item: d.item, resume: true }
+        end if
     else if m.zone = "dash"
         if m.dash = 0
             musicCommand("prev")
@@ -668,6 +859,7 @@ end sub
 
 function focusedItem() as dynamic
     if m.zone = "hero" and m.heroItems.count() > 0 then return m.heroItems[m.heroIndex].item
+    if m.zone = "tonight" and m.tn < m.tData.count() and m.tData[m.tn].kind <> "list" then return m.tData[m.tn].item
     if m.zone = "rows"
         card = m.rows[m.row].callFunc("current", invalid)
         if card <> invalid then return card.item
@@ -683,10 +875,24 @@ sub moveSide(d as integer)
             stepHero(-1)
             m.btn = 0
         else if i >= n
-            stepHero(1)
-            m.btn = 0
+            if m.heroIndex >= m.heroItems.count() - 1 and m.tData.count() > 0
+                m.zone = "tonight"
+                m.tn = 0
+            else
+                stepHero(1)
+                m.btn = 0
+            end if
         else
             m.btn = i
+        end if
+    else if m.zone = "tonight"
+        i = m.tn + d
+        if i < 0
+            m.zone = "hero"
+            m.btn = buttonCount() - 1
+            if m.btn < 0 then m.btn = 0
+        else if i < m.tData.count()
+            m.tn = i
         end if
     else if m.zone = "dash"
         x = m.dash
@@ -708,7 +914,7 @@ sub moveSide(d as integer)
 end sub
 
 sub moveUp()
-    if m.zone = "hero"
+    if m.zone = "hero" or m.zone = "tonight"
         hideFocus()
         m.top.request = { action: "pills" }
         return
@@ -730,7 +936,7 @@ sub moveUp()
 end sub
 
 sub moveDown()
-    if m.zone = "hero"
+    if m.zone = "hero" or m.zone = "tonight"
         m.zone = "dash"
     else if m.zone = "dash"
         if m.dash = 4 or m.dash = 5
@@ -806,6 +1012,9 @@ sub hideFocus()
         r.visible = false
     end for
     m.reqRing.visible = false
+    for each c in m.tCards
+        c.ring.visible = false
+    end for
     for each r in m.moodRings
         r.visible = false
     end for
