@@ -9,7 +9,6 @@ sub init()
         { key: "fav", icon: "star" },
         { key: "photoSeconds", icon: "timer", values: ["5", "8", "15", "30"], texts: ["5 s", "8 s", "15 s", "30 s"], fallback: "8" },
         { key: "photoOrder", icon: "shuffle", values: ["shuffle", "order"], texts: ["Shuffle", "Oldest first"], fallback: "shuffle" },
-        { key: "photoPan", icon: "pan", values: ["on", "off"], texts: ["Pan on", "Pan off"], fallback: "on" },
         { key: "photoSaver", icon: "moon", values: ["", "this"], texts: ["Saver off", "Saver on"], fallback: "" }
     ]
     m.sel = 0

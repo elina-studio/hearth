@@ -1,5 +1,6 @@
-' The Window. One photo at a time with a slow pan and zoom, crossfading every few seconds.
-' Left/Right step through photos, OK pauses, ✱ opens the options panel, Back closes.
+' The Window. One photo at a time, crossfading every few seconds.
+' Left/Right step through photos, OK pauses, Down or ✱ opens the options card, Back closes.
+' Photos stay still (no pan and zoom) and crossfade softly.
 ' Play, Rewind and Fast forward stay with the music.
 sub init()
     m.layers = [
@@ -37,9 +38,6 @@ sub init()
     m.fade = m.top.findNode("fade")
     m.fadeIn = m.top.findNode("fadeIn")
     m.fadeOut = m.top.findNode("fadeOut")
-    m.panAnim = m.top.findNode("panAnim")
-    m.panScale = m.top.findNode("panScale")
-    m.panMove = m.top.findNode("panMove")
     m.advance = m.top.findNode("advance")
     m.advance.observeField("fire", "onAdvance")
     m.loadTimeout = m.top.findNode("loadTimeout")
@@ -95,11 +93,10 @@ sub applyPrefs()
     if m.seconds < 3 then m.seconds = 8
     m.advance.duration = m.seconds
     m.order = pPref("photoOrder", "shuffle")
-    m.pan = (pPref("photoPan", "on") = "on")
 end sub
 
 function normalHint() as object
-    return [{ icon: "lr", label: "Photos" }, { text: "OK", label: "Pause" }, { icon: "asterisk", label: "Options" }, { icon: "back", label: "Back" }]
+    return [{ icon: "lr", label: "Photos" }, { text: "OK", label: "Pause" }, { icon: "down", label: "Options" }, { icon: "back", label: "Back" }]
 end function
 
 ' ---------- photos ----------
@@ -206,8 +203,6 @@ sub load(slide as object)
     m.advance.control = "stop"
     m.pending = slide
     L = m.layers[1 - m.front]
-    L.pan.scale = [1.0, 1.0]
-    L.pan.translation = [0, 0]
     url = pPhotoUrl(slide.items[0], 1280, 720)
     m.need = 0
     m.expect = {}
@@ -305,7 +300,6 @@ sub reveal()
     m.fadeOut.keyValue = [outgoing.group.opacity, 0.0]
     m.fade.control = "start"
     m.front = 1 - m.front
-    startPan(incoming)
     if m.back = 0 and (m.history.count() = 0 or m.history.peek().Id <> m.pending.Id) then m.history.push(m.pending)
     if m.history.count() > 50 then m.history.shift()
     m.caption.text = slideCaption(m.pending)
@@ -340,19 +334,6 @@ end function
 
 sub showStar()
     if slideFav(m.pending) then m.star.text = "★ FAVOURITE" else m.star.text = ""
-end sub
-
-' Slow drift in one of four directions, lasting the photo's whole time on screen
-sub startPan(layer as object)
-    m.panAnim.control = "stop"
-    if not m.pan then return
-    dirs = [[-30, -16], [30, -16], [-30, 16], [30, 16]]
-    m.panScale.fieldToInterp = layer.panName + ".scale"
-    m.panMove.fieldToInterp = layer.panName + ".translation"
-    m.panMove.keyValue = [[0, 0], dirs[Rnd(4) - 1]]
-    m.panAnim.duration = m.seconds + 1.5
-    m.panAnim.control = "start"
-    if m.paused then m.panAnim.control = "pause"
 end sub
 
 sub onAdvance()
@@ -413,7 +394,6 @@ end sub
 ' ---------- options panel (✱) ----------
 sub openOptions()
     m.advance.control = "stop"
-    m.panAnim.control = "pause"
     m.captionGroup.visible = false
     m.hint.visible = false
     o = CreateObject("roSGNode", "PhotoOptions")
@@ -447,7 +427,6 @@ sub onOptionChanged(event as object)
         m.reorder = true
     end if
     applyPrefs()
-    if not m.pan then m.panAnim.control = "stop"
 end sub
 
 sub onRated(event as object)
@@ -472,10 +451,7 @@ sub closeOptions()
         m.next = 0
         m.back = 0
     end if
-    if not m.paused
-        if m.pan then m.panAnim.control = "resume"
-        if not m.loading then m.advance.control = "start"
-    end if
+    if not m.paused and not m.loading then m.advance.control = "start"
 end sub
 
 ' ---------- keys ----------
@@ -492,11 +468,9 @@ sub setPaused(p as boolean)
     m.pausedBadge.visible = p
     if p
         m.advance.control = "stop"
-        m.panAnim.control = "pause"
-        showHint([{ icon: "lr", label: "Photos" }, { text: "OK", label: "Resume" }, { icon: "asterisk", label: "Options" }, { icon: "back", label: "Back" }])
+        showHint([{ icon: "lr", label: "Photos" }, { text: "OK", label: "Resume" }, { icon: "down", label: "Options" }, { icon: "back", label: "Back" }])
     else
         showHint(normalHint())
-        if m.pan then m.panAnim.control = "resume"
         if not m.loading then showNext()
     end if
 end sub
@@ -515,9 +489,9 @@ function onKeyEvent(key as string, press as boolean) as boolean
         showHint(normalHint())
     else if key = "OK"
         setPaused(not m.paused)
-    else if key = "options"
+    else if key = "options" or key = "down"
         openOptions()
-    else if key = "up" or key = "down"
+    else if key = "up"
         showHint(normalHint())
         m.captionGroup.opacity = 1.0
         m.captionFade.control = "stop"
@@ -532,7 +506,6 @@ sub cleanup()
     m.advance.control = "stop"
     m.clockTimer.control = "stop"
     m.weatherTimer.control = "stop"
-    m.panAnim.control = "stop"
     mp = m.global.music
     if mp <> invalid
         mp.unobserveField("state")

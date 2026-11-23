@@ -47,13 +47,9 @@
     </Group>
     <Group id="optionsHolder" />
 
-    <Animation id="fade" duration="1.5" easeFunction="inOutQuad">
+    <Animation id="fade" duration="2" easeFunction="inOutQuad">
       <FloatFieldInterpolator id="fadeIn" key="[0.0, 1.0]" keyValue="[0.0, 1.0]" fieldToInterp="layerA.opacity" />
       <FloatFieldInterpolator id="fadeOut" key="[0.0, 1.0]" keyValue="[1.0, 0.0]" fieldToInterp="layerB.opacity" />
-    </Animation>
-    <Animation id="panAnim" duration="10" easeFunction="linear">
-      <Vector2DFieldInterpolator id="panScale" key="[0.0, 1.0]" keyValue="[[1.0, 1.0], [1.08, 1.08]]" fieldToInterp="panA.scale" />
-      <Vector2DFieldInterpolator id="panMove" key="[0.0, 1.0]" keyValue="[[0, 0], [-30, -16]]" fieldToInterp="panA.translation" />
     </Animation>
     <Animation id="captionFade" duration="0.8" delay="5">
       <FloatFieldInterpolator key="[0.0, 1.0]" keyValue="[1.0, 0.0]" fieldToInterp="captionGroup.opacity" />
