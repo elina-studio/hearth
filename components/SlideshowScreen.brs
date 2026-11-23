@@ -525,7 +525,7 @@ function onKeyEvent(key as string, press as boolean) as boolean
 end function
 
 sub cleanup()
-    m.top.findNode("lyrics").callFunc("stop", invalid)
+    m.top.findNode("lyrics").callFunc("lyricsStop", invalid)
     m.advance.control = "stop"
     m.clockTimer.control = "stop"
     m.weatherTimer.control = "stop"

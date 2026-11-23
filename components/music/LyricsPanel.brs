@@ -54,7 +54,7 @@ sub start(unused as dynamic)
     onTrack()
 end sub
 
-sub stop(unused as dynamic)
+sub lyricsStop(unused as dynamic)
     p = m.global.music
     p.unobserveFieldScoped("track")
     p.unobserveFieldScoped("position")

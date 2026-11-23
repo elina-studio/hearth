@@ -61,7 +61,7 @@ sub onMode()
     end if
     ' lyrics sit over the visualizer and the fire, not over the big cover
     if mode = "cover"
-        m.lyrics.callFunc("stop", invalid)
+        m.lyrics.callFunc("lyricsStop", invalid)
         m.lyrics.visible = false
     else
         m.lyrics.callFunc("start", invalid)
@@ -233,7 +233,7 @@ sub muRestoreFocus()
 end sub
 
 sub leave()
-    m.lyrics.callFunc("stop", invalid)
+    m.lyrics.callFunc("lyricsStop", invalid)
     if m.sound <> invalid
         m.sound.on = false
         m.sound.active = false

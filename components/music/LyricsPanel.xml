@@ -3,7 +3,7 @@
      Five lines: the current one in gold, two before and two after, dimmer. Time-coded lyrics follow the song (plus a timing
      nudge, which also helps when speakers play along); plain lyrics scroll in step with the song's progress.
      Found by the NAS helper (.lrc next to the song, then LRCLIB) via GET /api/lyrics. Hidden when a song has none.
-     The parent calls stop() when it leaves, toggle() to show/hide, nudge(seconds). -->
+     The parent calls lyricsStop() when it leaves, toggle() to show/hide, nudge(seconds). -->
 <component name="LyricsPanel" extends="Group">
   <children>
     <Poster id="bg" uri="pkg:/images/w/panel-v4.9.png" translation="[-12, -12]" width="784" height="434" blendColor="0x0B0E09C8" />
@@ -15,7 +15,7 @@
     <field id="active" type="boolean" value="true" />
     <field id="found" type="boolean" value="false" alwaysNotify="true" />
     <function name="start" />
-    <function name="stop" />
+    <function name="lyricsStop" />
     <function name="toggle" />
     <function name="nudge" />
     <function name="isOn" />
