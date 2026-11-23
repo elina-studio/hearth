@@ -29,6 +29,7 @@
     </Group>
     <SideSheet id="sheet" />
     <SubsFinder id="finder" />
+    <SubsAuto id="auto" />
     <Timer id="seasonWait" duration="0.35" />
     <Timer id="later" duration="6" />
     <Animation id="scroll" duration="0.22" easeFunction="outQuad">

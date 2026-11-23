@@ -16,7 +16,7 @@ sub init()
     m.note = m.top.findNode("note")
     m.note.font = hFont("regular", 23)
     m.hint = m.top.findNode("hint")
-    m.hint.font = hFont("regular", 20)
+    m.hintKey = ""
     m.poll = m.top.findNode("poll")
     m.poll.observeField("fire", "onPoll")
 
@@ -55,7 +55,7 @@ sub init()
     m.pitch = 116
     m.visibleRows = 5
     m.rowNodes = []
-    for i = 0 to m.visibleRows - 1
+    for i = 0 to 5
         g = m.list.createChild("Group")
         g.translation = [0, i * m.pitch]
         ring = g.createChild("Poster")
@@ -147,7 +147,7 @@ sub loadTracks()
     part = m.item._media[0].Part[0]
     if part = invalid or part.Stream = invalid then return
     for each s in part.Stream
-        if s.streamType = 3
+        if numOf(s.streamType) = 3
             name = strOf(s.displayTitle)
             if name = "" then name = strOf(s.language)
             if name = "" then name = "Unknown"
@@ -247,15 +247,18 @@ sub merge()
             if name = "" then name = "Subtitle"
             prov = strOf(s.providerTitle)
             if prov = "" then prov = "OpenSubtitles"
-            score = numOf(s.score)
-            ' Plex's scores aren't percentages (2895 for a good one), so they're not shown as a score
-            if score > 100 then score = -1
+            ' Plex's score is the download count on OpenSubtitles, like the Plex app shows
+            downloads = numOf(s.score)
             tags = []
+            if downloads >= 0 then tags.push("downloads")
             if isTrue(s.hearingImpaired) then tags.push("HI")
             if isTrue(s.forced) then tags.push("forced")
-            if isTrue(s.perfectMatch) then tags.push("exact match")
+            exact = isTrue(s.perfectMatch)
+            if exact then tags.unshift("exact match")
             if isTrue(s.downloaded) then tags.push("already here")
-            plex.push({ from: "plex", key: s.key, name: name, provider: "Plex · " + prov, score: score, tags: tags })
+            sortKey = downloads
+            if exact then sortKey = sortKey + 1000000000
+            plex.push({ from: "plex", key: s.key, name: name, provider: "Plex · " + prov, score: downloads, scoreText: fmtCount(downloads), sortKey: sortKey, tags: tags })
         end for
     end if
     bzTop = []
@@ -271,7 +274,7 @@ sub merge()
                 name = ""
                 if type(s.release_info) = "roArray" and s.release_info.count() > 0 then name = strOf(s.release_info[0])
                 if name = "" then name = "Subtitle from " + strOf(s.provider)
-                tags = []
+                tags = ["match"]
                 if hi then tags.push("HI")
                 if isTrue(s.forced) then tags.push("forced")
                 if type(s.matches) = "roArray"
@@ -282,13 +285,24 @@ sub merge()
                 end if
                 score = numOf(s.score)
                 if score < 0 then score = 0
-                r = { from: "bazarr", provider: s.provider, subtitle: s.subtitle, hi: s.hearing_impaired, forced: s.forced, name: name, score: score, tags: tags }
+                r = { from: "bazarr", provider: "Bazarr · " + strOf(s.provider), subtitle: s.subtitle, hi: s.hearing_impaired, forced: s.forced, name: name, score: score, scoreText: score.toStr() + "%", bar: score, tags: tags }
                 if score >= 90 then bzTop.push(r) else bzRest.push(r)
             end if
         end for
         bzTop.sortBy("score", "r")
         bzRest.sortBy("score", "r")
     end if
+    ' most downloaded first (exact matches for this file above all); the braid shows downloads against the top one
+    plex.sortBy("sortKey", "r")
+    top = 0
+    for each r in plex
+        if r.score > top then top = r.score
+    end for
+    for each r in plex
+        r.bar = 0
+        if top > 0 and r.score > 0 then r.bar = Int(r.score * 100 / top)
+        if r.score < 0 then r.scoreText = ""
+    end for
     m.results = []
     m.results.append(bzTop)
     m.results.append(plex)
@@ -360,10 +374,11 @@ sub onPolled(event as object)
     if not m.busy or not t.ok or t.response = invalid or t.response._media = invalid then return
     newest = invalid
     for each s in streamList(t.response)
-        if not m.before.doesExist(s.id.toStr())
-            lang = LCase(strOf(s.languageCode))
-            if newest = invalid or Left(lang, 2) = m.lang then newest = s
-        end if
+        isNew = not m.before.doesExist(strOf(s.id))
+        lang = LCase(strOf(s.languageCode))
+        print "[hearth-subs] poll: stream "; strOf(s.id); " "; lang; " "; strOf(s.codec); " key "; strOf(s.key); " new "; isNew; " "; strOf(s.displayTitle)
+        ' only a new subtitle in the language that was searched counts
+        if isNew and (Left(lang, 2) = m.lang or lang = "") then newest = s
     end for
     if newest = invalid then return
     m.poll.control = "stop"
@@ -393,6 +408,22 @@ sub onReloaded(event as object)
     t = hTaskFrom(event)
     if t.ok and t.response <> invalid and t.response._media <> invalid then m.item = t.response
     loadTracks()
+    ' Plex sometimes lists a fresh download a moment later; keep showing the one just turned on
+    if m.lastNew <> invalid
+        found = false
+        for each r in m.tracks
+            if r.stream <> invalid and strOf(r.stream.id) = strOf(m.lastNew.id) then found = true
+        end for
+        if not found
+            print "[hearth-subs] Plex's item doesn't list stream "; strOf(m.lastNew.id); " yet; keeping it in the list"
+            for each r in m.tracks
+                r.on = false
+            end for
+            nm = strOf(m.lastNew.displayTitle)
+            if nm = "" then nm = "Downloaded subtitle"
+            m.tracks.push({ kind: "track", stream: m.lastNew, name: nm, detail: "Just downloaded", on: true })
+        end if
+    end if
     paint()
 end sub
 
@@ -523,13 +554,24 @@ sub paint()
         end if
     end if
 
+    ' notes: errors, Bazarr setup, nothing found. With a note, one row fewer so it never runs into the hints.
+    note = ""
+    if m.message <> invalid and m.message <> "" then note = m.message
+    if m.tab = 1 and note = "" and m.bzDone and m.src <> "plex" and m.bzError <> ""
+        note = bazarrNote(m.bzError)
+    end if
+    if m.tab = 1 and note = "" and list.count() = 0 and m.plexDone and m.bzDone then note = "Nothing found in " + langName + ". Try another language or source."
+    m.visibleRows = 5
+    if note <> "" then m.visibleRows = 4
+    if m.tab = 0 and m.visibleRows = 5 then m.visibleRows = 6
+
     ' keep the focused row in view
     if m.sel < m.first then m.first = m.sel
     if m.sel > m.first + m.visibleRows - 1 then m.first = m.sel - m.visibleRows + 1
-    for i = 0 to m.visibleRows - 1
+    for i = 0 to m.rowNodes.count() - 1
         node = m.rowNodes[i]
         idx = m.first + i
-        if idx >= list.count()
+        if idx >= list.count() or i >= m.visibleRows
             node.g.visible = false
         else
             node.g.visible = true
@@ -559,9 +601,9 @@ sub paint()
                 if r.state <> invalid and r.state <> "" then tagText = UCase(r.state)
                 node.tags.text = tagText
                 if r.state <> invalid and r.state <> "" then node.tags.color = gold else node.tags.color = m.c.muted
-                if r.score >= 0
-                    node.score.text = r.score.toStr()
-                    hBraidSet(node.bar, r.score)
+                if strOf(r.scoreText) <> ""
+                    node.score.text = r.scoreText
+                    hBraidSet(node.bar, r.bar)
                 else
                     node.score.text = ""
                     node.bar.visible = false
@@ -570,25 +612,19 @@ sub paint()
         end if
     end for
 
-    ' notes: errors, Bazarr setup, nothing found
-    note = ""
-    if m.message <> invalid and m.message <> "" then note = m.message
-    if m.tab = 1 and note = "" and m.bzDone and m.src <> "plex" and m.bzError <> ""
-        note = bazarrNote(m.bzError)
-    end if
-    if m.tab = 1 and note = "" and list.count() = 0 and m.plexDone and m.bzDone then note = "Nothing found in " + langName + ". Try another language or source."
     m.note.text = note
     shown = list.count()
     if shown > m.visibleRows then shown = m.visibleRows
     m.note.translation = [1084, listTop + shown * m.pitch + 8]
     m.note.visible = (note <> "")
 
+    ' key hints with icons (the fonts have no arrow glyphs)
     if m.tab = 0
-        m.hint.text = "OK  Turn on      ▶  Find more      Back  Close"
+        hints([["ok", "Turn on"], ["right", "Find more"], ["back", "Close"]])
     else if m.zone = "chips"
-        m.hint.text = "OK  Change      ◀ ▶  Filters      ▼  Results"
+        hints([["ok", "Change"], ["lr", "Filters"], ["down", "Results"]])
     else
-        m.hint.text = "OK  Download and turn on      ◀  Back to the tracks"
+        hints([["ok", "Download and turn on"], ["left", "Back to the tracks"], ["back", "Close"]])
     end if
 end sub
 
@@ -604,7 +640,9 @@ function bazarrNote(err as string) as string
     else if err = "badkey"
         return "Bazarr said the key is wrong. Send it again with the curl command."
     else if err = "notfound"
-        return "Bazarr doesn't know this title (it only covers what Sonarr and Radarr manage)."
+        return "Bazarr doesn't have this title. It only covers shows in Sonarr and movies in Radarr."
+    else if err = "noepisode"
+        return "Bazarr has the show but not this episode's file yet. Sonarr may need a rescan."
     else if err = "unreachable"
         return "Couldn't reach Bazarr. Is it running?"
     end if
@@ -720,4 +758,58 @@ function strOf(v as dynamic) as string
     if v = invalid then return ""
     if t = "Integer" or t = "roInteger" or t = "LongInteger" or t = "Float" or t = "Double" or t = "Boolean" or t = "roBoolean" then return v.toStr()
     return ""
+end function
+
+' One row of key hints: [icon, words] pairs. icon: ok, left, right, lr, down, back.
+sub hints(list as object)
+    k = ""
+    for each h in list
+        k = k + h[0] + h[1] + "|"
+    end for
+    if k = m.hintKey then return
+    m.hintKey = k
+    m.hint.removeChildrenIndex(m.hint.getChildCount(), 0)
+    icons = { left: "home-left", right: "home-right", down: "home-down", back: "icon-back", lr: "icon-lr" }
+    for each h in list
+        if h[0] = "ok"
+            badge = m.hint.createChild("Group")
+            bg = badge.createChild("Poster")
+            bg.uri = "pkg:/images/w/chip.9.png"
+            bg.width = 46
+            bg.height = 30
+            bg.blendColor = m.c.muted
+            lb = badge.createChild("Label")
+            lb.width = 46
+            lb.height = 30
+            lb.horizAlign = "center"
+            lb.vertAlign = "center"
+            lb.font = hFont("bold", 18)
+            lb.color = m.c.goldInk
+            lb.text = "OK"
+        else
+            ic = m.hint.createChild("Poster")
+            ic.uri = "pkg:/images/icons/" + icons[h[0]] + ".png"
+            ic.width = 30
+            ic.height = 30
+            ic.blendColor = m.c.gold
+        end if
+        t = m.hint.createChild("Label")
+        t.font = hFont("regular", 20)
+        t.color = m.c.muted
+        t.height = 30
+        t.vertAlign = "center"
+        t.text = h[1]
+    end for
+end sub
+
+' 2895 -> "2,895"
+function fmtCount(n as integer) as string
+    if n < 0 then return ""
+    s = n.toStr()
+    out = ""
+    while Len(s) > 3
+        out = "," + Right(s, 3) + out
+        s = Left(s, Len(s) - 3)
+    end while
+    return s + out
 end function

@@ -116,21 +116,20 @@ function findIds(a as object) as object
     res = req("GET", "/api/series", { start: "0", length: "-1" }, "", 30000)
     if res.status = 401 then return { error: "badkey", status: 401 }
     if res.body = invalid or res.body.data = invalid then return { error: "unreachable", status: res.status }
-    plexPath = LCase(a.file)
+    ' each folder of the Plex path, simplified ("Supernatural (2005)" and "supernatural" both -> "supernatural")
+    segs = {}
+    for each seg in a.file.Replace("\", "/").split("/")
+        k = simple(seg)
+        if k <> "" then segs[k] = true
+    end for
+    want = simple(strOf(a.series))
     seriesId = invalid
     for each s in res.body.data
-        if s.path <> invalid
-            folder = LCase(baseName(s.path))
-            if folder <> "" and Instr(1, plexPath, "/" + folder + "/") > 0 then seriesId = s.sonarrSeriesId
-        end if
+        if s.path <> invalid and segs.doesExist(simple(baseName(s.path))) then seriesId = s.sonarrSeriesId
+        if seriesId = invalid and want <> "" and simple(strOf(s.title)) = want then seriesId = s.sonarrSeriesId
         if seriesId <> invalid then exit for
     end for
-    if seriesId = invalid
-        for each s in res.body.data
-            if s.title <> invalid and a.series <> invalid and LCase(s.title) = LCase(a.series) then seriesId = s.sonarrSeriesId
-            if seriesId <> invalid then exit for
-        end for
-    end if
+    print "[hearth-subs] Bazarr has "; res.body.data.count(); " shows; match for "; strOf(a.series); ": "; strOf(seriesId)
     if seriesId = invalid then return { error: "notfound", status: 404 }
     res = req("GET", "/api/episodes", { "seriesid[]": seriesId.toStr() }, "", 30000)
     if res.body = invalid or res.body.data = invalid then return { error: "unreachable", status: res.status }
@@ -140,7 +139,8 @@ function findIds(a as object) as object
     for each ep in res.body.data
         if sameNum(ep.season, a.season) and sameNum(ep.episode, a.episode) then return { kind: "episode", series: seriesId, episode: ep.sonarrEpisodeId }
     end for
-    return { error: "notfound", status: 404 }
+    print "[hearth-subs] Bazarr knows the show ("; res.body.data.count(); " episodes) but not this episode's file"
+    return { error: "noepisode", status: 404 }
 end function
 
 function missing(a as object) as object
@@ -330,4 +330,24 @@ end function
 function sameNum(a as dynamic, b as dynamic) as boolean
     x = numOf(a)
     return x >= 0 and x = numOf(b)
+end function
+
+' lower case letters and digits only, without a trailing "(2005)"
+function simple(v as string) as string
+    t = LCase(v)
+    r = CreateObject("roRegex", "\s*\(\d{4}\)\s*$", "")
+    t = r.Replace(t, "")
+    out = ""
+    for i = 1 to Len(t)
+        c = Mid(t, i, 1)
+        if (c >= "a" and c <= "z") or (c >= "0" and c <= "9") then out = out + c
+    end for
+    return out
+end function
+
+function strOf(v as dynamic) as string
+    t = type(v)
+    if t = "String" or t = "roString" then return v
+    if t = "Integer" or t = "roInteger" or t = "LongInteger" or t = "Float" or t = "Double" or t = "Boolean" or t = "roBoolean" then return v.toStr()
+    return ""
 end function

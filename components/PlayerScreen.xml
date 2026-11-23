@@ -12,6 +12,7 @@
     <PlayerSheet id="sheet" />
     <UpNextCard id="upnext" />
     <SubsFinder id="finder" context="player" />
+    <SubsAuto id="auto" />
   </children>
   <interface>
     <field id="item" type="assocarray" onChange="start" />

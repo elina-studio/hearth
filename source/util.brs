@@ -207,8 +207,11 @@ function hEscape(s as string) as string
 end function
 
 ' Captions preference shared by the CC buttons and the player: "on", "off", or "" (follow Plex's pick)
+' Subtitles are on by default (English, see components/subs/SubsAuto): "" means never set, so "on".
 function hCaptions() as string
-    return CreateObject("roRegistrySection", "hearth").Read("captions")
+    v = CreateObject("roRegistrySection", "hearth").Read("captions")
+    if v = "" then v = "on"
+    return v
 end function
 
 function hCaptionsOn() as boolean

@@ -22,6 +22,8 @@ sub init()
     m.finder.observeField("closed", "onFinderClosed")
     m.finder.observeField("result", "onFinderResult")
     m.reloadSubs = false
+    m.auto = m.top.findNode("auto")
+    m.auto.observeField("result", "onAutoSub")
     m.upnext = m.top.findNode("upnext")
     m.upnext.observeField("action", "onUpNextAction")
     m.video.observeField("position", "onPosition")
@@ -72,6 +74,9 @@ sub onItem(event as object)
     m.streams = hPlayStreams(part)
     m.decision = invalid
     uiOnItem(it)
+    ' no English subtitle yet: fetch the best one in the background and draw it once it arrives
+    m.auto.item = it
+    m.auto.callFunc("go", invalid)
     m.session = m.global.deviceId + "-" + Rnd(100000).toStr()
     hPlayLogCaps()
     chk = hPlayDirectCheck(media, m.streams)
@@ -381,6 +386,17 @@ sub onCaptionPicked()
         m.video.subtitleTrack = track
     end if
     m.top.setFocus(true)
+end sub
+
+' ---------- automatic English subtitles (components/subs/SubsAuto) ----------
+sub onAutoSub()
+    r = m.auto.result
+    if r = invalid or r.ok <> true or m.item = invalid or r.item = invalid or r.item.Id <> m.item.Id then return
+    if hCaptions() = "off" or m.subStream <> invalid or m.subApplied then return
+    print "[hearth-play] English subtitle fetched automatically; turning it on"
+    m.item = r.item
+    m.part = r.item._media[0].Part[0]
+    useHearthSub(r.stream)
 end sub
 
 ' ---------- subtitle finder (the * key) ----------

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Subtitles on by default, in English: when a title has no English text subtitle, quietly find the
+     best one (Plex's OpenSubtitles search: exact match, then most downloaded; Bazarr as a fallback),
+     download it, and pick it in Plex. Used by the details page (so it's ready before Play) and the player.
+     Host: set item (full Plex item with _media), then callFunc("go", invalid). Watch `result`:
+     { ok: true, stream } when a new one is on, { ok: false, why } otherwise. -->
+<component name="SubsAuto" extends="Node">
+  <interface>
+    <field id="item" type="assocarray" />
+    <field id="result" type="assocarray" alwaysNotify="true" />
+    <function name="go" />
+  </interface>
+  <script type="text/brightscript" uri="pkg:/source/util.brs" />
+  <script type="text/brightscript" uri="pkg:/components/playback.brs" />
+  <script type="text/brightscript" uri="pkg:/components/subs/SubsAuto.brs" />
+</component>

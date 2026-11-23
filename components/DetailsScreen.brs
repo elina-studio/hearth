@@ -109,6 +109,7 @@ sub onFull(event as object)
     else
         m.target = m.full
         m.targetFull = m.full
+        autoSubs()
         loadBazarrMovie()
     end if
     fillHeader()
@@ -121,6 +122,26 @@ sub onTargetFull(event as object)
     t = hTaskFrom(event)
     if not t.ok or t.response.Id = invalid then return
     m.targetFull = t.response
+    autoSubs()
+    fillHeader()
+    buildActions()
+end sub
+
+' Fetch an English subtitle ahead of Play when the title has none (components/subs/SubsAuto)
+sub autoSubs()
+    if m.auto = invalid
+        m.auto = m.top.findNode("auto")
+        m.auto.observeField("result", "onAutoSub")
+    end if
+    m.auto.item = m.targetFull
+    m.auto.callFunc("go", invalid)
+end sub
+
+sub onAutoSub()
+    r = m.auto.result
+    if r = invalid or r.ok <> true or r.item = invalid or m.targetFull = invalid or r.item.Id <> m.targetFull.Id then return
+    m.targetFull = r.item
+    if not m.isShow then m.full = r.item
     fillHeader()
     buildActions()
 end sub
