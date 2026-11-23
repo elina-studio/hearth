@@ -126,8 +126,14 @@ sub onWindowPhotos(event as object)
         m.loadedFor = ""
         return
     end if
-    m.windowPhotos = t.response.Items
-    if m.windowPhotos = invalid then m.windowPhotos = []
+    all = t.response.Items
+    if all = invalid then all = []
+    ' the window is wide: landscape photos fill it without cutting off heads
+    m.windowPhotos = []
+    for each it in all
+        if it.w = invalid or it.h = invalid or it.w >= it.h then m.windowPhotos.push(it)
+    end for
+    if m.windowPhotos.count() = 0 then m.windowPhotos = all
     if m.windowPhotos.count() = 0
         showEmpty()
         return
@@ -142,7 +148,7 @@ sub nextWindow()
     if m.top.getParent() = invalid then return
     m.winPos = (m.winPos + 1) mod m.windowPhotos.count()
     m.winPending = m.windowPhotos[m.winPos]
-    m.win[1 - m.winFront].uri = pPhotoUrl(m.winPending, 1280, 720)
+    m.win[1 - m.winFront].uri = pPhotoUrl(m.winPending, 1280, 720, true)
 end sub
 
 sub onWindowLoaded(event as object)
@@ -177,7 +183,7 @@ sub onAlbums(event as object)
         n = a.count
         if n = invalid then tile.sub = "Album" else if n = 1 then tile.sub = "1 photo" else tile.sub = hThousands(n) + " photos"
         ' covers load only for the first screenful; the rest as you scroll to them
-        if i < 8 then tile.image = pPhotoUrl(a, 272, 172)
+        if i < 8 then tile.image = pPhotoUrl(a, 272, 172, true)
     end for
     m.albumsLabel.visible = m.albums.count() > 0
     if m.sel >= m.albums.count() then m.sel = 0
@@ -206,7 +212,7 @@ sub paint()
     for i = first to first + 7
         if i < n and i < m.albums.count()
             tile = m.albumGroup.getChild(i)
-            if tile.image = "" then tile.image = pPhotoUrl(m.albums[i], 272, 172)
+            if tile.image = "" then tile.image = pPhotoUrl(m.albums[i], 272, 172, true)
         end if
     end for
     m.scroll.control = "stop"
