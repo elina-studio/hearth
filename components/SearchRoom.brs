@@ -39,6 +39,7 @@ sub init()
     m.sel = 0
     m.offset = 0
     m.zone = "kb"
+    m.onPill = false
     m.active = false
     m.seq = 0
 
@@ -188,6 +189,58 @@ sub onFound(event as object)
     m.hint.text = ""
     m.showingRecent = false
     setRows(rows)
+    checkSeasons()
+    checkMusic()
+end sub
+
+' Feedback #23: only offer "Request" on a show when Overseerr says it isn't fully in the library
+' (mediaInfo.status 5 = available; anything else, or not known to Overseerr, means seasons are missing).
+sub checkSeasons()
+    if m.reg.Read("overseerrKey") = "" then return
+    if m.oTasks = invalid then m.oTasks = {}
+    for i = 0 to m.rows.count() - 1
+        r = m.rows[i]
+        if r.pill <> invalid and r.item.Type = "Series"
+            t = CreateObject("roSGNode", "OverseerrTask")
+            t.method = "GET"
+            t.path = "/api/v1/search"
+            t.query = { query: rowTitle(r.item), page: "1" }
+            t.tag = m.seq.toStr() + "|" + i.toStr()
+            k = "s" + i.toStr() + "_" + m.seq.toStr()
+            t.key = k
+            m.oTasks[k] = t
+            t.observeField("done", "onSeasonCheck")
+            t.control = "RUN"
+        end if
+    end for
+end sub
+
+sub onSeasonCheck(event as object)
+    t = event.getRoSGNode()
+    if t.key <> invalid then m.oTasks.delete(t.key)
+    parts = t.tag.Split("|")
+    if parts.count() < 2 or parts[0] <> m.seq.toStr() then return
+    i = parts[1].toInt()
+    if i >= m.rows.count() or m.rows[i].pill = invalid then return
+    if not t.ok or t.response = invalid or t.response.results = invalid then return
+    it = m.rows[i].item
+    want = LCase(rowTitle(it))
+    best = invalid
+    for each x in t.response.results
+        if x.mediaType = "tv" and x.name <> invalid and LCase(x.name) = want
+            year = invalid
+            if x.firstAirDate <> invalid and Len(x.firstAirDate) >= 4 then year = Left(x.firstAirDate, 4).toInt()
+            if best = invalid then best = x
+            if it.ProductionYear <> invalid and year = it.ProductionYear then best = x
+        end if
+    end for
+    if best = invalid then return
+    status = 0
+    if best.mediaInfo <> invalid and best.mediaInfo.status <> invalid then status = best.mediaInfo.status
+    if status <> 5
+        m.rows[i].pill.visible = true
+        paint()
+    end if
 end sub
 
 ' Titles that start with what you typed first (ignoring a leading "The"), otherwise Plex's order.
@@ -241,6 +294,7 @@ sub setRows(rows as object)
     m.focusable = []
     m.sel = 0
     m.offset = 0
+    m.onPill = false
     y = 0
     for i = 0 to rows.count() - 1
         r = rows[i]
@@ -253,6 +307,9 @@ sub setRows(rows as object)
         else
             r.y = y
             if r.kind = "recent" then r.h = 64 else r.h = 92
+            if r.kind = "item" and (r.item.Type = "Series" or r.item.Type = "artist" or r.item.Type = "album")
+                r.more = "Request"
+            end if
             r.node = makeRow(r)
             m.focusable.push(i)
             y = y + r.h + 10
@@ -362,16 +419,43 @@ function makeRow(r as object) as object
         end if
         top = 12
         if r.subText = "" then top = 26
+        textW = 1064 - textX - 20
+        if r.more <> invalid
+            ' feedback #23: a "More seasons" / "More albums" pill at the row's right end (Right reaches it)
+            pw = Len(r.more) * 14 + 92
+            pill = g.createChild("Group")
+            pill.translation = [1064 - pw - 18, 18]
+            pb = pill.createChild("Poster")
+            pb.uri = "pkg:/images/pill.9.png"
+            pb.width = pw
+            pb.height = 56
+            pi = pill.createChild("Poster")
+            pi.uri = "pkg:/images/icons/plus.png"
+            pi.width = 28
+            pi.height = 28
+            pi.translation = [22, 14]
+            pl = pill.createChild("Label")
+            pl.translation = [60, 0]
+            pl.width = pw - 72
+            pl.height = 56
+            pl.vertAlign = "center"
+            pl.font = hFont("bold", 24)
+            pl.text = r.more
+            r.pill = pill
+            ' hidden until Overseerr (shows) or Lidarr (music) says something is missing
+            pill.visible = false
+            textW = textW - pw - 24
+        end if
         tl = g.createChild("Label")
         tl.translation = [textX, top]
-        tl.width = 1064 - textX - 20
+        tl.width = textW
         tl.font = hFont("bold", 30)
         tl.color = "0xEDE6CAFF"
         tl.text = title
         if r.subText <> ""
             sl = g.createChild("Label")
             sl.translation = [textX, top + 42]
-            sl.width = 1064 - textX - 20
+            sl.width = textW
             sl.font = hFont("regular", 22)
             sl.color = "0xB5AF8CFF"
             sl.text = r.subText
@@ -407,6 +491,9 @@ function subtitle(it as object, withKind as boolean) as string
         if t = "album" and it.ProductionYear <> invalid then parts.push(it.ProductionYear.toStr())
     else if t = "Movie" or t = "Series"
         if it.ProductionYear <> invalid then parts.push(it.ProductionYear.toStr())
+        if t = "Series" and it.SeasonCount <> invalid
+            if it.SeasonCount = 1 then parts.push("1 season") else parts.push(it.SeasonCount.toStr() + " seasons")
+        end if
     end if
     return parts.join("  ·  ")
 end function
@@ -424,6 +511,17 @@ end function
 sub openRow()
     if m.focusable.count() = 0 then return
     r = m.rows[m.focusable[m.sel]]
+    if m.onPill and r.pill <> invalid
+        rememberSearch(m.term)
+        if r.item.Type = "Series"
+            m.top.request = { action: "room", name: "Requests", search: rowTitle(r.item) }
+        else
+            artist = rowTitle(r.item)
+            if r.item.Type = "album" and r.item.ArtistName <> invalid then artist = r.item.ArtistName
+            m.top.request = { action: "musicView", mode: "request", term: artist }
+        end if
+        return
+    end if
     if r.kind = "recent"
         m.kb.text = r.text ' the keyboard's text change runs the search
         return
@@ -456,7 +554,16 @@ end sub
 sub paint()
     m.kb.active = (m.active and m.zone = "kb")
     for i = 0 to m.focusable.count() - 1
-        m.rows[m.focusable[i]].node.visible = (m.active and m.zone = "results" and i = m.sel)
+        r = m.rows[m.focusable[i]]
+        here = (m.active and m.zone = "results" and i = m.sel)
+        r.node.visible = here and not (m.onPill and r.pill <> invalid)
+        if r.pill <> invalid
+            lit = here and m.onPill
+            if lit then r.pill.getChild(0).blendColor = "0xE0B34AFF" else r.pill.getChild(0).blendColor = "0x2A2410FF"
+            if lit then c = "0x1F1606FF" else c = "0xE0B34AFF"
+            r.pill.getChild(1).blendColor = c
+            r.pill.getChild(2).color = c
+        end if
     end for
     ' keep the focused row, and its group heading, inside the viewport
     if m.focusable.count() > 0
@@ -522,11 +629,20 @@ function onKeyEvent(key as string, press as boolean) as boolean
         m.kb.callFunc("handleKey", key)
         return true
     end if
+    pr = m.rows[m.focusable[m.sel]].pill
+    hasPill = (pr <> invalid and pr.visible)
     if key = "up"
+        m.onPill = false
         if m.sel > 0 then m.sel = m.sel - 1 else m.zone = "kb"
     else if key = "down"
+        m.onPill = false
         if m.sel < m.focusable.count() - 1 then m.sel = m.sel + 1
+    else if key = "right"
+        if hasPill then m.onPill = true
+    else if key = "left" and m.onPill
+        m.onPill = false
     else if key = "left" or key = "back"
+        m.onPill = false
         m.zone = "kb"
     else if key = "OK"
         openRow()
@@ -537,3 +653,108 @@ function onKeyEvent(key as string, press as boolean) as boolean
     paint()
     return true
 end function
+
+' ---------- Lidarr: "Request" on artists and albums only when tracks are missing ----------
+' Lidarr's statistics.percentOfTracks < 100, or not in Lidarr at all, counts as missing.
+
+sub checkMusic()
+    if m.reg.Read("lidarrKey") = "" then return
+    if m.lidarr = invalid then m.lidarr = { artists: invalid, albums: {}, loading: false }
+    if m.lidarr.artists = invalid
+        if not m.lidarr.loading
+            m.lidarr.loading = true
+            lTask("/artist", {}, "onLidarrArtists", "artists")
+        end if
+        return
+    end if
+    for i = 0 to m.rows.count() - 1
+        r = m.rows[i]
+        if r.pill <> invalid and (r.item.Type = "artist" or r.item.Type = "album") then judgeMusic(i)
+    end for
+end sub
+
+sub lTask(path as string, query as object, cb as string, tag as string)
+    t = CreateObject("roSGNode", "LidarrTask")
+    t.method = "GET"
+    t.path = path
+    t.query = query
+    t.tag = tag
+    if m.oTasks = invalid then m.oTasks = {}
+    k = "l" + Rnd(1000000).toStr()
+    t.key = k
+    m.oTasks[k] = t
+    t.observeField("done", cb)
+    t.control = "RUN"
+end sub
+
+function lidarrDone(event as object) as object
+    t = event.getRoSGNode()
+    if t.key <> invalid then m.oTasks.delete(t.key)
+    return t
+end function
+
+function pct(x as object) as float
+    if x.statistics = invalid or x.statistics.percentOfTracks = invalid then return 0
+    return x.statistics.percentOfTracks
+end function
+
+sub onLidarrArtists(event as object)
+    t = lidarrDone(event)
+    m.lidarr.loading = false
+    if not t.ok or t.response = invalid or t.response.Items = invalid then return
+    a = {}
+    for each x in t.response.Items
+        if x.artistName <> invalid then a[LCase(x.artistName)] = { id: x.id, pct: pct(x) }
+    end for
+    m.lidarr.artists = a
+    checkMusic()
+end sub
+
+sub judgeMusic(i as integer)
+    r = m.rows[i]
+    it = r.item
+    if it.Type = "artist"
+        name = rowTitle(it)
+    else
+        name = it.ArtistName
+        if name = invalid then name = ""
+    end if
+    a = m.lidarr.artists[LCase(name)]
+    if a = invalid
+        showPill(i) ' not in Lidarr yet: requesting adds it
+        return
+    end if
+    if it.Type = "artist"
+        if a.pct < 100 then showPill(i)
+        return
+    end if
+    key = a.id.toStr()
+    albums = m.lidarr.albums[key]
+    if albums = invalid
+        if m.lidarr.albums[key + "_loading"] = invalid
+            m.lidarr.albums[key + "_loading"] = true
+            lTask("/album", { artistId: key }, "onLidarrAlbums", key)
+        end if
+        return
+    end if
+    got = albums[LCase(rowTitle(it))]
+    if got = invalid or got < 100 then showPill(i)
+end sub
+
+sub onLidarrAlbums(event as object)
+    t = lidarrDone(event)
+    if not t.ok or t.response = invalid or t.response.Items = invalid then return
+    al = {}
+    for each x in t.response.Items
+        if x.title <> invalid then al[LCase(x.title)] = pct(x)
+    end for
+    m.lidarr.albums[t.tag] = al
+    checkMusic()
+end sub
+
+sub showPill(i as integer)
+    if i < m.rows.count() and m.rows[i].pill <> invalid
+        m.rows[i].pill.visible = true
+        paint()
+    end if
+end sub

@@ -319,6 +319,7 @@ function norm(md as object) as object
         it.Type = "Movie"
     else if t = "show"
         it.Type = "Series"
+        it.SeasonCount = md.childCount
     else if t = "season"
         ' a season stands in for its show
         it.Type = "Series"
