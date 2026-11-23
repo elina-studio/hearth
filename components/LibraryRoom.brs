@@ -34,6 +34,8 @@ sub init()
     m.index = 0
     m.top0 = 0
     m.item = invalid
+    m.subsFor = invalid
+    m.subsNote = ""
     m.genre = invalid
     ' A to Z filters (Sort B) and letters (Letters B)
     m.gridClip = m.top.findNode("gridClip")
@@ -168,8 +170,12 @@ sub showButtons()
         else
             kinds.push(["play", "Play", "home-play"])
         end if
-        if hCaptionsOn() then kinds.push(["cc", "Captions on", "home-cc"]) else kinds.push(["cc", "Captions off", "home-cc"])
-        if it.Type <> "Series" then kinds.push(["details", "Details", "home-info"])
+        if it.Type <> "Series"
+            lab = "Subtitles"
+            if m.subsFor = it.Id then lab = m.subsNote
+            kinds.push(["cc", lab, "home-cc"])
+            kinds.push(["details", "Details", "home-info"])
+        end if
     end if
     x = 0
     for i = 0 to 2
@@ -452,8 +458,7 @@ sub runButton()
     if buttonCount() = 0 or m.item = invalid then return
     act = m.buttons[m.btn].act
     if act = "cc"
-        hToggleCaptions()
-        showButtons()
+        hSubsPick(m.item)
     else if act = "resume"
         m.top.request = { action: "play", item: m.item, resume: true }
     else if act = "play"
@@ -801,4 +806,13 @@ sub paintLetters()
             g.label.color = "0xB5AF8CFF"
         end if
     end for
+end sub
+
+' the subtitle picker (subs.brs) calls this after a pick
+sub hSubsChanged(label as string)
+    if m.item <> invalid
+        m.subsFor = m.item.Id
+        m.subsNote = label
+    end if
+    showButtons()
 end sub

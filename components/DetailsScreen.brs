@@ -84,7 +84,11 @@ sub buildButtons(it as object)
             list.push({ label: "Play", action: "restart" })
         end if
     end if
-    if hCaptionsOn() then list.push({ label: "CC  Captions on", action: "captions" }) else list.push({ label: "CC  Captions off", action: "captions" })
+    if it.Type <> "Series"
+        lab = "CC  Subtitles"
+        if it._media <> invalid then lab = "CC  " + hSubsLabel(it)
+        list.push({ label: lab, action: "subs" })
+    end if
     if played then list.push({ label: "Watched", action: "unplayed" }) else list.push({ label: "Mark watched", action: "played" })
 
     m.buttons.removeChildrenIndex(m.buttons.getChildCount(), 0)
@@ -155,9 +159,8 @@ sub runAction(a as string)
         m.top.request = { action: "play", item: it, resume: false }
     else if a = "playNext" and m.nextEpisode <> invalid
         m.top.request = { action: "play", item: m.nextEpisode, resume: true }
-    else if a = "captions"
-        hToggleCaptions()
-        buildButtons(it)
+    else if a = "subs"
+        hSubsPick(it)
     else if a = "played" or a = "unplayed"
         hPlex(a, { id: it.Id }, "onChanged")
     end if
@@ -223,3 +226,8 @@ function onKeyEvent(key as string, press as boolean) as boolean
     paint()
     return true
 end function
+
+' the subtitle picker (subs.brs) calls this after a pick
+sub hSubsChanged(label as string)
+    if m.full <> invalid then buildButtons(m.full)
+end sub

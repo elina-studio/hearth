@@ -9,6 +9,9 @@ sub init()
     m.tick = m.top.findNode("tick")
     m.tick.observeField("fire", "onTick")
     m.video.observeField("state", "onState")
+    m.video.observeField("availableSubtitleTracks", "applyEmbeddedSub")
+    m.retried5 = false
+    m.subApplied = false
     m.leaving = false
     m.started = false
     m.ready = false
@@ -180,10 +183,11 @@ sub onState()
             if m.wantSub <> invalid
                 m.video.globalCaptionMode = "On"
                 m.video.subtitleTrack = m.wantSub
-            else if m.capsPref = "on"
-                m.video.globalCaptionMode = "On"
+                m.subApplied = true
             else if m.capsPref = "off"
                 m.video.globalCaptionMode = "Off"
+            else
+                applyEmbeddedSub()
             end if
         end if
         report("playing")
@@ -192,6 +196,19 @@ sub onState()
     else if s = "finished"
         leave()
     else if s = "error"
+        if m.video.errorCode = -5 and not m.retried5
+            ' "only one playing instance": the music (or a mood's sound) still held the player; stop it and try again
+            print "[hearth-play] another player was still active; stopping music and retrying"
+            m.retried5 = true
+            mp = m.global.music
+            if mp <> invalid then mp.command = { cmd: "stop" }
+            t = CreateObject("roSGNode", "Timer")
+            t.duration = 1
+            t.observeField("fire", "retryPlay")
+            m.retryTimer = t
+            t.control = "start"
+            return
+        end if
         if m.mode = "direct" and not m.started
             ' the TV refused the file after all: let Plex repackage it instead
             print "[hearth-play] direct play failed ("; m.video.errorCode; " "; m.video.errorMsg; "); falling back to a Plex remux"
@@ -206,6 +223,37 @@ sub onState()
         if msg = invalid or msg = "" then msg = "The video stopped with an error."
         fail(msg + " (" + m.video.errorCode.toStr() + ")")
     end if
+end sub
+
+sub retryPlay()
+    m.video.control = "play"
+end sub
+
+' The caption Plex has picked for this title is inside the file (or arrives in the remux): once the TV
+' lists the tracks it found, turn on the one in that language. With nothing picked in Plex but the CC
+' preference on, English (or the first track) is used, like the Plex app's "auto".
+sub applyEmbeddedSub()
+    if m.subApplied or not m.started or m.capsPref = "off" then return
+    tracks = m.video.availableSubtitleTracks
+    if tracks = invalid or tracks.count() = 0 then return
+    want = ""
+    if m.streams <> invalid and m.streams.sub <> invalid
+        if m.streams.sub.languageCode <> invalid then want = LCase(m.streams.sub.languageCode)
+    else if m.capsPref <> "on"
+        return
+    end if
+    if want = "" then want = "en"
+    pick = invalid
+    for each tr in tracks
+        lang = ""
+        if tr.Language <> invalid then lang = LCase(tr.Language)
+        if pick = invalid and Left(lang, 2) = Left(want, 2) then pick = tr
+    end for
+    if pick = invalid then pick = tracks[0]
+    print "[hearth-play] captions on: "; pick.TrackName; " ("; pick.Language; ")"
+    m.video.globalCaptionMode = "On"
+    m.video.subtitleTrack = pick.TrackName
+    m.subApplied = true
 end sub
 
 sub onTick()

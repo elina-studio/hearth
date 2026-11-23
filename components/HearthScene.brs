@@ -119,8 +119,8 @@ sub handle(r as object)
         s.item = r.item
         pushScreen(s)
     else if a = "play"
-        ' the TV plays one stream at a time: music pauses for video
-        m.music.command = { cmd: "pause" }
+        ' the TV plays one stream at a time: a paused Audio node still holds it, so music stops for video
+        m.music.command = { cmd: "stop" }
         s = CreateObject("roSGNode", "PlayerScreen")
         s.resume = (r.resume = true)
         s.item = r.item

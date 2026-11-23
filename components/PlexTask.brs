@@ -162,6 +162,9 @@ sub runTask()
         ' ask Plex what it would do with a playback request (copy or convert each stream), without starting it
         res = req("GET", m.server + "/video/:/transcode/universal/decision?" + a.query, {}, m.token)
         out = decisionSummary(res.body)
+    else if op = "setSubtitle"
+        ' what Plex apps do: remember the chosen subtitle on the server (0 = none), so every player honors it
+        res = req("PUT", m.server + "/library/parts/" + a.part.toStr(), { subtitleStreamID: a.stream.toStr(), allParts: "1" }, m.token)
     else if op = "timeline"
         q = { ratingKey: a.id, key: "/library/metadata/" + a.id, state: a.state, time: a.time, duration: a.duration, identifier: "com.plexapp.plugins.library" }
         res = req("GET", m.server + "/:/timeline", q, m.token)
