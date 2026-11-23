@@ -59,9 +59,14 @@ function pxItems(t as object) as object
     if t = invalid or not t.ok or t.response = invalid then return []
     mc = t.response.MediaContainer
     if mc = invalid then return []
-    if mc.Metadata <> invalid then return mc.Metadata
-    if mc.Directory <> invalid then return mc.Directory
-    return []
+    src = mc.Metadata
+    if src = invalid then src = mc.Directory
+    if src = invalid then return []
+    keep = []
+    for each md in src
+        if not isHiddenItem(md) then keep.push(md)
+    end for
+    return keep
 end function
 
 ' Plex resizes (and can blur) any library image

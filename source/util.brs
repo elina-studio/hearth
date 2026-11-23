@@ -344,3 +344,22 @@ sub hFbStatus(event as object)
     g = p.getParent()
     if g <> invalid and g.hasField("fb") then g.fb.visible = (p.loadStatus <> "ready")
 end sub
+
+' Names kept out of every shelf and list (Home, Music New/albums, search): matched anywhere in an item's title, album or artist.
+' Add more here, lower case.
+function hearthHiddenWords() as object
+    return ["pimsleur"]
+end function
+
+function isHiddenItem(md as dynamic) as boolean
+    if md = invalid or Type(md) <> "roAssociativeArray" then return false
+    t = ""
+    if md.title <> invalid then t = t + " " + md.title.toStr()
+    if md.parentTitle <> invalid then t = t + " " + md.parentTitle.toStr()
+    if md.grandparentTitle <> invalid then t = t + " " + md.grandparentTitle.toStr()
+    t = LCase(t)
+    for each w in hearthHiddenWords()
+        if Instr(1, t, w) > 0 then return true
+    end for
+    return false
+end function
