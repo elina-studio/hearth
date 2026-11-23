@@ -7,6 +7,7 @@
     <field id="query" type="assocarray" />
     <field id="bodyText" type="string" />
     <field id="tag" type="string" />
+    <field id="timeout" type="integer" value="20000" />
     <field id="key" type="string" />
     <field id="status" type="integer" />
     <field id="ok" type="boolean" />

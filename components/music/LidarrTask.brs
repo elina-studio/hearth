@@ -38,7 +38,7 @@ sub runTask()
     status = 0
     text = ""
     if started
-        msg = wait(20000, port)
+        msg = wait(m.top.timeout, port)
         if type(msg) = "roUrlEvent"
             status = msg.GetResponseCode()
             text = msg.GetString()

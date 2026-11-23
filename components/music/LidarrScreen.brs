@@ -102,6 +102,8 @@ end sub
 function lApi(method as string, path as string, query as object, body as dynamic, cb as string, tag = "" as string) as object
     t = CreateObject("roSGNode", "LidarrTask")
     t.method = method
+    ' searches go out to Lidarr's online music database, which can be slow: give them a minute
+    if Instr(1, path, "/lookup") > 0 or method <> "GET" then t.timeout = 60000
     ' query and body go across as text: assocarray keys lose their capitals crossing into a Task,
     ' and Lidarr wants foreignArtistId, addOptions, albumsToMonitor... exactly as written
     qs = pxQuery(query)
@@ -121,6 +123,10 @@ end function
 function bad(t as object) as boolean
     if t.status = 401
         showSetup("Lidarr didn't accept the saved key.")
+        return true
+    end if
+    if t.status = -1
+        say("Lidarr didn't answer in time.")
         return true
     end if
     if t.status <= 0
@@ -157,7 +163,19 @@ end sub
 sub onLookup(event as object)
     t = hTaskFrom(event)
     if t.tag <> m.kb.text then return
-    if bad(t) then return
+    if t.status = -1 or (t.status >= 500)
+        ' Lidarr is up (the profiles loaded) but its online music database didn't answer:
+        ' fall back to the artists Lidarr already has, and say so on screen
+        m.empty.text = "Lidarr's online music database isn't answering, so new artists can't be found right now. Showing artists already in Lidarr."
+        m.lookupFailed = true
+        lApi("GET", "/artist", invalid, invalid, "onLocalArtists", t.tag)
+        return
+    end if
+    if bad(t)
+        m.empty.text = "Lidarr search failed. Try again in a moment."
+        return
+    end if
+    m.lookupFailed = false
     m.results = []
     items = t.response.Items
     if items <> invalid
@@ -172,6 +190,30 @@ sub onLookup(event as object)
         m.empty.text = "Lidarr found nobody called " + m.kb.text + "."
     else
         focusArtist(0, true)
+    end if
+    paint()
+end sub
+
+' Search the artists Lidarr already has, by name (used when the online lookup fails)
+sub onLocalArtists(event as object)
+    t = hTaskFrom(event)
+    if t.tag <> m.kb.text then return
+    if not t.ok then return
+    want = LCase(t.tag)
+    m.results = []
+    items = t.response.Items
+    if items <> invalid
+        for each a in items
+            if m.results.Count() < 4 and Instr(1, LCase(pxStr(a.artistName)), want) > 0 then m.results.push(a)
+        end for
+    end if
+    m.sel = 0
+    drawMatches()
+    if m.results.Count() = 0
+        showPreview(false)
+    else
+        focusArtist(0, true)
+        say("Lidarr's online music database isn't answering. These are artists Lidarr already has.")
     end if
     paint()
 end sub
