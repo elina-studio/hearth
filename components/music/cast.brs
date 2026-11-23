@@ -26,9 +26,10 @@ function castActive() as boolean
     return m.top.castCount > 0
 end function
 
+' the TV is ticked and hasn't handed its screen to a video (tvYield)
 function castTvOn() as boolean
     rooms = m.top.rooms
-    return rooms[0].on = true
+    return rooms[0].on = true and m.tvYielded <> true
 end function
 
 function castOnIds() as object
@@ -64,6 +65,10 @@ function castCommand(c as object) as boolean
         m.castAlignTimer.control = "start"
     else if cmd = "castResync"
         castAlign()
+    else if cmd = "tvYield"
+        tvYield()
+    else if cmd = "tvRejoin"
+        tvRejoin()
     else
         return false
     end if
@@ -372,5 +377,42 @@ sub castPause(paused as boolean)
         else
             castStartClock()
         end if
+    end if
+end sub
+
+' ---------- lending the TV to a video (the Ambiance hearth) ----------
+' tvYield: only the TV's own Audio stops, so a Video node can play. Speakers keep going and the
+' player stays "playing" (our clock keeps the position). With no speakers it's a pause.
+sub tvYield()
+    if m.tvYielded = true then return
+    hasQueue = (m.top.queue <> invalid and m.top.queue.count() > 0)
+    if not hasQueue then return
+    live = (m.top.state = "playing" or m.top.state = "buffering")
+    m.tvYielded = true
+    m.castTimer.control = "stop"
+    if castActive()
+        m.audio.control = "stop"
+        if live then castStartClock()
+    else
+        if live then m.audio.control = "pause"
+        m.top.state = "paused"
+        m.tvYieldResume = live
+    end if
+end sub
+
+' tvRejoin: the TV picks the song up again where the speakers are (or where it paused)
+sub tvRejoin()
+    if m.tvYielded <> true then return
+    m.tvYielded = false
+    if castActive()
+        m.castClock.control = "stop"
+        if castTvOn() and m.top.state = "playing"
+            spk = castSpeakerPos()
+            if spk < 0 then spk = m.top.position
+            castStartTv(spk + m.top.castDelay)
+        end if
+    else if m.tvYieldResume = true
+        m.tvYieldResume = false
+        resume()
     end if
 end sub

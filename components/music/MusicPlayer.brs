@@ -23,6 +23,11 @@ sub onCommand()
     if c.cmd = invalid then return
     cmd = c.cmd
     if castCommand(c) then return
+    ' the TV's screen is lent to a video and no speaker plays: play/pause only decides what happens on tvRejoin
+    if m.tvYielded = true and not castActive() and (cmd = "toggle" or cmd = "play" or cmd = "resume" or cmd = "pause")
+        m.tvYieldResume = (cmd <> "pause" and not (cmd = "toggle" and m.tvYieldResume = true))
+        return
+    end if
     ' while speakers play along, pause / resume reach them too
     hasQueue = (m.top.queue <> invalid and m.top.queue.count() > 0)
     if castActive() and hasQueue and (cmd = "toggle" or cmd = "pause" or cmd = "play" or cmd = "resume")
@@ -407,6 +412,12 @@ sub playIndex(i as integer, startAt = 0 as float)
         else
             castStartClock()
         end if
+        return
+    end if
+    if m.tvYielded = true
+        ' a video has the screen: the song waits for tvRejoin
+        m.top.state = "paused"
+        m.tvYieldResume = true
         return
     end if
     m.audio.control = "play"
