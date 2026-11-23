@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Chapters filmstrip above the bar (mockups/player/panel-chap-A-filmstrip.png).
+     chapters: [{ title, start (s), thumb (url or "") }]; action: { cmd: "jump", to } | { cmd: "close" } -->
+<component name="ChapterStrip" extends="Group">
+  <children>
+    <Poster uri="pkg:/images/player/shade-bottom.png" translation="[0, 520]" width="1920" height="560" />
+    <Poster id="icon" uri="pkg:/images/player/chap.png" translation="[100, 604]" width="32" height="32" blendColor="0xE0B34AFF" />
+    <Label id="head" translation="[146, 592]" text="Chapters" color="0xEDE6CAFF" />
+    <Label id="count" translation="[310, 604]" color="0xB5AF8CFF" />
+    <Group id="clip" clippingRect="[60, 560, 1800, 420]">
+      <Group id="row" translation="[100, 680]" />
+    </Group>
+    <Group id="barHolder" translation="[100, 940]" />
+    <Group id="ticks" />
+    <KeyHints id="hints" translation="[1820, 990]" />
+  </children>
+  <interface>
+    <field id="chapters" type="array" onChange="build" />
+    <field id="position" type="float" />
+    <field id="duration" type="float" />
+    <field id="action" type="assocarray" alwaysNotify="true" />
+    <function name="open" />
+  </interface>
+  <script type="text/brightscript" uri="pkg:/source/util.brs" />
+  <script type="text/brightscript" uri="pkg:/components/player/ChapterStrip.brs" />
+</component>

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Scrub thumbnails from Plex's preview thumbnails (a BIF file: /library/parts/<id>/indexes/sd).
+     Set url and run; ready turns true once the index is read. Then set want = seconds, and frameUri
+     gets a local jpg for the nearest frame (frameAt = that frame's second). -->
+<component name="BifTask" extends="Task">
+  <interface>
+    <field id="url" type="string" />
+    <field id="ready" type="boolean" />
+    <field id="want" type="float" alwaysNotify="true" />
+    <field id="frameUri" type="string" />
+    <field id="frameAt" type="float" />
+    <field id="quit" type="boolean" />
+  </interface>
+  <script type="text/brightscript" uri="pkg:/components/player/BifTask.brs" />
+</component>

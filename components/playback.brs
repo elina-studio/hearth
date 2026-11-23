@@ -127,12 +127,23 @@ function hPlayHlsQuery(itemId as string, startSec as dynamic, subs as string, se
         res = "1280x720"
         quality = "&videoQuality=60&maxVideoBitrate=3000"
     end if
+    ds = "1"
+    if m.forceQuality = "720" or m.forceQuality = "480"
+        ' picked in the player's Quality list: always convert the picture down to this size
+        ds = "0"
+        res = "1280x720"
+        quality = "&videoQuality=60&maxVideoBitrate=3000"
+        if m.forceQuality = "480"
+            res = "854x480"
+            quality = "&videoQuality=50&maxVideoBitrate=1500"
+        end if
+    end if
     extra = "add-transcode-target(type=videoProfile&context=streaming&protocol=hls&container=mpegts&videoCodec=" + vcodecs + "&audioCodec=" + acodecs + ")"
     if Instr(1, vcodecs, "hevc") > 0 then extra = extra + "+append-transcode-target-codec(type=videoProfile&context=streaming&protocol=hls&videoCodec=hevc)"
     extra = extra + "+add-transcode-target-audio-codec(type=videoProfile&context=streaming&protocol=hls&audioCodec=" + acodecs + ")"
     q = "path=" + hEscape("/library/metadata/" + itemId) + "&mediaIndex=0&partIndex=0&protocol=hls&fastSeek=1&copyts=1"
     ' copy video whenever possible; the LAN can carry a full-quality file, so don't trigger a convert for size
-    q = q + "&directPlay=0&directStream=1&directStreamAudio=1&videoResolution=" + res + quality
+    q = q + "&directPlay=0&directStream=" + ds + "&directStreamAudio=1&videoResolution=" + res + quality
     q = q + "&offset=" + Int(startSec).toStr() + "&subtitles=" + subs + "&session=" + hEscape(session)
     q = q + "&X-Plex-Client-Identifier=" + hEscape(m.global.deviceId) + "&X-Plex-Product=Hearth&X-Plex-Platform=Roku&X-Plex-Token=" + token
     q = q + "&X-Plex-Client-Profile-Extra=" + hEscape(extra)

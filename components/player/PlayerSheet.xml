@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The player's right-hand side sheet (mockups/player/panel-*-A / combined). The player fills `items`;
+     the sheet handles focus and scrolling and reports through `action`:
+       { id, cmd: "ok" }            OK on a row
+       { id, cmd: "step", dir }     Left/Right on a stepper or the timing ruler
+       { id, cmd: "pick", index }   a new choice in a preset strip or pill row
+       { cmd: "close" }             Back
+     Item kinds: kicker, twig, head, note, row, step, presets, ruler, stats, pipe, pills (see SideSheet.brs). -->
+<component name="PlayerSheet" extends="Group">
+  <children>
+    <Poster id="panel" uri="pkg:/images/w/panel.9.png" translation="[1108, 28]" width="784" height="1024" blendColor="0x11170EFF" opacity="0.96" />
+    <Poster id="icon" translation="[1160, 70]" width="36" height="36" blendColor="0xE0B34AFF" />
+    <Label id="title" translation="[1210, 58]" width="640" color="0xEDE6CAFF" />
+    <Group id="clip" translation="[1130, 130]" clippingRect="[0, -70, 760, 920]">
+      <Group id="content" />
+    </Group>
+    <KeyHints id="hints" translation="[1860, 990]" />
+  </children>
+  <interface>
+    <field id="sheetTitle" type="string" onChange="onTitle" />
+    <field id="sheetIcon" type="string" onChange="onTitle" />
+    <field id="items" type="array" onChange="build" alwaysNotify="true" />
+    <field id="focusId" type="string" />
+    <field id="action" type="assocarray" alwaysNotify="true" />
+  </interface>
+  <script type="text/brightscript" uri="pkg:/source/util.brs" />
+  <script type="text/brightscript" uri="pkg:/components/player/PlayerSheet.brs" />
+</component>

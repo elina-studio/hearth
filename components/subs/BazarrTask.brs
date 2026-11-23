@@ -58,6 +58,11 @@ sub runTask()
             err = "download"
             print "[hearth-subs] Bazarr download said ("; status; "): "; Left(res.text, 200)
         end if
+    else if m.top.op = "sync"
+        ' Bazarr's subsync (PATCH /api/subtitles action=sync): re-times the saved file against the audio
+        r = syncSub(a)
+        status = r.status
+        err = r.error
     else if m.top.op = "missing"
         ' which episodes (or the movie) lack a wanted subtitle language, as Bazarr sees it
         r = missing(a)
@@ -257,4 +262,47 @@ function req(method as string, path as string, query as object, body as string, 
     parsed = invalid
     if text <> invalid and text <> "" then parsed = ParseJson(text)
     return { status: status, body: parsed, text: text }
+end function
+
+function syncSub(a as object) as object
+    ids = findIds(a)
+    if ids.error <> invalid then return { status: ids.status, error: ids.error }
+    if ids.kind = "movie"
+        res = req("GET", "/api/movies", { "radarrid[]": ids.movie.toStr() }, "", 30000)
+        kind = "movie"
+        id = ids.movie
+    else
+        res = req("GET", "/api/episodes", { "episodeid[]": ids.episode.toStr() }, "", 30000)
+        kind = "episode"
+        id = ids.episode
+    end if
+    if res.body = invalid or res.body.data = invalid or res.body.data.count() = 0 then return { status: res.status, error: "notfound" }
+    want = LCase(toStr(a.language))
+    pick = invalid
+    for each sb in listOf(res.body.data[0].subtitles)
+        if sb.path <> invalid and sb.path <> ""
+            c2 = LCase(toStr(sb.code2))
+            c3 = LCase(toStr(sb.code3))
+            if pick = invalid and (want = "" or c3 = want or c2 = want or c2 = Left(want, 2)) then pick = sb
+        end if
+    end for
+    if pick = invalid then return { status: 404, error: "nofile" }
+    form = { action: "sync", language: toStr(pick.code2), path: pick.path, type: kind, id: id.toStr(), forced: tf(pick.forced), hi: tf(pick.hi) }
+    print "[hearth-subs] Bazarr sync "; pick.path
+    r2 = req("PATCH", "/api/subtitles", form, formBody(form), 300000)
+    if r2.status < 200 or r2.status >= 300
+        print "[hearth-subs] Bazarr sync said ("; r2.status; "): "; Left(r2.text, 200)
+        return { status: r2.status, error: "sync" }
+    end if
+    return { status: r2.status, error: "" }
+end function
+
+function tf(v as dynamic) as string
+    if v = true then return "True"
+    return "False"
+end function
+
+function toStr(v as dynamic) as string
+    if v = invalid then return ""
+    return v.toStr()
 end function

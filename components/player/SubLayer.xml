@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Subtitles drawn by Hearth (so their look and timing can be changed). Set cues (from SubTask), then
+     keep `time` current; `delay` shifts them (negative = earlier); `style` is the look (see SubLayer.brs). -->
+<component name="SubLayer" extends="Group">
+  <children>
+    <Rectangle id="box" color="0x000000A0" visible="false" />
+    <Group id="shadows" />
+    <Label id="text" width="1600" wrap="true" maxLines="4" horizAlign="center" translation="[160, 0]" />
+  </children>
+  <interface>
+    <field id="cues" type="array" onChange="onCues" />
+    <field id="time" type="float" onChange="onTime" />
+    <field id="delay" type="float" onChange="onTime" />
+    <field id="style" type="assocarray" onChange="onStyle" />
+    <field id="lifted" type="boolean" onChange="onStyle" />
+  </interface>
+  <script type="text/brightscript" uri="pkg:/source/util.brs" />
+  <script type="text/brightscript" uri="pkg:/components/player/SubLayer.brs" />
+</component>
