@@ -13,7 +13,9 @@ sub runTask()
     if m.top.mode = "requests"
         loadRequests()
     else
-        r = fetch(m.top.method, m.top.path, m.top.query, m.top.body)
+        b = m.top.body
+        if m.top.bodyText <> "" then b = m.top.bodyText
+        r = fetch(m.top.method, m.top.path, m.top.query, b)
         finish(r.status, r.data)
     end if
 end sub
@@ -91,7 +93,11 @@ function fetch(method as string, path as string, query as dynamic, body as dynam
         xfer.setRequest(UCase(method))
         xfer.addHeader("Content-Type", "application/json")
         text = "{}"
-        if body <> invalid then text = FormatJson(body)
+        if type(body) = "roString" or type(body) = "String"
+            text = body
+        else if body <> invalid and body.count() > 0
+            text = FormatJson(body)
+        end if
         started = xfer.AsyncPostFromString(text)
     end if
     status = 0

@@ -107,7 +107,9 @@ sub oApi(method as string, path as string, query as dynamic, body as dynamic, cb
     t.method = method
     t.path = path
     if query <> invalid then t.query = query
-    if body <> invalid then t.body = body
+    if body <> invalid
+        if type(body) = "roString" or type(body) = "String" then t.bodyText = body else t.body = body
+    end if
     t.tag = tag
     keep(t, cb)
 end sub
@@ -691,7 +693,7 @@ sub sendPending()
     p = m.pending
     m.pending = invalid
     m.top.findNode("undoTimer").control = "stop"
-    oApi("POST", "/api/v1/request", invalid, p.body, "onRequested", p.card.data.title)
+    oApi("POST", "/api/v1/request", invalid, rqRequestJson(p.body), "onRequested", p.card.data.title)
     m.toast.visible = false
 end sub
 
