@@ -36,7 +36,7 @@ sub init()
     m.nextUp = m.top.findNode("nextUp")
     m.latest = m.top.findNode("latest")
     m.rows = [m.nextUp, m.latest, m.top.findNode("musicRow"), m.top.findNode("reqRow"), m.top.findNode("photoRow")]
-    m.rowY = [590, 930, 1270, 1610, 1950]
+    m.rowY = [540, 880, 1220, 1560, 1900]
     for each r in m.rows
         r.visible = false
     end for
@@ -439,7 +439,7 @@ end sub
 
 ' stack the rows under the cards with no gaps for hidden ones
 sub layoutRows()
-    y = 590
+    y = 540
     for r = 0 to m.rows.count() - 1
         row = m.rows[r]
         if row.visible

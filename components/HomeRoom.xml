@@ -6,22 +6,22 @@
   <children>
     <Group id="content">
       <!-- a short hero band (about a quarter of the screen); its art fades into the night on the left -->
-      <Rectangle translation="[96, 50]" width="1728" height="250" color="0x141A11FF" />
-      <Poster id="heroArt" translation="[96, 50]" width="1728" height="250" loadDisplayMode="scaleToZoom" />
-      <Poster uri="pkg:/images/fade-left.png" translation="[96, 50]" width="1150" height="250" />
+      <Rectangle translation="[96, 0]" width="1728" height="250" color="0x141A11FF" />
+      <Poster id="heroArt" translation="[96, 0]" width="1728" height="250" loadDisplayMode="scaleToZoom" />
+      <Poster uri="pkg:/images/fade-left.png" translation="[96, 0]" width="1150" height="250" />
 
-      <Label id="greeting" translation="[96, 0]" color="0xD9A066FF" />
-      <Label id="heroEyebrow" translation="[136, 70]" width="1300" color="0xE0B34AFF" />
-      <Label id="heroTitle" translation="[136, 98]" width="1300" maxLines="1" color="0xEDE6CAFF" />
-      <Group id="heroProgress" translation="[136, 186]">
+      <Label id="greeting" translation="[96, 0]" visible="false" color="0xD9A066FF" />
+      <Label id="heroEyebrow" translation="[136, 20]" width="1300" color="0xE0B34AFF" />
+      <Label id="heroTitle" translation="[136, 48]" width="1300" maxLines="1" color="0xEDE6CAFF" />
+      <Group id="heroProgress" translation="[136, 136]">
         <Rectangle width="300" height="6" color="0xFFFFFF26" />
         <Rectangle id="heroBar" width="0" height="6" color="0xE0B34AFF" />
         <Label id="heroLeft" translation="[320, -17]" height="40" vertAlign="center" color="0xEDE6CAFF" />
       </Group>
-      <Group id="buttons" translation="[136, 214]" />
+      <Group id="buttons" translation="[136, 164]" />
 
       <!-- which of the 3 Continue items is showing -->
-      <Group id="pager" translation="[0, 256]">
+      <Group id="pager" translation="[0, 206]">
         <Poster id="pgLeft" uri="pkg:/images/icons/home-left.png" width="30" height="30" blendColor="0xB5AF8CFF" />
         <Group id="dots" />
         <Poster id="pgRight" uri="pkg:/images/icons/home-right.png" width="30" height="30" blendColor="0xB5AF8CFF" />
@@ -29,7 +29,7 @@
       </Group>
 
       <!-- Now playing -->
-      <Group id="musicCard" translation="[96, 326]">
+      <Group id="musicCard" translation="[96, 276]">
         <Poster uri="pkg:/images/tile.9.png" blendColor="0x141A11F2" width="604" height="230" />
         <Rectangle translation="[28, 26]" width="178" height="178" color="0x2A2620FF" />
         <Poster id="musicArt" translation="[28, 26]" width="178" height="178" loadDisplayMode="scaleToZoom" />
@@ -48,7 +48,7 @@
       </Group>
 
       <!-- Requests -->
-      <Group id="reqCard" translation="[730, 326]">
+      <Group id="reqCard" translation="[730, 276]">
         <Poster uri="pkg:/images/tile.9.png" blendColor="0x141A11F2" width="532" height="230" />
         <Poster uri="pkg:/images/icons/home-down.png" translation="[28, 30]" width="28" height="28" blendColor="0xB5AF8CFF" />
         <Label id="reqEyebrow" translation="[64, 28]" height="32" vertAlign="center" color="0xB5AF8CFF" text="REQUESTS" />
@@ -58,18 +58,18 @@
       </Group>
 
       <!-- Set the mood -->
-      <Group id="moodCard" translation="[1292, 326]">
+      <Group id="moodCard" translation="[1292, 276]">
         <Poster uri="pkg:/images/tile.9.png" blendColor="0x141A11F2" width="532" height="230" />
         <Poster uri="pkg:/images/icons/home-flame.png" translation="[28, 30]" width="28" height="28" blendColor="0xB5AF8CFF" />
         <Label id="moodEyebrow" translation="[64, 28]" height="32" vertAlign="center" color="0xB5AF8CFF" text="SET THE MOOD" />
         <Group id="moodTiles" translation="[28, 70]" />
       </Group>
 
-      <CardRow id="nextUp" translation="[96, 590]" title="Next up" />
-      <CardRow id="latest" translation="[96, 930]" title="Recently added" />
-      <CardRow id="musicRow" translation="[96, 1270]" title="Music · new albums" cardWidth="240" cardHeight="240" />
-      <CardRow id="reqRow" translation="[96, 1610]" title="Requests" cardWidth="200" cardHeight="300" />
-      <CardRow id="photoRow" translation="[96, 1950]" title="Photos · lately" />
+      <CardRow id="nextUp" translation="[96, 540]" title="Next up" />
+      <CardRow id="latest" translation="[96, 880]" title="Recently added" />
+      <CardRow id="musicRow" translation="[96, 1220]" title="Music · new albums" cardWidth="240" cardHeight="240" />
+      <CardRow id="reqRow" translation="[96, 1560]" title="Requests" cardWidth="200" cardHeight="300" />
+      <CardRow id="photoRow" translation="[96, 1900]" title="Photos · lately" />
     </Group>
     <Animation id="scroll" duration="0.22" easeFunction="outQuad">
       <Vector2DFieldInterpolator id="scrollTo" key="[0.0, 1.0]" fieldToInterp="content.translation" />

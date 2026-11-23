@@ -1,5 +1,5 @@
 sub init()
-    m.names = ["Home", "Movies", "Shows", "Music", "Requests", "Ambiance", "Photos", "Search"]
+    m.names = ["Home", "Shows", "Movies", "Music", "Requests", "Ambiance", "Photos", "Search"]
     m.pillsGroup = m.top.findNode("pills")
     for each n in m.names
         p = m.pillsGroup.createChild("HearthPill")
