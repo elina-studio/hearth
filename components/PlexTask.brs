@@ -131,10 +131,10 @@ sub runTask()
         end for
         out = { Names: names }
     else if op = "item"
-        ' includeMarkers: intro and credits times (skip intro, Up next)
-        q = { includeMarkers: "1" }
+        ' markers: intro and credits times (Plex Pass detection), for skip intro and Up next; chapters for the player
+        q = { includeMarkers: "1", includeChapters: "1" }
         ' the details page wants extras (trailers), outside ids (Overseerr), and the show's next episode
-        if a.full = true then q = { includeMarkers: "1", includeExtras: "1", includeGuids: "1", includeOnDeck: "1", includeConcerts: "0" }
+        if a.full = true then q = { includeExtras: "1", includeGuids: "1", includeOnDeck: "1", includeConcerts: "0", includeMarkers: "1", includeChapters: "1" }
         res = req("GET", m.server + "/library/metadata/" + a.id, q, m.token)
         list = metas(res.body)
         if list.count() > 0
@@ -531,6 +531,7 @@ function norm(md as object) as object
     it._img = img
     if md.Media <> invalid then it._media = md.Media
     if md.Marker <> invalid then it._markers = md.Marker
+    if md.Chapter <> invalid then it._chapters = md.Chapter
     return it
 end function
 

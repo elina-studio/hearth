@@ -26,6 +26,7 @@ sub init()
     m.upnext.observeField("action", "onUpNextAction")
     m.video.observeField("position", "onPosition")
     resetUpNext()
+    uiInit()
 end sub
 
 sub onShown(unused as dynamic)
@@ -69,9 +70,13 @@ sub onItem(event as object)
     m.part = part
     setupUpNext(it)
     m.streams = hPlayStreams(part)
+    m.decision = invalid
+    uiOnItem(it)
     m.session = m.global.deviceId + "-" + Rnd(100000).toStr()
     hPlayLogCaps()
     chk = hPlayDirectCheck(media, m.streams)
+    if m.forceQuality <> invalid then chk = { ok: false, why: "picked quality " + m.forceQuality + "p" }
+    m.planWhy = chk.why
     print "[hearth-play] "; hTitle(it); " | "; toStr(media.container); " "; toStr(media.videoCodec); " "; toStr(media.height); "p "; toStr(media.audioCodec); " | sub "; subDesc()
     if chk.ok
         print "[hearth-play] plan: direct play (no Plex conversion)"
@@ -101,6 +106,7 @@ end sub
 sub onDecision(event as object)
     t = hTaskFrom(event)
     d = t.response
+    m.decision = d
     if t.ok and d <> invalid
         print "[hearth-play] Plex says: video "; d.video; " ("; d.videoCodec; "), audio "; d.audio; " ("; d.audioCodec; "), captions "; d.subtitle; " ("; d.subtitleCodec; ") | "; d.general
         ' never let a caption cost a full video convert: drop the embedded caption and ask again
@@ -110,7 +116,7 @@ sub onDecision(event as object)
             askDecision()
             return
         end if
-        if d.video = "transcode" and not m.hlsLight
+        if d.video = "transcode" and not m.hlsLight and m.forceQuality = invalid
             ' a full convert at 1080p is more than the NAS CPU can do in real time (stuck loading); ask for 720p instead
             print "[hearth-play] Plex must convert the video; asking for 720p at 3 Mbps so the NAS keeps up"
             m.hlsLight = true
@@ -203,22 +209,16 @@ sub onState()
         if not m.started
             m.started = true
             m.tick.control = "start"
-            if m.wantSub <> invalid
-                m.video.globalCaptionMode = "On"
-                m.video.subtitleTrack = m.wantSub
-                m.subApplied = true
-            else if m.capsPref = "off"
-                m.video.globalCaptionMode = "Off"
-            else
-                applyEmbeddedSub()
-            end if
+            uiStartSubs()
         end if
+        uiOnState(s)
         report("playing")
     else if s = "paused" and m.started
+        uiOnState(s)
         report("paused")
     else if s = "finished"
-        ' Up next autoplay (next episode in this player) first; otherwise leave, and goOn plays any queued item
-        if m.next <> invalid and autoplayOn()
+        m.finished = true
+        if m.next <> invalid and autoplayOn() and m.sleepMode <> "ep"
             playNext()
         else
             m.finished = true
@@ -262,7 +262,7 @@ end sub
 ' lists the tracks it found, turn on the one in that language. With nothing picked in Plex but the CC
 ' preference on, English (or the first track) is used, like the Plex app's "auto".
 sub applyEmbeddedSub()
-    if m.subApplied or not m.started or m.capsPref = "off" then return
+    if m.subApplied or not m.started or m.capsPref = "off" or m.subMode = "hearth" then return
     tracks = m.video.availableSubtitleTracks
     if tracks = invalid or tracks.count() = 0 then return
     want = ""
@@ -287,6 +287,8 @@ end sub
 
 sub onTick()
     if m.leaving then return
+    checkSleep()
+    if m.leaving then return
     if m.video.state = "paused" then report("paused") else report("playing")
 end sub
 
@@ -299,7 +301,12 @@ sub leave()
     m.upnext.callFunc("halt", invalid)
     m.leaving = true
     m.tick.control = "stop"
-    if m.started
+    m.ov.callFunc("close", invalid)
+    if m.markWatched = true
+        ' Mark watched and leave: save it as finished, not as a spot to resume
+        hPlex("timeline", { id: m.item.Id, state: "stopped", time: m.durationMs.toStr(), duration: m.durationMs.toStr() }, "onReported")
+        hPlex("played", { id: m.item.Id }, "onStopped")
+    else if m.started
         ' wait for Plex to save the spot so the next screen shows it
         ms = Int(position() * 1000)
         hPlex("timeline", { id: m.item.Id, state: "stopped", time: ms.toStr(), duration: m.durationMs.toStr() }, "onStopped")
@@ -389,12 +396,14 @@ sub onFinderResult()
     r = m.finder.result
     if r = invalid then return
     if r.action = "off"
-        m.video.globalCaptionMode = "Off"
+        subsOff()
         m.capsPref = "off"
     else if r.action = "select"
         s = r.stream
         m.capsPref = "on"
-        if s.key <> invalid
+        if isTextSub(s)
+            useHearthSub(s)
+        else if s.key <> invalid
             ' a subtitle file: it is one of the tracks handed to the video at the start
             url = m.global.plexServer + s.key + "?X-Plex-Token=" + m.global.plexServerToken
             m.video.globalCaptionMode = "On"
@@ -414,21 +423,15 @@ end sub
 sub onFinderClosed()
     if m.reloadSubs
         m.reloadSubs = false
-        print "[hearth-play] new subtitle downloaded; restarting at "; Int(position()); " s to load it"
-        m.resumeAt = position()
-        m.tick.control = "stop"
-        m.ready = false
-        m.started = false
-        m.subApplied = false
-        m.retried5 = false
-        m.hlsLight = false
-        m.video.control = "stop"
-        m.status.visible = true
-        hPlex("item", { id: m.item.Id }, "onItem")
+        print "[hearth-play] new subtitle downloaded; restarting to load it"
+        ' Plex now has the new file picked; take its choice instead of the old one
+        m.subStream = invalid
+        reloadAt(position())
+        return
     else if m.wasPlaying
         m.video.control = "resume"
     end if
-    m.video.setFocus(true)
+    focusBack()
 end sub
 
 sub afterOptions()
@@ -439,7 +442,7 @@ end sub
 
 ' called when the error message closes
 sub restoreFocus()
-    if m.failed = true then leave() else m.video.setFocus(true)
+    if m.failed = true then leave() else focusBack()
 end sub
 
 ' ---------- Up next and autoplay ----------
@@ -453,6 +456,7 @@ sub resetUpNext()
     m.upShown = false
     m.upDismissed = false
     m.playingNext = false
+    m.nextFromQueue = false
 end sub
 
 function autoplayOn() as boolean
@@ -461,7 +465,9 @@ end function
 
 sub setupUpNext(it as object)
     resetUpNext()
-    if it.Type <> "Episode" or it.SeriesId = invalid then return
+    q = m.top.queue
+    queued = (q <> invalid and q.count() > 0)
+    if not queued and (it.Type <> "Episode" or it.SeriesId = invalid) then return
     durSec = m.durationMs / 1000
     if it._markers <> invalid
         ' the last credits marker is the one at the end (some shows have a mid-episode credits roll too)
@@ -480,7 +486,13 @@ sub setupUpNext(it as object)
     else if m.creditsAt <> invalid
         print "[hearth-play] credits marker at "; Int(m.creditsAt); " s"
     end if
-    hPlex("nextEp", { show: it.SeriesId, id: it.Id }, "onNextEp")
+    if queued
+        ' Shuffle / play season from the details page: the queue decides what comes next
+        m.next = q[0]
+        m.nextFromQueue = true
+    else
+        hPlex("nextEp", { show: it.SeriesId, id: it.Id }, "onNextEp")
+    end if
 end sub
 
 sub onNextEp(event as object)
@@ -495,13 +507,15 @@ sub onNextEp(event as object)
 end sub
 
 sub onPosition()
+    uiOnPosition()
     if m.next = invalid or m.creditsAt = invalid or m.upShown or m.upDismissed or not m.started then return
-    if m.finder.visible = true then return
+    if m.finder.visible = true or m.sheet.visible or m.chapters.visible or m.sleepMode = "ep" then return
     if position() >= m.creditsAt then showUpNext()
 end sub
 
 sub showUpNext()
     m.upShown = true
+    m.ov.callFunc("close", invalid)
     m.upnext.autoplay = autoplayOn()
     m.upnext.item = m.next
     m.upnext.callFunc("begin", invalid)
@@ -515,7 +529,7 @@ sub onUpNextAction()
     else if a = "dismiss"
         m.upDismissed = true
         m.upnext.callFunc("halt", invalid)
-        m.video.setFocus(true)
+        focusBack()
     end if
 end sub
 
@@ -526,10 +540,20 @@ sub playNext()
     nxt = m.next
     m.upnext.callFunc("halt", invalid)
     m.tick.control = "stop"
-    if m.started
+    if m.started and m.noMarkOnNext = true
+        ms = Int(position() * 1000)
+        hPlex("timeline", { id: m.item.Id, state: "stopped", time: ms.toStr(), duration: m.durationMs.toStr() }, "onReported")
+    else if m.started
         hPlex("timeline", { id: m.item.Id, state: "stopped", time: m.durationMs.toStr(), duration: m.durationMs.toStr() }, "onReported")
         hPlex("played", { id: m.item.Id }, "onReported")
     end if
+    m.noMarkOnNext = false
+    uiReset(false)
+    m.subStream = invalid
+    m.epSeasons = invalid
+    m.epList = invalid
+    m.forceQuality = invalid
+    m.reloading = false
     m.video.control = "stop"
     m.ready = false
     m.started = false
@@ -541,25 +565,32 @@ sub playNext()
     m.status.visible = true
     m.video.setFocus(true)
     print "[hearth-play] autoplay: "; hSubtitle(nxt)
-    ' carry on where the next episode was left, if it was started before
-    m.top.resume = true
+    if m.nextFromQueue
+        q = m.top.queue
+        rest = []
+        for i = 1 to q.count() - 1
+            rest.push(q[i])
+        end for
+        m.top.queue = rest
+        m.top.resume = false
+    else
+        ' carry on where the next episode was left, if it was started before
+        m.top.resume = true
+    end if
+    m.finished = false
     m.top.item = nxt
 end sub
 
 function onKeyEvent(key as string, press as boolean) as boolean
     if not press then return false
-    if key = "back"
-        leave()
-        return true
-    end if
     if key = "play" and m.upnext.visible
         ' the Up next card has focus; play/pause still controls the video
         if m.video.state = "paused" then m.video.control = "resume" else m.video.control = "pause"
         return true
     end if
-    if key = "options" and m.ready
-        openFinder()
+    if key = "back"
+        leave()
         return true
     end if
-    return false
+    return uiKey(key)
 end function
