@@ -315,6 +315,21 @@ function norm(md as object) as object
     t = md.type
     it = { Id: md.ratingKey, Name: md.title, Overview: md.summary, ProductionYear: md.year, OfficialRating: md.contentRating, LibraryId: md.librarySectionID }
     img = { Primary: md.thumb, Thumb: invalid, Backdrop: md.art }
+    ' cast and director for the details page (only present on a full item fetch)
+    if md.Role <> invalid
+        cast = []
+        for each role in md.Role
+            if cast.count() < 3 and role.tag <> invalid then cast.push(role.tag)
+        end for
+        it.Cast = cast
+    end if
+    if md.Director <> invalid
+        dirNames = []
+        for each dr in md.Director
+            if dr.tag <> invalid then dirNames.push(dr.tag)
+        end for
+        it.Directors = dirNames
+    end if
     if t = "movie"
         it.Type = "Movie"
     else if t = "show"

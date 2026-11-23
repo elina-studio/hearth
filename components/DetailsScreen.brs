@@ -1,9 +1,11 @@
 sub init()
     m.backdrop = m.top.findNode("backdrop")
     m.eyebrow = m.top.findNode("eyebrow")
-    m.eyebrow.font = hFont("caps", 30)
+    m.eyebrow.font = hFont("caps", 28)
     m.title = m.top.findNode("title")
-    m.title.font = hFont("caps", 96)
+    m.title.font = hFont("caps", 80)
+    m.cast = m.top.findNode("cast")
+    m.cast.font = hFont("regular", 24)
     m.meta = m.top.findNode("meta")
     m.meta.font = hFont("regular", 26)
     m.overview = m.top.findNode("overview")
@@ -57,14 +59,25 @@ sub show(it as object)
     if it.RunTimeTicks <> invalid and it.Type <> "Series" then parts.push(Int(it.RunTimeTicks / 600000000).toStr() + " min")
     if it.OfficialRating <> invalid then parts.push(it.OfficialRating)
     if it.Genres <> invalid and it.Genres.count() > 0 then parts.push(it.Genres[0])
+    if it.Type = "Series" and it.SeasonCount <> invalid and it.SeasonCount > 0
+        if it.SeasonCount = 1 then parts.push("1 season") else parts.push(it.SeasonCount.toStr() + " seasons")
+    end if
+    cast = ""
+    if it.Cast <> invalid and it.Cast.count() > 0 then cast = "Starring " + it.Cast.join(", ")
+    if it.Directors <> invalid and it.Directors.count() > 0
+        if cast <> "" then cast = cast + "  ·  "
+        cast = cast + "Directed by " + it.Directors[0]
+    end if
+    m.cast.text = cast
     m.meta.text = parts.join("  ·  ")
     ov = it.Overview
     if ov = invalid then ov = ""
     m.overview.text = ov
-    m.backdrop.uri = hImageAny(it, ["Backdrop", "Thumb", "Primary"], 1300)
+    ' the poster: for an episode this is the show's poster
+    m.backdrop.uri = hImageAny(it, ["Primary", "Thumb"], 340)
     pct = hPercent(it)
     m.track.visible = pct > 0 and it.Type <> "Series"
-    if it.Type <> "Series" then m.bar.width = 520 * pct / 100 else m.bar.width = 0
+    if it.Type <> "Series" then m.bar.width = 420 * pct / 100 else m.bar.width = 0
     buildButtons(it)
 end sub
 
@@ -144,7 +157,7 @@ sub paint()
     end for
     m.below.active = (m.zone = 1)
     y = 0
-    if m.zone = 1 then y = -380
+    if m.zone = 1 then y = -300
     m.scroll.control = "stop"
     m.scrollTo.keyValue = [m.content.translation, [0, y]]
     m.scroll.control = "start"

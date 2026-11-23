@@ -1,21 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Details: big title, overview, one row of buttons, then episodes (shows) or more like this (movies). -->
+<!-- Details B: poster on the left, no backdrop. Eyebrow, title, meta, overview, one row of buttons
+     (Play / Subtitles / Mark watched) and a cast line beside it; episodes or more like this below. -->
 <component name="DetailsScreen" extends="Group">
   <children>
-    <Poster id="backdrop" translation="[620, 0]" width="1300" height="700" loadDisplayMode="scaleToZoom" />
-    <Poster uri="pkg:/images/shade.png" translation="[620, 0]" width="1300" height="700" />
-    <Rectangle width="760" height="700" color="0x0B0E09B0" />
     <Group id="content">
-      <Group translation="[96, 90]">
+      <Rectangle translation="[96, 40]" width="340" height="510" color="0x2A2620FF" />
+      <Poster id="backdrop" translation="[96, 40]" width="340" height="510" loadDisplayMode="scaleToZoom" />
+      <Group translation="[480, 50]">
         <Label id="eyebrow" color="0xD9A066FF" />
-        <Label id="title" translation="[0, 40]" width="1100" wrap="true" maxLines="2" color="0xEDE6CAFF" />
-        <Label id="meta" translation="[0, 232]" width="1100" color="0xD9A066FF" />
-        <Label id="overview" translation="[0, 280]" width="900" height="150" wrap="true" maxLines="4" color="0xB5AF8CFF" />
-        <Rectangle id="track" translation="[0, 446]" width="520" height="8" color="0xFFFFFF22" visible="false" />
-        <Rectangle id="bar" translation="[0, 446]" width="0" height="8" color="0xE0B34AFF" />
-        <LayoutGroup id="buttons" translation="[0, 480]" layoutDirection="horiz" itemSpacings="[16]" />
+        <Label id="title" translation="[0, 34]" width="1340" maxLines="1" color="0xEDE6CAFF" />
+        <Label id="meta" translation="[0, 132]" width="1300" color="0xB5AF8CFF" />
+        <Label id="overview" translation="[0, 178]" width="1240" height="120" wrap="true" maxLines="3" color="0xEDE6CAFF" />
+        <Rectangle id="track" translation="[0, 310]" width="420" height="6" color="0xFFFFFF22" visible="false" />
+        <Rectangle id="bar" translation="[0, 310]" width="0" height="6" color="0xE0B34AFF" />
+        <LayoutGroup id="buttons" translation="[0, 334]" layoutDirection="horiz" itemSpacings="[16]" />
+        <Label id="cast" translation="[0, 420]" width="1300" maxLines="1" color="0xB5AF8CFF" />
       </Group>
-      <CardRow id="below" translation="[96, 680]" />
+      <CardRow id="below" translation="[96, 600]" />
     </Group>
     <Animation id="scroll" duration="0.22" easeFunction="outQuad">
       <Vector2DFieldInterpolator id="scrollTo" key="[0.0, 1.0]" fieldToInterp="content.translation" />

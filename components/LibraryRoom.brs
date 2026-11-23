@@ -242,6 +242,7 @@ sub buildTabs()
         m.tabLabels.push(g)
         x = x + w + 44
     end for
+    m.tabsW = x - 44
 end sub
 
 sub paintTabs()
@@ -514,8 +515,12 @@ function onKeyEvent(key as string, press as boolean) as boolean
             loadTab(m.tab - 1)
         else if key = "right" and m.tab < m.tabNames.count() - 1
             loadTab(m.tab + 1)
+        else if key = "right" and onAZ()
+            ' the filter chips sit on the same line, right of the tabs
+            m.zone = "chips"
+            m.chip = 0
         else if key = "down" or key = "OK"
-            m.zone = zoneNext("tabs", 1)
+            m.zone = zoneNext("chips", 1)
         else if key = "up"
             if buttonCount() = 0
                 leaveToPills()
@@ -526,11 +531,14 @@ function onKeyEvent(key as string, press as boolean) as boolean
     else if m.zone = "chips"
         if key = "left" and m.chip > 0
             m.chip = m.chip - 1
+        else if key = "left"
+            m.zone = "tabs"
         else if key = "right" and m.chip < 4
             m.chip = m.chip + 1
-        else if key = "up" or key = "down"
-            if key = "up" then d = -1 else d = 1
-            m.zone = zoneNext("chips", d)
+        else if key = "up"
+            m.zone = zoneNext("tabs", -1)
+        else if key = "down"
+            m.zone = zoneNext("chips", 1)
         else if key = "OK"
             runChip()
             return true
@@ -601,11 +609,14 @@ function zoneNext(z as string, d as integer) as string
     return z
 end function
 
-' Moves the grid down to make room for the chip row and the letter row
+' Sort B: the chips share the tab line (right of the tabs); only the letter row pushes the grid down
 sub layoutAZ()
+    tw = 600
+    if m.tabsW <> invalid then tw = m.tabsW
+    m.chipsG.translation = [96 + tw + 48, 268]
+    m.lettersG.translation = [96, 324]
     y = 330
-    if onAZ() then y = 386
-    if lettersOn() then y = 446
+    if lettersOn() then y = 384
     m.gridClip.translation = [0, y]
     m.empty.translation = [96, y + 30]
     m.chipsG.visible = onAZ()
