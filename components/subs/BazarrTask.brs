@@ -58,6 +58,30 @@ sub runTask()
             err = "download"
             print "[hearth-subs] Bazarr download said ("; status; "): "; Left(res.text, 200)
         end if
+    else if m.top.op = "missing"
+        ' which episodes (or the movie) lack a wanted subtitle language, as Bazarr sees it
+        r = missing(a)
+        status = r.status
+        err = r.error
+        out = r.out
+    else if m.top.op = "fetchMissing"
+        ' Bazarr's automatic search + download for each missing language (best match wins)
+        n = 0
+        for each x in a.list
+            form = { language: x.code2, forced: x.forced, hi: x.hi }
+            if a.kind = "movie"
+                form.radarrid = a.movie.toStr()
+                res = req("PATCH", "/api/movies/subtitles", form, formBody(form), 120000)
+            else
+                form.seriesid = a.series.toStr()
+                form.episodeid = x.episode.toStr()
+                res = req("PATCH", "/api/episodes/subtitles", form, formBody(form), 120000)
+            end if
+            status = res.status
+            if status >= 200 and status < 300 then n = n + 1 else print "[hearth-subs] Bazarr fetch said ("; status; "): "; Left(res.text, 200)
+        end for
+        out = { fetched: n }
+        if n = 0 and a.list.count() > 0 then err = "download"
     end if
     m.top.status = status
     m.top.error = err
@@ -112,6 +136,66 @@ function findIds(a as object) as object
         if ep.season = a.season and ep.episode = a.episode then return { kind: "episode", series: seriesId, episode: ep.sonarrEpisodeId }
     end for
     return { error: "notfound", status: 404 }
+end function
+
+function missing(a as object) as object
+    if a.movie = true
+        ids = findIds(a)
+        if ids.error <> invalid then return { status: ids.status, error: ids.error, out: {} }
+        res = req("GET", "/api/movies", { "radarrid[]": ids.movie.toStr() }, "", 30000)
+        langs = []
+        if res.body <> invalid and res.body.data <> invalid and res.body.data.count() > 0
+            for each l in listOf(res.body.data[0].missing_subtitles)
+                langs.push(lang(l))
+            end for
+        end if
+        return { status: res.status, error: "", out: { kind: "movie", movie: ids.movie, missing: { movie: langs } } }
+    end if
+    res = req("GET", "/api/series", { start: "0", length: "-1" }, "", 30000)
+    if res.status = 401 then return { status: 401, error: "badkey", out: {} }
+    if res.body = invalid or res.body.data = invalid then return { status: res.status, error: "unreachable", out: {} }
+    folder = LCase(baseName(a.folder))
+    sid = invalid
+    for each s in res.body.data
+        if s.path <> invalid and folder <> "" and LCase(baseName(s.path)) = folder then sid = s.sonarrSeriesId
+        if sid <> invalid then exit for
+    end for
+    if sid = invalid
+        for each s in res.body.data
+            if s.title <> invalid and a.series <> invalid and LCase(s.title) = LCase(a.series) then sid = s.sonarrSeriesId
+            if sid <> invalid then exit for
+        end for
+    end if
+    if sid = invalid then return { status: 404, error: "notfound", out: {} }
+    res = req("GET", "/api/episodes", { "seriesid[]": sid.toStr() }, "", 30000)
+    miss = {}
+    if res.body <> invalid and res.body.data <> invalid
+        for each ep in res.body.data
+            langs = []
+            for each l in listOf(ep.missing_subtitles)
+                x = lang(l)
+                x.episode = ep.sonarrEpisodeId
+                langs.push(x)
+            end for
+            if langs.count() > 0 then miss[ep.season.toStr() + "-" + ep.episode.toStr()] = langs
+        end for
+    end if
+    return { status: res.status, error: "", out: { kind: "episode", series: sid, missing: miss } }
+end function
+
+function listOf(v as dynamic) as object
+    if type(v) = "roArray" then return v
+    return []
+end function
+
+function lang(l as object) as object
+    hi = "False"
+    forced = "False"
+    if l.hi = true then hi = "True"
+    if l.forced = true then forced = "True"
+    name = l.name
+    if name = invalid then name = l.code2
+    return { code2: l.code2, name: name, hi: hi, forced: forced }
 end function
 
 function baseName(p as dynamic) as string

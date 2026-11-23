@@ -2,7 +2,9 @@
 <!-- Bazarr calls for the subtitle finder. The key and address live on the TV (registry "hearth":
      bazarrKey, optional bazarrUrl), never in the repo.
      op "search": args { file, series, season, episode, movie } -> response { Items, ids }
-     op "download": args { ids, provider, subtitle, hi, forced } -->
+     op "download": args { ids, provider, subtitle, hi, forced }
+     op "missing": args { movie, file, title, year } or { folder, series } -> { kind, series|movie, missing }
+     op "fetchMissing": args { kind, series|movie, list: [{ episode, code2, hi, forced }] } -->
 <component name="BazarrTask" extends="Task">
   <interface>
     <field id="op" type="string" />

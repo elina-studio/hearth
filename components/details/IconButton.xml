@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Details action button (mockup A): line icon + label in a rough outline; gold fill when focused.
+     With no text it is a square icon button (the More "…" button). -->
+<component name="IconButton" extends="Group">
+  <children>
+    <Poster id="fill" uri="pkg:/images/w/button-fill.9.png" translation="[-12, -12]" blendColor="0xE0B34AFF" visible="false" />
+    <Poster id="line" uri="pkg:/images/w/button-outline.9.png" translation="[-12, -12]" blendColor="0x404B2DFF" />
+    <Poster id="icon" width="28" height="28" blendColor="0xE0B34AFF" />
+    <Label id="label" vertAlign="center" color="0xEDE6CAFF" />
+  </children>
+  <interface>
+    <field id="icon" type="string" onChange="update" />
+    <field id="text" type="string" onChange="update" />
+    <field id="focused" type="boolean" value="false" onChange="update" />
+    <!-- read back by the parent after update, to lay the row out -->
+    <field id="width" type="integer" value="0" />
+  </interface>
+  <script type="text/brightscript" uri="pkg:/source/util.brs" />
+  <script type="text/brightscript" uri="pkg:/components/details/IconButton.brs" />
+</component>
