@@ -237,7 +237,7 @@ function hBraid(parent as object, w as integer, y as integer) as object
     brClip.translation = [1, 1]
     brBody = brClip.createChild("Poster")
     brBody.uri = "pkg:/images/w/progress-fill-body.png"
-    brBody.width = 1900
+    brBody.width = 512
     brBody.height = 10
     brTip = bar.createChild("Poster")
     brTip.uri = "pkg:/images/w/progress-fill-tip.png"
