@@ -59,7 +59,9 @@ sub onMood()
     ' so a mood with your own footage plays it instead of the drawn scene.
     if needClips()
         m.clipsAsked = true
-        hPlex("clips", { section: m.global.libraries.ambiance }, "onMoodClips")
+        sec = ""
+        if m.global.libraries.ambiance <> invalid then sec = m.global.libraries.ambiance
+        hPlex("clips", { section: sec }, "onMoodClips")
         return
     end if
     it = ambMood(md)
@@ -360,7 +362,7 @@ function needClips() as boolean
     if m.clipsAsked = true then return false
     if m.global.hasField("ambItems") and m.global.ambItems <> invalid and m.global.ambItems.count() > 0 then return false
     libs = m.global.libraries
-    return libs <> invalid and libs.ambiance <> invalid
+    return libs <> invalid and libs.Count() > 0
 end function
 
 sub onMoodClips(event as object)

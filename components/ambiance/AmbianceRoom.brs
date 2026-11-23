@@ -65,12 +65,16 @@ end function
 sub loadClips()
     if m.clipsAsked then return
     libs = m.global.libraries
-    if libs = invalid or libs.ambiance = invalid
-        print "[ambiance] no Plex Ambiance library (yet)"
+    if libs = invalid or libs.Count() = 0
+        print "[ambiance] Plex libraries not loaded yet"
         return
     end if
     m.clipsAsked = true
-    hPlex("clips", { section: libs.ambiance }, "onClips")
+    ' no Ambiance library: PlexTask looks for a hearth folder inside the movie libraries instead
+    sec = ""
+    if libs.ambiance <> invalid then sec = libs.ambiance
+    print "[ambiance] asking Plex for clips, library '"; sec; "'"
+    hPlex("clips", { section: sec }, "onClips")
 end sub
 
 sub onClips(event as object)
@@ -112,6 +116,9 @@ function makePanel(i as integer) as object
     pic.width = m.W
     pic.height = m.H
     pic.loadDisplayMode = "scaleToZoom"
+    ' decode at the TV's real 720p size, not the file's
+    pic.loadWidth = Int(m.W * 2 / 3)
+    pic.loadHeight = Int(m.H * 2 / 3)
     pic.uri = it.still
     if it.plexStill <> invalid and it.plexStill <> "" then pic.uri = plexStill(it.plexStill)
     top = g.createChild("Poster")

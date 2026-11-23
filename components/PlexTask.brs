@@ -99,9 +99,19 @@ sub runTask()
         out = { Genres: gs }
     else if op = "clips"
         ' the Ambiance library: each clip with what the mood screen needs to stream it
-        res = req("GET", m.server + "/library/sections/" + a.section + "/all", { "X-Plex-Container-Start": "0", "X-Plex-Container-Size": "60" }, m.token)
+        ' With no Ambiance library, look for a folder called hearth/ambiance inside any movie-type library.
+        section = toS(a.section, "")
+        found = []
+        if section <> ""
+            res = req("GET", m.server + "/library/sections/" + section + "/all", { "X-Plex-Container-Start": "0", "X-Plex-Container-Size": "60" }, m.token)
+            found = metas(res.body)
+        else
+            res = req("GET", m.server + "/library/sections", {}, m.token)
+            found = clipFolders(res.body)
+        end if
+        print "[ambiance] clips: section '"; section; "' status "; res.status; " items "; found.count()
         clips = []
-        for each md in metas(res.body)
+        for each md in found
             if md.Media <> invalid and md.Media.count() > 0 and md.Media[0].Part <> invalid and md.Media[0].Part.count() > 0
                 med = md.Media[0]
                 part = med.Part[0]
@@ -181,6 +191,41 @@ sub runTask()
     m.top.response = out
     m.top.done = true
 end sub
+
+' Files in a folder named hearth / ambiance / ambience at the top of any movie-type library (Plex's
+' "By folder" browse), for when the person hasn't made a separate Ambiance library.
+function clipFolders(body as dynamic) as object
+    out = []
+    for each d in dirs(body)
+        if d.type = "movie" and d.key <> invalid
+            base = "/library/sections/" + d.key.toStr() + "/folder"
+            r = req("GET", m.server + base, {}, m.token)
+            for each fd in entries(r.body)
+                t = LCase(toS(fd.title, ""))
+                if (t = "hearth" or t = "ambiance" or t = "ambience") and fd.key <> invalid
+                    k = fd.key.toStr()
+                    if Left(k, 1) <> "/" then k = base + "/" + k
+                    print "[ambiance] found folder "; t; " in library "; d.title
+                    r2 = req("GET", m.server + k, {}, m.token)
+                    for each md in entries(r2.body)
+                        if md.Media <> invalid then out.push(md)
+                    end for
+                end if
+            end for
+        end if
+    end for
+    return out
+end function
+
+' Directory and Metadata entries of a response, together.
+function entries(body as dynamic) as object
+    out = []
+    if body = invalid or body.MediaContainer = invalid then return out
+    mc = body.MediaContainer
+    if mc.Directory <> invalid then out.append(mc.Directory)
+    if mc.Metadata <> invalid then out.append(mc.Metadata)
+    return out
+end function
 
 function isAmbiance(d as object) as boolean
     t = LCase(toS(d.title, ""))
