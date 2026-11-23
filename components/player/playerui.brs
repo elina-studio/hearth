@@ -93,11 +93,11 @@ function uiKey(key as string) as boolean
     if m.upnext.visible then return false
     st = m.video.state
     if key = "OK" or key = "play"
-        if st = "playing"
-            m.video.control = "pause"
-            openOverlay("pause")
-        else
+        if st = "paused"
             m.video.control = "resume"
+        else
+            if st = "playing" then m.video.control = "pause"
+            openOverlay("pause")
         end if
         return true
     else if key = "down" or key = "up"
@@ -129,7 +129,7 @@ sub focusBack()
     else if m.ov.visible
         m.ov.setFocus(true)
     else
-        m.video.setFocus(true)
+        m.top.setFocus(true)
     end if
 end sub
 
@@ -143,7 +143,7 @@ sub onOverlayAction()
         if m.video.state = "playing" then m.video.control = "pause" else m.video.control = "resume"
     else if a.cmd = "hidden"
         m.subs.lifted = false
-        if not m.sheet.visible and not m.chapters.visible then m.video.setFocus(true)
+        if not m.sheet.visible and not m.chapters.visible then m.top.setFocus(true)
     else if a.cmd = "button"
         id = a.id
         if id = "cc"
@@ -173,9 +173,9 @@ sub onChapterAction()
         seekTo(a.to)
         if m.video.state = "paused" then m.video.control = "resume"
         m.reopenOverlay = false
-        m.video.setFocus(true)
+        m.top.setFocus(true)
     else
-        if m.reopenOverlay then openOverlay("pause") else m.video.setFocus(true)
+        if m.reopenOverlay then openOverlay("pause") else m.top.setFocus(true)
         m.reopenOverlay = false
     end if
 end sub
@@ -394,7 +394,7 @@ sub closeSheet()
         m.reopenOverlay = false
         openOverlay("pause")
     else
-        m.video.setFocus(true)
+        m.top.setFocus(true)
     end if
 end sub
 

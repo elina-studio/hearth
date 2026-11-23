@@ -30,7 +30,7 @@ sub init()
 end sub
 
 sub onShown(unused as dynamic)
-    m.video.setFocus(true)
+    m.top.setFocus(true)
 end sub
 
 sub start()
@@ -186,7 +186,7 @@ sub buildContent()
 
     m.video.content = content
     m.video.control = "play"
-    m.video.setFocus(true)
+    m.top.setFocus(true)
     m.ready = true
 end sub
 
@@ -380,7 +380,7 @@ sub onCaptionPicked()
         m.video.globalCaptionMode = "On"
         m.video.subtitleTrack = track
     end if
-    m.video.setFocus(true)
+    m.top.setFocus(true)
 end sub
 
 ' ---------- subtitle finder (the * key) ----------
@@ -490,6 +490,7 @@ sub setupUpNext(it as object)
         ' Shuffle / play season from the details page: the queue decides what comes next
         m.next = q[0]
         m.nextFromQueue = true
+        m.ov.canNext = true
     else
         hPlex("nextEp", { show: it.SeriesId, id: it.Id }, "onNextEp")
     end if
@@ -503,6 +504,7 @@ sub onNextEp(event as object)
         return
     end if
     m.next = n
+    m.ov.canNext = true
     print "[hearth-play] next up: "; hSubtitle(n)
 end sub
 
@@ -563,7 +565,7 @@ sub playNext()
     m.offset = 0
     m.status.text = "Lighting the lantern..."
     m.status.visible = true
-    m.video.setFocus(true)
+    m.top.setFocus(true)
     print "[hearth-play] autoplay: "; hSubtitle(nxt)
     if m.nextFromQueue
         q = m.top.queue
@@ -583,6 +585,7 @@ end sub
 
 function onKeyEvent(key as string, press as boolean) as boolean
     if not press then return false
+    print "[hearth-ui] key "; key; " | ready "; m.ready; " | video "; m.video.state; " | up next "; m.upnext.visible
     if key = "play" and m.upnext.visible
         ' the Up next card has focus; play/pause still controls the video
         if m.video.state = "paused" then m.video.control = "resume" else m.video.control = "pause"
