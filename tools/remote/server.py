@@ -165,6 +165,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.end_headers()
                 return False
             return True
+        print("denied %s %s %s" % (who, self.client_address[0], path[:80]), flush=True)
         if who == "locked":
             self.send_json({"error": "too many tries, wait a minute"}, 429)
         elif path.startswith(("/api/", "/px/")):
@@ -172,7 +173,7 @@ class Handler(BaseHTTPRequestHandler):
         else:
             self.send_html("<!doctype html><meta name=viewport content='width=device-width'><body style='font:18px Georgia,serif;background:#0b100c;color:#e6dfc8;padding:32px'>"
                            "<h2>Hearth</h2><p>This page needs the house key. Open the link that ends in <code>?t=...</code> "
-                           "(the setup step printed it).</p>", 401)
+                           "(the setup step printed it).</p><p style='opacity:.6;font-size:15px'>This device's address: %s</p>" % self.client_address[0], 401)
         return False
 
     def send_json(self, obj, code=200):
