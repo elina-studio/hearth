@@ -23,8 +23,9 @@ if [ "$C" != "401" ]; then echo "The lock did not come up (got '$C'). Tell me an
 echo "   Locked: the keys page now says 401 to strangers."
 
 echo "4/4 Reading your house key..."
-KEY=$(ssh -t $CTL "$NAS" "sudo cat /volume1/docker/hearth-remote/data/helper-token" 2>/dev/null | tr -d '\r\n ')
-[ ${#KEY} -lt 16 ] && { echo "Couldn't read the house key. Tell me."; exit 1; }
+echo "   (if it asks for the sudo password again, type it and press Enter; nothing shows as you type)"
+KEY=$(ssh -t $CTL "$NAS" "sudo cat /volume1/docker/hearth-remote/data/helper-token" | tr -d '\r' | grep -oE '[0-9a-f]{48}' | head -1)
+[ ${#KEY} -lt 48 ] && { echo "Couldn't read the house key. Tell me."; exit 1; }
 C2=$(curl -s -o /dev/null -w "%{http_code}" -H "X-Hearth-Token: $KEY" http://192.168.254.41:8765/api/keys)
 echo "   With the key: $C2 (200 is right)."
 echo
