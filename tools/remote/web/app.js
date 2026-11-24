@@ -1218,7 +1218,7 @@ const rqYear = r => { const d = r.releaseDate || r.firstAirDate || ''; return d.
 function rqMediaCard(r) {
   const st = r.mediaInfo && r.mediaInfo.status != null ? r.mediaInfo.status : -1;
   const title = r.title || r.name || '';
-  return { kind: 'media', title, image: tmdb(r.posterPath, 'w185'), chip: rqMediaChip(st), progress: -1, data: { id: r.id, mediaType: r.mediaType, title, year: rqYear(r), overview: r.overview, poster: r.posterPath, rating: r.voteAverage, mediaStatus: st } };
+  return { kind: 'media', title, image: tmdb(r.posterPath, 'w185'), chip: rqMediaChip(st), progress: -1, data: { id: r.id, mediaType: r.mediaType, title, year: rqYear(r), overview: r.overview, poster: r.posterPath, rating: r.voteAverage, mediaStatus: st }, score: r.voteAverage > 0 ? (Math.round(r.voteAverage * 10) / 10).toFixed(1) : '', vote: r.voteAverage || 0, genreIds: r.genreIds || [], date: r.releaseDate || r.firstAirDate || '' };
 }
 function rqWhen(iso) {
   if (!iso) return ''; const d = new Date(iso), n = new Date();
@@ -1267,6 +1267,17 @@ const arrivedWhen = secs => {
   if (days < 7) return { band: d.toLocaleDateString([], { weekday: 'short' }).toUpperCase(), text: d.toLocaleDateString([], { weekday: 'long' }), today: false };
   const md = d.toLocaleDateString([], { month: 'short', day: 'numeric' }); return { band: md.toUpperCase(), text: md, today: false };
 };
+const RQ_FILT = ['trending', 'movies', 'tv'];
+const rqNF = () => ({ genres: [], provider: '', minRating: 0, sort: 'popular' });
+// The streaming services worth showing (TMDB has hundreds), in a fixed order, without the "with ads" and channel variants
+function rqPickProviders(all) {
+  const out = [];
+  for (const [k, n] of [['netflix', 'Netflix'], ['max', 'Max'], ['disney', 'Disney+'], ['prime video', 'Prime'], ['apple tv', 'Apple TV+'], ['hulu', 'Hulu'], ['paramount', 'Paramount+'], ['peacock', 'Peacock'], ['tubi', 'Tubi']]) {
+    const p = all.find(x => { const nm = (x.name || '').toLowerCase(); return (k === 'max' ? (nm === 'max' || nm === 'hbo max') : nm.includes(k)) && !nm.includes('ads') && !nm.includes('channel'); });
+    if (p) out.push({ id: p.id, name: n, logoPath: p.logoPath });
+  }
+  return out;
+}
 const RLISTS = [
   { key: 'search', icon: 'search', name: 'Search', about: 'TYPE A TITLE' },
   { key: 'new', icon: 'down', name: 'New', about: 'NEWLY DOWNLOADED · NEWEST FIRST' },
@@ -1284,6 +1295,7 @@ function roomRequests(room, tok) {
   room.innerHTML = `<div class="rr"><div class="rrail" id="rrail">${RLISTS.map((l, i) => `<div class="fx rli" data-a="rail" data-i="${i}">${ricon(l.icon)}<span>${l.name}</span><em></em></div>`).join('')}</div>
     <div class="rhead"><div class="reb" id="reb"></div><div class="rtt" id="rtt"></div></div>
     <div class="rtabs" id="rtabs"></div>
+    <div class="rfbar" id="rfb"><div class="fx rfbtn" data-a="rqfilter">${ricon('list')}<span>Filter &amp; sort</span></div><div class="rfsum" id="rfs"></div></div>
     <div class="rgrid scroll" id="rg"><div class="rgg" id="rgg"></div></div>
     <div class="rempty" id="rem"></div>
     <div class="rsearch" id="rs"><div class="skb"><div class="sdisp" id="rsd"></div><div class="srule"></div>
@@ -1292,7 +1304,7 @@ function roomRequests(room, tok) {
       <div class="rsres"><div class="rsh" id="rsh"></div><div id="rsl"></div></div></div>
     <div class="rmusic" id="rm">${ricon('note')}<h3>ASK LIDARR FOR AN ARTIST</h3><p>Music requests aren't on the projector yet. Use the TV for those for now.</p></div>
     <div class="rtoast" id="rto"><span id="rtt2"></span><em id="rth"></em></div></div>`;
-  const S = RQ = RQ && RQ.keep ? Object.assign(RQ, { room }) : { room, idx: 2, cards: {}, details: {}, newTab: 0, newAll: null, text: '', query: '', pending: null, seq: 0, keep: true };
+  const S = RQ = RQ && RQ.keep ? Object.assign(RQ, { room }) : { room, idx: 2, cards: {}, details: {}, newTab: 0, newAll: null, text: '', query: '', pending: null, seq: 0, keep: true, filters: { trending: rqNF(), movies: rqNF(), tv: rqNF() }, gen: {}, acc: {}, pageNo: {}, genres: { movie: [], tv: [] }, provs: { movie: [], tv: [] }, rt: {} };
   S.room = room; S.tok = tok; S.over = null;
   const $r = s => $(s, room);
   S.cur = () => RLISTS[S.idx];
@@ -1305,7 +1317,7 @@ function roomRequests(room, tok) {
   const chipHTML = ch => ch && ch.text ? `<div class="rchip ${ch.tone}">${ricon(ch.icon)}<span>${esc(ch.text.toUpperCase())}</span></div>` : '';
   S.cardHTML = (c, i) => {
     const sq = c.square, mine = S.cur().key === 'mine' && !S.over;
-    return `<div class="fx rc ${mine ? 'mine' : ''}" data-a="rqcard" data-i="${i}"><div class="rim ${sq ? 'sq' : ''}" data-bg="${esc(c.image || '')}"></div><div class="rph ${sq ? 'sq' : ''}">${esc(c.title)}</div>${chipHTML(c.chip)}${c.progress >= 0 ? `<div class="rbar"><i style="width:${Math.max(c.progress > 0 ? 8 : 0, Math.min(100, c.progress))}%"></i></div>` : ''}${c.caption ? `<div class="rcap"><b>${esc(c.title)}</b><span>${esc(c.caption)}</span></div>` : ''}</div>`;
+    return `<div class="fx rc ${mine ? 'mine' : ''}" data-a="rqcard" data-i="${i}"><div class="rim ${sq ? 'sq' : ''}" data-bg="${esc(c.image || '')}"></div><div class="rph ${sq ? 'sq' : ''}">${esc(c.title)}</div>${c.score && c.kind === 'media' ? `<div class="rscore">★ ${esc(c.score)}</div>` : ''}${chipHTML(c.chip)}${c.progress >= 0 ? `<div class="rbar"><i style="width:${Math.max(c.progress > 0 ? 8 : 0, Math.min(100, c.progress))}%"></i></div>` : ''}${c.caption ? `<div class="rcap"><b>${esc(c.title)}</b><span>${esc(c.caption)}</span></div>` : ''}</div>`;
   };
   S.show = () => {
     const l = S.cur(); S.paintRail();
@@ -1314,8 +1326,11 @@ function roomRequests(room, tok) {
     $r('#rm').style.display = k === 'music' && !ov_ ? 'flex' : 'none';
     $r('#rg').style.display = (k === 'search' || k === 'music') && !ov_ ? 'none' : 'block';
     $r('#rtabs').style.display = k === 'new' && !ov_ ? 'flex' : 'none';
-    $r('#rg').style.top = k === 'new' && !ov_ ? '210px' : '140px';
-    $r('#rem').style.top = k === 'new' && !ov_ ? '230px' : '160px';
+    const filt = RQ_FILT.includes(k) && !ov_;
+    $r('#rfb').style.display = filt ? 'flex' : 'none';
+    if (filt) $r('#rfs').textContent = S.summary(k);
+    $r('#rg').style.top = (k === 'new' || filt) && !ov_ ? '210px' : '140px';
+    $r('#rem').style.top = (k === 'new' || filt) && !ov_ ? '230px' : '160px';
     if (k === 'new') $r('#rtabs').innerHTML = RTABS.map(([, ic_, n], i) => `<div class="fx rtab ${i === S.newTab ? 'cur' : ''}" data-a="rtab" data-i="${i}">${ricon(ic_)}<span>${n}</span></div>`).join('');
     if (ov_) { S.header(ov_.eyebrow, ov_.title); S.draw(ov_.cards); return; }
     $r('#rem').textContent = '';
@@ -1326,7 +1341,8 @@ function roomRequests(room, tok) {
     $r('#rem').textContent = '';
     if (!cards) { $r('#rg #rgg') && ($r('#rgg').innerHTML = ''); $r('#rem').textContent = S.problem || (k === 'new' ? 'Asking Plex…' : 'Asking Overseerr…'); return; }
     if (k === 'new') { const want = RTABS[S.newTab][0]; S.draw(cards.filter(c => !want || c.data.kind === want)); } else S.draw(cards);
-    if (!cards.length) $r('#rem').textContent = k === 'mine' ? 'No requests yet. Pick something in Trending or Search and press OK.' : k === 'new' ? "Nothing new here yet. Things you request show up here once they've downloaded." : 'Nothing here right now.';
+    if (!cards.length && RQ_FILT.includes(k) && S.active(k)) $r('#rem').textContent = 'Nothing matches those filters. Open Filter & sort to change them.';
+    else if (!cards.length) $r('#rem').textContent = k === 'mine' ? 'No requests yet. Pick something in Trending or Search and press OK.' : k === 'new' ? "Nothing new here yet. Things you request show up here once they've downloaded." : 'Nothing here right now.';
   };
   S.draw = cards => {
     S.shown = cards; const g = $r('#rgg'); g.className = 'rgg' + (S.cur().key === 'mine' && !S.over ? ' mine' : '');
@@ -1343,8 +1359,82 @@ function roomRequests(room, tok) {
   };
   S.toastMsg = (text, hint, ms) => { $r('#rtt2').textContent = text; $r('#rth').textContent = hint || ''; $r('#rto').classList.add('show'); clearTimeout(S.tt); if (ms !== 0) S.tt = setTimeout(() => $r('#rto').classList.remove('show'), ms || 4000); };
   S.load = async () => {
-    for (const l of RLISTS) if (l.path) ov('GET', l.path + '?page=1').then(j => { S.cards[l.key] = (j.results || []).filter(r => r.mediaType === 'movie' || r.mediaType === 'tv').map(rqMediaCard); S.problem = ''; if (RQ === S && S.room === room) { S.paintRail(); if (S.cur().key === l.key && !S.over) S.show(); } }).catch(e => { if (e.status === 401 || e.status === 403 || e.status === 503) S.problem = 'Overseerr is not letting this in (' + e.message + '). Re-send the Overseerr key from the phone.'; else S.problem = "Can't reach Overseerr: " + e.message; if (S.cur().key === l.key) S.show(); });
+    for (const l of RLISTS) if (l.path) S.loadList(l.key);
+    ov('GET', '/api/v1/genres/movie').then(j => { S.genres.movie = j.results || []; }).catch(() => {});
+    ov('GET', '/api/v1/genres/tv').then(j => { S.genres.tv = j.results || []; }).catch(() => {});
+    for (const kind of ['movie', 'tv']) ov('GET', `/api/v1/watchproviders/${kind === 'movie' ? 'movies' : 'tv'}?watchRegion=US`).then(j => { S.provs[kind] = rqPickProviders(j.results || []); }).catch(() => {});
     S.loadMine(); S.loadNew();
+  };
+  /* Discover lists: up to 5 pages (about 100 titles); movies and shows are narrowed by Overseerr, Trending here */
+  S.loadList = key => {
+    const g = S.gen[key] = (S.gen[key] || 0) + 1; S.acc[key] = []; const seen = new Set(); S.pageNo[key] = 0;
+    const path = RLISTS.find(l => l.key === key).path;
+    const page = p => {
+      ov('GET', path + '?' + S.query_(key, p)).then(j => {
+        if (S.gen[key] !== g) return;
+        for (const r of (j.results || [])) { if (r.mediaType === undefined && r.title !== undefined) r.mediaType = 'movie'; if (r.mediaType !== 'movie' && r.mediaType !== 'tv') continue; const id = r.mediaType + r.id; if (!seen.has(id)) { seen.add(id); S.acc[key].push(rqMediaCard(r)); } }
+        S.problem = ''; S.pageNo[key] = p; S.cards[key] = S.clientFilter(key, S.acc[key]);
+        if (RQ === S && S.room === room) { S.paintRail(); if (S.cur().key === key && !S.over) { const f = document.querySelector('#room .rc.on'); const at = f ? +f.dataset.i : -1; S.show(); if (at >= 0) setFocus($$('.rc', room)[at] || null); } }
+        if (p < 5 && j.totalPages && p < j.totalPages) page(p + 1);
+      }).catch(e => { if (S.gen[key] !== g) return; if (e.status === 401 || e.status === 403 || e.status === 503) S.problem = 'Overseerr is not letting this in (' + e.message + '). Re-send the Overseerr key from the phone.'; else S.problem = "Can't reach Overseerr: " + e.message; if (S.cur().key === key) S.show(); });
+    };
+    page(1);
+  };
+  S.query_ = (key, p) => {
+    const q = new URLSearchParams({ page: p }); if (key !== 'movies' && key !== 'tv') return q.toString();
+    const f = S.filters[key], kind = key === 'tv' ? 'tv' : 'movie';
+    const ids = f.genres.map(n => (S.genres[kind].find(g => g.name === n) || {}).id).filter(Boolean); if (ids.length) q.set('genre', ids.join(','));
+    if (f.provider) { q.set('watchProviders', f.provider); q.set('watchRegion', 'US'); }
+    if (f.minRating > 0) { q.set('voteAverageGte', f.minRating); q.set('voteCountGte', 100); }
+    const today = new Date().toISOString().slice(0, 10);
+    if (f.sort === 'rating') { q.set('sortBy', 'vote_average.desc'); if (!f.minRating) q.set('voteCountGte', 300); }
+    else if (f.sort === 'newest') { if (kind === 'movie') { q.set('sortBy', 'primary_release_date.desc'); q.set('primaryReleaseDateLte', today); } else { q.set('sortBy', 'first_air_date.desc'); q.set('firstAirDateLte', today); } q.set('voteCountGte', 20); }
+    else if (f.sort === 'az') { q.set('sortBy', kind === 'movie' ? 'original_title.asc' : 'original_name.asc'); q.set('voteCountGte', 20); }
+    return q.toString();
+  };
+  S.clientFilter = (key, cards) => {
+    if (key !== 'trending') return cards; const f = S.filters.trending;
+    const idsFor = n => ['movie', 'tv'].map(k => (S.genres[k].find(g => g.name === n) || {}).id).filter(Boolean);
+    let out = cards.filter(c => (!f.minRating || c.vote >= f.minRating) && f.genres.every(n => idsFor(n).some(id => c.genreIds.includes(id))));
+    if (f.sort === 'rating') out = out.slice().sort((a, b) => b.vote - a.vote); else if (f.sort === 'newest') out = out.slice().sort((a, b) => b.date.localeCompare(a.date)); else if (f.sort === 'az') out = out.slice().sort((a, b) => a.title.localeCompare(b.title));
+    return out;
+  };
+  S.active = key => { const f = S.filters[key]; return f.genres.length > 0 || !!f.provider || f.minRating > 0 || f.sort !== 'popular'; };
+  S.summary = key => {
+    const f = S.filters[key], parts = [], kind = key === 'tv' ? 'tv' : 'movie';
+    if (f.genres.length) parts.push(f.genres.join(' + '));
+    if (f.provider) { const p = S.provs[kind].find(x => String(x.id) === f.provider); if (p) parts.push('on ' + p.name); }
+    if (f.minRating) parts.push('rated ' + f.minRating + '.0+');
+    parts.push({ popular: 'most popular', rating: 'top rated', newest: 'newest', az: 'A to Z' }[f.sort]);
+    return ((S.cards[key] || []).length) + ' titles · ' + parts.join(' · ');
+  };
+  S.sheet = () => {
+    const key = S.cur().key; S.fkey = key; S.fw = JSON.parse(JSON.stringify(S.filters[key]));
+    const L = openLayer('popup', '<div class="rfpanel" id="rfp"></div>', { close: () => S.applyFilters() });
+    S.drawSheet(); firstFocus(L.el);
+  };
+  S.drawSheet = () => {
+    const key = S.fkey, f = S.fw, names = [], seen = new Set();
+    for (const kind of key === 'movies' ? ['movie'] : key === 'tv' ? ['tv'] : ['movie', 'tv']) for (const g of S.genres[kind]) if (!seen.has(g.name)) { seen.add(g.name); names.push(g.name); }
+    const chip = (k, v, label, on, extra) => `<div class="fx rfc ${on ? 'sel' : ''}" data-a="rqfc" data-k="${k}" data-v="${esc(v)}">${extra || ''}<span>${esc(label)}</span></div>`;
+    const provs = key === 'movies' ? S.provs.movie : key === 'tv' ? S.provs.tv : [];
+    $('#rfp').innerHTML = `<div class="rfh">${esc(RLISTS.find(l => l.key === key).name)}</div>
+      <div class="rfs">Genre</div><div class="rfrow">${chip('any', '', 'Any', !f.genres.length)}${names.map(n => chip('genre', n, n, f.genres.includes(n))).join('')}</div>
+      ${provs.length ? `<div class="rfs">Streaming on</div><div class="rfrow">${chip('prov', '', 'Any', !f.provider)}${provs.map(p => chip('prov', String(p.id), p.name, f.provider === String(p.id), `<img src="${tmdb(p.logoPath, 'w92')}" alt="">`)).join('')}</div>` : ''}
+      <div class="rfs">Rating (TMDB)</div><div class="rfrow">${[[0, 'Any'], [6, '6.0+'], [7, '7.0+'], [8, '8.0+']].map(([v, t]) => chip('rate', v, t, f.minRating === v, v ? '<i class="rfstar">★</i>' : '')).join('')}</div>
+      <div class="rfs">Sort</div><div class="rfrow">${[['popular', 'Popular'], ['rating', 'Top rated'], ['newest', 'Newest'], ['az', 'A to Z']].map(([v, t]) => chip('sort', v, t, f.sort === v)).join('')}</div>
+      <div class="rfrow rfend"><div class="fx rfc sel wide" data-a="rqfdone"><span>Show results</span></div>${chip('reset', '', 'Reset', false)}</div>`;
+  };
+  S.fchip = el => {
+    const f = S.fw, k = el.dataset.k, v = el.dataset.v;
+    if (k === 'any') f.genres = []; else if (k === 'genre') f.genres = f.genres.includes(v) ? f.genres.filter(x => x !== v) : f.genres.concat(v);
+    else if (k === 'prov') f.provider = v; else if (k === 'rate') f.minRating = +v; else if (k === 'sort') f.sort = v;
+    else if (k === 'reset') Object.assign(f, rqNF());
+    S.drawSheet(); const again = $$('#rfp .rfc').find(e => e.dataset.k === k && e.dataset.v === v) || $('#rfp .rfc'); setFocus(again);
+  };
+  S.applyFilters = () => {
+    const key = S.fkey; if (!key || JSON.stringify(S.fw) === JSON.stringify(S.filters[key])) return;
+    S.filters[key] = S.fw; S.loadList(key);
   };
   S.loadMine = async () => {
     try {
@@ -1444,6 +1534,11 @@ function roomRequests(room, tok) {
     const L = openLayer('popup', `<div class="rpanel"><div class="rpp" style="background-image:url('${esc(m.poster)}')"></div><div class="rpx"><div class="reb">${esc(m.eyebrow)}${m.rating ? `<i class="star">★</i>${esc(m.rating)}` : ''}</div><div class="rpt">${esc(m.title.toUpperCase())}</div><div class="rpo">${esc(m.overview)}</div>
       <div class="rpi">${m.items.map(it => `<div class="fx rpb ${it.check ? 'chk' : ''} ${it.locked ? 'locked' : ''} ${it.check ? 'checked' : ''}" data-a="rqpick" data-t="${it.tag}">${it.check ? '<i class="bx"></i>' : (it.icon ? ricon(it.icon) : '')}<span>${esc(it.label)}</span>${it.sub ? `<em>${esc(it.sub)}</em>` : ''}${it.right ? `<u>${esc(it.right)}</u>` : ''}</div>`).join('')}</div><div class="rph2">Back to close</div></div></div>`);
     L.card = c; L.rq = true;
+    if (c.kind === 'media' && c.data.id != null && m.rating !== '') {
+      const rk = c.data.mediaType + c.data.id, put = t => { const eb = $('.reb', L.el); if (t && eb && !eb.querySelector('.rtc')) eb.insertAdjacentHTML('beforeend', `<span class="rtc">${esc(t)}</span>`); };
+      if (S.rt[rk] !== undefined) put(S.rt[rk]);
+      else ov('GET', c.data.mediaType === 'tv' ? `/api/v1/tv/${c.data.id}/ratings` : `/api/v1/movie/${c.data.id}/ratingscombined`).then(j => { const r = j.rt || j; S.rt[rk] = r.criticsScore != null ? 'ROTTEN TOMATOES ' + Math.round(r.criticsScore) + '%' : ''; put(S.rt[rk]); }).catch(() => { S.rt[rk] = ''; });
+    }
   };
   S.pick = (L, el) => {
     const a = el.dataset.t, c = L.card, d = c.data;
@@ -1728,6 +1823,9 @@ function act(el) {
   else if (a === 'rtab') RQ.tab(+d.i);
   else if (a === 'rqkey') { const c = d.c; if (c === '⌫') RQ.type(RQ.text.slice(0, -1)); else if (c === '⌧') RQ.type(''); else RQ.type(RQ.text + c); }
   else if (a === 'rqpick') RQ.pick(layers[layers.length - 1], el);
+  else if (a === 'rqfilter') RQ.sheet();
+  else if (a === 'rqfc') RQ.fchip(el);
+  else if (a === 'rqfdone') closeLayer();
   else if (a === 'pshow') openSlideshow(d.id, d.n);
   else if (a === 'soptsec') { const L = layers[layers.length - 1]; L.seconds = L.secs[(L.secs.indexOf(L.seconds) + 1) % L.secs.length]; SETPREF('photoSeconds', L.seconds); el.textContent = 'Time per photo: ' + L.seconds + ' s'; }
   else if (a === 'soptorder') { const L = layers[layers.length - 1]; L.order = L.order === 'order' ? 'shuffle' : 'order'; SETPREF('photoOrder', L.order); el.textContent = 'Order: ' + (L.order === 'order' ? 'Oldest first' : 'Shuffle') + ' (next batch)'; }

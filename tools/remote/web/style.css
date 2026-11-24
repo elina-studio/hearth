@@ -319,6 +319,23 @@ video{position:absolute;inset:0;width:100%;height:100%;background:#000;object-fi
 .rcap{position:absolute;left:0;top:340px;width:180px;z-index:2}
 .rcap b{display:block;font:700 21px/1.2 HearthSans;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .rcap span{display:block;font:19px HearthText;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rscore{position:absolute;right:8px;top:8px;z-index:2;background:#0B0E09d0;color:var(--gold);font:700 20px/30px HearthSans;padding:0 9px;border-radius:5px}
+.rfbar{position:absolute;left:540px;top:128px;display:none;align-items:center;gap:26px}
+.rfbtn{display:flex;align-items:center;gap:12px;height:52px;padding:0 24px;border-radius:26px;background:#ffffff12;font:700 26px HearthSans}
+.rfbtn .ic{width:24px;height:24px}
+.rfsum{font:24px HearthText;color:var(--muted)}
+.rfpanel{width:900px;max-height:1000px;overflow:hidden;background:#141A11;border-radius:16px;border:2px solid #ffffff14;padding:26px 34px}
+.rfh{font:italic 42px HearthFell}
+.rfs{font:30px HearthFell;color:#D9A066;margin:14px 0 8px}
+.rfrow{display:flex;flex-wrap:wrap;gap:10px}
+.rfc{display:flex;align-items:center;gap:8px;height:46px;padding:0 20px;border-radius:23px;background:#ffffff12;font:700 22px HearthSans}
+.rfc img{width:30px;height:30px;border-radius:6px;margin-left:-8px}
+.rfc.sel{background:var(--gold);color:var(--goldInk)}
+.rfc.on{outline:4px solid #FFF3D0;outline-offset:3px}
+.rfc.wide{width:520px;justify-content:center}
+.rfstar{font-style:normal}
+.rfend{margin-top:22px}
+.rtc{margin-left:24px;color:#F0907C}
 .rempty{position:absolute;left:540px;top:160px;width:1200px;font:28px HearthText;color:var(--muted)}
 .rsearch{position:absolute;left:540px;top:20px;width:1300px;display:none}
 .rsearch .skb{position:absolute;left:0;top:44px}
