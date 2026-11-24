@@ -1,14 +1,30 @@
 #!/bin/bash
-# Finds the Overseerr key that really works, sends it to the TV, and fixes the NAS copy.
-# Never prints a key. Run on the Mac.
-NAS="Elina@192.168.254.41"; TV="192.168.254.9"; U=http://192.168.254.41:5055
-CTL="-o ControlMaster=auto -o ControlPath=/tmp/hearth-ssh-%r-%h -o ControlPersist=300"
-ssh -t $CTL "$NAS" "sudo -v" || { echo "sudo failed: the NAS admin password was not accepted (nothing was changed). Run this again and type it carefully at the second prompt."; exit 1; }
-OUT=$(ssh -t $CTL "$NAS" 'F=$(sudo find /volume1/docker -maxdepth 6 -name settings.json 2>/dev/null | grep -i seerr | head -1); echo "FILE=$F"; for k in $(sudo grep -oE "apiKey\": \"[^\"]+" "$F" | cut -d\" -f3); do c=$(curl -s -o /dev/null -w "%{http_code}" -H "X-Api-Key: $k" "'$U'/api/v1/request?take=1"); echo "CODE=$c"; [ "$c" = 200 ] && echo "GOOD=$k" && break; done' 2>/dev/null | tr -d '\r')
-echo "$OUT" | grep -E "^(FILE|CODE)="
-KEY=$(echo "$OUT" | grep '^GOOD=' | head -1 | cut -d= -f2-)
-echo "$OUT" | grep -q "^FILE=.\+" || { echo "sudo failed or settings.json not found, so no key was checked (nothing was changed). Run this again and type the NAS password carefully."; exit 1; }
-[ -z "$KEY" ] && { echo "No working key found in settings.json. Tell me the lines above."; exit 1; }
-curl -s -X POST -G --data-urlencode "overseerrUrl=$U" --data-urlencode "overseerrKey=$KEY" "http://$TV:8060/input" && echo "sent to the TV"
-ssh -t $CTL "$NAS" "sudo sed -i 's/\"overseerrKey\": *\"[^\"]*\"/\"overseerrKey\":\"$KEY\"/' /volume1/docker/hearth-remote/data/hearth-keys.json && echo fixed the NAS copy"
-echo "Done. Open Requests on the TV (leave and re-enter Hearth if it is already open)."
+# Finds the Overseerr key that really works, then (from the NAS itself) sends it to the TV
+# and fixes the NAS copy. One ssh session, one sudo, no key is ever printed.
+NAS="Elina@192.168.254.41"
+REMOTE=$(cat <<'EOF'
+U=http://192.168.254.41:5055
+TV=192.168.254.9
+echo "Overseerr status: $(curl -s -o /dev/null -w '%{http_code}' $U/api/v1/status)"
+F=$(find /volume1/docker -maxdepth 6 -name settings.json 2>/dev/null | grep -i seerr | head -1)
+echo "settings file: ${F:-NOT FOUND}"
+[ -z "$F" ] && { echo "folders in /volume1/docker:"; ls /volume1/docker; exit 1; }
+n=0
+for k in $(grep -oE 'apiKey": "[^"]+' "$F" | cut -d'"' -f3); do
+  n=$((n+1))
+  c=$(curl -s -o /dev/null -w '%{http_code}' -H "X-Api-Key: $k" "$U/api/v1/request?take=1")
+  echo "key #$n -> HTTP $c"
+  if [ "$c" = 200 ]; then
+    curl -s -X POST -G --data-urlencode "overseerrUrl=$U" --data-urlencode "overseerrKey=$k" "http://$TV:8060/input" && echo "sent to the TV"
+    J=/volume1/docker/hearth-remote/data/hearth-keys.json
+    if [ -f "$J" ]; then sed -i "s/\"overseerrKey\": *\"[^\"]*\"/\"overseerrKey\":\"$k\"/" "$J" && echo "fixed the NAS copy"; else echo "no NAS copy file found at $J"; fi
+    echo "DONE"
+    exit 0
+  fi
+done
+echo "No key in settings.json worked (checked $n)."
+exit 1
+EOF
+)
+B=$(printf '%s' "$REMOTE" | base64 | tr -d '\n')
+ssh -t "$NAS" "echo $B | base64 -d > /tmp/hearth-ov.sh && sudo sh /tmp/hearth-ov.sh; rm -f /tmp/hearth-ov.sh"
