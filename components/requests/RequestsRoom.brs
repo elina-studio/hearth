@@ -1,5 +1,5 @@
 ' Requests room (layout B: rail and grid, Search first; P1 poster-card popup).
-' Zones: "rail", "grid", "kb" (search keyboard), "results" (search results), "popup", "setup", "save".
+' Zones: "rail", "grid", "bar" (filter bar), "sheet" (filter sheet), "kb" (search keyboard), "results" (search results), "popup", "setup", "save".
 
 sub init()
     m.reg = CreateObject("roRegistrySection", "hearth")
@@ -76,6 +76,19 @@ sub init()
     m.wantPopup = ""
     m.ver = 0
     m.builtFor = ""
+    ' Discover lists: up to 5 pages (about 100 titles), narrowed by the filter sheet
+    m.filters = { trending: newFilters(), movies: newFilters(), tv: newFilters() }
+    m.gen = {}
+    m.acc = {}
+    m.seen = {}
+    m.pageNo = {}
+    m.genres = { movie: [], tv: [] }
+    m.provs = { movie: [], tv: [] }
+    m.rt = {}
+    m.filterBar = m.top.findNode("filterBar")
+    m.top.findNode("barLabel").font = hFont("bold", 26)
+    m.top.findNode("barSum").font = hFont("regular", 24)
+    m.sheetHolder = m.top.findNode("sheetHolder")
 
     if not m.global.hasField("overseerrKey") then m.global.addFields({ overseerrKey: "" })
     m.global.observeField("overseerrKey", "onKeyArrived")
@@ -100,8 +113,12 @@ sub refresh(unused as dynamic)
         m.loaded = true
         m.problem = ""
         for each l in m.lists
-            if l.path <> invalid then oApi("GET", l.path, { page: "1" }, invalid, "onList", l.key)
+            if l.path <> invalid then loadList(l.key)
         end for
+        oApi("GET", "/api/v1/genres/movie", invalid, invalid, "onGenres", "movie")
+        oApi("GET", "/api/v1/genres/tv", invalid, invalid, "onGenres", "tv")
+        oApi("GET", "/api/v1/watchproviders/movies", { watchRegion: watchRegion() }, invalid, "onProviders", "movie")
+        oApi("GET", "/api/v1/watchproviders/tv", { watchRegion: watchRegion() }, invalid, "onProviders", "tv")
     end if
     loadMine()
     loadNew()
@@ -267,12 +284,201 @@ end function
 
 sub onList(event as object)
     t = taskFrom(event)
+    parts = t.tag.Split("|")
+    key = parts[0]
+    if m.gen[key] <> Val(parts[1]) then return
     if checkProblem(t) then return
-    m.cards[t.tag] = discoverCards(t)
-    m.ver = m.ver + 1
+    page = Val(parts[2])
+    for each c in discoverCards(t)
+        id = c.data.mediaType + c.data.id.toStr()
+        if m.seen[key][id] = invalid
+            m.seen[key][id] = true
+            m.acc[key].push(c)
+        end if
+    end for
+    m.pageNo[key] = page
+    publishList(key)
+    total = t.response.totalPages
+    if page < 5 and total <> invalid and page < total then fetchPage(key, page + 1)
+end sub
+
+sub publishList(key as string)
+    m.cards[key] = clientFilter(key, m.acc[key])
     m.problem = ""
     paintRail()
-    if currentList().key = t.tag then showList()
+    if currentList().key = key then showList()
+end sub
+
+function newFilters() as object
+    return { genres: [], provider: "", minRating: 0, sort: "popular" }
+end function
+
+function isFilterable(key as string) as boolean
+    return key = "trending" or key = "movies" or key = "tv"
+end function
+
+function isDiscover(key as string) as boolean
+    return key = "trending" or key = "movies" or key = "tv" or key = "upcoming"
+end function
+
+function watchRegion() as string
+    r = m.reg.Read("watchRegion")
+    if r = "" then r = "US"
+    return r
+end function
+
+function listByKey(key as string) as object
+    for each l in m.lists
+        if l.key = key then return l
+    end for
+    return invalid
+end function
+
+' Start a list again from page 1 (new filters); the old cards stay up until page 1 arrives
+sub loadList(key as string)
+    if m.gen[key] = invalid then m.gen[key] = 0
+    m.gen[key] = m.gen[key] + 1
+    m.acc[key] = []
+    m.seen[key] = {}
+    m.pageNo[key] = 0
+    fetchPage(key, 1)
+end sub
+
+sub fetchPage(key as string, page as integer)
+    q = { page: page.toStr() }
+    addFilterQuery(q, key)
+    oApi("GET", listByKey(key).path, q, invalid, "onList", key + "|" + m.gen[key].toStr() + "|" + page.toStr())
+end sub
+
+' Movies and shows are narrowed by Overseerr itself; Trending can't be, so it is narrowed here (clientFilter)
+sub addFilterQuery(q as object, key as string)
+    if key <> "movies" and key <> "tv" then return
+    f = m.filters[key]
+    kind = "movie"
+    if key = "tv" then kind = "tv"
+    ids = []
+    for each name in f.genres
+        id = genreId(kind, name)
+        if id <> "" then ids.push(id)
+    end for
+    if ids.count() > 0 then q.genre = ids.join(",")
+    if f.provider <> ""
+        q.watchProviders = f.provider
+        q.watchRegion = watchRegion()
+    end if
+    if f.minRating > 0
+        q.voteAverageGte = f.minRating.toStr()
+        q.voteCountGte = "100"
+    end if
+    today = CreateObject("roDateTime").ToISOString().Left(10)
+    if f.sort = "rating"
+        q.sortBy = "vote_average.desc"
+        if f.minRating <= 0 then q.voteCountGte = "300"
+    else if f.sort = "newest"
+        if kind = "movie"
+            q.sortBy = "primary_release_date.desc"
+            q.primaryReleaseDateLte = today
+        else
+            q.sortBy = "first_air_date.desc"
+            q.firstAirDateLte = today
+        end if
+        q.voteCountGte = "20"
+    else if f.sort = "az"
+        if kind = "movie" then q.sortBy = "original_title.asc" else q.sortBy = "original_name.asc"
+        q.voteCountGte = "20"
+    end if
+end sub
+
+function genreId(kind as string, name as string) as string
+    for each g in m.genres[kind]
+        if g.name = name then return g.id.toStr()
+    end for
+    return ""
+end function
+
+function clientFilter(key as string, cards as object) as object
+    if key <> "trending" then return cards
+    f = m.filters.trending
+    out = []
+    for each c in cards
+        ok = true
+        if f.minRating > 0 and (c.vote = invalid or c.vote < f.minRating) then ok = false
+        if ok
+            for each name in f.genres
+                if not cardHasGenre(c, name) then ok = false
+            end for
+        end if
+        if ok then out.push(c)
+    end for
+    if f.sort = "rating"
+        out = sortCards(out, "vote", true)
+    else if f.sort = "newest"
+        out = sortCards(out, "date", true)
+    else if f.sort = "az"
+        out = sortCards(out, "title", false)
+    end if
+    return out
+end function
+
+function cardHasGenre(c as object, name as string) as boolean
+    if c.genreIds = invalid then return false
+    for each kind in ["movie", "tv"]
+        id = genreId(kind, name)
+        if id <> ""
+            for each g in c.genreIds
+                if g.toStr() = id then return true
+            end for
+        end if
+    end for
+    return false
+end function
+
+' Simple insertion sort (lists are about 100 long)
+function sortCards(cards as object, field as string, desc as boolean) as object
+    out = []
+    for each c in cards
+        v = c[field]
+        if v = invalid
+            if field = "vote" then v = 0 else v = ""
+        end if
+        i = out.count()
+        while i > 0
+            w = out[i - 1][field]
+            if w = invalid
+                if field = "vote" then w = 0 else w = ""
+            end if
+            before = false
+            if desc then before = (v > w) else before = (LCase(v.toStr()) < LCase(w.toStr()))
+            if not before then exit while
+            i = i - 1
+        end while
+        out.Insert(i, c)
+    end for
+    return out
+end function
+
+sub onGenres(event as object)
+    t = taskFrom(event)
+    if t.ok and t.response.results <> invalid then m.genres[t.tag] = t.response.results
+end sub
+
+sub onProviders(event as object)
+    t = taskFrom(event)
+    if not (t.ok and t.response.results <> invalid) then return
+    out = []
+    wanted = [{ k: "netflix", n: "Netflix" }, { k: "max", n: "Max" }, { k: "disney", n: "Disney+" }, { k: "prime video", n: "Prime" }, { k: "apple tv", n: "Apple TV+" }, { k: "hulu", n: "Hulu" }, { k: "paramount", n: "Paramount+" }, { k: "peacock", n: "Peacock" }, { k: "tubi", n: "Tubi" }]
+    for each w in wanted
+        for each p in t.response.results
+            nm = LCase(p.name)
+            hit = (Instr(1, nm, w.k) > 0)
+            if w.k = "max" then hit = (nm = "max" or nm = "hbo max")
+            if hit and Instr(1, nm, "ads") = 0 and Instr(1, nm, "channel") = 0
+                out.push({ id: p.id, name: w.n, logo: rqImage(p.logoPath, "w92") })
+                exit for
+            end if
+        end for
+    end for
+    m.provs[t.tag] = out
 end sub
 
 function discoverCards(t as object) as object
@@ -395,12 +601,15 @@ sub showList()
     m.musicPanel.visible = (l.key = "music")
     m.gridClip.visible = (l.key <> "search" and l.key <> "music")
     isNew = (l.key = "new")
+    filt = isFilterable(l.key)
     m.tabs.visible = isNew
-    if isNew
+    m.filterBar.visible = filt
+    if filt then paintBar()
+    if isNew or filt
         m.gridClip.translation = [540, 210]
         m.gridClip.clippingRect = [-14, -14, 1310, 740]
         m.empty.translation = [540, 230]
-        paintTabs()
+        if isNew then paintTabs()
     else
         m.gridClip.translation = [540, 140]
         m.gridClip.clippingRect = [-14, -14, 1310, 800]
@@ -430,6 +639,8 @@ sub showList()
             m.empty.text = "No requests yet. Pick something in Trending or Search and press OK."
         else if l.key = "new"
             m.empty.text = "Nothing new here yet. Things you request show up here once they've downloaded."
+        else if isFilterable(l.key) and filtersActive(l.key)
+            m.empty.text = "Nothing matches those filters. Press * to change them."
         else
             m.empty.text = "Nothing here right now."
         end if
@@ -456,7 +667,17 @@ sub buildGrid()
     key = currentList().key
     cards = m.cards[key]
     stamp = key + "|" + m.ver.toStr()
+    if isDiscover(key) and m.gen[key] <> invalid
+        ' the same search keeps its cards and just adds the new pages (re-sorted Trending rebuilds)
+        stamp = key + "|g" + m.gen[key].toStr()
+        if key = "trending" and m.filters.trending.sort <> "popular" then stamp = stamp + "|" + m.pageNo.trending.toStr()
+    end if
     if stamp = m.builtFor and cards <> invalid
+        for i = m.grid.getChildCount() to cards.count() - 1
+            n = m.grid.createChild("ReqCard")
+            n.translation = [(i mod m.cols) * m.pitchX, Int(i / m.cols) * gridPitchY()]
+            n.card = cards[i]
+        end for
         paintGrid()
         return
     end if
@@ -749,6 +970,31 @@ sub showPopup(model as object)
     m.popup = p
     m.zoneBeforePopup = m.zone
     m.zone = "popup"
+    ' Rotten Tomatoes critics score (Overseerr looks it up per title)
+    c = m.popCard
+    if c <> invalid and c.kind = "media" and c.data.id <> invalid
+        rk = c.data.mediaType + c.data.id.toStr()
+        if m.rt[rk] <> invalid
+            if m.rt[rk] <> "" then p.callFunc("setRt", m.rt[rk])
+        else
+            path = "/api/v1/movie/" + c.data.id.toStr() + "/ratingscombined"
+            if c.data.mediaType = "tv" then path = "/api/v1/tv/" + c.data.id.toStr() + "/ratings"
+            oApi("GET", path, invalid, invalid, "onRt", rk)
+        end if
+    end if
+end sub
+
+sub onRt(event as object)
+    t = taskFrom(event)
+    text = ""
+    if t.ok and t.response <> invalid
+        r = t.response
+        if r.rt <> invalid then r = r.rt
+        if r.criticsScore <> invalid then text = "ROTTEN TOMATOES " + Int(r.criticsScore).toStr() + "%"
+    end if
+    m.rt[t.tag] = text
+    c = m.popCard
+    if m.popup <> invalid and text <> "" and c <> invalid and c.data.mediaType + c.data.id.toStr() = t.tag then m.popup.callFunc("setRt", text)
 end sub
 
 sub closePopup()
@@ -1070,6 +1316,11 @@ function onKeyEvent(key as string, press as boolean) as boolean
         m.popup.callFunc("handleKey", key)
         return true
     end if
+    if z = "sheet"
+        m.sheet.callFunc("handleKey", key)
+        return true
+    end if
+    if z = "bar" then return barKey(key)
     if z = "setup"
         edge = m.keyKb.callFunc("handleKey", key)
         if edge = "up" or edge = "back"
@@ -1150,6 +1401,9 @@ function railKey(key as string) as boolean
     else if key = "back"
         toPills()
         return true
+    else if key = "options" and isFilterable(currentList().key)
+        openSheet()
+        return true
     else if key = "right" or key = "OK"
         k = currentList().key
         if k = "search"
@@ -1161,6 +1415,8 @@ function railKey(key as string) as boolean
             m.zone = "grid"
         else if k = "new" and m.newAll <> invalid
             m.zone = "tabs"
+        else if isFilterable(k) and m.cards[k] <> invalid
+            m.zone = "bar"
         end if
     else
         return true
@@ -1190,6 +1446,11 @@ function gridKey(key as string) as boolean
             refreshFocus()
             return true
         end if
+        if i < m.cols and isFilterable(currentList().key)
+            m.zone = "bar"
+            refreshFocus()
+            return true
+        end if
         if i < m.cols
             toPills()
             return true
@@ -1205,6 +1466,9 @@ function gridKey(key as string) as boolean
         m.zone = "rail"
         refreshFocus()
         return true
+    else if key = "options" and isFilterable(currentList().key)
+        openSheet()
+        return true
     else if key = "OK" or key = "options"
         openCard(currentCard())
         return true
@@ -1212,6 +1476,122 @@ function gridKey(key as string) as boolean
     paintGrid()
     return true
 end function
+
+' ================================================================ filter bar and sheet
+
+function filtersActive(key as string) as boolean
+    f = m.filters[key]
+    return f.genres.count() > 0 or f.provider <> "" or f.minRating > 0 or f.sort <> "popular"
+end function
+
+function filterSummary(key as string) as string
+    f = m.filters[key]
+    parts = []
+    if f.genres.count() > 0 then parts.push(f.genres.join(" + "))
+    if f.provider <> ""
+        kind = "movie"
+        if key = "tv" then kind = "tv"
+        for each p in m.provs[kind]
+            if p.id.toStr() = f.provider then parts.push("on " + p.name)
+        end for
+    end if
+    if f.minRating > 0 then parts.push("rated " + f.minRating.toStr() + ".0+")
+    names = { popular: "most popular", rating: "top rated", newest: "newest", az: "A to Z" }
+    parts.push(names[f.sort])
+    n = 0
+    if m.cards[key] <> invalid then n = m.cards[key].count()
+    return n.toStr() + " titles · " + parts.join(" · ")
+end function
+
+sub paintBar()
+    key = currentList().key
+    on = (m.focused and m.zone = "bar")
+    bg = m.top.findNode("barBg")
+    lab = m.top.findNode("barLabel")
+    ico = m.top.findNode("barIcon")
+    m.top.findNode("barRing").visible = on
+    if on
+        bg.blendColor = "0xE0B34AFF"
+        lab.color = "0x1F1606FF"
+        ico.blendColor = "0x1F1606FF"
+    else if filtersActive(key)
+        bg.blendColor = "0xE0B34A55"
+        lab.color = "0xEDE6CAFF"
+        ico.blendColor = "0xEDE6CAFF"
+    else
+        bg.blendColor = "0xFFFFFF12"
+        lab.color = "0xEDE6CAFF"
+        ico.blendColor = "0xEDE6CAFF"
+    end if
+    m.top.findNode("barSum").text = filterSummary(key)
+end sub
+
+function barKey(key as string) as boolean
+    if key = "OK" or key = "options"
+        openSheet()
+        return true
+    else if key = "down"
+        c = m.cards[currentList().key]
+        if c <> invalid and c.count() > 0 then m.zone = "grid"
+    else if key = "up"
+        toPills()
+        return true
+    else if key = "left" or key = "back"
+        m.zone = "rail"
+    end if
+    refreshFocus()
+    return true
+end function
+
+sub openSheet()
+    key = currentList().key
+    if not isFilterable(key) then return
+    genres = []
+    seen = {}
+    kinds = ["movie", "tv"]
+    if key = "movies" then kinds = ["movie"]
+    if key = "tv" then kinds = ["tv"]
+    for each kind in kinds
+        for each g in m.genres[kind]
+            if seen[g.name] = invalid
+                seen[g.name] = true
+                genres.push({ name: g.name })
+            end if
+        end for
+    end for
+    provs = []
+    if key = "movies" then provs = m.provs.movie
+    if key = "tv" then provs = m.provs.tv
+    closeSheet()
+    s = m.sheetHolder.createChild("FilterSheet")
+    s.config = { title: currentList().name, genres: genres, providers: provs, filters: m.filters[key] }
+    s.observeField("result", "onSheetResult")
+    m.sheet = s
+    m.zoneBeforeSheet = m.zone
+    m.zone = "sheet"
+end sub
+
+sub closeSheet()
+    if m.sheet <> invalid
+        m.sheetHolder.removeChild(m.sheet)
+        m.sheet = invalid
+    end if
+end sub
+
+sub onSheetResult(event as object)
+    f = event.getData()
+    key = currentList().key
+    old = m.filters[key]
+    changed = (FormatJson(f) <> FormatJson(old))
+    closeSheet()
+    m.zone = "bar"
+    if changed
+        m.filters[key] = f
+        m.gridIndex = 0
+        loadList(key)
+    end if
+    refreshFocus()
+end sub
 
 function tabsKey(key as string) as boolean
     if key = "left"

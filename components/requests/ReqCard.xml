@@ -5,6 +5,11 @@
     <Rectangle id="bg" width="180" height="270" color="0x1D2418FF" />
     <Label id="fallback" translation="[12, 10]" width="156" height="250" wrap="true" horizAlign="center" vertAlign="center" color="0xEDE6CAFF" />
     <Poster id="poster" width="180" height="270" loadWidth="180" loadHeight="270" loadDisplayMode="scaleToZoom" />
+    <Group id="score" translation="[104, 8]" visible="false">
+      <Rectangle width="68" height="30" color="0x0B0E09D0" />
+      <Poster uri="pkg:/images/requests/star.png" width="16" height="16" translation="[7, 7]" blendColor="0xE0B34AFF" />
+      <Label id="scoreText" translation="[28, 0]" width="38" height="30" vertAlign="center" color="0xE0B34AFF" />
+    </Group>
     <Group id="tile" visible="false">
       <Poster uri="pkg:/images/tile.9.png" blendColor="0xFFFFFF0F" width="180" height="270" />
       <Poster id="tileIcon" translation="[58, 70]" width="64" height="64" blendColor="0xE0B34AFF" />

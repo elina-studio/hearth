@@ -1,6 +1,7 @@
 sub init()
     m.top.findNode("eyebrow").font = hFont("caps", 26)
     m.top.findNode("rating").font = hFont("caps", 26)
+    m.top.findNode("rt").font = hFont("caps", 26)
     m.top.findNode("title").font = hFont("caps", 64)
     m.top.findNode("overview").font = hFont("regular", 24)
     m.items = m.top.findNode("items")
@@ -180,4 +181,14 @@ sub setLabel(args as object)
         if m.list[i].tag = args.tag then m.list[i].label = args.label
     end for
     drawItems()
+end sub
+
+' Rotten Tomatoes critics score, shown after the TMDB rating once Overseerr has fetched it
+sub setRt(text as string)
+    rt = m.top.findNode("rt")
+    rt.text = text
+    x = m.top.findNode("eyebrow").boundingRect().width + 14
+    rating = m.top.findNode("rating")
+    if rating.visible then x = rating.translation[0] + rating.boundingRect().width + 28
+    rt.translation = [x, 0]
 end sub

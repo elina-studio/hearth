@@ -94,7 +94,11 @@ function rqMediaCard(r as object) as object
     if r.mediaInfo <> invalid then status = rqNum(r.mediaInfo.status)
     title = rqTitle(r)
     data = { id: r.id, mediaType: r.mediaType, title: title, year: rqYear(r), overview: r.overview, backdrop: r.backdropPath, poster: r.posterPath, rating: r.voteAverage, mediaStatus: status }
-    return { kind: "media", title: title, image: rqImage(r.posterPath, "w185"), chip: rqMediaChip(status), progress: -1, data: data }
+    ' score = the TMDB audience score on the poster; genreIds and date feed the Trending filters
+    date = r.releaseDate
+    if date = invalid then date = r.firstAirDate
+    if date = invalid then date = ""
+    return { kind: "media", title: title, image: rqImage(r.posterPath, "w185"), chip: rqMediaChip(status), progress: -1, data: data, score: rqRating(r.voteAverage), vote: r.voteAverage, genreIds: r.genreIds, date: date }
 end function
 
 ' One of your requests (q) with its title details (info) from OverseerrTask mode "requests".

@@ -12,6 +12,13 @@
         <Label id="title" translation="[0, 34]" width="1280" maxLines="1" color="0xEDE6CAFF" />
       </Group>
       <Group id="tabs" translation="[540, 128]" visible="false" />
+      <Group id="filterBar" translation="[540, 128]" visible="false">
+        <Poster id="barBg" uri="pkg:/images/pill.9.png" width="236" height="52" blendColor="0xFFFFFF12" />
+        <Poster id="barIcon" uri="pkg:/images/requests/list.png" width="24" height="24" translation="[22, 14]" blendColor="0xEDE6CAFF" />
+        <Label id="barLabel" translation="[58, 0]" height="52" vertAlign="center" text="Filter &amp; sort" color="0xEDE6CAFF" />
+        <Poster id="barRing" uri="pkg:/images/pill-ring.9.png" blendColor="0xFFF3D0FF" translation="[-5, -5]" width="246" height="62" visible="false" />
+        <Label id="barSum" translation="[262, 0]" width="1040" height="52" vertAlign="center" color="0xB5AF8CFF" />
+      </Group>
       <Group id="gridClip" translation="[540, 140]" clippingRect="[-14, -14, 1310, 800]">
         <Group id="grid" />
       </Group>
@@ -40,6 +47,7 @@
       <Label id="toastHint" height="76" vertAlign="center" color="0xB5AF8CFF" />
     </Group>
     <Group id="popupHolder" />
+    <Group id="sheetHolder" />
     <Timer id="toastTimer" duration="4" />
     <Timer id="undoTimer" duration="1" repeat="true" />
     <Timer id="detailTimer" duration="0.4" />
