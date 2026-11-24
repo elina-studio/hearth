@@ -331,7 +331,35 @@ function soon(room, name) {
 
 /* ---------- Home ---------- */
 const MOODS = [['hearth', 'Hearth'], ['rain', 'Rain'], ['fireflies', 'Fireflies'], ['lightsout', 'Lights out']];
+const TN = { eps: [], movies: [], lists: [], bump: 0 };
+const tnLen = min => min >= 60 ? (min % 60 ? Math.floor(min / 60) + ' h ' + (min % 60) : Math.floor(min / 60) + ' h') : min + ' min';
+// A short episode, a film and a playlist for the time of day; the date and time bucket seed the choice (same as the Roku)
+function pickTonight() {
+  if (cur !== 'Home' || !$('#rows')) return;
+  const t = new Date(), h = t.getHours(), dow = t.getDay();
+  const late = h >= 22 || h < 5; const bucket = late ? 3 : h >= 17 ? 2 : h >= 11 ? 1 : 0;
+  const note = ['Morning', 'Afternoon', 'Evening', 'Late evening'][bucket];
+  const epMax = late ? 25 : bucket === 2 ? 35 : 45, movieMax = late || (bucket === 2 && dow >= 1 && dow <= 5) ? 100 : 180;
+  const seed = t.getFullYear() * 372 + (t.getMonth() + 1) * 31 + t.getDate() + bucket * 7 + TN.bump;
+  const mins = x => Math.round((x.duration || 0) / 60000);
+  const out = [];
+  let c = TN.eps.filter(x => mins(x) > 0 && mins(x) <= epMax);
+  if (!c.length && TN.eps.length) c = [TN.eps.slice().sort((a, b) => mins(a) - mins(b))[0]];
+  if (c.length) { const it = c[seed % c.length], cd = cardOf(it); out.push({ a: `data-a="play" data-k="${it.ratingKey}" data-t="${it.type}"`, ic: 'episode', kick: 'A QUICK ONE · ' + tnLen(mins(it)).toUpperCase(), title: cd.title, pic: img(cd.pic, 296, 90) }); }
+  c = TN.movies.filter(x => mins(x) > 0 && mins(x) <= movieMax);
+  if (c.length) { const it = c[(seed * 3 + 1) % c.length]; out.push({ a: `data-a="play" data-k="${it.ratingKey}" data-t="movie"`, ic: 'film', kick: 'A FILM · ' + tnLen(mins(it)).toUpperCase(), title: it.title, pic: img(it.art || it.thumb, 296, 90) }); }
+  let ls = TN.lists; const calm = ls.filter(x => /calm|quiet|soft|sleep|wind|chill|night|evening|ambient|relax|mellow|lull/i.test(x.title));
+  if (bucket >= 2 && calm.length) ls = calm;
+  if (ls.length) { const it = ls[(seed * 5 + 2) % ls.length], m2 = mins(it); out.push({ a: `data-a="album" data-k="${it.ratingKey}" data-t="playlist"`, ic: 'home-note', kick: 'A PLAYLIST' + (m2 ? ' · ' + tnLen(m2).toUpperCase() : ''), title: it.title, pic: img(it.composite || it.thumb, 300, 300) }); }
+  const old = $('#tonight'); const had = old && old.contains(focusEl); if (old) old.remove();
+  if (!out.length) return;
+  const sec = document.createElement('div'); sec.id = 'tonight'; sec.dataset.o = -1;
+  sec.innerHTML = hd('Tonight', note) + `<div class="row">${out.map(o => `<div class="fx card tn" ${o.a}><div class="img" data-bg="${o.pic}"></div><div class="tk"><i class="ic" style="--m:url(img/icons/${o.ic}.png)"></i>${esc(o.kick)}</div><div class="t">${esc(o.title)}</div></div>`).join('')}</div>`;
+  const rows = $('#rows'); rows.insertBefore(sec, rows.firstChild);
+  if (had) setFocus($('.fx', sec));
+}
 async function roomHome(room, tok) {
+  TN.eps = []; TN.movies = []; TN.lists = [];
   await libs();
   const mood = MOODS.map(([m, n]) => `<div class="fx mtile" data-a="mood" data-m="${m}" style="background-image:url(img/tile-${m}.jpg)"><b>${n}</b></div>`).join('');
   room.innerHTML = `<div class="scroll">
@@ -350,6 +378,7 @@ async function roomHome(room, tok) {
     const resume = items.find(m => m.viewOffset > 0);
     fillHero(resume);
     const nextUp = items.filter(m => m.type === 'episode' && !m.viewOffset);
+    TN.eps = nextUp; pickTonight();
     addRow('Next up', 'to watch', nextUp.map(cardHTML), 0);
   }).catch(() => { if (tok === renderTok) $('#hero').innerHTML = `<div class="kick" style="position:absolute;left:40px;top:24px;color:var(--ember)">Can't reach your library</div><h1 style="position:absolute;left:40px;top:60px;margin:0;font:700 60px HearthSans">NAS OFFLINE?</h1>`; });
   pj('/library/recentlyAdded', { 'X-Plex-Container-Size': 60 }).then(mc => {
@@ -360,12 +389,14 @@ async function roomHome(room, tok) {
       const key = m.type === 'movie' ? m.ratingKey : (m.grandparentTitle || m.parentTitle || m.title);
       if (seen.has(key)) continue; seen.add(key); out.push(m);
     }
+    TN.movies = (mc.Metadata || []).filter(m => m.type === 'movie' && !hiddenItem(m) && !m.viewCount); pickTonight();
     addRow('Recently added', 'new', out.slice(0, 20).map(cardHTML), 1);
   }).catch(() => {});
   if (musicLib) pj(`/library/sections/${musicLib.key}/albums`, { sort: 'addedAt:desc', 'X-Plex-Container-Size': 20 }).then(mc => {
     if (tok !== renderTok) return;
     addRow('Music · new albums', 'albums', (mc.Metadata || []).map(albumHTML), 2);
   }).catch(() => {});
+  pj('/playlists', { playlistType: 'audio' }).then(mc => { TN.lists = (mc.Metadata || []).filter(x => x.leafCount > 0); pickTonight(); }).catch(() => {});
   fetch('/px/overseerr/api/v1/request/count').then(r => r.json()).then(c => {
     if (tok !== renderTok) return;
     $('#rn').textContent = (c.pending || 0) + (c.processing || 0);
