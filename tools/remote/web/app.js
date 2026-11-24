@@ -267,7 +267,7 @@ function remoteKey(k) {
 const ROOMS = ['Home', 'Shows', 'Movies', 'Music', 'Requests', 'Ambiance', 'Photos', 'Search', 'Test'];
 const LIVE = new Set(['Home', 'Shows', 'Movies', 'Music', 'Requests', 'Ambiance', 'Photos', 'Search', 'Test']);
 let cur = 'Home', renderTok = 0, autoF = null;
-const RBX = { Home: [280, 101], Shows: [420, 121], Movies: [578, 133], Music: [750, 111], Requests: [899, 174], Ambiance: [1111, 182], Photos: [1332, 134], Search: [1504, 136] };
+const RBX = { Home: [100, 101], Shows: [240, 121], Movies: [398, 133], Music: [570, 111], Requests: [719, 174], Ambiance: [931, 182], Photos: [1152, 134], Search: [1324, 136] };
 function drawBar() {
   $('#rooms').innerHTML = ROOMS.map(r => `<div class="fx rm ${RBX[r] ? '' : 'tst'} ${r === cur ? 'cur' : ''}" data-a="room" data-r="${r}">${RBX[r] ? '' : r}</div>`).join('')
     + '<img class="bf" id="bglow" src="img/w/firefly-glow.png" alt=""><img class="bf" id="bf1" src="img/w/firefly-small.png" width="48" height="48" alt=""><img class="bf" id="bf2" src="img/w/firefly-small.png" width="48" height="48" style="opacity:.45" alt=""><img class="bf" id="bfly" src="img/w/firefly-main.png" width="64" height="64" alt="">';
