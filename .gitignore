@@ -1,3 +1,10 @@
 out/
 node_modules/
 __pycache__/
+
+# helper secrets and caches (never commit)
+.env
+tools/remote/data/
+tools/remote/.env
+hearth-keys.json
+helper-token

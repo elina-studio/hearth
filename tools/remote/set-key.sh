@@ -13,8 +13,10 @@ read -r -p "$S address [http://192.168.254.41:$P]: " URL; URL=${URL:-http://192.
 read -r -s -p "Paste the $S key (hidden): " KEY; echo
 [ -z "$KEY" ] && { echo "No key entered, nothing changed."; exit 1; }
 curl -s -X POST -G --data-urlencode "$UK=$URL" --data-urlencode "$KK=$KEY" "http://$TV:8060/input" && echo "sent to the TV"
-OLD=$(curl -s --max-time 4 http://192.168.254.41:8765/api/keys); OLD=${OLD:-\{\}}
+CTL="-o ControlMaster=auto -o ControlPath=/tmp/hearth-ssh-%r-%h -o ControlPersist=300"
+ssh -t $CTL "$NAS" "sudo -v" || exit 1
+OLD=$(ssh $CTL "$NAS" "sudo cat /volume1/docker/hearth-remote/data/hearth-keys.json" 2>/dev/null | tr -d '\r'); OLD=${OLD:-\{\}}
 OLD=$(echo "$OLD" | sed -E "s/\"$UK\": *\"[^\"]*\",? *//; s/\"$KK\": *\"[^\"]*\",? *//; s/,\\s*}/}/")
 NEW="${OLD%\}}"; [ "$NEW" = "{" ] && SEP="" || SEP=","
 NEW="$NEW$SEP\"$UK\":\"$URL\",\"$KK\":\"$KEY\"}"
-printf '%s' "$NEW" | ssh -t "$NAS" "sudo tee /volume1/docker/hearth-remote/data/hearth-keys.json >/dev/null && echo saved on the NAS"
+printf '%s' "$NEW" | ssh $CTL "$NAS" "sudo tee /volume1/docker/hearth-remote/data/hearth-keys.json >/dev/null && echo saved on the NAS"

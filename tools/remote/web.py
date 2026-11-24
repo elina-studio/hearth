@@ -86,6 +86,12 @@ def proxy(h, method, path):
         h.send_json({"error": "no key saved for %s (run save-keys.sh)" % segs[2]}, 503)
         return
     rest = "/" + urllib.parse.unquote(segs[3] if len(segs) > 3 else "")
+    if ".." in rest.split("/") or "\\" in rest or "\x00" in rest:
+        h.send_json({"error": "bad path"}, 400)
+        return
+    if method not in ("GET", "HEAD", "POST", "DELETE"):
+        h.send_json({"error": "not allowed"}, 405)
+        return
     query = urllib.parse.parse_qsl(parts.query, keep_blank_values=True)
     is_pic = kind == "plex" and method == "GET" and rest.startswith("/photo/:/transcode")
     headers = {"Accept": "*/*" if is_pic else h.headers.get("Accept", "*/*")}
@@ -123,6 +129,9 @@ def proxy(h, method, path):
             headers[name] = h.headers[name]
     body = None
     n = int(h.headers.get("Content-Length") or 0)
+    if n < 0 or n > 2 * 1024 * 1024:
+        h.send_json({"error": "too big"}, 413)
+        return
     if n:
         body = h.rfile.read(n)
     u = urllib.parse.urlsplit(base)
@@ -131,7 +140,8 @@ def proxy(h, method, path):
         conn.request(method, urllib.parse.quote(rest, safe="/:@!$&'()*+,;=-._~") + "?" + urllib.parse.urlencode(query), body=body, headers=headers)
         r = conn.getresponse()
     except Exception as e:
-        h.send_json({"error": "can't reach %s: %s" % (segs[2], e)}, 502)
+        print("proxy error:", segs[2], e, flush=True)
+        h.send_json({"error": "can't reach %s" % segs[2]}, 502)
         return
     if cache_file and r.status == 200:
         data = r.read()
@@ -156,7 +166,6 @@ def proxy(h, method, path):
         v = r.getheader(name)
         if v:
             h.send_header(name, v)
-    h.send_header("Access-Control-Allow-Origin", "*")
     h.end_headers()
     if method == "HEAD":
         conn.close()

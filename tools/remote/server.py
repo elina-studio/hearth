@@ -14,6 +14,7 @@ Settings (environment):
   WHISPER_LANG   spoken language           (default en)
   DATA_DIR       where the HTTPS cert, lyrics cache and Last.fm session live (default /data)
   LASTFM_API_KEY / LASTFM_API_SECRET / PUBLIC_URL   Last.fm scrobbling (lastfm.py)
+  HELPER_TOKEN   the house key (default: made on first start in DATA_DIR/helper-token); see guard.py
   MUSIC_ROOT     folder .lrc lyrics files may be read from (default /volume1, mounted read-only)
 """
 import json
@@ -21,11 +22,14 @@ import os
 import socket
 import ssl
 import subprocess
+import sys
+import traceback
 import threading
 import urllib.parse
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+import guard
 import lastfm
 import lyrics
 import web
@@ -45,6 +49,17 @@ KEYS = {
     "InstantReplay", "Info", "Backspace", "Search", "Enter",
     "VolumeDown", "VolumeUp", "VolumeMute", "PowerOff", "PowerOn",
 }
+
+class TooBig(Exception):
+    pass
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, *a, **k):
+        return None
+
+
+_no_redirect = urllib.request.build_opener(_NoRedirect)
 
 ecp_lock = threading.Lock()  # one ECP call at a time keeps keys in order
 
@@ -117,6 +132,49 @@ class Handler(BaseHTTPRequestHandler):
     def log_message(self, fmt, *args):
         pass  # quiet; errors still print below
 
+    _ct = ""
+
+    def send_header(self, k, v):
+        if k.lower() == "content-type":
+            self._ct = v
+        super().send_header(k, v)
+
+    def end_headers(self):
+        for k, v in guard.SEC_HEADERS:
+            super().send_header(k, v)
+        if self._ct.startswith("text/html"):
+            super().send_header("Content-Security-Policy", guard.CSP)
+        super().end_headers()
+
+    def gate(self, path):
+        """True when the caller may go on. Otherwise the answer is already sent."""
+        q = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+        who = guard.check(self.client_address[0], path, self.headers, (q.get("t") or [""])[0])
+        if who in ("open", "tv", "token"):
+            return True
+        if who == "query":
+            if self.command == "GET" and not path.startswith(("/api/", "/px/")):
+                # keep the key in a cookie, then drop it from the address bar
+                rest = urllib.parse.urlencode([(k, v) for k, vs in q.items() if k != "t" for v in vs])
+                self.send_response(302)
+                secure = "; Secure" if self.server.is_https else ""
+                self.send_header("Set-Cookie", "%s=%s; Path=/; Max-Age=31536000; HttpOnly; SameSite=Strict%s" % (guard.COOKIE, guard.TOKEN, secure))
+                self.send_header("Location", path + ("?" + rest if rest else ""))
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+                return False
+            return True
+        if who == "locked":
+            self.send_json({"error": "too many tries, wait a minute"}, 429)
+        elif path.startswith(("/api/", "/px/")):
+            self.send_json({"error": "locked: open the helper with the house key first"}, 401)
+        else:
+            self.send_html("<!doctype html><meta name=viewport content='width=device-width'><body style='font:18px Georgia,serif;background:#0b100c;color:#e6dfc8;padding:32px'>"
+                           "<h2>Hearth</h2><p>This page needs the house key. Open the link that ends in <code>?t=...</code> "
+                           "(the setup step printed it).</p>", 401)
+        return False
+
     def send_json(self, obj, code=200):
         body = json.dumps(obj).encode()
         self.send_response(code)
@@ -126,9 +184,9 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
-    def send_html(self, text):
+    def send_html(self, text, code=200):
         body = text.encode()
-        self.send_response(200)
+        self.send_response(code)
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Cache-Control", "no-store")
         self.send_header("Content-Length", str(len(body)))
@@ -152,18 +210,24 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
-    def body(self):
+    def body(self, limit=262144):
         n = int(self.headers.get("Content-Length") or 0)
+        if n > limit or n < 0:
+            raise TooBig()
         return self.rfile.read(n) if n else b""
 
     def do_HEAD(self):
         path = self.path.split("?")[0]
+        if not self.gate(path):
+            return
         if path.startswith("/px/"):
             return web.proxy(self, "HEAD", path)
         self.send_json({"error": "not found"}, 404)
 
     def do_GET(self):
         path = self.path.split("?")[0]
+        if not self.gate(path):
+            return
         if path.startswith("/px/"):
             return web.proxy(self, "GET", path)
         if path == "/hearth" or path.startswith("/hearth/"):
@@ -220,6 +284,14 @@ class Handler(BaseHTTPRequestHandler):
         else:
             self.send_json({"error": "not found"}, 404)
 
+    def round_url_ok(self, url):
+        # only http pictures from the Plex server this NAS already talks to (stops the helper being used to poke other devices)
+        u = urllib.parse.urlsplit(url)
+        if u.scheme != "http" or not u.hostname:
+            return False
+        allowed = {urllib.parse.urlsplit(web.keys().get("plexServer") or "http://192.168.254.41:32400").hostname, "192.168.254.41"}
+        return u.hostname in allowed
+
     def round_image(self):
         # a picture cut to a circle with real transparency (Roku can't clip): ?u=<image url>&s=<size>
         q = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
@@ -228,7 +300,7 @@ class Handler(BaseHTTPRequestHandler):
             size = max(32, min(600, int((q.get("s") or ["200"])[0])))
         except ValueError:
             size = 200
-        if not url.startswith("http://"):
+        if not self.round_url_ok(url):
             self.send_json({"error": "bad url"}, 400)
             return
         import hashlib
@@ -239,7 +311,7 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 from PIL import Image, ImageDraw
                 import io
-                raw = urllib.request.urlopen(url, timeout=10).read()
+                raw = _no_redirect.open(url, timeout=10).read(12 * 1024 * 1024)
                 im = Image.open(io.BytesIO(raw)).convert("RGBA")
                 w, h = im.size
                 side = min(w, h)
@@ -249,7 +321,8 @@ class Handler(BaseHTTPRequestHandler):
                 im.putalpha(big.resize((size, size), Image.LANCZOS))
                 im.save(f, "PNG")
             except Exception as e:
-                self.send_json({"error": str(e)}, 502)
+                print("round image error:", e, flush=True)
+                self.send_json({"error": "could not make the picture"}, 502)
                 return
         with open(f, "rb") as fh:
             body = fh.read()
@@ -279,17 +352,21 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_DELETE(self):
         path = self.path.split("?")[0]
+        if not self.gate(path):
+            return
         if path.startswith("/px/"):
             return web.proxy(self, "DELETE", path)
         self.send_json({"error": "not found"}, 404)
 
     def do_POST(self):
         path = self.path.split("?")[0]
+        if not self.gate(path):
+            return
         if path.startswith("/px/"):
             return web.proxy(self, "POST", path)
         try:
             if path == "/api/voice":
-                pcm = self.body()
+                pcm = self.body(8 * 1024 * 1024)
                 if len(pcm) < 3200:
                     return self.send_json({"text": ""})
                 return self.send_json({"text": transcribe(pcm)})
@@ -336,10 +413,14 @@ class Handler(BaseHTTPRequestHandler):
             else:
                 return self.send_json({"error": "not found"}, 404)
             self.send_json({"ok": True})
+        except TooBig:
+            self.send_json({"error": "too big"}, 413)
         except (OSError, urllib.error.URLError) as e:
-            self.send_json({"error": "Can't reach %s: %s" % (path.startswith("/api/voice") and "whisper" or "the TV", e)}, 502)
-        except Exception as e:
-            self.send_json({"error": str(e)}, 500)
+            print("upstream error:", path, e, flush=True)
+            self.send_json({"error": "Can't reach %s" % (path.startswith("/api/voice") and "whisper" or "the TV")}, 502)
+        except Exception:
+            traceback.print_exc()
+            self.send_json({"error": "something went wrong"}, 500)
 
 
 def make_cert():
@@ -358,11 +439,14 @@ def make_cert():
 
 def main():
     servers = [ThreadingHTTPServer(("0.0.0.0", HTTP_PORT), Handler)]
+    servers[0].is_https = False
     if HTTPS_PORT:
         try:
             crt, key = make_cert()
             s = ThreadingHTTPServer(("0.0.0.0", HTTPS_PORT), Handler)
+            s.is_https = True
             ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+            ctx.minimum_version = ssl.TLSVersion.TLSv1_2
             ctx.load_cert_chain(crt, key)
             s.socket = ctx.wrap_socket(s.socket, server_side=True)
             servers.append(s)
@@ -372,6 +456,7 @@ def main():
         threading.Thread(target=s.serve_forever, daemon=True).start()
     print("Hearth remote: http :%d%s, TV %s, whisper %s:%d" % (
         HTTP_PORT, (", https :%d" % HTTPS_PORT) if len(servers) > 1 else "", TV_IP, WHISPER_HOST, WHISPER_PORT), flush=True)
+    print("House key in %s (the TV %s is let in without it; phones open /?t=<key> once)" % (os.path.join(DATA_DIR, "helper-token"), TV_IP), flush=True)
     threading.Thread(target=lastfm.worker, daemon=True).start()
     servers[0].serve_forever()
 

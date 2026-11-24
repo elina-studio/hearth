@@ -46,3 +46,12 @@ page never holds a password.
   plain `http://192.168.254.41:8765/hearth/` also works if the browser allows it).
 - Ready: Home, Music, Ambiance, Test video. Movies, Shows, Requests, Photos and Search show a
   placeholder until they are ported.
+
+## House key (security)
+
+The helper now refuses anyone without the house key. It is made on first start and kept in `data/helper-token` (mode 600), or set with `HELPER_TOKEN`.
+- The TV is let in by its address (`TV_IP`) for `/api/*` and the Last.fm QR, so key restore, lyrics and scrobbling keep working with nothing to configure.
+- A phone or the projector page opens `http://<nas>:8765/?t=<key>` once; the helper keeps it in a cookie. `tools/remote/show-link.sh` (run on the Mac) prints both links.
+- Scripts send it as the header `X-Hearth-Token`.
+- Ten wrong tries from one address lock that address out for a minute.
+- Responses carry security headers and a Content-Security-Policy; the old `Access-Control-Allow-Origin: *` is gone; request bodies are capped; `/api/round` only fetches pictures from the Plex server.
