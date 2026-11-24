@@ -660,7 +660,9 @@ async function playItem(rk, type, o) {
   } else md = (await pj('/library/metadata/' + rk)).Metadata?.[0];
   if (!md) { toast('Plex has no such item'); return; }
   const media = md.Media?.[0], part = media?.Part?.[0];
-  const full = (await pj('/library/metadata/' + md.ratingKey)).Metadata?.[0] || md;
+  const full = (await pj('/library/metadata/' + md.ratingKey, { includeMarkers: 1, includeChapters: 1 })).Metadata?.[0] || md;
+  let nextEp = null;
+  if (full.type === 'episode' && full.grandparentRatingKey) { try { const all = (await pj(`/library/metadata/${full.grandparentRatingKey}/allLeaves`)).Metadata || []; const i = all.findIndex(x => x.ratingKey === full.ratingKey); nextEp = i >= 0 ? all[i + 1] || null : null; } catch (e) { /* no next */ } }
   const dur = (full.duration || 0) / 1000;
   let start = o.from != null ? o.from : ((full.viewOffset || 0) / 1000);
   if (dur && (start < 10 || start > dur * .95)) start = 0;
@@ -671,7 +673,7 @@ async function playItem(rk, type, o) {
   let audId = o.audio !== undefined ? o.audio : audDef, subId = o.sub !== undefined ? o.sub : defSub(full);
   if (mode === 'direct' && audId && audId !== audDef) mode = 'hls1080';
   const sub = full.type === 'episode' ? `${full.grandparentTitle} · S${full.parentIndex} E${full.index}` : (full.year || '');
-  const L = openLayer('player', `<video id="pv" playsinline poster="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" disablepictureinpicture disableremoteplayback controlslist="nodownload noremoteplayback"></video><div class="hudbox"><div class="stats" id="pst"></div><div class="subs" id="psub"></div><div class="pov show" id="pov"><h3>${esc(full.type === 'episode' ? full.title : full.title)}</h3><div class="sub">${esc(sub)}</div><div class="tm"><span id="pcur">0:00</span><div class="tr"><i id="pbar"></i></div><span id="pdur">${fmt(dur)}</span></div><div class="pbtns"><div class="fx chip" data-a="back">‹ Back</div><div class="fx chip" data-a="pseek" data-d="-10">⏪ 10s</div><div class="fx chip live" data-a="ppp">Play / Pause</div><div class="fx chip" data-a="pseek" data-d="30">30s ⏩</div><div class="fx chip" data-a="pcc">CC</div><div class="fx chip" data-a="paud">Audio</div><div class="fx chip" data-a="pstats">Stats</div></div></div><div class="msg" id="pmsg" style="display:none"></div></div>`, {
+  const L = openLayer('player', `<video id="pv" playsinline poster="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" disablepictureinpicture disableremoteplayback controlslist="nodownload noremoteplayback"></video><div class="hudbox"><div class="stats" id="pst"></div><div class="subs" id="psub"></div><div class="pov show" id="pov"><h3>${esc(full.type === 'episode' ? full.title : full.title)}</h3><div class="sub">${esc(sub)}</div><div class="tm"><span id="pcur">0:00</span><div class="tr"><i id="pbar"></i></div><span id="pdur">${fmt(dur)}</span></div><div class="pbtns"><div class="fx chip" data-a="back">‹ Back</div><div class="fx chip" data-a="pseek" data-d="-10">⏪ 10s</div><div class="fx chip live" data-a="ppp">Play / Pause</div><div class="fx chip" data-a="pseek" data-d="30">30s ⏩</div><div class="fx chip" data-a="pchap">Chapters</div><div class="fx chip" data-a="pcc">CC</div><div class="fx chip" data-a="paud">Audio</div><div class="fx chip" data-a="pstats">Stats</div></div></div><div class="msg" id="pmsg" style="display:none"></div><div class="fx skipb" id="pskip" data-a="pskip" style="display:none">Skip intro ›</div><div class="pausescr" id="ppause"><div class="pk">PAUSED</div><div class="pt">${esc(full.title)}</div><div class="ps">${esc(sub)}</div><div class="pc" id="ppch"></div></div><div class="upnext" id="pup" style="display:none"><div class="uk">UP NEXT</div><div class="ut" id="put"></div><div class="us" id="pus"></div><div class="ub"><div class="fx chip live" data-a="pupplay">Play now</div><div class="fx chip" data-a="pupno">Watch credits</div></div></div></div>`, {
     onKey(e) {
       const v = L.v, k = e.key;
       if (k === ' ' || k === 'Enter' || k === 'MediaPlayPause') { v.paused ? v.play() : v.pause(); L.hud(); return true; }
@@ -722,6 +724,35 @@ async function playItem(rk, type, o) {
     $('#pcur', L.el).textContent = fmt(L.pos()); $('#pbar', L.el).style.width = (dur ? L.pos() / dur * 100 : 0) + '%';
     if (L.stats) { const q = v.getVideoPlaybackQuality ? v.getVideoPlaybackQuality() : {}; const buf = v.buffered.length ? v.buffered.end(v.buffered.length - 1) - v.currentTime : 0; $('#pst', L.el).textContent = `mode      ${L.mode}\nsource    ${media?.container}/${media?.videoCodec}/${media?.audioCodec} ${media?.width}x${media?.height}\nshown     ${v.videoWidth}x${v.videoHeight}\ndropped   ${q.droppedVideoFrames || 0} of ${q.totalVideoFrames || 0}\nbuffered  ${buf.toFixed(1)}s\nposition  ${fmt(L.pos())}`; }
   }, 500);
+  // Skip intro, Up next, pause screen (same rules as the Roku player)
+  const marks = full.Marker || [], chaps = full.Chapter || [];
+  let intro = null, creditsAt = null; L.upDone = false; L.skipDone = false;
+  for (const mk of marks) {
+    if (mk.type === 'intro' && !intro && mk.endTimeOffset > mk.startTimeOffset + 5000 && mk.endTimeOffset / 1000 < dur * .5) intro = [mk.startTimeOffset / 1000, mk.endTimeOffset / 1000];
+    if (mk.type === 'credits' && mk.startTimeOffset / 1000 > dur * .5) creditsAt = Math.max(creditsAt || 0, mk.startTimeOffset / 1000);
+  }
+  if (creditsAt == null && dur > 120) creditsAt = dur - Math.min(40, dur * .08);
+  const chapAt = p => { let c = null; for (const x of chaps) if (x.startTimeOffset / 1000 <= p) c = x; return c; };
+  L.step = () => {
+    const p = L.pos(), skip = $('#pskip', L.el), up = $('#pup', L.el);
+    const inIntro = intro && !L.skipDone && p >= intro[0] - 1 && p < intro[1] - 1 && !v.paused;
+    skip.style.display = inIntro ? 'block' : 'none';
+    if (inIntro && !focusEl) setFocus(skip);
+    if (nextEp && creditsAt != null && !L.upDone && p >= creditsAt && !v.paused) {
+      L.upDone = true; L.upLeft = PREF('autoplay', 'on') === 'off' ? 0 : 10;
+      $('#put', L.el).textContent = (nextEp.title || 'Next episode'); $('#pus', L.el).textContent = `S${nextEp.parentIndex} E${nextEp.index}`;
+      up.style.display = 'block'; setFocus($('#pup .fx', L.el));
+      clearInterval(L.upT);
+      if (L.upLeft) L.upT = setInterval(() => { L.upLeft--; $('#pus', L.el).textContent = `S${nextEp.parentIndex} E${nextEp.index}  ·  playing in ${L.upLeft}`; if (L.upLeft <= 0) { clearInterval(L.upT); L.goNext(); } }, 1000);
+    }
+    const pa = $('#ppause', L.el); const showP = v.paused && !L.closing && !$('#pmenu', L.el);
+    pa.classList.toggle('on', showP);
+    if (showP) { const c = chapAt(p); $('#ppch', L.el).textContent = (c ? (c.tag || 'Chapter') + '  ·  ' : '') + fmt(p) + ' of ' + fmt(dur); }
+  };
+  L.goNext = () => { clearInterval(L.upT); fetch(`${PX}/:/scrobble?key=${full.ratingKey}&identifier=com.plexapp.plugins.library`).catch(() => {}); closeLayer(); setTimeout(() => playItem(nextEp.ratingKey, 'episode', { from: 0 }).catch(e => toast(e.message)), 350); };
+  L.doSkip = () => { L.skipDone = true; $('#pskip', L.el).style.display = 'none'; L.seekTo(intro[1]); setFocus(null); };
+  L.pickChap = () => { if (!chaps.length) { toast('No chapters in this one'); return; } L.menu('Chapters', chaps.map((c, i) => ({ label: `${fmt(c.startTimeOffset / 1000)}  ${c.tag || 'Chapter ' + (i + 1)}`, on: chapAt(L.pos()) === c })), i => L.seekTo(chaps[i].startTimeOffset / 1000)); };
+  L.stepT = setInterval(L.step, 400);
   L.rt = setInterval(() => report(v.paused ? 'paused' : 'playing'), 10000);
   v.addEventListener('ended', () => { fetch(`${PX}/:/scrobble?key=${full.ratingKey}&identifier=com.plexapp.plugins.library`).catch(() => {}); closeLayer(); });
   L.cues = [];
@@ -757,7 +788,7 @@ async function playItem(rk, type, o) {
   };
   L.setSub(subId);
   aud.pause(); M.playing = false; M.paint();
-  L.close = () => { clearInterval(L.iv); clearInterval(L.rt); clearInterval(L.subTick); clearTimeout(L.ht); report('stopped'); if (L.hls) L.hls.destroy(); v.pause(); v.removeAttribute('src'); v.load(); if (L.mode !== 'direct') fetch(`${PX}/video/:/transcode/universal/stop?session=${session}`).catch(() => {}); };
+  L.close = () => { L.closing = true; clearInterval(L.stepT); clearInterval(L.upT); clearInterval(L.iv); clearInterval(L.rt); clearInterval(L.subTick); clearTimeout(L.ht); report('stopped'); if (L.hls) L.hls.destroy(); v.pause(); v.removeAttribute('src'); v.load(); if (L.mode !== 'direct') fetch(`${PX}/video/:/transcode/universal/stop?session=${session}`).catch(() => {}); };
   load(mode, mode === 'direct' ? start : start);
   L.hud(); setFocus(null);
 }
@@ -1642,6 +1673,10 @@ function act(el) {
   else if (a === 'ep') { const L = layers[layers.length - 1]; L.epSel = +d.i; playTarget(L, null, L.eps[+d.i]); }
   else if (a === 'season') { const L = layers[layers.length - 1]; L.sIdx = +d.i; L.loadEps().then(() => { L.drawTabs(); L.drawEps(); setFocus($$('.stab', L.el)[L.sIdx]); }); }
   else if (a === 'shuffle') { const L = layers[layers.length - 1]; const e = L.eps[Math.random() * L.eps.length | 0]; playTarget(L, 0, e); }
+  else if (a === 'pskip') layers[layers.length - 1].doSkip();
+  else if (a === 'pupplay') layers[layers.length - 1].goNext();
+  else if (a === 'pupno') { const L = layers[layers.length - 1]; clearInterval(L.upT); $('#pup', L.el).style.display = 'none'; setFocus(null); }
+  else if (a === 'pchap') layers[layers.length - 1].pickChap();
   else if (a === 'clip') playItem(d.k, 'clip', { from: 0 }).catch(e => toast(e.message));
   else if (a === 'skey') { const c = d.c; if (c === '⌫') SR.set(SR.text.slice(0, -1)); else if (c === '⌧') SR.set(''); else SR.set(SR.text + c); }
   else if (a === 'spick') SR.set(d.t);
