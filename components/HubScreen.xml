@@ -1,10 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The hub: lantern, room pills, clock, and the current room underneath. -->
+<!-- The hub: room pills, clock, and the current room underneath. -->
 <component name="HubScreen" extends="Group">
   <children>
     <Group id="roomHolder" translation="[0, 150]" />
     <Rectangle id="topShade" width="1920" height="150" color="0x0B0E09E6" />
-    <LanternMark translation="[100, 28]" />
     <!-- room bar (whimsy spec 2-3): pre-rendered DW Pica caps labels centred on 960; the settled room gets a glow,
          the firefly and two small friends; on the bar one firefly follows focus -->
     <Poster id="flyGlow" uri="pkg:/images/w/firefly-glow.png" height="62" />
