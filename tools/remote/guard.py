@@ -4,6 +4,7 @@ One long random "house key" (never in git) protects everything except what the T
 and the Last.fm pairing pages:
   - the TV (by its address, TV_IP) may use /api/* and /lastfm/qr.png without the key, so it can
     restore its saved keys after a reinstall, ask for lyrics, round pictures and scrobble;
+  - the projector (PROJECTOR_IP) may use its own page (/hearth, /px, /api/pj) the same way;
   - a phone or the projector page opens the helper once with  http://<nas>:8765/?t=<house key>
     and the helper keeps it in a cookie (HttpOnly, SameSite=Strict) from then on;
   - scripts send it as the header  X-Hearth-Token.
@@ -18,6 +19,7 @@ import time
 
 DATA_DIR = os.environ.get("DATA_DIR", "/data")
 TV_IP = os.environ.get("TV_IP", "192.168.254.9")
+PROJECTOR_IP = os.environ.get("PROJECTOR_IP", "").strip()
 COOKIE = "hearth_t"
 
 # pages that stay open: Last.fm pairing (Last.fm itself checks the token it hands back)
@@ -25,6 +27,8 @@ OPEN_PATHS = ("/lastfm", "/lastfm/done")
 # what the TV (and only the TV's address) may call without the key
 TV_PREFIXES = ("/api/",)
 TV_PATHS = ("/lastfm/qr.png",)
+# the projector's browser can't type a long key, so its address may open its own page and what that page reads
+PROJECTOR_PREFIXES = ("/hearth", "/px/", "/api/pj/")
 
 SEC_HEADERS = (
     ("X-Content-Type-Options", "nosniff"),
@@ -105,6 +109,8 @@ def check(ip, path, headers, query_t):
     if path in OPEN_PATHS:
         return "open"
     if ip == TV_IP and (path.startswith(TV_PREFIXES) or path in TV_PATHS):
+        return "tv"
+    if PROJECTOR_IP and ip == PROJECTOR_IP and path.startswith(PROJECTOR_PREFIXES):
         return "tv"
     if locked_out(ip):
         return "locked"

@@ -7,6 +7,7 @@ services:
     network_mode: host          # reaches the TV (ECP :8060) and whisper (:10300) directly
     environment:
       TV_IP: 192.168.254.9
+      PROJECTOR_IP: 192.168.254.62   # the Yincodi projector's browser is let in without the house key
       HTTP_PORT: "8765"
       HTTPS_PORT: "8766"
       WHISPER_HOST: 127.0.0.1   # whisper runs on this NAS
