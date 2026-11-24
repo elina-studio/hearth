@@ -981,6 +981,7 @@ async function openDetail(id, type, opt) {
     }
     const allW = L.isShow ? !((md.leafCount || 0) - (md.viewedLeafCount || 0)) : !!md.viewCount;
     acts.push(allW ? ['checkc', 'Watched', 'unwatch'] : ['eye', 'Mark watched', 'watch']);
+    acts.push(['more', 'More', 'more']);
     L.acts = acts;
     const people = (md.Role || []).slice(0, 24);
     $('#dp', L.el).innerHTML = `<div class="dhead"><div class="dpanel"></div><div class="dposter" style="background-image:url('${img(md.thumb, 200, 300)}')"></div>
@@ -1666,6 +1667,13 @@ function act(el) {
     } else if (k === 'audio') {
       const al = audOf(L.full), cur = L.audSel !== undefined ? L.audSel : defAud(L.full);
       pickSheet('Audio', al.map(sLabel), i => { L.audSel = al[i].id; L.render(); setFocus($$('.ib', L.el)[L.acts.findIndex(x => x[2] === 'audio')]); }, al.findIndex(x => x.id === cur));
+    } else if (k === 'more') {
+      const md = L.md, m0 = L.full && L.full.Media && L.full.Media[0], pt = m0 && m0.Part && m0.Part[0];
+      const row = (n, v) => v ? `<div class="mr"><em>${esc(n)}</em><span>${esc(v)}</span></div>` : '';
+      const names = a => (a || []).map(x => x.tag).join(', ');
+      const size = pt && pt.size ? (pt.size / 1073741824).toFixed(1) + ' GB' : '';
+      const html = row('Studio', md.studio) + row('Directed by', names(md.Director)) + row('Written by', names(md.Writer)) + row('Genres', names(md.Genre)) + row('Country', names(md.Country)) + row('Added', md.addedAt ? new Date(md.addedAt * 1000).toLocaleDateString() : '') + row('File', pt && pt.file ? pt.file.split('/').pop() : '') + row('Size', size) + row('Video', m0 ? `${m0.width}x${m0.height} ${m0.videoCodec} ${m0.bitrate || ''} kbps` : '') + row('Container', m0 && m0.container);
+      openLayer('sheet more', `<div class="in" style="flex-direction:column"><h2>More</h2><div class="mlist scroll" style="position:relative;flex:1;overflow:auto">${html}</div><div class="fx chip" data-a="back">Close</div></div>`);
     } else if (k === 'resume') playTarget(L); else if (k === 'restart') playTarget(L, 0);
     else if (k.startsWith('trailer:')) playItem(k.slice(8), 'clip', { from: 0 }).catch(e => toast(e.message));
     else if (k === 'watch' || k === 'unwatch') fetch(`${PX}/:/${k === 'watch' ? 'scrobble' : 'unscrobble'}?key=${L.md.ratingKey}&identifier=com.plexapp.plugins.library`).then(() => { toast(k === 'watch' ? 'Marked watched' : 'Marked unwatched'); L.load(); }).catch(() => toast('Plex did not answer'));
