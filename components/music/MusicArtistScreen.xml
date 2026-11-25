@@ -11,9 +11,11 @@
     <Label id="name" translation="[244, 50]" width="760" maxLines="1" color="0xEDE6CAFF" />
     <Label id="sub" translation="[244, 126]" width="760" maxLines="1" color="0xB5AF8CFF" />
     <Group id="buttons" translation="[0, 72]" />
-    <Rectangle translation="[96, 198]" width="1728" height="2" color="0xD9A06655" />
-    <Group clippingRect="[60, 216, 600, 720]">
-      <Group id="albums" translation="[96, 230]" />
+    <!-- section header (whimsy spec): Fell italic title with its own twig -->
+    <Poster id="albTwig" uri="pkg:/images/w/twig-420-s5.png" translation="[210, 156]" width="460" height="120" />
+    <Label id="albHead" translation="[96, 196]" width="200" color="0xEDE6CAFF" text="Albums" />
+    <Group clippingRect="[40, 250, 640, 700]">
+      <Group id="albums" translation="[96, 270]" />
     </Group>
     <Group id="pane" translation="[680, 230]">
       <Rectangle width="150" height="150" color="0x1D2418FF" />

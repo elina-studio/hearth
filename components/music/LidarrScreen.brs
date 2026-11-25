@@ -14,7 +14,7 @@ sub init()
     m.pvSub = m.top.findNode("pvSub")
     m.pvSub.font = hFont("regular", 26)
     m.pvButtons = m.top.findNode("pvButtons")
-    m.top.findNode("pvAlbumsTitle").font = hFont("regular", 28)
+    m.top.findNode("pvAlbumsTitle").font = hFont("fell", 40)
     m.pvAlbums = m.top.findNode("pvAlbums")
     m.pvNote = m.top.findNode("pvNote")
     m.pvNote.font = hFont("regular", 22)
@@ -549,18 +549,20 @@ sub badge(g as object, state as string)
     if state = "lib"
         text = "In library"
         icon = "check"
-        c = "0xA9C46AFF"
+        c = "0x14200AFF"
+        bgc = "0x8FAF5AFF"
     else
         text = "Requested"
         icon = "clock"
-        c = "0xE0B34AFF"
+        c = "0x1F1606FF"
+        bgc = "0xE0B34AFF"
     end if
     w = 40 + Len(text) * 11
     b = g.createChild("Rectangle")
     b.translation = [8, 8]
     b.width = w
     b.height = 32
-    b.color = "0x0B0E09E6"
+    b.color = bgc
     i = g.createChild("Poster")
     i.translation = [14, 13]
     i.width = 22

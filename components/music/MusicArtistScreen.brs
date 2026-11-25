@@ -6,6 +6,7 @@ sub init()
     m.art = m.top.findNode("art")
     m.name = m.top.findNode("name")
     m.name.font = hFont("caps", 64)
+    m.top.findNode("albHead").font = hFont("fell", 40)
     m.sub = m.top.findNode("sub")
     m.sub.font = hFont("regular", 24)
     m.albumList = m.top.findNode("albums")
@@ -209,10 +210,12 @@ sub drawAlbums()
         md = m.albums[i].md
         g = m.albumList.createChild("Group")
         g.translation = [0, i * 120]
-        hl = g.createChild("Rectangle")
-        hl.width = 520
-        hl.height = 112
-        hl.color = "0xE0B34A00"
+        hl = g.createChild("Poster")
+        hl.uri = "pkg:/images/w/focus-ring" + hVar(i) + ".9.png"
+        hl.translation = [-27, -27]
+        hl.width = 574
+        hl.height = 166
+        hl.opacity = 0
         bg = g.createChild("Rectangle")
         bg.translation = [10, 10]
         bg.width = 92
@@ -394,15 +397,15 @@ sub paint()
     for i = 0 to m.albumRows.Count() - 1
         g = m.albumRows[i]
         if i = m.sel and m.zone = "albums"
-            g.getChild(0).color = "0xE0B34AFF"
-            fg = "0x1F1606FF"
-            sub2 = "0x1F1606C0"
+            g.getChild(0).opacity = 1
+            fg = "0xEDE6CAFF"
+            sub2 = "0xB5AF8CFF"
         else if i = m.sel
-            g.getChild(0).color = "0xE0B34A2E"
+            g.getChild(0).opacity = 0.35
             fg = "0xEDE6CAFF"
             sub2 = "0xB5AF8CFF"
         else
-            g.getChild(0).color = "0xE0B34A00"
+            g.getChild(0).opacity = 0
             fg = "0xEDE6CAFF"
             sub2 = "0xB5AF8CFF"
         end if
@@ -414,7 +417,7 @@ sub paint()
     maxY = (m.albums.Count() - 5) * 120
     if scrollY > maxY then scrollY = maxY
     if scrollY < 0 then scrollY = 0
-    m.albumList.translation = [96, 230 - scrollY]
+    m.albumList.translation = [96, 270 - scrollY]
     for j = 0 to m.songNodes.Count() - 1
         if m.zone = "songs" and j = m.song then c = "0xE0B34A2E" else c = "0xE0B34A00"
         m.songNodes[j].getChild(0).color = c
