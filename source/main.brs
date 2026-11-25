@@ -101,11 +101,10 @@ sub RunScreenSaver()
     end while
 end sub
 
-' After a reinstall the TV's registry is empty. If the NAS helper holds a copy of the keys
+' Every launch: fill in any key the TV is missing (a reinstall can empty the registry). If the NAS helper holds a copy of the keys
 ' (tools/remote/save-keys.sh puts them in data/hearth-keys.json), pull them back before the app starts.
 sub restoreKeys()
     reg = CreateObject("roRegistrySection", "hearth")
-    if reg.Read("plexToken") <> "" then return
     base = reg.Read("nasUrl")
     if base = "" then base = "http://192.168.254.41:8765"
     port = CreateObject("roMessagePort")
@@ -113,14 +112,15 @@ sub restoreKeys()
     xfer.setMessagePort(port)
     xfer.setUrl(base + "/api/keys")
     if not xfer.asyncGetToString() then return
-    msg = wait(3000, port)
+    msg = wait(5000, port)
     if type(msg) <> "roUrlEvent" or msg.getResponseCode() <> 200 then return
     data = ParseJson(msg.getString())
     if data = invalid or type(data) <> "roAssociativeArray" then return
     ok = ["plexToken", "plexServer", "plexServerToken", "plexServerName", "overseerrUrl", "overseerrKey", "lidarrUrl", "lidarrKey", "bazarrUrl", "bazarrKey", "radarrUrl", "radarrKey", "sonarrUrl", "sonarrKey", "haUrl", "haToken", "haEntity", "lastfmOn"]
     n = 0
     for each k in ok
-        if data[k] <> invalid and type(data[k]) = "String" and data[k] <> ""
+        ' fill in only what the TV is missing; a key typed or sent later always wins
+        if data[k] <> invalid and type(data[k]) = "String" and data[k] <> "" and reg.Read(k) = ""
             reg.Write(k, data[k])
             n = n + 1
         end if

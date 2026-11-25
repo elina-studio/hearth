@@ -64,7 +64,43 @@ sub loadRequests()
     finish(200, { results: out })
 end sub
 
+' Asks Overseerr; if the saved key is missing or refused, pulls the current one from the NAS helper
+' (tools/remote hearth-keys.json) once and tries again, so a wiped or stale key heals itself.
 function fetch(method as string, path as string, query as dynamic, body as dynamic) as object
+    if m.apiKey = invalid or m.apiKey = "" then healKey()
+    r = fetchOnce(method, path, query, body)
+    if r.status = 401 or r.status = 403
+        if healKey() then r = fetchOnce(method, path, query, body)
+    end if
+    return r
+end function
+
+function healKey() as boolean
+    if m.healed = true then return false
+    m.healed = true
+    reg = CreateObject("roRegistrySection", "hearth")
+    nas = reg.Read("nasUrl")
+    if nas = "" then nas = "http://192.168.254.41:8765"
+    port = CreateObject("roMessagePort")
+    x = CreateObject("roUrlTransfer")
+    x.setMessagePort(port)
+    x.setUrl(nas + "/api/keys")
+    if not x.asyncGetToString() then return false
+    msg = wait(5000, port)
+    if type(msg) <> "roUrlEvent" or msg.getResponseCode() <> 200 then return false
+    d = ParseJson(msg.getString())
+    if d = invalid or type(d) <> "roAssociativeArray" then return false
+    k = d.overseerrKey
+    if k = invalid or k = "" or k = m.apiKey then return false
+    reg.Write("overseerrKey", k)
+    if d.overseerrUrl <> invalid and d.overseerrUrl <> "" and reg.Read("overseerrUrl") = "" then reg.Write("overseerrUrl", d.overseerrUrl)
+    reg.Flush()
+    m.apiKey = k
+    print "[hearth] Overseerr key refreshed from the NAS helper"
+    return true
+end function
+
+function fetchOnce(method as string, path as string, query as dynamic, body as dynamic) as object
     xfer = CreateObject("roUrlTransfer")
     port = CreateObject("roMessagePort")
     xfer.setMessagePort(port)

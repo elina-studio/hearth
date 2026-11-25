@@ -9,6 +9,9 @@ echo "Overseerr status: $(curl -s -o /dev/null -w '%{http_code}' $U/api/v1/statu
 F=$(find /volume1/docker -maxdepth 6 -name settings.json 2>/dev/null | grep -i seerr | head -1)
 echo "settings file: ${F:-NOT FOUND}"
 [ -z "$F" ] && { echo "folders in /volume1/docker:"; ls /volume1/docker; exit 1; }
+J=/volume1/docker/hearth-remote/data/hearth-keys.json
+NK=$(grep -oE 'overseerrKey":"[^"]+' "$J" 2>/dev/null | cut -d'"' -f3)
+echo "NAS saved copy -> HTTP $(curl -s -o /dev/null -w '%{http_code}' -H "X-Api-Key: $NK" "$U/api/v1/request?take=1") (000 = none saved)"
 n=0
 for k in $(grep -oE 'apiKey": "[^"]+' "$F" | cut -d'"' -f3); do
   n=$((n+1))
