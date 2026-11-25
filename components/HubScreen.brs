@@ -425,16 +425,21 @@ end sub
 sub loadWeather()
     c = pCfg()
     if c.haToken = ""
+        print "[weather] no haToken saved on this TV"
         m.weather.text = ""
         layoutWeather()
         return
     end if
+    print "[weather] asking " + c.haUrl + "/api/states/" + c.haEntity
     pHa("/api/states/" + c.haEntity, "onWeather")
 end sub
 
 sub onWeather(event as object)
     t = pTaskFrom(event)
-    if not t.ok or t.response.state = invalid then return
+    if not t.ok or t.response.state = invalid
+        print "[weather] failed: HTTP " + t.status.toStr() + " (-1 = no answer, 401 = bad token, 404 = wrong entity)"
+        return
+    end if
     s = pWeatherWord(t.response.state)
     s = UCase(Left(s, 1)) + Mid(s, 2)
     a = t.response.attributes
