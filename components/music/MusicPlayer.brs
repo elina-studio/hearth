@@ -12,6 +12,30 @@ sub init()
     castInit()
     lfmInit()
     radioInit()
+    ' While music plays, keep the TV's screensaver (the lantern) away, just like a video does:
+    ' when it took over, the next song didn't start and the album view froze.
+    m.awake = CreateObject("roSGNode", "Timer")
+    m.awake.repeat = true
+    m.awake.duration = 45
+    m.awake.observeField("fire", "onStayAwake")
+    m.top.observeField("state", "onPlayState")
+end sub
+
+sub onPlayState()
+    s = m.top.state
+    if s = "playing" or s = "buffering"
+        if m.awake.control <> "start"
+            onStayAwake()
+            m.awake.control = "start"
+        end if
+    else
+        m.awake.control = "stop"
+    end if
+end sub
+
+' counts as a remote press, so the TV's screensaver timer starts over (no network call)
+sub onStayAwake()
+    pHa("", "", true)
 end sub
 
 sub say(text as string)
