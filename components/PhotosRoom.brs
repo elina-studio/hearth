@@ -57,6 +57,8 @@ sub refresh(unused as dynamic)
     if pPref("photoSection", "") <> lib then pSetPref("photoSection", lib)
     m.loadedAt = m.clock.TotalSeconds()
     m.note.text = ""
+    ' the Start button is always there (showEmpty removed it; the summary may never answer)
+    if m.buttons.count() = 0 then buildButtons()
     m.eyebrow.text = "THE WINDOW"
     if m.title.text = "" then m.title.text = "YOUR PHOTOS"
     pPhotos("albums", { section: lib }, "onAlbums")
@@ -266,7 +268,7 @@ function onKeyEvent(key as string, press as boolean) as boolean
         if m.zone = "albums" and m.sel < m.albums.count() - 1 then m.sel = m.sel + 1
         paint()
     else if key = "OK"
-        if pLibrary() = "" or m.loadedFor = ""
+        if pLibrary() = "" or m.loadedFor = "" or m.buttons.count() = 0
             m.loadedFor = ""
             refresh(invalid)
         else

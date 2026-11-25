@@ -164,7 +164,7 @@ sub drawRows(items as object)
         sub2.maxLines = 1
         sub2.color = "0xB5AF8CFF"
         if m.mode = "recs"
-            sub2.text = "like " + e.because
+            if e.because <> invalid then sub2.text = "like " + e.because
         else if e.plays <> invalid
             sub2.text = e.plays.toStr() + " plays"
         end if
@@ -194,11 +194,13 @@ sub showDetail(items as object)
     if m.mode = "recs"
         m.kick.text = "RECOMMENDED"
         m.title.text = e.name
-        m.meta.text = "Because you play " + e.because + ". Not in your library yet."
+        because = "artists you play"
+        if e.because <> invalid then because = e.because
+        m.meta.text = "Because you play " + because + ". Not in your library yet."
     else
         m.kick.text = "ARTISTS YOU LOVE"
         m.title.text = e.name
-        m.meta.text = e.plays.toStr() + " plays on Last.fm"
+        if e.plays <> invalid then m.meta.text = e.plays.toStr() + " plays on Last.fm" else m.meta.text = "On Last.fm"
     end if
     buildButtons()
     m.albums.removeChildrenIndex(m.albums.getChildCount(), 0)

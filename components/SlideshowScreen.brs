@@ -112,6 +112,9 @@ sub fetchBatch()
         m.status.text = "No photos library in Plex yet. Press Back."
         return
     end if
+    ' one request at a time: Right or the timer can ask again while a batch is still on its way
+    if m.fetching = true then return
+    m.fetching = true
     if m.top.albumId = "@favourites"
         pPhotos("favourites", { section: lib }, "onBatch")
     else if m.top.albumId = "@onthisday"
@@ -128,6 +131,7 @@ sub fetchBatch()
 end sub
 
 sub onBatch(event as object)
+    m.fetching = false
     t = pTaskFrom(event)
     if not t.ok
         m.status.text = "Can't get photos from Plex (" + t.status.toStr() + "). Press Back and try again."
@@ -218,6 +222,9 @@ sub load(slide as object)
         L.photo.width = 960
         L.photo.height = 1080
         L.photo.loadDisplayMode = "scaleToZoom"
+        ' decode at the half-screen shape (like photo2), not the 16:9 default
+        L.photo.loadWidth = 640
+        L.photo.loadHeight = 720
         url2 = pPhotoUrl(slide.items[1], 960, 1080, true)
         L.photo2.visible = true
         setPhoto(L.photo2, url2)
@@ -227,6 +234,8 @@ sub load(slide as object)
         L.photo.width = 1920
         L.photo.height = 1080
         L.photo.loadDisplayMode = "scaleToFit"
+        L.photo.loadWidth = 1280
+        L.photo.loadHeight = 720
         L.photo2.visible = false
     end if
     L.back.uri = url

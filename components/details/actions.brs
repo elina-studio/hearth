@@ -136,6 +136,12 @@ function fileSub(it as dynamic) as string
     return parts.join(" · ")
 end function
 
+' like pStr, but keeps the case (file names and track names are shown to the person)
+function rawStr(v as dynamic) as string
+    if v = invalid then return ""
+    return v.toStr()
+end function
+
 function sizeText(b as dynamic) as string
     gb = b / 1073741824.0
     if gb >= 1
@@ -260,6 +266,8 @@ end sub
 
 sub onMatches(event as object)
     t = hTaskFrom(event)
+    ' the sheet was closed (or replaced) while Plex was thinking: don't pop it back open
+    if not (m.sheet.visible and m.sheet.heading = "Fix match") then return
     rows = []
     if t.ok
         for each x in t.response.Items
@@ -288,7 +296,11 @@ end sub
 
 sub onWithFull(event as object)
     t = hTaskFrom(event)
-    if t.ok and t.response.Id <> invalid then fullReady(t.response, m.fullPurpose)
+    if t.ok and t.response.Id <> invalid
+        fullReady(t.response, m.fullPurpose)
+    else
+        hMessage("Plex", "Couldn't read this file's details. Try again in a moment.")
+    end if
 end sub
 
 sub fullReady(it as object, purpose as string)
@@ -303,7 +315,7 @@ sub fullReady(it as object, purpose as string)
             for each s in part.Stream
                 if s.streamType = 2
                     lab = s.displayTitle
-                    if lab = invalid then lab = pStr(s.language) + " " + channelsText(s.channels)
+                    if lab = invalid then lab = rawStr(s.language) + " " + channelsText(s.channels)
                     sub2 = ""
                     if s.title <> invalid and s.title <> lab then sub2 = s.title
                     sel = (st.audio <> invalid and st.audio.id = s.id)
@@ -326,7 +338,7 @@ function fileRows(it as object, md as object, part as dynamic) as object
     rows = []
     rows.push({ header: "File" })
     if part <> invalid
-        f = pStr(part.file)
+        f = rawStr(part.file)
         bits = f.split("/")
         if bits.count() > 0 then f = bits[bits.count() - 1]
         rows.push({ icon: "file", label: f })
@@ -342,11 +354,11 @@ function fileRows(it as object, md as object, part as dynamic) as object
     if part <> invalid and part.Stream <> invalid
         rows.push({ header: "Video" })
         for each s in part.Stream
-            if s.streamType = 1 then rows.push({ icon: "film", label: pStr(s.displayTitle), sub: pStr(s.profile) })
+            if s.streamType = 1 then rows.push({ icon: "film", label: rawStr(s.displayTitle), sub: rawStr(s.profile) })
         end for
         rows.push({ header: "Audio" })
         for each s in part.Stream
-            if s.streamType = 2 then rows.push({ icon: "audio", label: pStr(s.displayTitle), checked: s.selected = true })
+            if s.streamType = 2 then rows.push({ icon: "audio", label: rawStr(s.displayTitle), checked: s.selected = true })
         end for
         subs = []
         for each s in part.Stream
@@ -357,7 +369,7 @@ function fileRows(it as object, md as object, part as dynamic) as object
             for each s in subs
                 where = "in the file"
                 if s.key <> invalid then where = "separate file"
-                rows.push({ icon: "cc", label: pStr(s.displayTitle), sub: where, checked: s.selected = true })
+                rows.push({ icon: "cc", label: rawStr(s.displayTitle), sub: where, checked: s.selected = true })
             end for
         end if
     end if
@@ -374,6 +386,7 @@ end sub
 
 sub onPerson(event as object)
     t = hTaskFrom(event)
+    if not (m.sheet.visible and m.sheet.heading = m.personName) then return
     rows = []
     if t.ok
         for each x in t.response.Items
@@ -416,6 +429,7 @@ end sub
 sub onOverseerrShow(event as object)
     t = event.getRoSGNode()
     m.oTask = invalid
+    if not (m.sheet.visible and m.sheet.heading = "Request more seasons") then return
     if not t.ok
         m.sheet.callFunc("close", invalid)
         if t.status = 401 or t.status = 403
@@ -472,7 +486,7 @@ sub onOverseerrShow(event as object)
 end sub
 
 sub sendRequest(d as object)
-    body = FormatJson({ mediaType: "tv", mediaId: m.tmdbId.toInt(), seasons: d.seasons })
+    body = FormatJson({ "mediaType": "tv", "mediaId": m.tmdbId.toInt(), "seasons": d.seasons })
     overseerr("POST", "/api/v1/request", body, "onRequested")
 end sub
 
@@ -607,7 +621,11 @@ end sub
 
 sub onFinderItem(event as object)
     t = hTaskFrom(event)
-    if t.ok and t.response <> invalid and t.response.Id <> invalid then openFinder(t.response)
+    if t.ok and t.response <> invalid and t.response.Id <> invalid
+        openFinder(t.response)
+    else
+        hMessage("Subtitles", "Couldn't reach Plex to look for subtitles. Try again in a moment.")
+    end if
 end sub
 
 sub onFinderResult()

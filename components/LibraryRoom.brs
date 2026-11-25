@@ -267,9 +267,14 @@ sub refresh(unused as dynamic)
         return
     end if
     m.section = libs[m.top.kind]
+    ' coming back from details or after Options: keep the poster (and genre) you were on
+    g = m.genre
+    m.keepAt = invalid
+    if m.items.count() > 0 then m.keepAt = m.index
     m.data = {}
     m.genre = invalid
     loadTab(m.tab)
+    if g <> invalid then openGenre(g)
 end sub
 
 sub loadTab(t as integer)
@@ -309,7 +314,12 @@ end sub
 sub onTab(event as object)
     t = hTaskFrom(event)
     items = []
-    if t.ok and t.response.Items <> invalid then items = t.response.Items
+    if not t.ok
+        ' don't cache a failure as "empty"
+        if tabKey() = t.tag and m.genre = invalid then m.empty.text = "Couldn't reach Plex. Change tab to try again."
+        return
+    end if
+    if t.response.Items <> invalid then items = t.response.Items
     m.data[t.tag] = items
     if tabKey() = t.tag and m.genre = invalid then showItems(items)
 end sub
@@ -326,7 +336,12 @@ end function
 sub onGenres(event as object)
     t = hTaskFrom(event)
     items = []
-    if t.ok and t.response.Genres <> invalid
+    if not t.ok
+        m.wantGenrePick = false
+        if m.tabNames[m.tab] = "Genres" and m.genre = invalid then m.empty.text = "Couldn't reach Plex. Change tab to try again."
+        return
+    end if
+    if t.response.Genres <> invalid
         for each g in t.response.Genres
             items.push({ genreName: g.name, genreKey: g.key })
         end for
@@ -351,14 +366,20 @@ end sub
 sub onGenre(event as object)
     t = hTaskFrom(event)
     if m.genre = invalid or m.genre.genreName <> t.tag then return
+    if not t.ok
+        m.empty.text = "Couldn't load " + t.tag + ". Press Back and try again."
+        return
+    end if
     items = []
-    if t.ok and t.response.Items <> invalid then items = t.response.Items
+    if t.response.Items <> invalid then items = t.response.Items
     showItems(items)
 end sub
 
 sub showItems(items as object)
     m.items = items
     m.index = 0
+    if m.keepAt <> invalid and m.keepAt < items.count() then m.index = m.keepAt
+    m.keepAt = invalid
     m.top0 = 0
     for each g in m.slots
         g.at = -1
@@ -417,7 +438,7 @@ end sub
 ' ---------- focus ----------
 sub focusIn(unused as dynamic)
     m.focused = true
-    if m.items.count() > 0 then m.zone = "grid" else m.zone = "tabs"
+    if m.items.count() > 0 or m.keepAt <> invalid then m.zone = "grid" else m.zone = "tabs"
     m.top.setFocus(true)
     paint()
 end sub
@@ -439,8 +460,7 @@ sub restoreFocus()
 end sub
 
 sub afterOptions()
-    m.data = {}
-    loadTab(m.tab)
+    refresh(invalid)
 end sub
 
 sub onOptions()
@@ -474,7 +494,9 @@ function onKeyEvent(key as string, press as boolean) as boolean
         if m.genre <> invalid
             m.genre = invalid
             layoutAZ()
-            showItems(m.data["Genres"])
+            gl = m.data["Genres"]
+            if gl = invalid then gl = []
+            showItems(gl)
             return true
         end if
         if m.zone <> "grid" and m.items.count() > 0
@@ -509,6 +531,7 @@ function onKeyEvent(key as string, press as boolean) as boolean
             return true
         end if
     else if m.zone = "tabs"
+        if key = "left" or key = "right" then m.keepAt = invalid
         if key = "left" and m.tab > 0
             loadTab(m.tab - 1)
         else if key = "right" and m.tab < m.tabNames.count() - 1

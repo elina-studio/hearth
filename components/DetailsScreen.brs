@@ -104,7 +104,15 @@ end sub
 
 sub onFull(event as object)
     t = hTaskFrom(event)
-    if not t.ok or t.response.Id = invalid then return
+    if not t.ok or t.response.Id = invalid
+        if m.full = invalid
+            ' first load failed: say so instead of leaving a blank page
+            m.empty.translation = [340, 334]
+            m.empty.text = "Couldn't load this title from Plex. Press Back to return."
+            m.empty.visible = true
+        end if
+        return
+    end if
     m.full = t.response
     m.isShow = (m.full.Type = "Series")
     if m.isShow then m.roomBar.current = "Shows" else m.roomBar.current = "Movies"
@@ -192,8 +200,22 @@ end sub
 
 sub onSeasonEpisodes(event as object)
     t = hTaskFrom(event)
-    if not t.ok then return
     if m.sIdx < 0 or m.seasons[m.sIdx].Id <> m.loadingSeason then return
+    if not t.ok
+        ' don't leave the previous season's episodes under this season's tab
+        m.eps = []
+        for each r in m.pool
+            r.at = -1
+        end for
+        m.empty.visible = true
+        m.empty.translation = [100, m.LIST_TOP]
+        m.empty.text = "Couldn't load this season. Pick it again to retry."
+        if m.zone = "eps" then m.zone = "tabs"
+        drawChips()
+        layoutBelow()
+        paint()
+        return
+    end if
     m.eps = t.response.Items
     sel = -1
     if m.wantEp <> invalid
@@ -461,6 +483,8 @@ sub drawChips()
     n = missingInSeason().count()
     if n > 0 then list.push({ icon: "ccx", text: "Find " + n.toStr() + " missing", action: "fetchMissing" })
     m.chips = list
+    ' a chip may have just disappeared (e.g. "Find missing" after Bazarr): keep the cursor on something real
+    if m.zone = "tabs" and m.tabSel >= m.seasons.count() + list.count() then m.tabSel = m.sIdx
     m.chipsBox.removeChildrenIndex(m.chipsBox.getChildCount(), 0)
     vi = 2
     for each c in list
@@ -706,9 +730,11 @@ end sub
 sub paintHints()
     opt = "More"
     if m.zone = "eps" then opt = "Episode options"
+    if m.zone = "below" then opt = "Options"
     keys = [{ icon: "back", label: m.roomBar.current }]
     if m.zone = "act" then keys.push({ icon: "up", label: "Rooms" })
-    if m.zone <> "bar" then keys.push({ icon: "asterisk", label: opt })
+    ' * does nothing on the season tabs, so don't advertise it there
+    if m.zone <> "bar" and m.zone <> "tabs" then keys.push({ icon: "asterisk", label: opt })
     sig = FormatJson(keys)
     if sig <> m.hintSig
         m.hintSig = sig
@@ -785,7 +811,7 @@ function onKeyEvent(key as string, press as boolean) as boolean
             drawTabs()
         else if key = "OK"
             if m.tabSel >= m.seasons.count()
-                runAction(m.chips[m.tabSel - m.seasons.count()].action)
+                if m.tabSel - m.seasons.count() < m.chips.count() then runAction(m.chips[m.tabSel - m.seasons.count()].action)
             else
                 m.seasonWait.control = "stop"
                 onSeasonWait()

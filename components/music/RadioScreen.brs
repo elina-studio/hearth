@@ -213,6 +213,8 @@ end sub
 sub onMoods(event as object)
     t = hTaskFrom(event)
     items = pxItems(t)
+    ' the screen was left while Plex was answering: don't open a dialog over another screen
+    if m.top.getScene() = invalid then return
     m.note.text = ""
     if items.Count() = 0
         m.note.text = "Plex has no mood tags for this library. Try a song or favourites radio."

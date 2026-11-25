@@ -181,6 +181,7 @@ sub refresh(unused = invalid as dynamic)
         m.asked = {}
     end if
     m.loadedFor = s
+    m.failed = invalid
     if m.rows.count() = 0 and m.tab = 0 then m.empty.text = "Loading your music" + Chr(8230)
     m.results = {}
     m.hubOrder = []
@@ -252,6 +253,14 @@ sub build()
     if m.hubOrder <> invalid then order.append(m.hubOrder)
     order.push("Artists")
     order.push("Playlists")
+    ' every call failed: keep the shelves the cache drew rather than blanking them
+    if m.failed <> invalid and m.rows.count() > 0
+        got = false
+        for each name in order
+            if m.results[name] <> invalid and m.results[name].count() > 0 then got = true
+        end for
+        if not got then return
+    end if
     keepTitle = invalid
     keepIndex = 0
     if m.row < m.rows.count()
@@ -389,6 +398,12 @@ end sub
 sub onLib(event as object)
     t = hTaskFrom(event)
     kind = t.tag
+    ' a failed refresh keeps what the cache already drew instead of blanking it
+    old = m.lib[kind]
+    if not t.ok and old <> invalid and old.cards <> invalid and old.cards.Count() > 0
+        onMessageText("Couldn't refresh from Plex (error " + t.status.toStr() + "). Showing the saved list.")
+        return
+    end if
     cards = []
     items = pxItems(t)
     for each md in items
@@ -565,6 +580,10 @@ end sub
 
 ' ---------- actions ----------
 function focusedCard() as object
+    ' the New tab's spotlight album is focused while newSpot is set
+    if m.tabDefs[m.tab][1] = "new" and m.newSpot and m.newItem <> invalid
+        return { item: m.newItem, sub: pxStr(m.newItem.parentTitle) }
+    end if
     if m.tab = 0
         if m.row >= m.rows.count() then return invalid
         return m.rows[m.row].callFunc("current", invalid)

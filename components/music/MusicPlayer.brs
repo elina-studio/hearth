@@ -350,6 +350,7 @@ sub load(tracks as object, start as dynamic, shuffle as boolean, label as dynami
     if tracks = invalid or tracks.count() = 0 then return
     radioDetach()
     if start = invalid then start = 0
+    if start < 0 or start >= tracks.count() then start = 0
     m.original = invalid
     if shuffle
         tracks = shuffled(tracks)

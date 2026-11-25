@@ -145,6 +145,8 @@ function wideLabels() as object
 end function
 
 sub onMode()
+    ' full mode types keys and addresses (an Overseerr key is about 68 characters): lift the 40 character search limit
+    if m.top.mode = "full" and m.top.maxLength = 40 then m.top.maxLength = 120
     m.page = 0
     labelKeys()
     paint()
@@ -363,7 +365,8 @@ end sub
 ' Returns "" when the key was used here, otherwise the key (an edge) for the parent.
 function handleKey(k as string) as string
     if Left(k, 4) = "Lit_"
-        typeText(LCase(Mid(k, 5)))
+        ' full mode types keys and addresses, which are case-sensitive; search mode matches lower case
+        if m.top.mode = "full" then typeText(Mid(k, 5)) else typeText(LCase(Mid(k, 5)))
         return ""
     else if k = "backspace"
         deleteLetter()

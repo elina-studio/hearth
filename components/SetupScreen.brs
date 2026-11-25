@@ -42,6 +42,7 @@ end sub
 
 ' ---------- step 1: link code ----------
 sub newPin()
+    m.found = false
     m.poll.control = "stop"
     m.step.text = "SETUP · 1 OF 2"
     m.heading.text = "SIGN IN WITH PLEX"
@@ -72,6 +73,8 @@ end sub
 
 sub onPinChecked(event as object)
     t = hTaskFrom(event)
+    ' a check still in flight when the code was accepted must not start the server search a second time
+    if m.found = true then return
     if t.status = 404
         ' codes expire after a while
         newPin()
@@ -80,6 +83,7 @@ sub onPinChecked(event as object)
     r = t.response
     if t.ok and r <> invalid and r.authToken <> invalid and r.authToken <> ""
         m.poll.control = "stop"
+        m.found = true
         m.global.plexToken = r.authToken
         findServer()
     end if

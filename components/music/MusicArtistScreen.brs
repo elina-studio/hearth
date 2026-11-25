@@ -81,7 +81,11 @@ end sub
 sub onArtist(event as object)
     t = hTaskFrom(event)
     items = pxItems(t)
-    if items.Count() = 0 then return
+    if items.Count() = 0
+        m.name.text = ""
+        if t.status <= 0 then say("Can't reach Plex.") else say("Couldn't open this artist.")
+        return
+    end if
     a = items[0]
     m.artist = a
     m.name.text = UCase(pxStr(a.title))

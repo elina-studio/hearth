@@ -166,6 +166,7 @@ end sub
 
 function onKeyEvent(key as string, press as boolean) as boolean
     if not m.top.visible then return false
+    if hMediaKey(key) then return false
     if not press then return true
     if key = "back" or key = "options"
         close()

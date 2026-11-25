@@ -96,7 +96,7 @@ sub build()
         m.sub.text = "The NAS helper needs your free Last.fm API key first. Steps are in tools/remote/README.md: create the key at last.fm/api/account/create, put it in the hearth-remote .env file, and rebuild the container."
         chip("left", "Back", 480, "back")
     else if s.state = "connected"
-        m.sub.text = "Connected as " + s.user + ". Everything you play, on the TV or on speakers, is counted."
+        m.sub.text = "Connected as " + pxStr(s.user) + ". Everything you play, on the TV or on speakers, is counted."
         castOn = (reg.Read("lastfmCast") <> "0")
         nowOn = (reg.Read("lastfmNow") <> "0")
         loveOn = (reg.Read("lastfmLove") <> "0")
@@ -123,8 +123,8 @@ sub build()
             p.width = 30
             p.height = 30
             p.translation = [1140, y + 8]
-            lbl(m.dyn, 1190, y, 620, e.title, "bold", 28, "0xEDE6CAFF")
-            lbl(m.dyn, 1190, y + 38, 620, e.artist, "regular", 22, "0xB5AF8CFF")
+            lbl(m.dyn, 1190, y, 620, pxStr(e.title), "bold", 28, "0xEDE6CAFF")
+            lbl(m.dyn, 1190, y + 38, 620, pxStr(e.artist), "regular", 22, "0xB5AF8CFF")
             y = y + 96
         end for
         if s.recent.Count() = 0 then lbl(m.dyn, 1140, 320, 680, "Nothing yet. Play a song and it appears here.", "regular", 24, "0xB5AF8CFF")

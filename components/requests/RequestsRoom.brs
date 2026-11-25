@@ -215,6 +215,9 @@ sub onPoll()
 end sub
 
 sub loadMine()
+    ' one at a time: each run fetches every request's title one by one, so a slow Overseerr must not pile them up
+    if m.mineBusy = true then return
+    m.mineBusy = true
     t = CreateObject("roSGNode", "OverseerrTask")
     t.mode = "requests"
     t.tag = "mine"
@@ -288,6 +291,13 @@ sub onList(event as object)
     key = parts[0]
     if m.gen[key] <> Val(parts[1]) then return
     if checkProblem(t) then return
+    if not t.ok
+        if Val(parts[2]) = 1 and m.cards[key] = invalid
+            m.problem = "Overseerr answered with error " + t.status.toStr() + ". Back out and in to try again."
+            showList()
+        end if
+        return
+    end if
     page = Val(parts[2])
     for each c in discoverCards(t)
         id = c.data.mediaType + c.data.id.toStr()
@@ -490,6 +500,9 @@ function discoverCards(t as object) as object
             if r.mediaType = invalid and r.title <> invalid
                 r.mediaType = "movie"
                 cards.push(rqMediaCard(r))
+            else if r.mediaType = invalid and r.name <> invalid
+                r.mediaType = "tv"
+                cards.push(rqMediaCard(r))
             end if
         end for
     end if
@@ -498,7 +511,10 @@ end function
 
 sub onMine(event as object)
     t = taskFrom(event)
+    m.mineBusy = false
     if checkProblem(t) then return
+    ' a server hiccup must not wipe the list that is already on screen
+    if not t.ok and m.cards["mine"] <> invalid then return
     cards = []
     if t.ok and t.response.results <> invalid
         for each r in t.response.results
@@ -756,7 +772,13 @@ end sub
 
 sub onDetails(event as object)
     t = taskFrom(event)
-    if not t.ok then return
+    if not t.ok
+        if m.wantPopup = t.tag
+            m.wantPopup = ""
+            flash("warn", "Couldn't open that title", "Overseerr said error " + t.status.toStr())
+        end if
+        return
+    end if
     m.details[t.tag] = t.response
     if m.zone = "grid" then showCardInfo()
     if m.wantPopup = t.tag then openPopupFor(m.wantCard)
@@ -1068,8 +1090,11 @@ sub startRequest(c as object, seasons as dynamic)
     d = c.data
     body = { mediaType: d.mediaType, mediaId: d.id }
     if seasons <> invalid then body.seasons = seasons
-    m.pending = { body: body, card: c, list: currentList().key, index: m.gridIndex, left: 3 }
-    setChip(c, rqChip("Requested", "clock", "gold"))
+    m.pending = { body: body, card: c, list: currentList().key, index: m.gridIndex, left: 3, prevChip: c.chip, prevStatus: d.mediaStatus }
+    ' mark the card itself (not just the drawn chip) so a second OK offers no "Request" and sends no duplicate
+    c.chip = rqChip("Requested", "clock", "gold")
+    d.mediaStatus = 2
+    setChip(c, c.chip)
     showUndo()
     m.top.findNode("undoTimer").control = "start"
 end sub
@@ -1093,6 +1118,8 @@ sub sendPending()
     p = m.pending
     m.pending = invalid
     m.top.findNode("undoTimer").control = "stop"
+    if m.sent = invalid then m.sent = {}
+    m.sent[p.card.data.title] = p
     oApi("POST", "/api/v1/request", invalid, rqRequestJson(p.body), "onRequested", p.card.data.title)
     m.toast.visible = false
 end sub
@@ -1101,18 +1128,34 @@ sub undoPending()
     p = m.pending
     m.pending = invalid
     m.top.findNode("undoTimer").control = "stop"
-    setChip(p.card, p.card.chip)
+    p.card.chip = p.prevChip
+    p.card.data.mediaStatus = p.prevStatus
+    setChip(p.card, p.prevChip)
     flash("close", "Not requested: " + p.card.data.title, "")
 end sub
 
 sub onRequested(event as object)
     t = taskFrom(event)
+    if m.sent <> invalid and t.ok then m.sent.delete(t.tag)
     if t.ok
         flash("check", "Requested " + t.tag, "")
         ' start the download now: Radarr/Sonarr search immediately
         hArrKick(t.response)
         loadMine()
         return
+    end if
+    p = invalid
+    if m.sent <> invalid then p = m.sent[t.tag]
+    if t.status = 409
+        flash("check", t.tag + " is already requested", "")
+        loadMine()
+        return
+    end if
+    ' put the card back so it can be asked for again
+    if p <> invalid
+        p.card.chip = p.prevChip
+        p.card.data.mediaStatus = p.prevStatus
+        setChip(p.card, p.prevChip)
     end if
     why = ""
     if t.response <> invalid and t.response.message <> invalid then why = t.response.message
@@ -1141,6 +1184,7 @@ end sub
 ' ================================================================ more like this, Plex
 
 sub moreLike(d as object)
+    m.likeKind = d.mediaType
     oApi("GET", "/api/v1/" + d.mediaType + "/" + d.id.toStr() + "/recommendations", { page: "1" }, invalid, "onLike", d.title)
 end sub
 
@@ -1150,7 +1194,10 @@ sub onLike(event as object)
     cards = []
     if t.ok and t.response.results <> invalid
         for each r in t.response.results
-            if r.mediaType = invalid then r.mediaType = "movie"
+            if r.mediaType = invalid
+                r.mediaType = "movie"
+                if m.likeKind <> invalid then r.mediaType = m.likeKind
+            end if
             cards.push(rqMediaCard(r))
         end for
     end if
@@ -1254,7 +1301,14 @@ sub showSetup(problem as string)
     lines.push("Or type it on the keyboard here (the phone remote can paste it), then choose Save key.")
     m.setupText.text = lines.join(Chr(10))
     m.setup.visible = true
+    ' a sheet or popup left open would sit on top of the key screen and swallow its keys
+    closeSheet()
+    if m.popup <> invalid
+        m.popupHolder.removeChild(m.popup)
+        m.popup = invalid
+    end if
     if m.zone <> "save" then m.zone = "setup"
+    if m.focused then refreshFocus()
 end sub
 
 sub saveTypedKey()
@@ -1270,7 +1324,19 @@ end sub
 
 ' ================================================================ focus and keys
 
+' Overseerr was down or errored while the lists loaded: ask again when the room is entered
+sub retryLists()
+    if m.problem = "" or m.setup.visible then return
+    m.problem = ""
+    for each l in m.lists
+        if l.path <> invalid and m.cards[l.key] = invalid then loadList(l.key)
+    end for
+    if m.genres.movie.count() = 0 then oApi("GET", "/api/v1/genres/movie", invalid, invalid, "onGenres", "movie")
+    if m.genres.tv.count() = 0 then oApi("GET", "/api/v1/genres/tv", invalid, invalid, "onGenres", "tv")
+end sub
+
 sub focusIn(unused as dynamic)
+    retryLists()
     m.focused = true
     m.top.setFocus(true)
     refreshFocus()

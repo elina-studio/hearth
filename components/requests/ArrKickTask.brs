@@ -40,6 +40,8 @@ sub runTask()
             end if
         end if
         if id <> invalid then exit for
+        ' a wrong key will not fix itself in 40 s
+        if r.status = 401 or r.status = 403 then exit for
         sleep(4000)
     end for
     if id = invalid

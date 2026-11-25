@@ -172,7 +172,7 @@ sub onLookup(event as object)
         return
     end if
     if bad(t)
-        m.empty.text = "Lidarr search failed. Try again in a moment."
+        if not m.setup.visible then m.empty.text = "Lidarr search failed. Try again in a moment."
         return
     end if
     m.lookupFailed = false
@@ -397,6 +397,8 @@ function norm(s as string) as string
         c = Mid(s, i, 1)
         if (c >= "a" and c <= "z") or (c >= "0" and c <= "9") then out = out + c
     end for
+    ' a title with no Latin letters or digits (Cyrillic...) must not collapse to "" or every such title matches every other
+    if out = "" then out = s
     return out
 end function
 
@@ -641,7 +643,8 @@ sub requestAlbums(items as object)
     for each x in items
         names.push(pxStr(x.al.title))
     end for
-    muMarkRequested(pxStr(a.artistName), names)
+    m.pendingArtist = pxStr(a.artistName)
+    m.pendingNames = names
     if not owned(a)
         df = m.defaults
         if df = invalid or df.root = invalid or df.quality = invalid or df.metadata = invalid
@@ -725,6 +728,8 @@ end sub
 
 ' Mark what we just asked for as Requested and say so.
 sub done()
+    ' only now that Lidarr said yes does the New tab show "Requested"
+    if m.pendingArtist <> invalid then muMarkRequested(m.pendingArtist, m.pendingNames)
     for each x in m.pending
         x.state = "want"
     end for
@@ -796,8 +801,11 @@ function onKeyEvent(key as string, press as boolean) as boolean
         else if key = "up"
             if m.btnActions.Count() > 0 then m.zone = "actions"
         else if key = "OK"
-            x = m.pvData.albums[m.alb]
-            if x.state = "lib"
+            x = invalid
+            if m.pvData <> invalid and m.alb >= 0 and m.alb < m.pvData.albums.Count() then x = m.pvData.albums[m.alb]
+            if x = invalid
+                ' the panel is being rebuilt (a late search answer): nothing to pick yet
+            else if x.state = "lib"
                 say(pxStr(x.al.title) + " is already in your library.")
             else if x.state = "want"
                 say(pxStr(x.al.title) + " is already requested.")

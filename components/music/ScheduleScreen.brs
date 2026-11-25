@@ -218,12 +218,14 @@ sub refresh()
             for i = 0 to 6
                 on = (Mid(s.days, i + 1, 1) = "1")
                 cell = n.boxes[i]
+                cursor = (m.row = 3 and i = m.day)
                 if on
-                    cell.b.color = "0xE0B34AFF"
+                    if cursor then cell.b.color = "0xFFE7A0FF" else cell.b.color = "0xE0B34AFF"
                     cell.t.color = "0x1F1606FF"
                 else
-                    cell.b.color = "0x00000000"
-                    cell.t.color = "0xB5AF8CFF"
+                    ' the day under the cursor shows as a faint box so Left/Right is visible
+                    if cursor then cell.b.color = "0x3A4528FF" else cell.b.color = "0x00000000"
+                    if cursor then cell.t.color = "0xEDE6CAFF" else cell.t.color = "0xB5AF8CFF"
                 end if
             end for
         end if
@@ -421,6 +423,9 @@ sub onPlaylistPick()
 end sub
 
 sub muRestoreFocus()
+    ' the Rooms dialog reopens itself after each tick; its predecessor's wasClosed must not pull focus off it
+    sc = m.top.getScene()
+    if sc <> invalid and sc.dialog <> invalid then return
     m.top.setFocus(true)
 end sub
 

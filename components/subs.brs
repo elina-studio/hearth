@@ -16,6 +16,7 @@ end function
 function hSubsStreams(it as object) as object
     out = []
     if it = invalid or it._media = invalid or it._media.count() = 0 then return out
+    if it._media[0].Part = invalid or it._media[0].Part.count() = 0 then return out
     part = it._media[0].Part[0]
     if part = invalid or part.Stream = invalid then return out
     for each s in part.Stream
@@ -44,7 +45,10 @@ end sub
 
 sub hSubsOnItem(event as object)
     t = hTaskFrom(event)
-    if not t.ok or t.response = invalid then return
+    if not t.ok or t.response = invalid or t.response.Id = invalid
+        hMessage("Subtitles", "Couldn't reach Plex to list subtitles. Try again in a moment.")
+        return
+    end if
     hSubsDialog(t.response)
 end sub
 

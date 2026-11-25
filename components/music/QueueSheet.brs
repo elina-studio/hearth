@@ -116,12 +116,14 @@ sub draw()
     end for
     mins = Int(total / 60)
     txt = n.toStr() + " songs"
+    if n = 1 then txt = "1 song"
     if mins >= 60 then txt = txt + " · " + Int(mins / 60).toStr() + " hr " + (mins mod 60).toStr() + " min" else txt = txt + " · " + mins.toStr() + " min"
     label(g, txt, [560, 30], 310, "regular", 22, "0xB5AF8CFF").horizAlign = "right"
     if n = 0
         label(g, "Nothing is queued yet. Add songs from an album or artist.", [40, 120], 800, "regular", 26, "0xB5AF8CFF")
         return
     end if
+    if p.index < 0 or p.index >= n then return
     label(g, "Now playing", [40, 84], 400, "regular", 22, "0xB5AF8CFF")
     drawRow(900, 118, q[p.index], false, true, "")
     cnt = upCount()

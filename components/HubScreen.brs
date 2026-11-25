@@ -57,7 +57,8 @@ sub onShown(unused as dynamic)
     if m.zone = "pills"
         m.pillsGroup.getChild(m.pillIndex).setFocus(true)
     else if room <> invalid
-        room.callFunc("focusIn", invalid)
+        ' coming back from a screen: keep the place the room had (Home otherwise jumps to its first button)
+        room.callFunc("focusIn", { keep: true })
     end if
 end sub
 

@@ -1,13 +1,6 @@
 sub init()
     ' every mood with a picture of its own (built-in and Plex clips), not The Window
-    m.moods = []
-    m.titles = {}
-    for each it in ambItems()
-        if it.mood <> "window"
-            m.moods.push(it.mood)
-            m.titles[it.mood] = it.title
-        end if
-    end for
+    loadMoodList()
     m.video = m.top.findNode("video")
     m.video.observeField("state", "onVideoState")
     m.credit = m.top.findNode("credit")
@@ -67,6 +60,19 @@ sub init()
     m.asleep = false
 end sub
 
+' every mood with a picture of its own (built-in and Plex clips), not The Window.
+' Rebuilt on each mood change: the Plex clips may have arrived since the screen was made.
+sub loadMoodList()
+    m.moods = []
+    m.titles = {}
+    for each it in ambItems()
+        if it.mood <> "window"
+            m.moods.push(it.mood)
+            m.titles[it.mood] = it.title
+        end if
+    end for
+end sub
+
 sub onMood()
     md = m.top.mood
     ' Opened straight from Home before the Ambiance room ever loaded: fetch the Plex clips first,
@@ -78,6 +84,9 @@ sub onMood()
         hPlex("clips", { section: sec }, "onMoodClips")
         return
     end if
+    loadMoodList()
+    ' a "Video unavailable" note from the last mood must not follow us to the next one
+    m.note.visible = false
     it = ambMood(md)
     m.item = it
     m.clip = invalid
@@ -583,7 +592,7 @@ sub onMenu()
 end sub
 
 sub onMenuClosed()
-    m.top.setFocus(true)
+    if m.controls.visible then m.controls.setFocus(true) else m.top.setFocus(true)
 end sub
 
 sub onSleep()
@@ -621,6 +630,10 @@ sub leave()
     m.focusTick.control = "stop"
     m.sleepTimer.control = "stop"
     m.videoWatch.control = "stop"
+    ' a pending start timer must not begin the video after we've gone, and the music observer goes with us
+    m.useVideo = false
+    mp = musicNode()
+    if mp <> invalid then mp.unobserveField("track")
     m.sound.active = false
     m.scene.running = false
     m.video.control = "stop"

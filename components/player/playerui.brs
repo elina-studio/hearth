@@ -102,6 +102,17 @@ function uiKey(key as string) as boolean
     if m.earMode then return earKey(key)
     if m.upnext.visible then return false
     st = m.video.state
+    if m.sheet.visible or m.chapters.visible
+        ' a panel is open: its unused keys (* and the transport keys) must not open the pause screen or another panel on top
+        if key = "play"
+            if st = "paused"
+                m.video.control = "resume"
+            else if st = "playing"
+                m.video.control = "pause"
+            end if
+        end if
+        return true
+    end if
     if key = "OK" or key = "play"
         if st = "paused"
             m.video.control = "resume"
@@ -129,6 +140,7 @@ sub openOverlay(mode as string)
     m.ov.playing = (m.video.state = "playing")
     m.ov.callFunc("open", mode)
     m.subs.lifted = true
+    updateSkip()
 end sub
 
 sub focusBack()
@@ -396,6 +408,7 @@ sub openSheet(kind as string, focusId as string)
     fillSheet(focusId)
     m.sheet.visible = true
     m.sheet.setFocus(true)
+    updateSkip()
     if kind = "eps" and m.epSeasons = invalid then loadSeasons()
 end sub
 

@@ -64,6 +64,8 @@ function text(t as string, x as integer, y as integer, w as integer, font as obj
 end function
 
 sub paint()
+    ' music events arrive while the bar is hidden: nothing to draw then
+    if not m.top.visible then return
     m.row.removeChildrenIndex(m.row.getChildCount(), 0)
     bx(0, 0, 1728, 120, "pkg:/images/amb/mix-round.9.png", "0x0A0C09FF", 0.85)
     bx(0, 0, 1728, 120, "pkg:/images/amb/mix-roundring.9.png", m.GOLD, 0.35)

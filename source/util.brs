@@ -302,6 +302,8 @@ end sub
 ' r is Overseerr's reply to POST /api/v1/request.
 sub hArrKick(r as object)
     if r = invalid or r.media = invalid then return
+    ' still waiting for approval in Overseerr: Radarr/Sonarr don't have it yet
+    if r.status <> invalid and r.status = 1 then return
     t = CreateObject("roSGNode", "ArrKickTask")
     mt = r.type
     if mt = invalid then mt = r.media.mediaType

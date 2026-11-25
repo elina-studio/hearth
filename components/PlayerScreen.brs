@@ -50,8 +50,9 @@ end function
 
 sub onItem(event as object)
     t = hTaskFrom(event)
+    if m.leaving then return
     it = t.response
-    if not t.ok or it = invalid or it._media = invalid or it._media.count() = 0
+    if not t.ok or it = invalid or it._media = invalid or it._media.count() = 0 or it._media[0].Part = invalid or it._media[0].Part.count() = 0
         if t.status <= 0 then fail("Couldn't reach Plex.") else fail("Plex didn't send a playable version.")
         return
     end if
@@ -113,6 +114,7 @@ end sub
 
 sub onDecision(event as object)
     t = hTaskFrom(event)
+    if m.leaving then return
     d = t.response
     m.decision = d
     if t.ok and d <> invalid
@@ -263,6 +265,7 @@ sub onState()
 end sub
 
 sub retryPlay()
+    if m.leaving then return
     m.video.control = "play"
 end sub
 
@@ -344,6 +347,7 @@ sub goOn()
 end sub
 
 sub fail(reason as string)
+    if m.leaving then return
     m.tick.control = "stop"
     m.video.control = "stop"
     m.status.visible = false
@@ -605,7 +609,7 @@ end sub
 
 function onKeyEvent(key as string, press as boolean) as boolean
     if not press then return false
-    if key = "OK" and m.skipOn = true and m.skipBtn.visible and not m.ov.visible and not m.sheet.visible and not m.chapters.visible and not m.upnext.visible
+    if key = "OK" and m.skipOn = true and m.skipBtn.visible and m.earMode <> true and not m.ov.visible and not m.sheet.visible and not m.chapters.visible and not m.upnext.visible
         doSkip()
         return true
     end if
@@ -659,7 +663,7 @@ sub updateSkip()
     if not m.skipOn or m.skipBtn = invalid then return
     p = position()
     inside = (p >= m.skipFrom - 1 and p < m.skipTo - 1)
-    if inside and not m.skipDone and not m.ov.visible and not m.sheet.visible and not m.chapters.visible and not m.upnext.visible and m.started
+    if inside and not m.skipDone and m.earMode <> true and not m.ov.visible and not m.sheet.visible and not m.chapters.visible and not m.upnext.visible and m.started
         if not m.skipBtn.visible then m.skipBtn.callFunc("show", invalid)
     else if m.skipBtn.visible
         m.skipBtn.callFunc("hide", invalid)

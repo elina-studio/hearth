@@ -432,6 +432,11 @@ end function
 ' ---------- Now playing / Listen now ----------
 sub showMusic()
     if m.spkOpen = true then drawSpeakers()
+    ' the like and radio buttons come and go with the music; focus on one that is gone would be invisible and dead
+    if (m.dash = 8 or m.dash = 9) and not inArr(musicSeq(), m.dash)
+        m.dash = 1
+        paint()
+    end if
     mp = m.global.music
     eb = m.top.findNode("musicEyebrow")
     ti = m.top.findNode("musicTitle")
@@ -964,10 +969,15 @@ sub stepHero(d as integer)
 end sub
 
 ' ---------- focus ----------
-sub focusIn(unused as dynamic)
-    ' coming down from the pills always lands on the hero's first button, not wherever you were last
-    m.zone = "hero"
-    m.btn = 0
+sub focusIn(opts as dynamic)
+    ' coming down from the pills always lands on the hero's first button, not wherever you were last;
+    ' coming back from a screen (opts.keep) stays where it was, if that spot still exists
+    keep = (type(opts) = "roAssociativeArray" and opts.keep = true)
+    if keep and m.zone = "rows" and not rowUsable(m.row) then keep = false
+    if not keep
+        m.zone = "hero"
+        m.btn = 0
+    end if
     m.top.setFocus(true)
     showGreeting()
     paint()
@@ -1097,7 +1107,8 @@ end sub
 function focusedItem() as dynamic
     if m.zone = "hero" and m.heroItems.count() > 0 then return m.heroItems[m.heroIndex].item
     if m.zone = "tonight" and m.tn < m.tData.count() and m.tData[m.tn].kind <> "list" then return m.tData[m.tn].item
-    if m.zone = "rows"
+    ' only the two video rows hold Plex video items; album, request and photo cards must not get the watched/details menu
+    if m.zone = "rows" and m.row <= 1
         card = m.rows[m.row].callFunc("current", invalid)
         if card <> invalid then return card.item
     end if

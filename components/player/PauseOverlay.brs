@@ -374,6 +374,7 @@ sub holdRepeat(key as string)
     if secs < 0.5 then return
     dir = 1
     if key = "left" then dir = -1
+    wasHolding = m.holdScrub
     if not m.holdScrub
         m.holdScrub = true
         m.holdWasPlaying = m.top.playing
@@ -392,8 +393,10 @@ sub holdRepeat(key as string)
     else if secs >= 1.5 then
         sp = 2
     end if
+    ' the 0.25 s scrub tick repaints; only repaint here when the speed (or the start) changed
+    changed = (sp <> m.scrubSpeed or not wasHolding)
     m.scrubSpeed = sp
-    paint()
+    if changed then paint()
 end sub
 
 sub endHold()
@@ -423,7 +426,8 @@ sub onScrubTick()
     end if
     steps = [2.5, 7.5, 20, 45, 90]
     m.target = clampTime(m.target + m.scrubDir * steps[m.scrubSpeed - 1])
-    if m.target <= 0 or (m.top.duration > 0 and m.target >= m.top.duration - 1) then stopScrub()
+    ' at either end: stop a scrub, but keep a held scrub alive so the release still commits it
+    if not m.holdScrub and (m.target <= 0 or (m.top.duration > 0 and m.target >= m.top.duration - 1)) then stopScrub()
     paint()
 end sub
 

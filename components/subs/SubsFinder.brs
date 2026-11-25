@@ -135,6 +135,9 @@ end sub
 
 sub close()
     m.poll.control = "stop"
+    ' closing mid-download: stop waiting, so a late answer can't restart the poll or reload the video behind the player
+    m.busy = false
+    if m.busyRow <> invalid then m.busyRow.state = ""
     m.top.visible = false
     m.top.closed = true
 end sub
@@ -334,6 +337,7 @@ end sub
 
 sub onPlexDownloaded(event as object)
     t = hTaskFrom(event)
+    if not m.busy then return
     if not t.ok
         failed("Plex couldn't download that one (status " + t.status.toStr() + "). Try another.")
         return
@@ -343,6 +347,7 @@ end sub
 
 sub onBazarrDownloaded(event as object)
     t = hTaskFrom(event)
+    if not m.busy then return
     if not t.ok
         failed("Bazarr couldn't download that one. Try another.")
         return
@@ -357,6 +362,7 @@ sub onRefreshed(event as object)
 end sub
 
 sub startPolling(tries as integer)
+    if not m.busy then return
     m.tries = tries
     m.busyRow.state = "Adding to Plex…"
     paint()
