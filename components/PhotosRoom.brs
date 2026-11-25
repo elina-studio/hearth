@@ -173,18 +173,18 @@ sub onWindowLoaded(event as object)
 end sub
 
 ' Second line under the title: day and date, the album it is in (its place), and where it is in tonight's window set
-function windowLine(it as object, pos as integer, n as integer) as string
+function windowLine(item as object, index as integer, total as integer) as string
     parts = []
-    d = it.date
-    if d <> invalid and Len(d) >= 10
-        dt = CreateObject("roDateTime")
-        dt.FromISO8601String(Left(d, 10) + "T12:00:00Z")
-        mo = pMonthName(dt.GetMonth())
-        if mo <> "" then parts.push(dt.GetWeekday() + " " + dt.GetDayOfMonth().toStr() + " " + mo)
+    dstr = item.date
+    if dstr <> invalid and Len(dstr) >= 10
+        dtm = CreateObject("roDateTime")
+        dtm.FromISO8601String(Left(dstr, 10) + "T12:00:00Z")
+        monthName = pMonthName(dtm.GetMonth())
+        if monthName <> "" then parts.push(dtm.GetWeekday() + " " + dtm.GetDayOfMonth().toStr() + " " + monthName)
     end if
-    if it.place <> invalid and it.place <> "" then parts.push(it.place)
-    if n > 1 then parts.push(pos.toStr() + " of " + n.toStr())
-    return parts.join(" · ")
+    if item.place <> invalid and item.place <> "" then parts.push(item.place)
+    if total > 1 then parts.push(index.toStr() + " of " + total.toStr())
+    return parts.join(" " + Chr(183) + " ")
 end function
 
 ' ---------- albums ----------
@@ -203,7 +203,10 @@ sub onAlbums(event as object)
         tile.title = a.Name
         n = a.count
         if n = invalid then tile.sub = "Album" else if n = 1 then tile.sub = "1 photo" else tile.sub = hThousands(n) + " photos"
-        if a.years <> invalid and a.years <> "" then tile.sub = a.years + " · " + tile.sub
+        if a.years <> invalid and a.years <> "" then
+            baseSub = tile.sub
+            tile.sub = a.years + " " + Chr(183) + " " + baseSub
+        end if
         ' covers load only for the first screenful; the rest as you scroll to them
         if i < 8 then tile.image = pPhotoUrl(a, 272, 172, true)
     end for
