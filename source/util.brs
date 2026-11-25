@@ -27,6 +27,21 @@ function hFont(kind as string, size as integer) as object
     return f
 end function
 
+' One shared Font per kind and size. Making a Font node for every label is slow, and a Discover grid of 100 posters
+' or a sheet of 50 chips would make hundreds of them.
+function hFontCached(kind as string, size as integer) as object
+    if not m.global.hasField("fontCache") then m.global.addFields({ fontCache: {} })
+    key = kind + "|" + size.toStr()
+    cache = m.global.fontCache
+    f = cache[key]
+    if f = invalid
+        f = hFont(kind, size)
+        cache[key] = f
+        m.global.fontCache = cache
+    end if
+    return f
+end function
+
 function hColors() as object
     return { night: "0x0B0E09FF", panel: "0x141A11FF", ink: "0xEDE6CAFF", muted: "0xB5AF8CFF", gold: "0xE0B34AFF", goldInk: "0x1F1606FF", olive: "0xA3A35AFF", rope: "0xD9A066FF", ember: "0xF0907CFF" }
 end function

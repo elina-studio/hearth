@@ -23,6 +23,7 @@ sub build()
     draw()
 end sub
 
+' Built once per open: every chip, with its place on screen. Pressing a chip only recolours chips (no nodes are made or fonts loaded).
 sub draw()
     m.content.removeChildrenIndex(m.content.getChildCount(), 0)
     m.items = []
@@ -30,43 +31,56 @@ sub draw()
     cfg = m.cfg
     maxW = 800
     t = m.content.createChild("Label")
-    t.font = hFont("fell", 42)
+    t.font = hFontCached("fell", 42)
     t.text = cfg.title
     t.color = "0xEDE6CAFF"
     t.width = maxW
     y = 62
     ' Genre (several can be on at once: both must match)
     y = section("Genre", y)
-    list = [{ kind: "genreAny", label: "Any", on: m.sel.genres.count() = 0 }]
+    list = [{ kind: "genreAny", label: "Any" }]
     for each g in cfg.genres
-        list.push({ kind: "genre", value: g.name, label: g.name, on: hasGenre(g.name) })
+        list.push({ kind: "genre", value: g.name, label: g.name })
     end for
     y = flow(list, y, maxW)
     if cfg.providers <> invalid and cfg.providers.count() > 0
         y = section("Streaming on", y)
-        list = [{ kind: "provider", value: "", label: "Any", on: m.sel.provider = "" }]
+        list = [{ kind: "provider", value: "", label: "Any" }]
         for each p in cfg.providers
-            list.push({ kind: "provider", value: p.id.toStr(), label: p.name, logo: p.logo, on: m.sel.provider = p.id.toStr() })
+            list.push({ kind: "provider", value: p.id.toStr(), label: p.name, logo: p.logo })
         end for
         y = flow(list, y, maxW)
     end if
     y = section("Rating (TMDB)", y)
     list = []
     for each r in [{ v: 0, t: "Any" }, { v: 6, t: "6.0+" }, { v: 7, t: "7.0+" }, { v: 8, t: "8.0+" }]
-        list.push({ kind: "rating", value: r.v, label: r.t, star: (r.v > 0), on: m.sel.minRating = r.v })
+        list.push({ kind: "rating", value: r.v, label: r.t, star: (r.v > 0) })
     end for
     y = flow(list, y, maxW)
     y = section("Sort", y)
     list = []
     for each s in [{ v: "popular", t: "Popular" }, { v: "rating", t: "Top rated" }, { v: "newest", t: "Newest" }, { v: "az", t: "A to Z" }]
-        list.push({ kind: "sort", value: s.v, label: s.t, on: m.sel.sort = s.v })
+        list.push({ kind: "sort", value: s.v, label: s.t })
     end for
     y = flow(list, y, maxW)
     y = y + 14
-    list = [{ kind: "done", label: "Show results", on: true, wide: 560 }, { kind: "reset", label: "Reset", on: false }]
+    list = [{ kind: "done", label: "Show results", wide: 560 }, { kind: "reset", label: "Reset" }]
     y = flow(list, y, maxW)
-    paint()
+    for each it in m.items
+        makeChip(it)
+    end for
+    refresh()
 end sub
+
+function isOn(it as object) as boolean
+    k = it.kind
+    if k = "genreAny" then return m.sel.genres.count() = 0
+    if k = "genre" then return hasGenre(it.value)
+    if k = "provider" then return m.sel.provider = it.value
+    if k = "rating" then return m.sel.minRating = it.value
+    if k = "sort" then return m.sel.sort = it.value
+    return k = "done"
+end function
 
 function hasGenre(name as string) as boolean
     for each g in m.sel.genres
@@ -77,7 +91,7 @@ end function
 
 function section(text as string, y as integer) as integer
     l = m.content.createChild("Label")
-    l.font = hFont("fell", 30)
+    l.font = hFontCached("fell", 30)
     l.color = "0xD9A066FF"
     l.text = text
     l.translation = [0, y + 4]
@@ -88,12 +102,11 @@ end function
 function flow(list as object, y as integer, maxW as integer) as integer
     x = 0
     row = []
+    probe = CreateObject("roSGNode", "Label")
+    probe.font = hFontCached("bold", 22)
     for each it in list
-        probe = m.content.createChild("Label")
-        probe.font = hFont("bold", 22)
         probe.text = it.label
         w = probe.boundingRect().width + 40
-        m.content.removeChild(probe)
         if it.logo <> invalid and it.logo <> "" then w = w + 38
         if it.star = true then w = w + 28
         if it.wide <> invalid and it.wide > w then w = it.wide
@@ -116,67 +129,65 @@ function flow(list as object, y as integer, maxW as integer) as integer
     return y + 58
 end function
 
-sub paint()
-    ' remove old chip nodes, keep title and section labels
-    for i = m.content.getChildCount() - 1 to 0 step -1
-        c = m.content.getChild(i)
-        if c.id = "chip" then m.content.removeChild(c)
-    end for
+sub makeChip(it as object)
+    g = m.content.createChild("Group")
+    g.translation = [it.x, it.y]
+    it.bg = g.createChild("Poster")
+    it.bg.uri = "pkg:/images/pill.9.png"
+    it.bg.width = it.w
+    it.bg.height = 48
+    tx = 20
+    if it.logo <> invalid and it.logo <> ""
+        lg = g.createChild("Poster")
+        lg.uri = it.logo
+        lg.width = 30
+        lg.height = 30
+        lg.loadDisplayMode = "scaleToFit"
+        lg.translation = [14, 9]
+        tx = 54
+    end if
+    if it.star = true
+        it.st = g.createChild("Poster")
+        it.st.uri = "pkg:/images/requests/star.png"
+        it.st.width = 20
+        it.st.height = 20
+        it.st.translation = [18, 14]
+        tx = 46
+    end if
+    it.lab = g.createChild("Label")
+    it.lab.font = hFontCached("bold", 22)
+    it.lab.text = it.label
+    it.lab.height = 48
+    it.lab.vertAlign = "center"
+    if it.wide <> invalid
+        it.lab.width = it.w
+        it.lab.horizAlign = "center"
+    else
+        it.lab.translation = [tx, 0]
+    end if
+    it.ring = g.createChild("Poster")
+    it.ring.uri = "pkg:/images/pill-ring.9.png"
+    it.ring.blendColor = "0xFFF3D0FF"
+    it.ring.translation = [-5, -5]
+    it.ring.width = it.w + 10
+    it.ring.height = 58
+    it.ring.visible = false
+end sub
+
+' Recolour every chip for the current choices and focus
+sub refresh()
     for i = 0 to m.items.count() - 1
         it = m.items[i]
-        g = m.content.createChild("Group")
-        g.id = "chip"
-        g.translation = [it.x, it.y]
-        bg = g.createChild("Poster")
-        bg.uri = "pkg:/images/pill.9.png"
-        bg.width = it.w
-        bg.height = 48
         ink = "0xEDE6CAFF"
-        if it.on and it.kind <> "reset"
-            bg.blendColor = "0xE0B34AFF"
+        if isOn(it) and it.kind <> "reset"
+            it.bg.blendColor = "0xE0B34AFF"
             ink = "0x1F1606FF"
         else
-            bg.blendColor = "0xFFFFFF12"
+            it.bg.blendColor = "0xFFFFFF12"
         end if
-        tx = 20
-        if it.logo <> invalid and it.logo <> ""
-            lg = g.createChild("Poster")
-            lg.uri = it.logo
-            lg.width = 30
-            lg.height = 30
-            lg.loadDisplayMode = "scaleToFit"
-            lg.translation = [14, 9]
-            tx = 54
-        end if
-        if it.star = true
-            st = g.createChild("Poster")
-            st.uri = "pkg:/images/requests/star.png"
-            st.width = 20
-            st.height = 20
-            st.blendColor = ink
-            st.translation = [18, 14]
-            tx = 46
-        end if
-        lab = g.createChild("Label")
-        lab.font = hFont("bold", 22)
-        lab.text = it.label
-        lab.color = ink
-        lab.height = 48
-        lab.vertAlign = "center"
-        if it.wide <> invalid
-            lab.width = it.w
-            lab.horizAlign = "center"
-        else
-            lab.translation = [tx, 0]
-        end if
-        if i = m.focus
-            ring = g.createChild("Poster")
-            ring.uri = "pkg:/images/pill-ring.9.png"
-            ring.blendColor = "0xFFF3D0FF"
-            ring.translation = [-5, -5]
-            ring.width = it.w + 10
-            ring.height = 58
-        end if
+        it.lab.color = ink
+        if it.st <> invalid then it.st.blendColor = ink
+        it.ring.visible = (i = m.focus)
     end for
 end sub
 
@@ -197,7 +208,7 @@ function handleKey(key as string) as boolean
         finish()
         return true
     end if
-    paint()
+    refresh()
     return true
 end function
 
@@ -243,7 +254,7 @@ sub press(it as object)
         finish()
         return
     end if
-    draw()
+    refresh()
 end sub
 
 sub finish()

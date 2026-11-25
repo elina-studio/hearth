@@ -82,6 +82,8 @@ sub init()
     m.acc = {}
     m.seen = {}
     m.pageNo = {}
+    m.busy = {}
+    m.listError = {}
     m.genres = { movie: [], tv: [] }
     m.provs = { movie: [], tv: [] }
     m.rt = {}
@@ -294,11 +296,17 @@ sub onList(event as object)
     parts = t.tag.Split("|")
     key = parts[0]
     if m.gen[key] <> Val(parts[1]) then return
+    m.busy[key] = false
     if checkProblem(t) then return
     if not t.ok
         if Val(parts[2]) = 1 and m.cards[key] = invalid
             m.problem = "Overseerr answered with error " + t.status.toStr() + ". Back out and in to try again."
             showList()
+        else if Val(parts[2]) = 1
+            ' a filter Overseerr wouldn't run: say so instead of leaving the old cards up as if nothing happened
+            m.listError[key] = "Overseerr couldn't do that search (error " + t.status.toStr() + ")."
+            m.acc[key] = []
+            publishList(key)
         end if
         return
     end if
@@ -359,6 +367,9 @@ sub loadList(key as string)
     m.acc[key] = []
     m.seen[key] = {}
     m.pageNo[key] = 0
+    m.busy[key] = true
+    m.listError[key] = ""
+    if currentList().key = key and isFilterable(key) then paintBar()
     fetchPage(key, 1)
 end sub
 
@@ -663,6 +674,8 @@ sub showList()
             m.empty.text = "No requests yet. Pick something in Trending or Search and press OK."
         else if l.key = "new"
             m.empty.text = "Nothing new here yet. Things you request show up here once they've downloaded."
+        else if isFilterable(l.key) and m.listError[l.key] <> invalid and m.listError[l.key] <> ""
+            m.empty.text = m.listError[l.key] + " Press * to change the filters."
         else if isFilterable(l.key) and filtersActive(l.key)
             m.empty.text = "Nothing matches those filters. Press * to change them."
         else
@@ -1574,6 +1587,7 @@ function filterSummary(key as string) as string
     names = { popular: "most popular", rating: "top rated", newest: "newest", az: "A to Z" }
     parts.push(names[f.sort])
     text = parts.join(" · ")
+    if m.busy[key] = true then return "Asking Overseerr… · " + text
     if filtersActive(key)
         ' keep room for "Filtered · 43 of 100" and the hint on the same line
         if Len(text) > 48 then text = Left(text, 46) + "…"
