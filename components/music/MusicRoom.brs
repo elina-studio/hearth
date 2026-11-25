@@ -21,7 +21,7 @@ sub init()
     m.buildTimer.observeField("fire", "onBuildTimer")
 
     ' tabs are plain words with a gold underline (like Movies and Shows); Request sits apart after a divider
-    m.tabDefs = [["For you", "foryou"], ["Artists", "artists"], ["Albums", "albums"], ["Playlists", "playlists"], ["New", "new"], ["Radio", "radio"], ["Request", "request"]]
+    m.tabDefs = [["For you", "foryou"], ["Artists", "artists"], ["Albums", "albums"], ["Playlists", "playlists"], ["New", "new"], ["Discover", "discover"], ["Radio", "radio"], ["Request", "request"]]
     m.tabNodes = []
     x = 0
     for each t in m.tabDefs
@@ -100,6 +100,8 @@ sub init()
         l.text = Mid(m.LET, i + 1, 1)
     end for
 
+    m.disc = m.top.findNode("disc")
+    m.disc.observeField("request", "onDiscRequest")
     m.zone = "content"
     m.lastRight = "content"
     m.focused = false
@@ -305,6 +307,23 @@ sub showTab(i as integer)
     m.grid.visible = not forYou
     m.lettersG.visible = (kind = "artists" or kind = "albums")
     m.spot.visible = false
+    m.disc.visible = (kind = "discover")
+    if kind = "discover"
+        m.shelves.visible = false
+        m.grid.visible = false
+        m.lettersG.visible = false
+        known = []
+        al = m.lib["artists"]
+        if al <> invalid and al.cards <> invalid
+            for each c in al.cards
+                known.push(c.title)
+            end for
+        end if
+        m.disc.known = known
+        m.disc.callFunc("load", invalid)
+        paint()
+        return
+    end if
     if kind = "new"
         showNew()
         paint()
@@ -434,6 +453,7 @@ function curLib() as object
 end function
 
 function hasContent() as boolean
+    if m.tabDefs[m.tab][1] = "discover" then return true
     if m.tab = 0 then return m.rows.count() > 0
     if m.tabDefs[m.tab][1] = "new" and m.newItem <> invalid then return true
     lib = curLib()
@@ -498,7 +518,9 @@ sub paint()
     for i = 0 to m.rows.count() - 1
         m.rows[i].active = (m.focused and m.zone = "content" and m.tab = 0 and m.row = i)
     end for
-    m.grid.active = (m.focused and m.zone = "content" and m.tab > 0 and not (onNew and m.newSpot))
+    onDisc = (m.tabDefs[m.tab][1] = "discover")
+    m.disc.active = (m.focused and m.zone = "content" and onDisc)
+    m.grid.active = (m.focused and m.zone = "content" and m.tab > 0 and not onDisc and not (onNew and m.newSpot))
     if m.tab = 0 and m.rows.count() > 0
         y = 0
         if m.row >= 1 then y = -(m.rows[m.row].translation[1])
@@ -587,6 +609,11 @@ sub onCardOption()
     if b = 0 or b = 1
         muSend("playContainer", { kind: pxStr(md.type), id: pxStr(md.ratingKey), shuffle: (b = 1), label: pxStr(md.title) })
     end if
+end sub
+
+sub onDiscRequest()
+    r = m.disc.request
+    if r <> invalid then m.top.request = r
 end sub
 
 sub toPills()
@@ -696,6 +723,12 @@ sub letterKey(key as string)
 end sub
 
 sub contentKey(key as string)
+    if m.tabDefs[m.tab][1] = "discover"
+        edge = m.disc.callFunc("handleKey", key)
+        if edge = "left" then m.zone = "panel"
+        if edge = "up" then m.zone = "tabs"
+        return
+    end if
     if key = "OK" and m.tabDefs[m.tab][1] = "new" and m.newSpot
         newKey(key)
         return

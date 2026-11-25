@@ -31,6 +31,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import guard
 import lastfm
+import discover
 import lyrics
 import web
 
@@ -274,6 +275,12 @@ class Handler(BaseHTTPRequestHandler):
             except ValueError:
                 dur = 0
             self.send_json(lyrics.find(g("artist"), g("title"), g("album"), dur, g("file")))
+        elif path == "/api/discover":
+            q = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            self.send_json(discover.get(bool((q.get("refresh") or [""])[0])))
+        elif path == "/api/discover/albums":
+            q = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            self.send_json(discover.albums((q.get("artist") or [""])[0]))
         elif path == "/api/lastfm/status":
             self.send_json(lastfm.status())
         elif path in ("/lastfm", "/lastfm/done"):
@@ -376,6 +383,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_json(lastfm.begin())
             if path == "/api/lastfm/event":
                 return self.send_json(lastfm.event(req))
+            if path == "/api/discover/hide":
+                return self.send_json(discover.hide(str(req.get("name", ""))))
             if path == "/api/lastfm/disconnect":
                 lastfm.disconnect()
                 return self.send_json({"ok": True})
@@ -459,6 +468,7 @@ def main():
         HTTP_PORT, (", https :%d" % HTTPS_PORT) if len(servers) > 1 else "", TV_IP, WHISPER_HOST, WHISPER_PORT), flush=True)
     print("House key in %s (the TV %s is let in without it; phones open /?t=<key> once)" % (os.path.join(DATA_DIR, "helper-token"), TV_IP), flush=True)
     threading.Thread(target=lastfm.worker, daemon=True).start()
+    threading.Thread(target=discover.worker, daemon=True).start()
     servers[0].serve_forever()
 
 
