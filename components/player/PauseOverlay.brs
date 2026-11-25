@@ -159,6 +159,16 @@ sub paint()
     if m.target <> invalid then cur = m.target
     if cur < 0 then cur = 0
     if dur > 0 and cur > dur then cur = dur
+    ' films over an hour show h:mm:ss, which is too wide for the 64 px labels beside the bar: step down to 44 px
+    size = 64
+    if dur >= 3600 then size = 44
+    if m.timeSize <> size
+        m.timeSize = size
+        m.top.findNode("elapsed").font = hFont("bold", size)
+        m.top.findNode("remaining").font = hFont("bold", size)
+        m.top.findNode("elapsed").translation = [100, 800 + (64 - size) / 2]
+        m.top.findNode("remaining").translation = [1600, 800 + (64 - size) / 2]
+    end if
     m.top.findNode("elapsed").text = clockText(cur)
     left = dur - cur
     if dur <= 0 then left = 0
