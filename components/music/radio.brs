@@ -13,6 +13,8 @@ sub radioInit()
     reg = CreateObject("roRegistrySection", "hearth")
     m.radio = invalid
     m.radioLoading = false
+    m.keepTried = ""
+    m.wantNext = false
     m.radioBans = {}
     raw = reg.Read("radioBans")
     if raw <> ""
@@ -60,11 +62,12 @@ sub radioStart(c as object)
     if kind = "mood" then name = pxStr(c.moodName)
     if kind = "favs" then name = "your favourites"
     if kind = "forgotten" then name = "songs you haven't heard lately"
+    if c.label <> invalid and c.label <> "" then name = c.label
     r.name = name
     if seed <> invalid then r.window.push(seed)
     ' what was lined up after the current song gives way to the radio
     q = m.top.queue
-    if q <> invalid and q.Count() > 0 and (m.top.state = "playing" or m.top.state = "paused" or m.top.state = "buffering")
+    if c.keep <> true and q <> invalid and q.Count() > 0 and (m.top.state = "playing" or m.top.state = "paused" or m.top.state = "buffering")
         kept = []
         for i = 0 to m.top.index
             kept.push(q[i])
@@ -151,10 +154,28 @@ end sub
 
 sub radioCheck()
     r = m.radio
-    if r = invalid or r.busy then return
     q = m.top.queue
     if q = invalid then return
+    if r = invalid
+        ' the album or playlist is on its last song: line up more like it so the music never just stops
+        if q.Count() > 0 and q.Count() - 1 - m.top.index <= 0 and m.top.repeat <> "one" and m.top.repeat <> "all" then keepPlaying()
+        return
+    end if
+    if r.busy then return
     if q.Count() - 1 - m.top.index <= 3 then radioRefill()
+end sub
+
+' Carry on after the queue: a radio seeded from the song playing now (Plex sonic neighbours + that artist),
+' added after what's already queued, shown in the queue sheet. Once per queue end.
+sub keepPlaying()
+    if m.radio <> invalid then return
+    tr = m.top.track
+    if tr = invalid or tr.id = invalid or tr.id = "" then return
+    if m.keepTried = tr.id then return
+    m.keepTried = tr.id
+    label = "More like " + pxStr(tr.album)
+    if pxStr(tr.album) = "" then label = "More like " + pxStr(tr.artist)
+    radioStart({ kind: "song", keep: true, label: label })
 end sub
 
 sub radioFetch(path as string, query as object, src as string)
@@ -385,7 +406,10 @@ sub radioAppend(picks as object)
         out.append(picks)
         m.top.queue = out
         if m.original <> invalid then m.original.append(picks)
-        if r.first and (m.top.state = "none" or m.top.state = "stopped" or m.top.state = "ended") then playIndex(m.top.index + 1)
+        if m.wantNext = true or (r.first and (m.top.state = "none" or m.top.state = "stopped" or m.top.state = "ended"))
+            m.wantNext = false
+            playIndex(m.top.index + 1)
+        end if
     end if
     r.first = false
 end sub

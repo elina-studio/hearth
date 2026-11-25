@@ -510,7 +510,17 @@ sub skip(d as integer)
     end if
     i = m.top.index + d
     if i >= q.count()
-        if m.top.repeat = "all" then i = 0 else i = q.count() - 1
+        if m.top.repeat = "all"
+            i = 0
+        else
+            ' Next on the last song: play the first of the "more like this" songs as soon as they arrive
+            m.wantNext = true
+            m.keepTried = ""
+            keepPlaying()
+            if m.radio = invalid then m.wantNext = false
+            if m.radio <> invalid and not m.radio.busy then radioRefill()
+            return
+        end if
     end if
     if i < 0 then i = 0
     playIndex(i)
@@ -579,6 +589,9 @@ sub trackFinished()
         m.top.state = "ended"
         m.report.control = "stop"
         m.castClock.control = "stop"
+        ' the "more like this" songs may still be on their way: start the first when they land
+        keepPlaying()
+        if m.radio <> invalid then m.wantNext = true
     end if
 end sub
 
