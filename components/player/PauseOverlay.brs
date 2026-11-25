@@ -1,5 +1,5 @@
 ' Pause screen A. Two focus zones: the timeline (Left/Right skip 10 s back / 30 s ahead, Rewind/Fast-forward
-' scrub faster each press, OK plays or jumps to the scrub point) and the button row (Down from the timeline).
+' scrub faster each press, holding Left/Right seeks faster the longer it is held, OK plays or jumps to the scrub point) and the button row (Down from the timeline).
 ' While playing it hides itself after 5 s; while paused it stays.
 
 sub init()
@@ -32,6 +32,13 @@ sub init()
     m.target = invalid
     m.scrubDir = 0
     m.scrubSpeed = 0
+    m.holdKey = ""
+    m.holdScrub = false
+    m.holdWasPlaying = false
+    m.holdClock = CreateObject("roTimespan")
+    m.holdLast = CreateObject("roTimespan")
+    m.seekTag = m.top.findNode("seekTag")
+    m.seekTag.font = hFont("bold", 26)
     m.bif = invalid
     buildButtons()
 end sub
@@ -186,6 +193,15 @@ sub paint()
     else
         m.preview.visible = false
     end if
+    if m.scrubDir <> 0 and m.scrubSpeed > 0
+        mult = [10, 30, 80, 180, 360]
+        word = "Fast-forward"
+        if m.scrubDir < 0 then word = "Rewind"
+        m.seekTag.text = word + "  " + mult[m.scrubSpeed - 1].toStr() + "x"
+        m.seekTag.visible = true
+    else
+        m.seekTag.visible = false
+    end if
     paintHints()
 end sub
 
@@ -254,8 +270,6 @@ sub buildButtons()
             bg.translation = [0, -12]
             bg.width = 96
             bg.height = 88
-            moss = g.createChild("Poster")
-            hMossHug(moss, 12, 0, 84, d.id)
             icon = g.createChild("Poster")
             icon.uri = "pkg:/images/player/" + d.icon + ".png"
             icon.width = 36
@@ -267,7 +281,7 @@ sub buildButtons()
             lab.width = 110
             lab.horizAlign = "center"
             lab.translation = [-7, 74]
-            m.btnNodes.push({ bg: bg, moss: moss, icon: icon, label: lab, id: d.id })
+            m.btnNodes.push({ bg: bg, icon: icon, label: lab, id: d.id })
             x = x + 102
         end if
     end for
@@ -295,7 +309,6 @@ sub paintButtons()
             b.bg.blendColor = "0x404B2DFF"
             b.icon.blendColor = m.c.ink
         end if
-        b.moss.visible = focused
         if focused then b.label.color = "0xFFE7A0FF" else b.label.color = m.c.muted
     end for
 end sub
@@ -350,6 +363,52 @@ sub stopScrub()
     m.scrubTimer.control = "stop"
     m.scrubDir = 0
     m.scrubSpeed = 0
+    m.holdScrub = false
+end sub
+
+' ---------- hold Left/Right to seek ----------
+' Roku repeats the key press while a button is held and sends press=false on release. A tap keeps its 10 s / 30 s
+' skip; once held past 0.5 s the scrub starts and speeds up with the hold time (10x, 30x, 80x, 180x, 360x real time).
+sub holdRepeat(key as string)
+    secs = m.holdClock.TotalMilliseconds() / 1000
+    if secs < 0.5 then return
+    dir = 1
+    if key = "left" then dir = -1
+    if not m.holdScrub
+        m.holdScrub = true
+        m.holdWasPlaying = m.top.playing
+        if m.target = invalid then m.target = m.top.position
+        m.scrubDir = dir
+        m.hideTimer.control = "stop"
+        m.scrubTimer.control = "start"
+    end if
+    sp = 1
+    if secs >= 8 then
+        sp = 5
+    else if secs >= 5 then
+        sp = 4
+    else if secs >= 3 then
+        sp = 3
+    else if secs >= 1.5 then
+        sp = 2
+    end if
+    m.scrubSpeed = sp
+    paint()
+end sub
+
+sub endHold()
+    wasScrub = m.holdScrub
+    m.holdKey = ""
+    m.holdScrub = false
+    if not wasScrub then return
+    if m.holdWasPlaying and m.target <> invalid
+        commit()
+    else
+        ' paused: leave the scrub point (OK jumps there, Back cancels)
+        stopScrub()
+        paint()
+    end if
+    armHide()
 end sub
 
 sub onScrubTick()
@@ -357,7 +416,12 @@ sub onScrubTick()
         stopScrub()
         return
     end if
-    steps = [2.5, 7.5, 20, 45]
+    if m.holdScrub and m.holdLast.TotalMilliseconds() > 900
+        ' the release was missed: stop rather than run away
+        endHold()
+        return
+    end if
+    steps = [2.5, 7.5, 20, 45, 90]
     m.target = clampTime(m.target + m.scrubDir * steps[m.scrubSpeed - 1])
     if m.target <= 0 or (m.top.duration > 0 and m.target >= m.top.duration - 1) then stopScrub()
     paint()
@@ -374,7 +438,14 @@ end sub
 
 ' ---------- keys ----------
 function onKeyEvent(key as string, press as boolean) as boolean
-    if not press or not m.top.visible then return false
+    if not m.top.visible then return false
+    if not press
+        if (key = "left" or key = "right") and m.holdKey = key
+            endHold()
+            return true
+        end if
+        return false
+    end if
     armHide()
     if key = "back"
         if m.target <> invalid
@@ -404,12 +475,17 @@ function onKeyEvent(key as string, press as boolean) as boolean
         return true
     end if
     if m.zone = "bar"
-        if key = "left"
+        if key = "left" or key = "right"
+            fresh = (m.holdKey <> key or m.holdLast.TotalMilliseconds() > 900)
+            m.holdLast.Mark()
+            if not fresh
+                holdRepeat(key)
+                return true
+            end if
+            m.holdKey = key
+            m.holdClock.Mark()
             stopScrub()
-            jump(-10)
-        else if key = "right"
-            stopScrub()
-            jump(30)
+            if key = "left" then jump(-10) else jump(30)
         else if key = "OK"
             if m.target <> invalid then commit() else m.top.action = { cmd: "toggle" }
         else if key = "down"

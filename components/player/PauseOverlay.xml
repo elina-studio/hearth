@@ -22,6 +22,7 @@
     <Label id="remaining" translation="[1600, 800]" width="220" horizAlign="right" color="0xB5AF8CFF" />
     <Poster id="moon" uri="pkg:/images/player/moon.png" width="24" height="24" blendColor="0xB5AF8CFF" />
     <Label id="ends" translation="[1300, 882]" width="520" horizAlign="right" color="0xB5AF8CFF" />
+    <Label id="seekTag" translation="[300, 880]" width="600" color="0xFFE7A0FF" visible="false" />
     <Group id="buttons" translation="[0, 912]" />
     <KeyHints id="hints" translation="[1820, 1016]" />
     <Timer id="hideTimer" duration="5" />
