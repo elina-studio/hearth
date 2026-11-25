@@ -11,6 +11,14 @@
         <!-- second portrait photo when two share a slide -->
         <Poster id="photoA2" translation="[960, 0]" width="960" height="1080" loadWidth="640" loadHeight="720" loadDisplayMode="scaleToZoom" visible="false" />
       </Group>
+      <!-- optional "Frame" look: a gold hairline 10 px outside the photo and an italic date line under it -->
+      <Group id="frameA" visible="false">
+        <Rectangle id="frameAT" height="2" color="0xE0B34AAA" />
+        <Rectangle id="frameAB" height="2" color="0xE0B34AAA" />
+        <Rectangle id="frameAL" width="2" color="0xE0B34AAA" />
+        <Rectangle id="frameAR" width="2" color="0xE0B34AAA" />
+        <Label id="plateA" width="1920" height="50" horizAlign="center" vertAlign="center" color="0xD9A066FF" />
+      </Group>
     </Group>
     <Group id="layerB" opacity="0">
       <Poster id="backB" width="1920" height="1080" loadWidth="96" loadHeight="54" loadDisplayMode="scaleToZoom" opacity="0.5" />
@@ -18,6 +26,14 @@
         <Poster id="photoB" width="1920" height="1080" loadWidth="1280" loadHeight="720" loadDisplayMode="scaleToFit" />
         <!-- second portrait photo when two share a slide -->
         <Poster id="photoB2" translation="[960, 0]" width="960" height="1080" loadWidth="640" loadHeight="720" loadDisplayMode="scaleToZoom" visible="false" />
+      </Group>
+      <!-- optional "Frame" look: a gold hairline 10 px outside the photo and an italic date line under it -->
+      <Group id="frameB" visible="false">
+        <Rectangle id="frameBT" height="2" color="0xE0B34AAA" />
+        <Rectangle id="frameBB" height="2" color="0xE0B34AAA" />
+        <Rectangle id="frameBL" width="2" color="0xE0B34AAA" />
+        <Rectangle id="frameBR" width="2" color="0xE0B34AAA" />
+        <Label id="plateB" width="1920" height="50" horizAlign="center" vertAlign="center" color="0xD9A066FF" />
       </Group>
     </Group>
     <!-- fetches the next photo while this one shows, so the change is instant -->

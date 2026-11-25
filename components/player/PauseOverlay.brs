@@ -39,6 +39,9 @@ sub init()
     m.holdLast = CreateObject("roTimespan")
     m.seekTag = m.top.findNode("seekTag")
     m.seekTag.font = hFont("bold", 26)
+    m.seekDist = m.top.findNode("seekDist")
+    m.seekDistText = m.top.findNode("seekDistText")
+    m.seekDistText.font = hFont("bold", 24)
     m.bif = invalid
     buildButtons()
 end sub
@@ -209,10 +212,33 @@ sub paint()
         if m.scrubDir < 0 then word = "Rewind"
         m.seekTag.text = word + "  " + mult[m.scrubSpeed - 1].toStr() + "x"
         m.seekTag.visible = true
+        paintSeekDist()
     else
         m.seekTag.visible = false
+        m.seekDist.visible = false
     end if
     paintHints()
+end sub
+
+' The chip after the speed tag: distance from the playing point and the landing time, "+1:20 → 42:15"
+sub paintSeekDist()
+    if m.target = invalid
+        m.seekDist.visible = false
+        return
+    end if
+    d = Int(m.target) - Int(m.top.position)
+    sign = "+"
+    if d < 0
+        sign = "−"
+        d = -d
+    end if
+    m.seekDistText.text = sign + clockText(d) + " → " + clockText(m.target)
+    w = Int(m.seekDistText.boundingRect().width) + 36
+    m.top.findNode("seekDistFill").width = w
+    m.top.findNode("seekDistRing").width = w
+    tagW = Int(m.seekTag.boundingRect().width)
+    m.seekDist.translation = [300 + tagW + 18, 878]
+    m.seekDist.visible = true
 end sub
 
 sub paintHints()

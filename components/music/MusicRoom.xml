@@ -10,7 +10,7 @@
       <Poster uri="pkg:/images/w/panel-v3.9.png" translation="[-12, -12]" width="1174" height="82" blendColor="0x141A11FF" />
     </Group>
     <Label id="heading" translation="[690, 190]" width="1150" color="0xD9A066FF" />
-    <Group clippingRect="[660, 112, 1260, 818]">
+    <Group id="clip" clippingRect="[660, 112, 1260, 818]">
       <Group id="shelves" translation="[690, 132]" />
       <MusicGrid id="grid" translation="[690, 240]" visible="false" />
     </Group>
@@ -24,6 +24,16 @@
       <Group id="spotChips" translation="[256, 166]" />
     </Group>
     <DiscoverPane id="disc" translation="[690, 92]" visible="false" />
+    <!-- Plex didn't answer: a slim coral banner over the saved (dimmed) list, with Try again (Up from the grid) -->
+    <Group id="banner" translation="[690, 104]" visible="false">
+      <Poster uri="pkg:/images/w/panel-v3.9.png" translation="[-12, -12]" width="1174" height="84" blendColor="0xF0907C2E" />
+      <Label id="bannerText" translation="[24, 0]" width="900" height="60" vertAlign="center" maxLines="1" color="0xEDE6CAFF" />
+      <Group id="retry" translation="[956, 8]">
+        <Poster id="retryFill" uri="pkg:/images/w/button-fill-v3.9.png" translation="[-12, -12]" width="194" height="68" blendColor="0xFFFFFF14" />
+        <Poster id="retryIcon" uri="pkg:/images/icons/d-refresh.png" translation="[20, 11]" width="22" height="22" />
+        <Label id="retryLabel" text="Try again" translation="[52, 0]" width="110" height="44" vertAlign="center" color="0xEDE6CAFF" />
+      </Group>
+    </Group>
     <QueueSheet id="queue" translation="[1010, 150]" visible="false" />
     <Label id="empty" translation="[690, 160]" width="1150" wrap="true" color="0xB5AF8CFF" />
     <Label id="toast" translation="[690, 880]" width="1150" color="0xE0B34AFF" />

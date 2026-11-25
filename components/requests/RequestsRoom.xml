@@ -17,7 +17,16 @@
         <Poster id="barIcon" uri="pkg:/images/requests/list.png" width="24" height="24" translation="[22, 14]" blendColor="0xEDE6CAFF" />
         <Label id="barLabel" translation="[58, 0]" height="52" vertAlign="center" text="Filter &amp; sort" color="0xEDE6CAFF" />
         <Poster id="barRing" uri="pkg:/images/pill-ring.9.png" blendColor="0xFFF3D0FF" translation="[-5, -5]" width="246" height="62" visible="false" />
-        <Label id="barSum" translation="[262, 0]" width="1040" height="52" vertAlign="center" color="0xB5AF8CFF" />
+        <!-- summary, then (filters on) "Filtered · 43 of 100" and a "* change" hint, laid out left to right -->
+        <LayoutGroup id="barLine" translation="[262, 26]" layoutDirection="horiz" vertAlignment="center" itemSpacings="[20, 24, 10]">
+          <Label id="barSum" height="52" vertAlign="center" color="0xEDE6CAFF" />
+          <Label id="barCount" height="52" vertAlign="center" color="0xB5AF8CFF" />
+          <Group id="barHintKey">
+            <Poster uri="pkg:/images/pill.9.png" width="38" height="34" translation="[0, -17]" blendColor="0xFFFFFF1E" />
+            <Poster uri="pkg:/images/icons/icon-asterisk.png" width="18" height="18" translation="[10, -9]" blendColor="0xEDE6CAFF" />
+          </Group>
+          <Label id="barHint" height="52" vertAlign="center" text="change" color="0xB5AF8CFF" />
+        </LayoutGroup>
       </Group>
       <Group id="gridClip" translation="[540, 140]" clippingRect="[-14, -14, 1310, 800]">
         <Group id="grid" />

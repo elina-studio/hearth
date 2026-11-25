@@ -4,8 +4,8 @@
 ' Play, Rewind and Fast forward stay with the music.
 sub init()
     m.layers = [
-        { group: m.top.findNode("layerA"), back: m.top.findNode("backA"), photo: m.top.findNode("photoA"), photo2: m.top.findNode("photoA2"), pan: m.top.findNode("panA"), name: "layerA", panName: "panA" },
-        { group: m.top.findNode("layerB"), back: m.top.findNode("backB"), photo: m.top.findNode("photoB"), photo2: m.top.findNode("photoB2"), pan: m.top.findNode("panB"), name: "layerB", panName: "panB" }
+        { group: m.top.findNode("layerA"), back: m.top.findNode("backA"), photo: m.top.findNode("photoA"), photo2: m.top.findNode("photoA2"), pan: m.top.findNode("panA"), name: "layerA", panName: "panA", frame: m.top.findNode("frameA"), plate: m.top.findNode("plateA"), fT: m.top.findNode("frameAT"), fB: m.top.findNode("frameAB"), fL: m.top.findNode("frameAL"), fR: m.top.findNode("frameAR") },
+        { group: m.top.findNode("layerB"), back: m.top.findNode("backB"), photo: m.top.findNode("photoB"), photo2: m.top.findNode("photoB2"), pan: m.top.findNode("panB"), name: "layerB", panName: "panB", frame: m.top.findNode("frameB"), plate: m.top.findNode("plateB"), fT: m.top.findNode("frameBT"), fB: m.top.findNode("frameBB"), fL: m.top.findNode("frameBL"), fR: m.top.findNode("frameBR") }
     ]
     m.front = 1 ' index of the layer on screen; the first photo goes to the other one
     m.prefetch = m.top.findNode("prefetch")
@@ -52,6 +52,7 @@ sub init()
     m.weatherTimer = m.top.findNode("weatherTimer")
     m.weatherTimer.observeField("fire", "loadWeather")
     for each l in m.layers
+        l.plate.font = hFont("fell", 32)
         l.photo.observeField("loadStatus", "onLoadStatus")
         l.photo2.observeField("loadStatus", "onLoadStatus")
     end for
@@ -99,6 +100,7 @@ sub applyPrefs()
     if m.seconds < 3 then m.seconds = 8
     m.advance.duration = m.seconds
     m.order = pPref("photoOrder", "shuffle")
+    m.framed = (pPref("photoFrame", "off") = "on")
 end sub
 
 function normalHint() as object
@@ -216,11 +218,21 @@ sub load(slide as object)
     url = pPhotoUrl(slide.items[0], 1280, 720)
     m.need = 0
     m.expect = {}
+    ' the Frame look shows the photo inside a box (60 px at the sides, room for the date line below)
+    bx = 0 : by = 0 : bw = 1920 : bh = 1080
+    if m.framed
+        bx = 60 : by = 50 : bw = 1800 : bh = 910
+    end if
+    L.back.visible = not m.framed
+    L.frame.visible = false
     if slide.items.count() = 2
-        ' two portraits flush, each filling half the screen at full height
-        L.photo.translation = [0, 0]
-        L.photo.width = 960
-        L.photo.height = 1080
+        ' two portraits flush, each filling half the screen (or half the frame) at full height
+        L.photo.translation = [bx, by]
+        L.photo.width = bw / 2
+        L.photo.height = bh
+        L.photo2.translation = [bx + bw / 2, by]
+        L.photo2.width = bw / 2
+        L.photo2.height = bh
         L.photo.loadDisplayMode = "scaleToZoom"
         ' decode at the half-screen shape (like photo2), not the 16:9 default
         L.photo.loadWidth = 640
@@ -230,9 +242,9 @@ sub load(slide as object)
         setPhoto(L.photo2, url2)
         url = pPhotoUrl(slide.items[0], 960, 1080, true)
     else
-        L.photo.translation = [0, 0]
-        L.photo.width = 1920
-        L.photo.height = 1080
+        L.photo.translation = [bx, by]
+        L.photo.width = bw
+        L.photo.height = bh
         L.photo.loadDisplayMode = "scaleToFit"
         L.photo.loadWidth = 1280
         L.photo.loadHeight = 720
@@ -315,9 +327,11 @@ sub reveal()
     m.fadeOut.keyValue = [outgoing.group.opacity, 0.0]
     m.fade.control = "start"
     m.front = 1 - m.front
+    placeFrame(incoming, m.pending)
     if m.back = 0 and (m.history.count() = 0 or m.history.peek().Id <> m.pending.Id) then m.history.push(m.pending)
     if m.history.count() > 50 then m.history.shift()
-    m.caption.text = slideCaption(m.pending)
+    ' with the Frame look the date sits under the photo instead
+    if m.framed then m.caption.text = "" else m.caption.text = slideCaption(m.pending)
     showStar()
     m.captionGroup.opacity = 1.0
     m.captionFade.control = "stop"
@@ -325,6 +339,51 @@ sub reveal()
     nx = upcoming()
     if nx <> invalid and nx.items.count() = 1 then m.prefetch.uri = pPhotoUrl(nx.items[0], 1280, 720)
     if not m.paused and m.options = invalid then m.advance.control = "start"
+end sub
+
+' Frame look: hug the drawn photo (scaleToFit leaves bars inside the box) with the hairline, 10 px out,
+' and put "Lake Tahoe · June 2019" under it
+sub placeFrame(L as object, sl as object)
+    if not m.framed or sl = invalid
+        L.frame.visible = false
+        return
+    end if
+    x = L.photo.translation[0]
+    y = L.photo.translation[1]
+    w = L.photo.width
+    h = L.photo.height
+    if sl.items.count() = 2
+        w = w * 2
+    else if L.photo.bitmapWidth > 0 and L.photo.bitmapHeight > 0
+        sc = w / L.photo.bitmapWidth
+        if h / L.photo.bitmapHeight < sc then sc = h / L.photo.bitmapHeight
+        dw = L.photo.bitmapWidth * sc
+        dh = L.photo.bitmapHeight * sc
+        x = x + (w - dw) / 2
+        y = y + (h - dh) / 2
+        w = dw
+        h = dh
+    end if
+    x0 = Int(x) - 12
+    y0 = Int(y) - 12
+    fw = Int(w) + 24
+    fh = Int(h) + 24
+    L.fT.translation = [x0, y0]
+    L.fT.width = fw
+    L.fB.translation = [x0, y0 + fh - 2]
+    L.fB.width = fw
+    L.fL.translation = [x0, y0]
+    L.fL.height = fh
+    L.fR.translation = [x0 + fw - 2, y0]
+    L.fR.height = fh
+    it = sl.items[0]
+    parts = []
+    if it.place <> invalid and it.place <> "" then parts.push(it.place)
+    cap = slideCaption(sl)
+    if cap <> "" then parts.push(cap)
+    L.plate.text = parts.join(" · ")
+    L.plate.translation = [0, y0 + fh + 8]
+    L.frame.visible = true
 end sub
 
 function slideCaption(sl as object) as string
@@ -457,7 +516,10 @@ sub onOptionChanged(event as object)
     else if c.key = "photoOrder"
         m.reorder = true
     end if
+    wasFramed = m.framed
     applyPrefs()
+    ' show the Frame look (or take it off) on the photo that's up now
+    if m.framed <> wasFramed and m.pending <> invalid and not m.loading then load(m.pending)
 end sub
 
 sub onRated(event as object)

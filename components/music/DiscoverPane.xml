@@ -21,7 +21,9 @@
   </children>
   <interface>
     <field id="active" type="boolean" value="false" onChange="paint" />
-    <field id="known" type="array" />
+    <field id="known" type="array" onChange="onKnown" />
+    <!-- Plex artists: lower-case name to round photo URL ("" when Plex has no photo) -->
+    <field id="owned" type="assocarray" />
     <field id="request" type="assocarray" alwaysNotify="true" />
     <function name="load" />
     <function name="handleKey" />

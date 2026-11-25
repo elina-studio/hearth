@@ -17,6 +17,8 @@ sub init()
     m.eyeIcon = m.top.findNode("eyeIcon")
     m.title = m.top.findNode("title")
     m.title.font = hFont("caps", 96)
+    m.caption = m.top.findNode("caption")
+    m.caption.font = hFont("regular", 28)
     m.buttonsGroup = m.top.findNode("buttons")
     m.albumsLabel = m.top.findNode("albumsLabel")
     m.albumsLabel.font = hFont("caps", 28)
@@ -71,6 +73,7 @@ sub showEmpty()
     m.winTimer.control = "stop"
     m.eyebrow.text = "THE WINDOW"
     m.title.text = "NO PHOTOS YET"
+    m.caption.text = ""
     m.albums = []
     m.albumGroup.removeChildrenIndex(m.albumGroup.getChildCount(), 0)
     m.albumsLabel.visible = false
@@ -166,7 +169,23 @@ sub onWindowLoaded(event as object)
     m.winFront = 1 - m.winFront
     cap = pPhotoCaption(m.winPending)
     if cap <> "" then m.title.text = UCase(cap) else m.title.text = "YOUR PHOTOS"
+    m.caption.text = windowLine(m.winPending, m.winPos + 1, m.windowPhotos.count())
 end sub
+
+' Second line under the title: day and date, the album it is in (its place), and where it is in tonight's window set
+function windowLine(it as object, pos as integer, n as integer) as string
+    parts = []
+    d = it.date
+    if d <> invalid and Len(d) >= 10
+        dt = CreateObject("roDateTime")
+        dt.FromISO8601String(Left(d, 10) + "T12:00:00Z")
+        mo = pMonthName(dt.GetMonth())
+        if mo <> "" then parts.push(dt.GetWeekday() + " " + dt.GetDayOfMonth().toStr() + " " + mo)
+    end if
+    if it.place <> invalid and it.place <> "" then parts.push(it.place)
+    if n > 1 then parts.push(pos.toStr() + " of " + n.toStr())
+    return parts.join(" · ")
+end function
 
 ' ---------- albums ----------
 sub onAlbums(event as object)
@@ -184,6 +203,7 @@ sub onAlbums(event as object)
         tile.title = a.Name
         n = a.count
         if n = invalid then tile.sub = "Album" else if n = 1 then tile.sub = "1 photo" else tile.sub = hThousands(n) + " photos"
+        if a.years <> invalid and a.years <> "" then tile.sub = a.years + " · " + tile.sub
         ' covers load only for the first screenful; the rest as you scroll to them
         if i < 8 then tile.image = pPhotoUrl(a, 272, 172, true)
     end for

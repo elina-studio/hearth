@@ -8,7 +8,7 @@
     <Label id="title" translation="[100, 130]" color="0xEDE6CAFF" />
     <Rectangle translation="[560, 166]" width="300" height="3" color="0x6E4526FF" />
     <Group id="rows" translation="[100, 210]" />
-    <Group id="btns" translation="[100, 868]" />
+    <Group id="btns" translation="[100, 924]" />
     <Label id="gTitle" translation="[1020, 130]" color="0xE0B34AFF" text="WHAT YOU WILL HEAR" />
     <Rectangle translation="[1020, 190]" width="800" height="420" color="0x141A11FF" />
     <Group id="graph" translation="[1050, 210]" />

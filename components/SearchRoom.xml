@@ -10,6 +10,8 @@
     <Group id="viewport" translation="[760, 70]">
       <Group id="list" />
     </Group>
+    <!-- shown only while focus is in the Recent list: OK searches again, * removes the search -->
+    <KeyHints id="recentHints" translation="[760, 868]" visible="false" />
     <Timer id="debounce" duration="0.35" repeat="false" />
   </children>
   <interface>

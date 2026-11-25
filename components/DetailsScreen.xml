@@ -18,11 +18,11 @@
         <Group id="actions" translation="[0, 334]" />
       </Group>
       <Group id="tabsBox" translation="[100, 440]" visible="false">
-        <Group id="tabsClip" clippingRect="[-10, -10, 1320, 70]">
+        <Group id="tabsClip" clippingRect="[-10, -10, 1320, 94]">
           <Group id="tabs" />
         </Group>
         <LayoutGroup id="chips" translation="[1724, 2]" layoutDirection="horiz" horizAlignment="right" vertAlignment="center" itemSpacings="[14]" />
-        <Rectangle translation="[0, 50]" width="1724" height="2" color="0x404B2DFF" />
+        <Rectangle translation="[0, 74]" width="1724" height="2" color="0x404B2DFF" />
       </Group>
       <Group id="rows" translation="[100, 0]" />
       <Label id="empty" translation="[100, 520]" width="1700" color="0xB5AF8CFF" visible="false" />

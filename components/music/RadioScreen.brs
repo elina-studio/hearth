@@ -177,12 +177,24 @@ sub paint()
     m.vKnob.translation = [320 + 160 * m.variety - 15, 17]
     names = ["Very familiar", "Familiar", "Balanced", "Adventurous", "Very adventurous"]
     m.vName.text = names[m.variety]
+    ' the Start button reads back the mix: "Start radio · Calm, Adventurous"
+    m.btnNodes[0].text = "Start radio · " + mixName() + ", " + names[m.variety]
+    m.btnNodes[1].translation = [m.btnNodes[0].width + 18, 0]
     m.sFrame.visible = (m.row = 2)
     if m.skipWeek then m.sIcon.blendColor = "0xE0B34AFF" else m.sIcon.blendColor = "0x5E5A44FF"
     for i = 0 to m.btnNodes.Count() - 1
         m.btnNodes[i].focused = (m.row = 3 and i = m.btn)
     end for
 end sub
+
+' what the radio plays from, for the Start button
+function mixName() as string
+    d = m.defs[m.sel]
+    n = d.title
+    if d.kind = "mood" and m.moodName <> invalid and m.moodName <> "" then n = m.moodName
+    if Len(n) > 22 then n = Left(n, 21) + Chr(8230)
+    return n
+end function
 
 sub start()
     d = m.defs[m.sel]

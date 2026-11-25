@@ -16,10 +16,11 @@ sub init()
     m.countLabel.font = hFont("regular", 24)
     m.grid = m.top.findNode("grid")
     m.cols = 9
-    m.cw = 170
-    m.ch = 255
-    m.gapX = 24
-    m.gapY = 36
+    ' 160 x 240 with a 30 px row gap: two rows plus their progress braids end above the key hint strip
+    m.cw = 160
+    m.ch = 240
+    m.gapX = 36
+    m.gapY = 30
     m.visRows = 3
     buildSlots()
     buildButtons()
@@ -52,6 +53,8 @@ sub init()
     m.dialog = invalid
     m.wantGenrePick = false
     buildLetters()
+    m.hints = m.top.findNode("hints")
+    m.hintSig = ""
 end sub
 
 ' ---------- slots ----------
@@ -452,7 +455,46 @@ sub paint()
     paintChips()
     paintLetters()
     showInfo()
+    paintHints()
 end sub
+
+' The bottom strip: what OK, Play, * and Back do right now. Hidden when the room is only previewed and
+' while the A to Z letter row pushes the grid down onto it.
+sub paintHints()
+    show = m.focused and not lettersOn()
+    m.hints.visible = show
+    if not show then return
+    keys = []
+    it = invalid
+    if m.zone = "grid" and m.index < m.items.count() then it = m.items[m.index]
+    if it <> invalid then keys.push({ text: "OK", label: "Open" })
+    if playable(it) then keys.push({ icon: "play", label: "Play" })
+    if m.item <> invalid and m.item.genreName = invalid and m.item.Id <> invalid
+        ' the first choice of hOptions (dialogs.brs): Mark watched / Mark unwatched, then Open details
+        if m.item.UserData <> invalid and m.item.UserData.Played = true then opt = "Mark unwatched" else opt = "Mark watched"
+        keys.push({ icon: "asterisk", label: opt })
+    end if
+    back = "Rooms"
+    if m.genre <> invalid
+        back = "Genres"
+    else if m.zone <> "grid" and m.items.count() > 0
+        back = "Posters"
+    end if
+    keys.push({ icon: "back", label: back })
+    sig = FormatJson(keys)
+    if sig <> m.hintSig
+        m.hintSig = sig
+        m.hints.keys = keys
+        ' KeyHints lays out leftwards from x = 0; shift it so the strip starts at x = 96
+        m.hints.translation = [96 + Int(m.hints.localBoundingRect().width), 868]
+    end if
+end sub
+
+' A movie or episode on the grid (not a show or a genre tile): Play starts it, resuming when part-watched
+function playable(it as dynamic) as boolean
+    if it = invalid or it.genreName <> invalid or it.Id = invalid then return false
+    return it.Type <> "Series"
+end function
 
 sub restoreFocus()
     m.top.setFocus(true)
@@ -489,6 +531,13 @@ end sub
 
 function onKeyEvent(key as string, press as boolean) as boolean
     if not press then return false
+    if key = "play" and m.zone = "grid" and m.index < m.items.count()
+        it = m.items[m.index]
+        if playable(it)
+            m.top.request = { action: "play", item: it, resume: hPercent(it) > 0 }
+            return true
+        end if
+    end if
     if hMediaKey(key) then return false
     if key = "back"
         if m.genre <> invalid

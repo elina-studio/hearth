@@ -27,6 +27,14 @@ sub init()
     m.which = "morning"
     m.row = 2
     m.day = 0
+    ' the Days row has two lines: the seven days (0) and the Weekdays / Weekends / Every day presets (1)
+    m.dayLine = 0
+    m.preset = 0
+    m.PRESETS = [["Weekdays", "1111100"], ["Weekends", "0000011"], ["Every day", "1111111"]]
+    ' holding Left/Right on a time row: 5 minute steps, then 15 once held a moment
+    m.holdKey = ""
+    m.holdClock = CreateObject("roTimespan")
+    m.holdLast = CreateObject("roTimespan")
     m.btn = 0
     m.playlists = []
     m.rowNodes = []
@@ -75,6 +83,7 @@ function clockText(mins as integer) as string
 end function
 
 sub buildRows()
+    m.DAYS_EXTRA = 58
     defs = [["which", "sun", "Schedule"], ["on", "check", "Runs"], ["time", "clock", "Starts"], ["days", "sun", "Days"], ["rooms", "cast", "Rooms"], ["plays", "radio", "Plays"], ["vol", "wave", "Volume"], ["ramp", "clock", "Ramp"], ["stop", "moon", "Stops"]]
     g = m.top.findNode("rows")
     y = 0
@@ -108,8 +117,39 @@ sub buildRows()
         v.maxLines = 1
         v.font = hFont("bold", 30)
         v.color = "0xEDE6CAFF"
-        node = { g: r, ring: ring, val: v, key: d[0], boxes: [] }
+        node = { g: r, ring: ring, val: v, key: d[0], boxes: [], chips: [] }
         if d[0] = "days"
+            ' taller: the preset chips sit under the day boxes
+            bg.height = 64 + m.DAYS_EXTRA
+            ring.height = 64 + m.DAYS_EXTRA + 54
+            x = 250
+            for i = 0 to 2
+                name = m.PRESETS[i][0]
+                w = 40 + Len(name) * 14
+                v9 = hVar(i + 3)
+                cb = r.createChild("Poster")
+                cb.uri = "pkg:/images/w/button-fill" + v9 + ".9.png"
+                cb.translation = [x - 12, 70 - 12]
+                cb.width = w + 24
+                cb.height = 48 + 24
+                cr = r.createChild("Poster")
+                cr.uri = "pkg:/images/w/button-outline" + v9 + ".9.png"
+                cr.translation = [x - 12, 70 - 12]
+                cr.width = w + 24
+                cr.height = 48 + 24
+                cr.blendColor = "0xE0B34AFF"
+                cr.visible = false
+                ct = r.createChild("Label")
+                ct.translation = [x, 70]
+                ct.width = w
+                ct.height = 48
+                ct.horizAlign = "center"
+                ct.vertAlign = "center"
+                ct.font = hFont("bold", 24)
+                ct.text = name
+                node.chips.push({ b: cb, ring: cr, t: ct })
+                x = x + w + 16
+            end for
             for i = 0 to 6
                 b = r.createChild("Rectangle")
                 b.translation = [250 + i * 84, 6]
@@ -128,7 +168,8 @@ sub buildRows()
             end for
         end if
         m.rowNodes.push(node)
-        y = y + 74
+        y = y + 72
+        if d[0] = "days" then y = y + m.DAYS_EXTRA
     end for
 end sub
 
@@ -218,7 +259,7 @@ sub refresh()
             for i = 0 to 6
                 on = (Mid(s.days, i + 1, 1) = "1")
                 cell = n.boxes[i]
-                cursor = (m.row = 3 and i = m.day)
+                cursor = (m.row = 3 and m.dayLine = 0 and i = m.day)
                 if on
                     if cursor then cell.b.color = "0xFFE7A0FF" else cell.b.color = "0xE0B34AFF"
                     cell.t.color = "0x1F1606FF"
@@ -227,6 +268,14 @@ sub refresh()
                     if cursor then cell.b.color = "0x3A4528FF" else cell.b.color = "0x00000000"
                     if cursor then cell.t.color = "0xEDE6CAFF" else cell.t.color = "0xB5AF8CFF"
                 end if
+            end for
+            ' presets: gold when the days match it, a ring on the one under the cursor
+            for i = 0 to 2
+                c = n.chips[i]
+                match = (s.days = m.PRESETS[i][1])
+                if match then c.b.blendColor = "0xE0B34AFF" else c.b.blendColor = "0xFFFFFF14"
+                if match then c.t.color = "0x1F1606FF" else c.t.color = "0xEDE6CAFF"
+                c.ring.visible = (m.row = 3 and m.dayLine = 1 and i = m.preset)
             end for
         end if
     end for
@@ -274,8 +323,33 @@ sub drawGraph()
 end sub
 
 ' ---------- keys ----------
+' One Left/Right step on a time row. Roku repeats the press while the key is held (press=false on release):
+' 5 minutes a press, then 15 minutes (on the quarter hour) once it has been held for a second.
+function timeStep(mins as integer, key as string) as integer
+    if key <> m.holdKey or m.holdLast.TotalMilliseconds() > 600
+        m.holdKey = key
+        m.holdClock.Mark()
+    end if
+    m.holdLast.Mark()
+    dir = 1
+    if key = "left" then dir = -1
+    if m.holdClock.TotalMilliseconds() < 1000
+        return (mins + 1440 + 5 * dir) mod 1440
+    end if
+    ' on to the next quarter hour in that direction
+    if dir > 0
+        t = (Int(mins / 15) + 1) * 15
+    else
+        t = Int((mins + 14) / 15) * 15 - 15
+    end if
+    return (t + 1440) mod 1440
+end function
+
 function onKeyEvent(key as string, press as boolean) as boolean
-    if not press then return false
+    if not press
+        if key = m.holdKey then m.holdKey = ""
+        return false
+    end if
     if muMediaKey(key) then return true
     m.note.text = ""
     s = cur()
@@ -284,9 +358,19 @@ function onKeyEvent(key as string, press as boolean) as boolean
         return true
     end if
     if key = "up"
-        if m.row > 0 then m.row = m.row - 1
+        if m.row = 3 and m.dayLine = 1
+            m.dayLine = 0
+        else if m.row > 0
+            m.row = m.row - 1
+            if m.row = 3 then m.dayLine = 1
+        end if
     else if key = "down"
-        if m.row < 9 then m.row = m.row + 1
+        if m.row = 3 and m.dayLine = 0
+            m.dayLine = 1
+        else if m.row < 9
+            m.row = m.row + 1
+            if m.row = 3 then m.dayLine = 0
+        end if
     else if m.row = 0
         if key = "left" or key = "right" or key = "OK"
             if m.which = "morning" then m.which = "evening" else m.which = "morning"
@@ -294,8 +378,11 @@ function onKeyEvent(key as string, press as boolean) as boolean
     else if m.row = 1
         if key = "OK" or key = "left" or key = "right" then s.on = not s.on
     else if m.row = 2
-        if key = "left" then s.time = (s.time + 1440 - 5) mod 1440
-        if key = "right" then s.time = (s.time + 5) mod 1440
+        if key = "left" or key = "right" then s.time = timeStep(s.time, key)
+    else if m.row = 3 and m.dayLine = 1
+        if key = "left" and m.preset > 0 then m.preset = m.preset - 1
+        if key = "right" and m.preset < 2 then m.preset = m.preset + 1
+        if key = "OK" then s.days = m.PRESETS[m.preset][1]
     else if m.row = 3
         if key = "left" and m.day > 0 then m.day = m.day - 1
         if key = "right" and m.day < 6 then m.day = m.day + 1
@@ -316,8 +403,7 @@ function onKeyEvent(key as string, press as boolean) as boolean
         if key = "left" and s.ramp > 5 then s.ramp = s.ramp - 5
         if key = "right" and s.ramp < 60 then s.ramp = s.ramp + 5
     else if m.row = 8
-        if key = "left" then s.stop = (s.stop + 1440 - 5) mod 1440
-        if key = "right" then s.stop = (s.stop + 5) mod 1440
+        if key = "left" or key = "right" then s.stop = timeStep(s.stop, key)
     else
         if key = "left" and m.btn > 0 then m.btn = m.btn - 1
         if key = "right" and m.btn < 3 then m.btn = m.btn + 1

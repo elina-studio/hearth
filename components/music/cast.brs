@@ -21,6 +21,8 @@ sub castInit()
     ' plus castTrim (what the TV needs on top, from the phone's microphone or the TV timing row, kept per set of rooms)
     m.castLag = 1.5
     m.castTrim = 0
+    ' castLagShown: the lag measured for the speakers playing now, -1 until onCastPos has measured it (the cast sheet shows it)
+    if not m.top.hasField("castLagShown") then m.top.addFields({ castLagShown: -1.0 })
     d = CreateObject("roRegistrySection", "hearth").Read("castDelay")
     if d = "" then m.top.castDelay = 1.5 else m.top.castDelay = Val(d)
     m.castTrim = m.top.castDelay - m.castLag
@@ -242,6 +244,7 @@ sub castApply(before as object, changed as string)
     now = castOnIds()
     if changed <> "tv" and now.count() > 0 then castLoadTrim()
     m.top.castCount = now.count()
+    if now.count() = 0 then m.top.castLagShown = -1.0
     playing = (m.top.queue <> invalid and m.top.queue.count() > 0 and (m.top.state = "playing" or m.top.state = "buffering"))
     ' speakers that were unticked stop
     for each id in before
@@ -425,6 +428,7 @@ sub onCastPos(event as object)
     print "[hearth cast] speakers trail by "; lag
     if lag < 0 or lag > 6 then return
     m.castLag = lag
+    m.top.castLagShown = Int(lag * 10 + 0.5) / 10
     castSetDelay()
     castAlign()
     castQueueNext()

@@ -41,6 +41,7 @@ sub init()
     tick()
     m.preview = m.top.findNode("previewTimer")
     m.preview.observeField("fire", "onPreview")
+    initChip()
 
     m.rooms = {}
     m.current = "Home"
@@ -76,6 +77,104 @@ sub tick()
     w = m.clock.localBoundingRect().width
     m.clock.translation = [1824 - w, 12]
     m.clockFly.translation = [1824 - w - 34, 40]
+    if m.npChip <> invalid then layoutChip()
+end sub
+
+' ---------- now playing chip: display only, left of the clock ----------
+sub initChip()
+    m.npChip = m.top.findNode("npChip")
+    m.npBack = m.top.findNode("npBack")
+    m.npArt = m.top.findNode("npArt")
+    m.npArtBack = m.top.findNode("npArtBack")
+    m.npTitle = m.top.findNode("npTitle")
+    m.npTitle.font = hFont("bold", 20)
+    m.npArtist = m.top.findNode("npArtist")
+    m.npArtist.font = hFont("regular", 16)
+    m.npBars = m.top.findNode("npBars")
+    m.npPulse = m.top.findNode("npPulse")
+    m.npThumb = ""
+    m.npArt.observeField("loadStatus", "onChipArt")
+    mp = m.global.music
+    if mp <> invalid
+        mp.observeField("track", "updateChip")
+        mp.observeField("state", "updateChip")
+    end if
+    updateChip()
+end sub
+
+sub updateChip()
+    if m.npChip = invalid then return
+    mp = m.global.music
+    tr = invalid
+    on = false
+    if mp <> invalid
+        tr = mp.track
+        on = (tr <> invalid and (mp.state = "playing" or mp.state = "buffering"))
+    end if
+    ' the Music room shows its own now playing
+    if m.shown <> invalid and m.shown = "Music" then on = false
+    if not on
+        if m.npChip.visible
+            m.npChip.visible = false
+            m.npPulse.control = "stop"
+            m.clockFly.visible = true
+        end if
+        return
+    end if
+    m.npTitle.text = pxStr(tr.title)
+    m.npArtist.text = pxStr(tr.artist)
+    th = pxStr(tr.thumb)
+    if th <> m.npThumb
+        m.npThumb = th
+        m.npArtBack.visible = false
+        if th = ""
+            m.npArt.uri = ""
+        else
+            ' cut round by the NAS helper; onChipArt falls back to the square cover if that is unreachable
+            m.npArt.uri = pxRound(pxImage(th, 120, 120), 120)
+        end if
+    end if
+    if not m.npChip.visible
+        m.npChip.visible = true
+        m.clockFly.visible = false
+        m.npPulse.control = "start"
+    end if
+    layoutChip()
+end sub
+
+sub onChipArt()
+    if m.npArt.loadStatus = "failed" and m.npThumb <> ""
+        sq = pxImage(m.npThumb, 120, 120)
+        if m.npArt.uri <> sq
+            m.npArtBack.visible = true
+            m.npArt.uri = sq
+        end if
+    end if
+end sub
+
+' Sizes the chip to its words and right-aligns it just left of the clock (the steady firefly steps aside for it).
+' It must stay clear of the Search label on the left and the twig's leaf under the clock.
+sub layoutChip()
+    if not m.npChip.visible then return
+    right = m.clock.translation[0] - 14
+    if right > 1684 then right = 1684
+    left = 1474
+    fixed = 60 + 10 + 18 + 18
+    m.npTitle.width = 0
+    m.npArtist.width = 0
+    tw = m.npTitle.localBoundingRect().width
+    aw = m.npArtist.localBoundingRect().width
+    if aw > tw then tw = aw
+    room = right - left - fixed
+    if room < 40 then room = 40
+    if tw > room then tw = room
+    tw = Int(tw)
+    m.npTitle.width = tw
+    m.npArtist.width = tw
+    w = fixed + tw
+    m.npBack.width = w
+    m.npBars.translation = [60 + tw + 10, 18]
+    m.npChip.translation = [right - w, 26]
 end sub
 
 ' Lays out the weather line: icon, then text, right-aligned to 1824
@@ -146,6 +245,7 @@ sub showRoom(name as string, focus as boolean)
     if m.roomHolder.getChildCount() > 0 then m.roomHolder.removeChildIndex(0)
     m.roomHolder.appendChild(room)
     m.shown = name
+    updateChip()
     room.opacity = 1.0
     if focus
         m.current = name

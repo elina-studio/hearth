@@ -90,6 +90,8 @@ sub init()
     m.resume = []
     m.next = []
     m.new = []
+    m.heroNext = invalid
+    m.heroNextAsk = {}
     m.tasks = {}
     mp = m.global.music
     if mp <> invalid
@@ -305,15 +307,35 @@ end sub
 
 ' kinds: list of [act, text, icon]
 sub setButtons(kinds as object)
+    ' natural widths first; if the row would run past the hero text column (into Tonight), the first
+    ' button's label gives way and ends in an ellipsis
+    ws = []
+    total = 0
+    for i = 0 to 2
+        b = m.buttons[i]
+        b.label.width = 0
+        if i < kinds.count()
+            b.label.text = kinds[i][1]
+            w = Int(b.label.localBoundingRect().width) + 86
+            ws.push(w)
+            total = total + w + 12
+        end if
+    end for
+    over = total - 12 - 690
+    if over > 0 and ws.count() > 1
+        w0 = ws[0] - over
+        if w0 < 220 then w0 = 220
+        ws[0] = w0
+        m.buttons[0].label.width = w0 - 86
+    end if
     x = 0
     for i = 0 to 2
         b = m.buttons[i]
         if i < kinds.count()
             k = kinds[i]
             b.act = k[0]
-            b.label.text = k[1]
             b.icon.uri = "pkg:/images/icons/" + k[2] + ".png"
-            w = Int(b.label.localBoundingRect().width) + 86
+            w = ws[i]
             for each p in [b.idle, b.fill]
                 p.width = w
                 p.height = 56
@@ -920,7 +942,14 @@ sub showHero()
     m.heroProgress.visible = pct > 0
     m.heroBar.width = Int(300 * pct / 100)
     m.heroLeft.text = hMinutesLeft(item)
-    if item.Type = "Series"
+    nxt = invalid
+    if h.label = "CONTINUE" and heroFinished(item) then nxt = heroNextFor(item)
+    m.heroNext = nxt
+    if nxt <> invalid
+        lab = "Next: S" + hNum(nxt.ParentIndexNumber) + " · E" + hNum(nxt.IndexNumber)
+        if nxt.Name <> invalid and nxt.Name <> "" then lab = lab + " " + Chr(8220) + nxt.Name + Chr(8221)
+        setButtons([["nextEp", lab, "home-next"], ["start", "Watch E" + hNum(item.IndexNumber) + " again", "home-restart"], ["details", "Details", "home-info"]])
+    else if item.Type = "Series"
         setButtons([["details", "Open", "home-info"]])
     else if pct > 0
         setButtons([["resume", "Resume", "home-play"], ["start", "From start", "home-restart"], ["details", "Details", "home-info"]])
@@ -929,6 +958,48 @@ sub showHero()
     end if
     showPager()
     paint()
+end sub
+
+' An episode you watched to the credits (or Plex marked played) that still sits in Continue.
+function heroFinished(item as object) as boolean
+    if item.Type <> "Episode" or item.SeriesId = invalid then return false
+    return (item.UserData <> invalid and item.UserData.Played = true) or hPercent(item) >= 85
+end function
+
+' The episode after item: from Next up when it is there, else asked of Plex once (onHeroNext re-shows the hero).
+function heroNextFor(item as object) as dynamic
+    s = item.ParentIndexNumber
+    e = item.IndexNumber
+    for each it in m.next
+        if it.Type = "Episode" and it.SeriesId <> invalid and it.SeriesId.toStr() = item.SeriesId.toStr() and it.Id <> item.Id
+            if s = invalid or e = invalid or it.ParentIndexNumber = invalid or it.IndexNumber = invalid then return it
+            if it.ParentIndexNumber > s or (it.ParentIndexNumber = s and it.IndexNumber > e) then return it
+        end if
+    end for
+    if m.heroNextAsk = invalid then m.heroNextAsk = {}
+    key = item.Id.toStr()
+    if m.heroNextAsk.doesExist(key)
+        got = m.heroNextAsk[key]
+        if type(got) = "roAssociativeArray" then return got
+        return invalid
+    end if
+    m.heroNextAsk[key] = false
+    hPlex("nextEp", { show: item.SeriesId.toStr(), id: key }, "onHeroNext", key)
+    return invalid
+end function
+
+sub onHeroNext(event as object)
+    t = hTaskFrom(event)
+    n = t.response
+    if not t.ok or n = invalid or n.Id = invalid then return
+    if m.heroNextAsk = invalid then m.heroNextAsk = {}
+    m.heroNextAsk[t.tag] = n
+    if m.heroItems.count() > m.heroIndex and m.heroItems[m.heroIndex].item.Id.toStr() = t.tag
+        keepBtn = m.btn
+        showHero()
+        if keepBtn < buttonCount() then m.btn = keepBtn
+        paint()
+    end if
 end sub
 
 sub showPager()
@@ -1048,7 +1119,9 @@ sub activate()
         end if
         if m.heroItems.count() = 0 then return
         item = m.heroItems[m.heroIndex].item
-        if act = "resume"
+        if act = "nextEp" and m.heroNext <> invalid
+            m.top.request = { action: "play", item: m.heroNext, resume: (hPercent(m.heroNext) > 0) }
+        else if act = "resume"
             m.top.request = { action: "play", item: item, resume: true }
         else if act = "start"
             m.top.request = { action: "play", item: item, resume: false }

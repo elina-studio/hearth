@@ -19,6 +19,18 @@ sub init()
     m.scrollTo = m.top.findNode("scrollTo")
     m.buildTimer = m.top.findNode("buildTimer")
     m.buildTimer.observeField("fire", "onBuildTimer")
+    m.clip = m.top.findNode("clip")
+    m.spotG = m.top.findNode("spot")
+    m.banner = m.top.findNode("banner")
+    m.bannerText = m.top.findNode("bannerText")
+    m.bannerText.font = hFont("bold", 24)
+    m.retryFill = m.top.findNode("retryFill")
+    m.retryIcon = m.top.findNode("retryIcon")
+    m.retryLabel = m.top.findNode("retryLabel")
+    m.retryLabel.font = hFont("bold", 22)
+    m.offline = {}
+    m.retrying = {}
+    m.bo = 0
 
     ' tabs are plain words with a gold underline (like Movies and Shows); Request sits apart after a divider
     m.tabDefs = [["For you", "foryou"], ["Artists", "artists"], ["Albums", "albums"], ["Playlists", "playlists"], ["New", "new"], ["Discover", "discover"], ["Radio", "radio"], ["Request", "request"]]
@@ -124,7 +136,8 @@ end sub
 sub focusIn(unused as dynamic)
     if m.rows.count() = 0 then refresh()
     m.focused = true
-    if m.zone = "content" and not hasContent() then m.zone = "tabs"
+    if m.zone = "content" and not hasContent() then m.zone = upZone()
+    if m.zone = "banner" and not bannerOn() then m.zone = "tabs"
     m.top.setFocus(true)
     paint()
 end sub
@@ -175,7 +188,8 @@ sub refresh(unused = invalid as dynamic)
         muSend("findLibrary")
         return
     end if
-    if m.loadedFor = s and m.rows.count() > 0 then return
+    again = (m.retrying["foryou"] = true)
+    if m.loadedFor = s and m.rows.count() > 0 and not again then return
     if m.loadedFor <> s
         m.lib = {}
         m.asked = {}
@@ -207,6 +221,24 @@ end sub
 
 sub arrived()
     m.waiting = m.waiting - 1
+    if m.waiting = 0
+        got = false
+        for each k in m.results
+            if m.results[k] <> invalid and m.results[k].count() > 0 then got = true
+        end for
+        m.retrying.Delete("foryou")
+        if m.failed <> invalid and not got
+            m.offline["foryou"] = true
+        else
+            m.offline.Delete("foryou")
+            ' some shelves came, some didn't: a short note is enough
+            if m.failed <> invalid then onMessageText(m.failed)
+        end if
+        if m.tabDefs[m.tab][1] = "foryou"
+            applyBanner()
+            if m.offline["foryou"] = true and m.rows.count() = 0 then m.empty.text = ""
+        end if
+    end if
     if m.waiting <= 0 or m.builtOnce then build()
     if m.waiting = 0 and m.failed = invalid
         slim = {}
@@ -239,10 +271,7 @@ end sub
 sub onShelf(event as object)
     t = hTaskFrom(event)
     m.results[t.tag] = pxItems(t)
-    if not t.ok
-        m.failed = "Couldn't load " + t.tag + " from Plex (error " + t.status.toStr() + ")."
-        onMessageText(m.failed)
-    end if
+    if not t.ok then m.failed = "Couldn't load " + t.tag + " from Plex."
     arrived()
 end sub
 
@@ -298,7 +327,7 @@ sub build()
     if m.tab = 0
         if m.rows.count() > 0
             m.empty.text = ""
-        else if m.failed <> invalid
+        else if m.failed <> invalid and m.offline["foryou"] <> true
             m.empty.text = m.failed
         end if
     end if
@@ -317,18 +346,22 @@ sub showTab(i as integer)
     m.lettersG.visible = (kind = "artists" or kind = "albums")
     m.spot.visible = false
     m.disc.visible = (kind = "discover")
+    applyBanner()
     if kind = "discover"
         m.shelves.visible = false
         m.grid.visible = false
         m.lettersG.visible = false
-        known = []
+        ' Recommended leaves out artists already in Plex, so make sure the artist list is on its way
         al = m.lib["artists"]
-        if al <> invalid and al.cards <> invalid
-            for each c in al.cards
-                known.push(c.title)
-            end for
+        if al = invalid or al.cards = invalid
+            if m.asked = invalid then m.asked = {}
+            if m.asked["artists"] <> true or m.loadedFor <> m.askedFor
+                m.asked["artists"] = true
+                m.askedFor = m.loadedFor
+                loadLib("artists")
+            end if
         end if
-        m.disc.known = known
+        sendKnown()
         m.disc.callFunc("load", invalid)
         paint()
         return
@@ -339,12 +372,12 @@ sub showTab(i as integer)
         return
     end if
     if forYou
-        if m.rows.count() = 0 then m.empty.text = "Loading your music" + Chr(8230)
+        if m.rows.count() = 0 and not bannerOn() then m.empty.text = "Loading your music" + Chr(8230)
         paint()
         return
     end if
-    if m.lettersG.visible then m.grid.translation = [690, 240] else m.grid.translation = [690, 132]
-    if m.lettersG.visible then m.grid.viewHeight = 690 else m.grid.viewHeight = 798
+    if m.lettersG.visible then m.grid.translation = [690, 240 + m.bo] else m.grid.translation = [690, 132 + m.bo]
+    if m.lettersG.visible then m.grid.viewHeight = 690 - m.bo else m.grid.viewHeight = 798 - m.bo
     m.grid.round = (kind = "artists")
     lib = m.lib[kind]
     if lib = invalid or lib.cards = invalid
@@ -365,21 +398,27 @@ sub showTab(i as integer)
     paint()
 end sub
 
-sub loadLib(kind as string)
+sub loadLib(kind as string, useCache = true as boolean)
     s = muPlayer().section
+    here = (m.tabDefs[m.tab][1] = kind)
     if not pxReady() or s = ""
-        m.empty.text = "Sign in to Plex first."
+        m.retrying.Delete(kind)
+        if here then m.empty.text = "Sign in to Plex first."
         return
     end if
-    c = cacheRead(kind)
-    if c <> invalid and c.items <> invalid
+    c = invalid
+    if useCache then c = cacheRead(kind)
+    if not useCache
+        ' Try again: keep what is on screen until Plex answers
+    else if c <> invalid and c.items <> invalid
         lib = { cards: [], index: 0, note: "", starts: c.starts }
         for each md in c.items
             lib.cards.push(pxCard(md, 180))
         end for
         m.lib[kind] = lib
-        if m.tabDefs[m.tab][1] = kind then showTab(m.tab)
-    else
+        if here then showTab(m.tab)
+        if kind = "artists" and m.tabDefs[m.tab][1] = "discover" then sendKnown()
+    else if here
         m.empty.text = "Loading" + Chr(8230)
     end if
     if kind = "playlists"
@@ -399,9 +438,11 @@ sub onLib(event as object)
     t = hTaskFrom(event)
     kind = t.tag
     ' a failed refresh keeps what the cache already drew instead of blanking it
+    m.retrying.Delete(kind)
+    if t.ok then m.offline.Delete(kind) else m.offline[kind] = true
     old = m.lib[kind]
     if not t.ok and old <> invalid and old.cards <> invalid and old.cards.Count() > 0
-        onMessageText("Couldn't refresh from Plex (error " + t.status.toStr() + "). Showing the saved list.")
+        if m.tabDefs[m.tab][1] = kind then showTab(m.tab)
         return
     end if
     cards = []
@@ -415,7 +456,8 @@ sub onLib(event as object)
         saveLib(kind)
     end if
     note = ""
-    if not t.ok then note = "Couldn't load from Plex (error " + t.status.toStr() + ")." else if cards.Count() = 0 then note = "Nothing here yet."
+    ' a failure says so in the banner above the empty area
+    if t.ok and cards.Count() = 0 then note = "Nothing here yet."
     lib = m.lib[kind]
     if lib = invalid then lib = { starts: invalid }
     keepIndex = 0
@@ -425,6 +467,7 @@ sub onLib(event as object)
     lib.note = note
     m.lib[kind] = lib
     if m.tabDefs[m.tab][1] = kind then showTab(m.tab)
+    if kind = "artists" and m.tabDefs[m.tab][1] = "discover" then sendKnown()
 end sub
 
 ' Plex counts titles per first letter, in the same order as titleSort, so each letter's first card is a running total.
@@ -539,7 +582,7 @@ sub paint()
     if m.tab = 0 and m.rows.count() > 0
         y = 0
         if m.row >= 1 then y = -(m.rows[m.row].translation[1])
-        target = [690, 132 + y]
+        target = [690, 132 + m.bo + y]
         cur = m.shelves.translation
         if cur[1] <> target[1]
             m.scroll.control = "stop"
@@ -548,6 +591,16 @@ sub paint()
         end if
     end if
     if m.lettersG.visible then paintLetters()
+    f = (m.focused and m.zone = "banner")
+    if f
+        m.retryFill.blendColor = "0xE0B34AFF"
+        m.retryIcon.blendColor = "0x1F1606FF"
+        m.retryLabel.color = "0x1F1606FF"
+    else
+        m.retryFill.blendColor = "0xFFFFFF14"
+        m.retryIcon.blendColor = "0xEDE6CAFF"
+        m.retryLabel.color = "0xEDE6CAFF"
+    end if
 end sub
 
 sub paintLetters()
@@ -666,13 +719,16 @@ function onKeyEvent(key as string, press as boolean) as boolean
             toPills()
             return true
         else if edge = "right"
-            if m.lastRight = "content" and not hasContent() then m.lastRight = "tabs"
+            if m.lastRight = "content" and not hasContent() then m.lastRight = upZone()
+            if m.lastRight = "banner" and not bannerOn() then m.lastRight = "tabs"
             m.zone = m.lastRight
         end if
     else if m.zone = "tabs"
         tabKey(key)
     else if m.zone = "letters"
         letterKey(key)
+    else if m.zone = "banner"
+        bannerKey(key)
     else
         contentKey(key)
     end if
@@ -699,6 +755,8 @@ sub tabKey(key as string)
         if not isActionTab(m.tabSel) then showTab(m.tabSel)
     else if key = "OK" and isActionTab(m.tabSel)
         m.top.request = { action: "musicView", mode: m.tabDefs[m.tabSel][1] }
+    else if (key = "down" or key = "OK") and bannerOn()
+        m.zone = "banner"
     else if key = "down" or key = "OK"
         if m.lettersG.visible and hasContent()
             m.zone = "letters"
@@ -715,7 +773,7 @@ end sub
 
 sub letterKey(key as string)
     if key = "up"
-        m.zone = "tabs"
+        m.zone = upZone()
     else if key = "down"
         m.zone = "content"
     else if key = "left" or key = "right"
@@ -762,7 +820,7 @@ sub contentKey(key as string)
     end if
     if m.tab = 0
         if key = "up"
-            if m.row = 0 then m.zone = "tabs" else m.row = m.row - 1
+            if m.row = 0 then m.zone = upZone() else m.row = m.row - 1
         else if key = "down"
             if m.row < m.rows.count() - 1 then m.row = m.row + 1
         else if key = "left"
@@ -786,7 +844,7 @@ sub contentKey(key as string)
             here = letterAt(m.grid.index)
             if here >= 0 then m.letter = here
         else
-            m.zone = "tabs"
+            m.zone = upZone()
         end if
     end if
     lib = curLib()
@@ -874,8 +932,8 @@ sub showNew()
     for i = 1 to cards.Count() - 1
         rest.push(cards[i])
     end for
-    m.grid.translation = [690, 412]
-    m.grid.viewHeight = 518
+    m.grid.translation = [690, 412 + m.bo]
+    m.grid.viewHeight = 518 - m.bo
     m.grid.round = false
     if lib.index >= rest.Count() then lib.index = 0
     m.grid.index = lib.index
@@ -890,7 +948,7 @@ function newKey(key as string) as boolean
         else if key = "right"
             if m.spotBtn < m.spotBtns.Count() - 1 then m.spotBtn = m.spotBtn + 1
         else if key = "up"
-            m.zone = "tabs"
+            m.zone = upZone()
         else if key = "down"
             gc = m.grid.cards
             if gc <> invalid and gc.Count() > 0 then m.newSpot = false
@@ -906,3 +964,97 @@ function newKey(key as string) as boolean
     if key = "up" then return true
     return false
 end function
+
+' ---------- Plex not answering: banner with Try again ----------
+function bannerOn() as boolean
+    kind = m.tabDefs[m.tab][1]
+    return m.offline[kind] = true
+end function
+
+' where Up goes from the top of the content (or the letters): the banner when it shows, else the tabs
+function upZone() as string
+    if bannerOn() then return "banner"
+    return "tabs"
+end function
+
+' shows or hides the banner and pushes the tab's content down under it, dimmed
+sub applyBanner()
+    show = bannerOn()
+    kind = m.tabDefs[m.tab][1]
+    if show then m.bo = 72 else m.bo = 0
+    m.banner.visible = show
+    if show
+        if m.retrying[kind] = true
+            m.bannerText.text = "Trying Plex again" + Chr(8230)
+        else if hasContent()
+            m.bannerText.text = "Showing your saved list  ·  Plex isn't answering"
+        else
+            m.bannerText.text = "Plex isn't answering  ·  nothing saved on this TV yet"
+        end if
+    end if
+    if show then op = 0.45 else op = 1.0
+    m.grid.opacity = op
+    m.shelves.opacity = op
+    m.spotG.opacity = op
+    m.lettersG.translation = [690, 112 + m.bo]
+    m.heading.translation = [690, 190 + m.bo]
+    m.spotG.translation = [690, 132 + m.bo]
+    m.empty.translation = [690, 160 + m.bo]
+    m.clip.clippingRect = [660, 112 + m.bo, 1260, 818 - m.bo]
+    if not show and m.zone = "banner"
+        if hasContent() then m.zone = "content" else m.zone = "tabs"
+    end if
+end sub
+
+sub bannerKey(key as string)
+    if key = "up"
+        m.zone = "tabs"
+    else if key = "left"
+        m.zone = "panel"
+    else if key = "down"
+        if m.lettersG.visible and hasContent()
+            m.zone = "letters"
+            here = letterAt(m.grid.index)
+            if here >= 0 then m.letter = here
+        else if hasContent()
+            m.zone = "content"
+            if m.tabDefs[m.tab][1] = "new" and m.newItem <> invalid then m.newSpot = true
+        end if
+    else if key = "OK"
+        retryLoad()
+    end if
+end sub
+
+sub retryLoad()
+    kind = m.tabDefs[m.tab][1]
+    if m.retrying[kind] = true then return
+    m.retrying[kind] = true
+    applyBanner()
+    if kind = "foryou"
+        refresh()
+        if not pxReady() or muPlayer().section = ""
+            m.retrying.Delete("foryou")
+            applyBanner()
+        end if
+    else
+        if m.asked = invalid then m.asked = {}
+        m.asked[kind] = true
+        m.askedFor = m.loadedFor
+        loadLib(kind, false)
+    end if
+end sub
+
+' Discover drops recommended artists already in Plex, and shows the round Plex photo for loved ones you own
+sub sendKnown()
+    known = []
+    owned = {}
+    al = m.lib["artists"]
+    if al <> invalid and al.cards <> invalid
+        for each c in al.cards
+            known.push(c.title)
+            owned[LCase(c.title)] = c.image
+        end for
+    end if
+    m.disc.owned = owned
+    m.disc.known = known
+end sub

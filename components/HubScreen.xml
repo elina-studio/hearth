@@ -25,6 +25,27 @@
     <Poster uri="pkg:/images/clock/twig.png" translation="[1629, 56]" width="200" height="56" />
     <Poster id="wxIcon" translation="[1500, 100]" width="28" height="28" blendColor="0xE0B34AFF" visible="false" />
     <Label id="weather" translation="[1540, 96]" height="36" vertAlign="center" color="0xB5AF8CFF" />
+    <!-- now playing chip (audit idea 2A): left of the clock while music plays and Music is not the room.
+         Display only, never focused. HubScreen.layoutChip sizes it and right-aligns it to the clock. -->
+    <Group id="npChip" translation="[1474, 26]" visible="false">
+      <Poster id="npBack" uri="pkg:/images/pill-v2.9.png" height="56" blendColor="0xFFFFFF14" />
+      <Rectangle translation="[6, 6]" width="44" height="44" color="0x2A2620FF" visible="false" id="npArtBack" />
+      <Poster id="npArt" translation="[6, 6]" width="44" height="44" loadDisplayMode="scaleToZoom" />
+      <Label id="npTitle" translation="[60, 5]" height="26" vertAlign="center" maxLines="1" color="0xEDE6CAFF" />
+      <Label id="npArtist" translation="[60, 29]" height="22" vertAlign="center" maxLines="1" color="0xB5AF8CFF" />
+      <Group id="npBars">
+        <Rectangle id="npB0" translation="[0, 0]" width="3" height="20" color="0xE0B34AFF" scaleRotateCenter="[1.5, 20]" scale="[1, 0.5]" />
+        <Rectangle id="npB1" translation="[5, 0]" width="3" height="20" color="0xE0B34AFF" scaleRotateCenter="[1.5, 20]" scale="[1, 1]" />
+        <Rectangle id="npB2" translation="[10, 0]" width="3" height="20" color="0xE0B34AFF" scaleRotateCenter="[1.5, 20]" scale="[1, 0.7]" />
+        <Rectangle id="npB3" translation="[15, 0]" width="3" height="20" color="0xE0B34AFF" scaleRotateCenter="[1.5, 20]" scale="[1, 0.9]" />
+      </Group>
+    </Group>
+    <Animation id="npPulse" duration="1.6" repeat="true" easeFunction="linear">
+      <Vector2DFieldInterpolator key="[0.0, 0.25, 0.5, 0.75, 1.0]" keyValue="[[1, 0.5], [1, 0.9], [1, 0.35], [1, 0.75], [1, 0.5]]" fieldToInterp="npB0.scale" />
+      <Vector2DFieldInterpolator key="[0.0, 0.25, 0.5, 0.75, 1.0]" keyValue="[[1, 1.0], [1, 0.45], [1, 0.8], [1, 0.6], [1, 1.0]]" fieldToInterp="npB1.scale" />
+      <Vector2DFieldInterpolator key="[0.0, 0.25, 0.5, 0.75, 1.0]" keyValue="[[1, 0.7], [1, 1.0], [1, 0.5], [1, 0.95], [1, 0.7]]" fieldToInterp="npB2.scale" />
+      <Vector2DFieldInterpolator key="[0.0, 0.25, 0.5, 0.75, 1.0]" keyValue="[[1, 0.9], [1, 0.6], [1, 1.0], [1, 0.4], [1, 0.9]]" fieldToInterp="npB3.scale" />
+    </Animation>
     <Label id="buildTag" translation="[1524, 136]" width="300" horizAlign="right" color="0xB5AF8C55" />
     <Timer id="clockTimer" duration="20" repeat="true" />
     <Timer id="weatherTimer" duration="900" repeat="true" />
@@ -37,5 +58,6 @@
   </interface>
   <script type="text/brightscript" uri="pkg:/source/util.brs" />
   <script type="text/brightscript" uri="pkg:/source/photos.brs" />
+  <script type="text/brightscript" uri="pkg:/components/music/plex.brs" />
   <script type="text/brightscript" uri="pkg:/components/HubScreen.brs" />
 </component>

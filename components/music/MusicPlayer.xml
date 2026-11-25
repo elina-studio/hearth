@@ -15,6 +15,8 @@
     <field id="state" type="string" value="none" />
     <field id="track" type="assocarray" />
     <field id="queue" type="array" />
+    <!-- where the queue came from (QueueSheet header): { label, kind } kind = album | artist | playlist | all | nearest | "" -->
+    <field id="source" type="assocarray" />
     <field id="index" type="integer" value="0" />
     <field id="position" type="float" />
     <field id="duration" type="float" />

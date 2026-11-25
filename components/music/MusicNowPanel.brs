@@ -29,6 +29,7 @@ sub init()
     p.observeFieldScoped("lfmState", "showScrob")
     p.observeFieldScoped("rooms", "drawCast")
     p.observeFieldScoped("castDelay", "drawCast")
+    if p.hasField("castLagShown") then p.observeFieldScoped("castLagShown", "drawCast")
     build()
 end sub
 
@@ -426,12 +427,29 @@ function castKey(key as string) as string
     else if key = "options"
         muOptions(true)
     end if
-    ' keep the focused room on screen (6 rows fit)
+    ' keep the focused room on screen (6 rows fit, 5 while the speaker-lag line takes a row)
+    fit = castFit()
     if m.r >= 1 and m.r <= n
         if m.r - 1 < m.castTop then m.castTop = m.r - 1
-        if m.r - 1 > m.castTop + 5 then m.castTop = m.r - 6
+        if m.r - 1 > m.castTop + fit - 1 then m.castTop = m.r - fit
     end if
     return ""
+end function
+
+' the measured speaker lag as "1.8", or "" while it is unknown (nothing cast yet this song)
+function castTrailText() as string
+    p = muPlayer()
+    if not p.hasField("castLagShown") or p.castCount < 1 then return ""
+    v = p.castLagShown
+    if v = invalid or v < 0 then return ""
+    t = Int(v * 10 + 0.5)
+    return (t \ 10).toStr() + "." + (t mod 10).toStr()
+end function
+
+' rows of the room list that fit on screen
+function castFit() as integer
+    if castTrailText() <> "" then return 5
+    return 6
 end function
 
 sub drawCast()
@@ -461,11 +479,28 @@ sub drawCast()
     items = castItems()
     n = items.Count()
     delay = muPlayer().castDelay
-    for k = 0 to 5
+    trail = castTrailText()
+    fit = castFit()
+    slot = 0
+    for k = 0 to fit - 1
         i = m.castTop + k
         if i >= n then exit for
         it = items[i]
-        y = 380 + k * 66
+        y = 380 + slot * 66
+        slot = slot + 1
+        if it.kind = "timing" and trail <> ""
+            ' one muted line under TV timing with the lag measured this song, so a nudge has a starting point
+            tl = g.createChild("Label")
+            tl.text = "Speakers trail the TV by " + trail + " s · nudge until they meet"
+            tl.font = hFont("regular", 20)
+            tl.color = "0xB5AF8CFF"
+            tl.translation = [112, y + 64]
+            tl.width = 440
+            tl.wrap = true
+            tl.maxLines = 2
+            tl.lineSpacing = 0
+            slot = slot + 1
+        end if
         f = (m.top.active and m.r = i + 1)
         on = (it.on = true)
         if f

@@ -10,6 +10,8 @@ sub init()
     m.strip = m.top.findNode("strip")
     m.dotsGroup = m.top.findNode("dots")
     m.clipsAsked = false
+    ' true once Plex has said which clips there are; only then can a mood say "no clip yet"
+    m.clipsKnown = false
     build(ambItems(), CreateObject("roRegistrySection", "hearth").Read("ambLast"))
     m.slideTo = m.top.findNode("slideTo")
     m.slide = m.top.findNode("slide")
@@ -85,7 +87,12 @@ sub onClips(event as object)
         return
     end if
     print "[ambiance] plex clips: "; t.response.Clips.count()
-    if t.response.Clips.count() = 0 then return
+    m.clipsKnown = true
+    if t.response.Clips.count() = 0
+        build(ambMoods(), m.items[m.index].mood)
+        paint()
+        return
+    end if
     items = ambMerge(t.response.Clips)
     if not m.global.hasField("ambItems") then m.global.addFields({ ambItems: [] })
     m.global.ambItems = items
@@ -121,6 +128,9 @@ function makePanel(i as integer) as object
     pic.loadHeight = Int(m.H * 2 / 3)
     pic.uri = it.still
     if it.plexStill <> invalid and it.plexStill <> "" then pic.uri = plexStill(it.plexStill)
+    ' a built-in mood with no clip of the person's own: a dashed panel with the file name to add
+    hint = clipHint(it.mood)
+    if m.clipsKnown and it.clip = invalid and hint <> "" then missingPanel(g, pic, hint)
     top = g.createChild("Poster")
     top.uri = "pkg:/images/amb/shade-top.png"
     top.width = m.W
@@ -186,6 +196,68 @@ function makePanel(i as integer) as object
     p.mood = it.mood
     return p
 end function
+
+' The file-name start ambClipMood matches for each built-in mood ("" = no hint)
+function clipHint(md as string) as string
+    pre = { hearth: "fire", rain: "rain", fireflies: "firefly", lightsout: "embers" }
+    if pre[md] = invalid then return ""
+    return pre[md] + "-anything.mp4"
+end function
+
+sub missingPanel(g as object, pic as object, file as string)
+    pic.uri = ""
+    pic.visible = false
+    bg = g.createChild("Rectangle")
+    bg.width = m.W
+    bg.height = m.H
+    bg.color = "0xFFFFFF06"
+    ' dashes along the four edges (no dashed-line image in the package)
+    dash = 16
+    gap = 10
+    col = "0xFFFFFF22"
+    x = 0
+    while x < m.W
+        l = dash
+        if x + l > m.W then l = m.W - x
+        for each y in [0, m.H - 3]
+            r = g.createChild("Rectangle")
+            r.width = l
+            r.height = 3
+            r.color = col
+            r.translation = [x, y]
+        end for
+        x = x + dash + gap
+    end while
+    y = 0
+    while y < m.H
+        l = dash
+        if y + l > m.H then l = m.H - y
+        for each x in [0, m.W - 3]
+            r = g.createChild("Rectangle")
+            r.width = 3
+            r.height = l
+            r.color = col
+            r.translation = [x, y]
+        end for
+        y = y + dash + gap
+    end while
+    a = g.createChild("Label")
+    a.font = hFont("regular", 26)
+    a.color = "0xB5AF8CFF"
+    a.horizAlign = "center"
+    a.width = m.W - 60
+    a.wrap = true
+    a.lineSpacing = 10
+    a.translation = [30, 430]
+    a.text = "No clip yet." + Chr(10) + "Add one to Plex named"
+    f = g.createChild("Label")
+    f.font = hFont("bold", 28)
+    f.color = "0xE0B34AFF"
+    f.horizAlign = "center"
+    f.width = m.W - 60
+    f.translation = [30, 518]
+    f.text = file
+end sub
 
 sub paint()
     reg = CreateObject("roRegistrySection", "hearth")

@@ -37,7 +37,7 @@ sub init()
     m.finder.observeField("result", "onFinderResult")
     m.finderChanged = false
 
-    m.LIST_TOP = 516
+    m.LIST_TOP = 538
     m.ROW = 124
     ' the page sits 80px lower to make room for the rooms bar (RoomBar, 0-120)
     m.offset = 80
@@ -436,14 +436,31 @@ sub drawTabs()
         end if
         lab.translation = [0, 4]
         w = lab.boundingRect().width
-        if done
-            tick = g.createChild("Poster")
-            tick.uri = "pkg:/images/icons/d-check.png"
-            tick.width = 22
-            tick.height = 22
-            tick.translation = [w + 6, 12]
-            if foc then tick.blendColor = "0x1F1606FF" else tick.blendColor = "0x7E8A62FF"
-            w = w + 30
+        ' progress in words under the name: "all watched" + tick, "6 left", "8 new"
+        prog = seasonProgress(s)
+        if prog <> ""
+            sub1 = g.createChild("Label")
+            sub1.font = hFont("regular", 20)
+            sub1.text = prog
+            sub1.translation = [0, 40]
+            if foc
+                sub1.color = "0x1F1606CC"
+            else if cur
+                sub1.color = "0xEDE6CACC"
+            else
+                sub1.color = "0xB5AF8CCC"
+            end if
+            sw = sub1.boundingRect().width
+            if done
+                tick = g.createChild("Poster")
+                tick.uri = "pkg:/images/icons/d-check.png"
+                tick.width = 20
+                tick.height = 20
+                tick.translation = [sw + 6, 43]
+                if foc then tick.blendColor = "0x1F1606FF" else tick.blendColor = "0x7E8A62FF"
+                sw = sw + 26
+            end if
+            if sw > w then w = sw
         end if
         if foc
             pill = g.createChild("Poster")
@@ -451,7 +468,7 @@ sub drawTabs()
             pill.blendColor = "0xE0B34AFF"
             pill.translation = [-14 - 12, -4 - 12]
             pill.width = w + 28 + 24
-            pill.height = 48 + 24
+            pill.height = 72 + 24
             g.insertChild(pill, 0)
         end if
         if cur
@@ -459,7 +476,7 @@ sub drawTabs()
             u.color = "0xE0B34AFF"
             u.width = w
             u.height = 3
-            u.translation = [0, 46]
+            u.translation = [0, 68]
         end if
         m.tabX.push([x, w])
         x = x + w + 40
@@ -476,6 +493,14 @@ sub drawTabs()
         m.tabs.translation = [sx, 0]
     end if
 end sub
+
+' A season's progress in words, from the seasons answer (total / watched): "all watched", "6 left", "8 new"
+function seasonProgress(s as object) as string
+    if s.total = invalid or s.watched = invalid or s.total <= 0 then return ""
+    if s.watched >= s.total then return "all watched"
+    if s.watched <= 0 then return s.total.toStr() + " new"
+    return (s.total - s.watched).toStr() + " left"
+end function
 
 sub drawChips()
     list = []
@@ -701,7 +726,7 @@ sub paint()
     h = 400
     if m.zone = "tabs"
         top = 424
-        h = 60 + 2 * m.ROW
+        h = 82 + 2 * m.ROW
     else if m.zone = "eps"
         top = m.LIST_TOP + m.epSel * m.ROW - 30
         h = m.ROW + 40

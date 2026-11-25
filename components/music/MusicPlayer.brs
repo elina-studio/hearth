@@ -90,6 +90,7 @@ sub onCommand()
     else if cmd = "shuffleAll"
         shuffleAll()
     else if cmd = "load"
+        m.loadKind = pxStr(c.kind)
         load(c.tracks, c.start, c.shuffle = true, c.label)
     else if cmd = "playContainer"
         playContainer(c.kind, c.id, c.shuffle = true, c.label)
@@ -213,6 +214,7 @@ sub runPending(p as object)
     if p.tag = "all" then p.path = "/library/sections/" + m.top.section + "/all"
     m.top.busy = true
     m.label = p.label
+    m.loadKind = p.tag
     m.shuffleOnLoad = (p.shuffle = true)
     pxApi(p.path, p.query, "onTracks", p.tag)
 end sub
@@ -360,6 +362,12 @@ sub load(tracks as object, start as dynamic, shuffle as boolean, label as dynami
         m.top.shuffle = false
     end if
     m.top.queue = tracks
+    kind = ""
+    if m.loadKind <> invalid then kind = m.loadKind
+    name = ""
+    if label <> invalid then name = label
+    m.top.source = { label: name, kind: kind }
+    m.loadKind = ""
     m.errors = 0
     keep = (m.top.track <> invalid and tracks[start].id = m.top.track.id and (m.top.state = "playing" or m.top.state = "paused"))
     if keep

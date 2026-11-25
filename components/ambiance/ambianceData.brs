@@ -51,7 +51,6 @@ end function
 function ambMerge(clips as object) as object
     items = ambMoods()
     extra = []
-    taken = {}
     ' a TV-friendly copy named "<name>-tv.mp4" (made with the ffmpeg command) stands in for "<name>.<ext>"
     tvOf = {}
     for each c in clips
@@ -77,11 +76,22 @@ function ambMerge(clips as object) as object
         end if
     end for
     clips = picked
+    ' Several clips can start with the same mood word (say "Rain on glass.mov" from the phone and
+    ' "rain-tv.mp4" made for the TV). The first one in Plex's title order used to win, which could be the
+    ' 4K HEVC original this TV can't play: the mood then fell back to a picture. Pick the best one:
+    ' a "-tv" copy first, then one the TV plays as it is (H.264, 1080p or less), then the first.
+    best = {}
     for each c in clips
         md = ambClipMood(c.file)
         if md = "" then md = ambClipMood(c.Name)
-        if md <> "" and taken[md] = invalid
-            taken[md] = true
+        c._md = md
+        if md <> ""
+            if best[md] = invalid or ambClipScore(c) > ambClipScore(best[md]) then best[md] = c
+        end if
+    end for
+    for each c in clips
+        md = c._md
+        if md <> "" and best[md] <> invalid and best[md].Id = c.Id
             for each it in items
                 if it.mood = md
                     it.clip = c
@@ -104,6 +114,20 @@ function ambMerge(clips as object) as object
         out.push(it)
     end for
     return out
+end function
+
+' How well the TV will play a clip: 2 for a "-tv" copy, +1 when it needs no converting
+function ambClipScore(c as object) as integer
+    n = 0
+    b = ambBase(c.file)
+    if Len(b) > 3 and Right(b, 3) = "-tv" then n = n + 2
+    vc = ""
+    if c.videoCodec <> invalid then vc = LCase(c.videoCodec.toStr())
+    ok = (vc = "" or vc = "h264")
+    if c.width <> invalid and Val(c.width.toStr()) > 1920 then ok = false
+    if c.height <> invalid and Val(c.height.toStr()) > 1080 then ok = false
+    if ok then n = n + 1
+    return n
 end function
 
 ' Which generated sound goes with a mood (for "Both"): built-ins use their own; your clips by name.

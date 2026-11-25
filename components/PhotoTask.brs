@@ -1,5 +1,5 @@
 ' Reads the Plex photo library. Every result is { Items: [...] } where an item is
-' a photo { Id, Name, Type: "Photo", path, date } or an album { Id, Name, Type: "Album", count, path }.
+' a photo { Id, Name, Type: "Photo", path, date, place } or an album { Id, Name, Type: "Album", count, path, years }.
 ' path is a server image path for /photo/:/transcode (see pPhotoUrl).
 sub init()
     m.top.functionName = "runTask"
@@ -156,12 +156,19 @@ function norm(md as object) as object
         if it.path <> invalid and Instr(1, LCase(it.path), "screenshot") > 0 then it.Type = "Other"
         it.date = md.originallyAvailableAt
         if it.date = invalid and md.year <> invalid then it.date = md.year.toStr()
+        ' the album (folder) the photo sits in, shown as its place under the window title
+        if md.parentTitle <> invalid and md.parentTitle <> "" and md.parentTitle <> md.librarySectionTitle then it.place = md.parentTitle
     else if md.type = "photo" or md.type = "photoalbum" or md.key <> invalid and Instr(1, md.key, "/children") > 0
         it.Type = "Album"
         it.path = md.thumb
         n = md.leafCount
         if n = invalid then n = md.childCount
         it.count = n
+        ' years only when Plex gives the album a date itself (no extra calls per album)
+        y = invalid
+        if md.originallyAvailableAt <> invalid and Len(md.originallyAvailableAt) >= 4 then y = Left(md.originallyAvailableAt, 4)
+        if y = invalid and md.year <> invalid then y = md.year.toStr()
+        if y <> invalid then it.years = y
     else
         it.Type = "Other"
     end if

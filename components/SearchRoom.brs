@@ -17,6 +17,10 @@ sub init()
     m.list = m.top.findNode("list")
     m.debounce = m.top.findNode("debounce")
     m.debounce.observeField("fire", "runSearch")
+    m.recentHints = m.top.findNode("recentHints")
+    m.recentHints.keys = [{ text: "OK", label: "Search again" }, { icon: "asterisk", label: "Remove from recent" }]
+    ' KeyHints lays out leftwards from x = 0; shift it so the strip starts at the list's left edge
+    m.recentHints.translation = [760 + Int(m.recentHints.localBoundingRect().width), 868]
 
     m.groups = [
         { type: "Movie", head: "MOVIES", icon: "film" },
@@ -98,6 +102,27 @@ sub rememberSearch(term as string)
     m.recent = out
     m.reg.Write("recentSearches", FormatJson(out))
     m.reg.Flush()
+end sub
+
+' * on a recent row: drop it (saved), redraw the list and stay on the row that took its place
+sub forgetSearch(term as string)
+    out = []
+    for each r in m.recent
+        if LCase(r) <> LCase(term) then out.push(r)
+    end for
+    m.recent = out
+    m.reg.Write("recentSearches", FormatJson(out))
+    m.reg.Flush()
+    sel = m.sel
+    showIdle()
+    if m.focusable.count() = 0
+        m.zone = "kb"
+    else
+        if sel > m.focusable.count() - 1 then sel = m.focusable.count() - 1
+        m.sel = sel
+    end if
+    ' typed text with its answer still on the way: ask again (showIdle dropped the pending one)
+    if m.query.Trim() <> "" then runSearch()
 end sub
 
 ' ---------- searching ----------
@@ -576,6 +601,11 @@ sub paint()
         if r.y + r.h > m.offset + m.viewHeight then m.offset = r.y + r.h - m.viewHeight
     end if
     m.list.translation = [0, -m.offset]
+    onRecent = false
+    if m.active and m.zone = "results" and m.focusable.count() > 0 and m.sel < m.focusable.count()
+        onRecent = (m.rows[m.focusable[m.sel]].kind = "recent")
+    end if
+    m.recentHints.visible = onRecent
 end sub
 
 sub focusIn(unused as dynamic)
@@ -648,7 +678,11 @@ function onKeyEvent(key as string, press as boolean) as boolean
         openRow()
     else if key = "options"
         r = m.rows[m.focusable[m.sel]]
-        if r.kind = "item" and (r.item.Type = "Movie" or r.item.Type = "Series" or r.item.Type = "Episode") then hOptions(r.item)
+        if r.kind = "recent"
+            forgetSearch(r.text)
+        else if r.kind = "item" and (r.item.Type = "Movie" or r.item.Type = "Series" or r.item.Type = "Episode")
+            hOptions(r.item)
+        end if
     end if
     paint()
     return true

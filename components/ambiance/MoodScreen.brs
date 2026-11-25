@@ -15,6 +15,7 @@ sub init()
     m.focusTick.observeField("fire", "refocus")
     m.focusTick.control = "start"
     m.still = m.top.findNode("still")
+    m.black = m.top.findNode("black")
     m.dim = m.top.findNode("dim")
     m.dimLevels = [0, 0.25, 0.5, 0.7]
     m.dimIndex = 0
@@ -98,7 +99,7 @@ sub onMood()
     if m.clip <> invalid
         ' the person's own footage, streamed from their Plex "Ambiance" library
         m.note.visible = false
-        if m.video.getParent() = invalid then m.top.insertChild(m.video, 2)
+        if m.video.getParent() = invalid then m.top.insertChild(m.video, 3)
         m.video.content = clipContent(m.clip, needsConvert(m.clip))
         pic = m.clip.art
         if pic = invalid then pic = m.clip.thumb
@@ -158,8 +159,8 @@ function fullStill(path as string) as string
     return m.global.plexServer + "/photo/:/transcode?width=1280&height=720&minSize=1&upscale=1&url=" + hEscape(path) + "&X-Plex-Token=" + m.global.plexServerToken
 end function
 
-' Size the video so it covers the whole screen whatever its shape (crop, never black bars):
-' the picture is scaled to the screen's longer side and centred, the overflow falls off-screen.
+'' Size the video so the whole frame shows (fit, with black bars when its shape isn't 16:9), never cropped:
+' the owner's footage is framed on purpose (rain on the glass with the window edge in shot).
 sub fillScreen(clip as dynamic)
     w = 1920.0
     h = 1080.0
@@ -170,11 +171,12 @@ sub fillScreen(clip as dynamic)
     end if
     if ar > 0
         if ar > w / h
-            w = 1080.0 * ar
-        else
             h = 1920.0 / ar
+        else
+            w = 1080.0 * ar
         end if
     end if
+    m.black.visible = (clip <> invalid)
     m.video.width = Int(w)
     m.video.height = Int(h)
     m.video.translation = [Int((1920 - w) / 2), Int((1080 - h) / 2)]

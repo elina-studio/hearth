@@ -79,9 +79,11 @@ end function
 function filtered() as object
     if m.recsF <> invalid then return m.recsF
     known = {}
-    for each k in m.top.known
-        known[LCase(k)] = true
-    end for
+    if m.top.known <> invalid
+        for each k in m.top.known
+            known[LCase(k)] = true
+        end for
+    end if
     out = []
     for each e in m.data.recs
         n = LCase(e.name)
@@ -140,11 +142,31 @@ sub drawRows(items as object)
         sel.height = 88
         sel.color = "0xE0B34A14"
         sel.visible = (idx = m.sel and not ring.visible)
+        ' artists in the Plex library show their round Plex photo; the rest a lettered disc
         av = g.createChild("Rectangle")
         av.translation = [4, 10]
         av.width = 68
         av.height = 68
-        av.color = avatarColor(e.name)
+        av.color = "0x23291EFF"
+        img = ownedImage(e.name)
+        if img <> ""
+            ph = g.createChild("Poster")
+            ph.translation = [4, 10]
+            ph.width = 68
+            ph.height = 68
+            ph.loadDisplayMode = "scaleToZoom"
+            ph.uri = img
+        else
+            lt = g.createChild("Label")
+            lt.font = hFont("pica", 34)
+            lt.translation = [4, 10]
+            lt.width = 68
+            lt.height = 68
+            lt.horizAlign = "center"
+            lt.vertAlign = "center"
+            lt.color = "0xB5AF8CFF"
+            lt.text = UCase(Left(e.name, 1))
+        end if
         mk = g.createChild("Poster")
         mk.translation = [4, 10]
         mk.width = 68
@@ -178,6 +200,21 @@ sub drawRows(items as object)
     end for
 end sub
 
+' the round Plex photo for an artist in the library, or ""
+function ownedImage(name as string) as string
+    o = m.top.owned
+    if o = invalid then return ""
+    v = o[LCase(name)]
+    if v = invalid then return ""
+    return v
+end function
+
+' the room sends the Plex artist list once it has it: drop owned artists from Recommended and redraw
+sub onKnown()
+    m.recsF = invalid
+    if m.data <> invalid then redraw()
+end sub
+
 function avatarColor(name as string) as string
     h = 0
     for i = 1 to Len(name)
@@ -201,6 +238,8 @@ sub showDetail(items as object)
         m.kick.text = "ARTISTS YOU LOVE"
         m.title.text = e.name
         if e.plays <> invalid then m.meta.text = e.plays.toStr() + " plays on Last.fm" else m.meta.text = "On Last.fm"
+        o = m.top.owned
+        if o <> invalid and o[LCase(e.name)] <> invalid then m.meta.text = m.meta.text + "  ·  In your library"
     end if
     buildButtons()
     m.albums.removeChildrenIndex(m.albums.getChildCount(), 0)

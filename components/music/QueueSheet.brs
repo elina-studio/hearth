@@ -97,49 +97,29 @@ sub draw()
     q = p.queue
     if q = invalid then q = []
     n = q.count()
-    gold = "0xE0B34AFF"
-    ic = g.createChild("Poster")
-    ic.uri = "pkg:/images/music/icons/queue.png"
-    ic.translation = [40, 28]
-    ic.width = 32
-    ic.height = 32
-    ic.blendColor = gold
-    label(g, "QUEUE", [84, 26], 200, "caps", 28, "0xD9A066FF")
-    rl = g.createChild("Rectangle")
-    rl.translation = [220, 44]
-    rl.width = 400
-    rl.height = 2
-    rl.color = "0xD9A06655"
-    total = 0
-    for each t in q
-        total = total + t.duration
-    end for
-    mins = Int(total / 60)
-    txt = n.toStr() + " songs"
-    if n = 1 then txt = "1 song"
-    if mins >= 60 then txt = txt + " · " + Int(mins / 60).toStr() + " hr " + (mins mod 60).toStr() + " min" else txt = txt + " · " + mins.toStr() + " min"
-    label(g, txt, [560, 30], 310, "regular", 22, "0xB5AF8CFF").horizAlign = "right"
+    drawHeader(g, p, q)
     if n = 0
-        label(g, "Nothing is queued yet. Add songs from an album or artist.", [40, 120], 800, "regular", 26, "0xB5AF8CFF")
+        label(g, "Nothing is queued yet. Add songs from an album or artist.", [40, 170], 800, "regular", 26, "0xB5AF8CFF")
         return
     end if
     if p.index < 0 or p.index >= n then return
-    label(g, "Now playing", [40, 84], 400, "regular", 22, "0xB5AF8CFF")
-    drawRow(900, 118, q[p.index], false, true, "")
+    label(g, "Now playing", [40, 160], 400, "regular", 22, "0xB5AF8CFF")
+    drawRow(900, 192, q[p.index], false, true, "")
     cnt = upCount()
-    label(g, "Up next · " + cnt.toStr(), [40, 214], 400, "regular", 22, "0xB5AF8CFF")
+    label(g, "Coming up", [40, 286], 400, "regular", 22, "0xB5AF8CFF")
+    rows = 6
     if m.sel >= cnt then m.sel = cnt - 1
     if m.sel < 0 then m.sel = 0
     if m.sel < m.topRow then m.topRow = m.sel
-    if m.sel > m.topRow + 6 then m.topRow = m.sel - 6
-    for r = 0 to 6
+    if m.sel > m.topRow + rows - 1 then m.topRow = m.sel - rows + 1
+    for r = 0 to rows - 1
         k = m.topRow + r
         if k >= cnt then exit for
-        drawRow(k, 250 + r * 78, q[p.index + 1 + k], (m.zone = "list" and k = m.sel), false, (k + 1).toStr())
+        drawRow(k, 322 + r * 78, q[p.index + 1 + k], (m.zone = "list" and k = m.sel), false, (k + 1).toStr())
     end for
-    if cnt = 0 then label(g, "That's the last song.", [40, 262], 600, "regular", 24, "0xB5AF8CFF")
-    if cnt > 7
-        label(g, "▲ ▼", [800, 214], 70, "regular", 20, "0xB5AF8CFF").horizAlign = "right"
+    if cnt = 0 then label(g, "That's the last song.", [40, 334], 600, "regular", 24, "0xB5AF8CFF")
+    if cnt > rows
+        label(g, "▲ ▼", [800, 286], 70, "regular", 20, "0xB5AF8CFF").horizAlign = "right"
     end if
     labels = [["close", "Clear queue"], ["shuffle", "Shuffle rest"]]
     x = 40
@@ -226,4 +206,77 @@ end function
 
 sub muRestoreFocus()
     m.top.getParent().setFocus(true)
+end sub
+
+' "Up next · from" the album, playlist or radio the queue came from, with its cover and how many songs are left
+sub drawHeader(g as object, p as object, q as object)
+    n = q.count()
+    src = p.source
+    name = ""
+    kind = ""
+    if src <> invalid
+        name = pxStr(src.label)
+        kind = pxStr(src.kind)
+    end if
+    first = invalid
+    if n > 0 then first = q[0]
+    ' a list of songs from one album (played from the artist page) counts as that album
+    if kind = "" and n > 0 and first.albumId <> "" and q[n - 1].albumId = first.albumId then kind = "album"
+    title = name
+    sub2 = ""
+    thumb = ""
+    if first <> invalid then thumb = first.thumb
+    if p.radioOn
+        title = p.radioName
+        if title = "" then title = "Radio"
+        sub2 = "Radio"
+    else if kind = "album"
+        if title = "" and first <> invalid then title = first.album
+        if first <> invalid then sub2 = first.artist
+    else if kind = "playlist"
+        sub2 = "Playlist"
+    else if kind = "artist"
+        sub2 = "All their songs"
+    else if kind = "all"
+        title = "All your music"
+        sub2 = "Shuffled"
+        thumb = ""
+    else if kind = "nearest"
+        sub2 = "Songs that sound alike"
+    end if
+    if title = "" then title = "Your queue"
+    rest = upCount()
+    if n = 0
+        cnt = ""
+    else if rest = 0
+        cnt = "Last song"
+    else if rest = 1
+        cnt = "1 song left"
+    else
+        cnt = rest.toStr() + " songs left"
+    end if
+    if sub2 <> "" and cnt <> "" then sub2 = sub2 + " · " + cnt else sub2 = sub2 + cnt
+    bx = g.createChild("Rectangle")
+    bx.translation = [40, 26]
+    bx.width = 110
+    bx.height = 110
+    bx.color = "0x1D2418FF"
+    if thumb <> ""
+        ap = g.createChild("Poster")
+        ap.translation = [40, 26]
+        ap.width = 110
+        ap.height = 110
+        ap.loadDisplayMode = "scaleToZoom"
+        ap.uri = pxImage(thumb, 110, 110)
+    else
+        ic = g.createChild("Poster")
+        if p.radioOn then ic.uri = "pkg:/images/music/icons/radio.png" else ic.uri = "pkg:/images/music/icons/queue.png"
+        ic.translation = [73, 59]
+        ic.width = 44
+        ic.height = 44
+        ic.blendColor = "0xE0B34AFF"
+    end if
+    label(g, "Up next · from", [172, 28], 680, "fell", 26, "0xD9A066FF")
+    label(g, title, [172, 60], 690, "bold", 34, "0xEDE6CAFF")
+    label(g, sub2, [172, 106], 690, "regular", 20, "0xB5AF8CFF")
 end sub

@@ -447,6 +447,30 @@ sub drawPanel()
             btns = [["request", label, "missing"]]
             if missing.Count() > 1 then btns.push(["", "Latest only", "latest"])
             setButtons(btns)
+            ' a muted note on what is already on its way, so the count above adds up
+            asked = 0
+            for each x in d.albums
+                if x.state = "want" then asked = asked + 1
+            end for
+            if asked > 0
+                nx = 0
+                for each c in m.pvButtons.getChildren(-1, 0)
+                    if c.translation[0] + c.width > nx then nx = c.translation[0] + c.width
+                end for
+                nt = m.pvButtons.createChild("Label")
+                nt.text = asked.toStr() + " already requested"
+                ' beside the buttons when it fits the panel, else just under them
+                if nx + 24 + Len(nt.text) * 11 <= 700
+                    nt.translation = [nx + 24, 0]
+                    nt.height = 64
+                else
+                    nt.translation = [0, 74]
+                    nt.height = 30
+                end if
+                nt.vertAlign = "center"
+                nt.font = hFont("regular", 22)
+                nt.color = "0xB5AF8CFF"
+            end if
         end if
     end if
     m.pvAlbums.removeChildrenIndex(m.pvAlbums.getChildCount(), 0)
@@ -594,7 +618,7 @@ sub paint()
             l.color = "0xB5AF8CFF"
         end if
     end for
-    for i = 0 to m.pvButtons.getChildCount() - 1
+    for i = 0 to m.btnActions.Count() - 1
         m.pvButtons.getChild(i).focused = (m.zone = "actions" and i = m.btn)
     end for
     for i = 0 to m.pvAlbums.getChildCount() - 1

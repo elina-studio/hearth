@@ -16,6 +16,14 @@ end sub
 
 sub onShown(unused as dynamic)
     m.top.setFocus(true)
+    checkAgain()
+end sub
+
+' first look (and Try again): say we're asking, so the screen isn't blank while the helper answers
+sub checkAgain()
+    m.st = { state: "loading", recent: [] }
+    m.f = 0
+    build()
     refresh()
 end sub
 
@@ -89,9 +97,21 @@ sub build()
     s = m.st
     reg = CreateObject("roRegistrySection", "hearth")
     m.note.text = ""
-    if s.state = "unreachable"
-        m.sub.text = "Hearth can't reach its helper on the NAS (" + nasBase() + ")."
+    if s.state = "loading"
+        m.sub.text = "Keep a record of everything you play in Hearth, on the TV and on speakers."
+        ic = m.dyn.createChild("Poster")
+        ic.uri = "pkg:/images/music/icons/clock.png"
+        ic.blendColor = "0xE0B34AFF"
+        ic.width = 30
+        ic.height = 30
+        ic.translation = [100, 335]
+        lbl(m.dyn, 146, 330, 900, "Checking with the Hearth helper" + Chr(8230), "regular", 26, "0xB5AF8CFF")
         chip("left", "Back", 420, "back")
+    else if s.state = "unreachable"
+        m.sub.text = "Hearth can't reach its helper on the NAS (" + nasBase() + ")."
+        lbl(m.dyn, 100, 330, 900, "The helper didn" + Chr(8217) + "t answer.", "bold", 26, "0xF0907CFF")
+        chip("repeat", "Try again", 420, "retry")
+        chip("left", "Back", 520, "back")
     else if s.state = "off" or s.configured = false
         m.sub.text = "The NAS helper needs your free Last.fm API key first. Steps are in tools/remote/README.md: create the key at last.fm/api/account/create, put it in the hearth-remote .env file, and rebuild the container."
         chip("left", "Back", 480, "back")
@@ -170,8 +190,18 @@ sub act(a as string)
     else if a = "begin"
         m.note.text = "Asking Last.fm..."
         nasCall("POST", "/api/lastfm/begin", "{}", "onBegin", "")
+    else if a = "retry"
+        checkAgain()
     else if a = "disconnect"
-        nasCall("POST", "/api/lastfm/disconnect", "{}", "onDisconnected", "")
+        ' re-pairing needs the phone, so ask first
+        dlg = CreateObject("roSGNode", "StandardMessageDialog")
+        dlg.title = "Disconnect Last.fm?"
+        dlg.message = ["Hearth stops sending what you play. To connect again you'll need your phone."]
+        dlg.buttons = ["Disconnect", "Cancel"]
+        dlg.observeField("buttonSelected", "onDisconnectPick")
+        dlg.observeField("wasClosed", "onMuClosed")
+        m.confirm = dlg
+        m.top.getScene().dialog = dlg
     else if a = "cast" or a = "now" or a = "love"
         key = { cast: "lastfmCast", now: "lastfmNow", love: "lastfmLove" }[a]
         if reg.Read(key) = "0" then reg.Write(key, "1") else reg.Write(key, "0")
@@ -190,6 +220,15 @@ sub onBegin(event as object)
         e = t.response.error
         if e = invalid then e = "The NAS helper didn't answer."
         m.note.text = e
+    end if
+end sub
+
+sub onDisconnectPick()
+    b = m.confirm.buttonSelected
+    m.confirm.close = true
+    if b = 0
+        m.note.text = "Disconnecting..."
+        nasCall("POST", "/api/lastfm/disconnect", "{}", "onDisconnected", "")
     end if
 end sub
 

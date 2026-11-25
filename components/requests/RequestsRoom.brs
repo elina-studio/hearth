@@ -88,6 +88,9 @@ sub init()
     m.filterBar = m.top.findNode("filterBar")
     m.top.findNode("barLabel").font = hFont("bold", 26)
     m.top.findNode("barSum").font = hFont("regular", 24)
+    m.top.findNode("barCount").font = hFont("regular", 24)
+    m.top.findNode("barHint").font = hFont("regular", 22)
+    m.totals = {}
     m.sheetHolder = m.top.findNode("sheetHolder")
 
     if not m.global.hasField("overseerrKey") then m.global.addFields({ overseerrKey: "" })
@@ -307,6 +310,10 @@ sub onList(event as object)
         end if
     end for
     m.pageNo[key] = page
+    if page = 1
+        m.totals[key] = invalid
+        if t.response.totalResults <> invalid then m.totals[key] = t.response.totalResults
+    end if
     publishList(key)
     total = t.response.totalPages
     if page < 5 and total <> invalid and page < total then fetchPage(key, page + 1)
@@ -1564,9 +1571,42 @@ function filterSummary(key as string) as string
     if f.minRating > 0 then parts.push("rated " + f.minRating.toStr() + ".0+")
     names = { popular: "most popular", rating: "top rated", newest: "newest", az: "A to Z" }
     parts.push(names[f.sort])
-    n = 0
-    if m.cards[key] <> invalid then n = m.cards[key].count()
-    return n.toStr() + " titles · " + parts.join(" · ")
+    text = parts.join(" · ")
+    if filtersActive(key)
+        ' keep room for "Filtered · 43 of 100" and the hint on the same line
+        if Len(text) > 48 then text = Left(text, 46) + "…"
+        return text
+    end if
+    return filterCountShown(key).toStr() + " titles · " + text
+end function
+
+function filterCountShown(key as string) as integer
+    if m.cards[key] = invalid then return 0
+    return m.cards[key].count()
+end function
+
+' "Filtered · 43 of 100": Trending is narrowed here, so "of" is what was fetched (up to 5 pages);
+' movies and shows are narrowed by Overseerr, so "of" is its total for these filters (more than 100 means the cap was hit)
+function filterCountLine(key as string) as string
+    shown = filterCountShown(key)
+    total = invalid
+    if key = "trending"
+        if m.acc[key] <> invalid then total = m.acc[key].count()
+    else
+        total = m.totals[key]
+    end if
+    if total = invalid or total < shown then total = shown
+    return "Filtered · " + shown.toStr() + " of " + reqThousands(total)
+end function
+
+function reqThousands(n as integer) as string
+    s = n.toStr()
+    out = ""
+    while Len(s) > 3
+        out = "," + Right(s, 3) + out
+        s = Left(s, Len(s) - 3)
+    end while
+    return s + out
 end function
 
 sub paintBar()
@@ -1589,7 +1629,15 @@ sub paintBar()
         lab.color = "0xEDE6CAFF"
         ico.blendColor = "0xEDE6CAFF"
     end if
-    m.top.findNode("barSum").text = filterSummary(key)
+    act = filtersActive(key)
+    sum = m.top.findNode("barSum")
+    sum.text = filterSummary(key)
+    if act then sum.color = "0xEDE6CAFF" else sum.color = "0xB5AF8CFF"
+    cnt = m.top.findNode("barCount")
+    cnt.visible = act
+    if act then cnt.text = filterCountLine(key) else cnt.text = ""
+    m.top.findNode("barHintKey").visible = act
+    m.top.findNode("barHint").visible = act
 end sub
 
 function barKey(key as string) as boolean
