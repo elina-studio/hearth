@@ -6,7 +6,8 @@ sub init()
     m.coverTitle.font = hFont("bold", 56)
     m.coverSub = m.top.findNode("coverSub")
     m.coverSub.font = hFont("regular", 32)
-    m.coverFill = m.top.findNode("coverFill")
+    m.coverClip = m.top.findNode("coverClip")
+    m.coverTip = m.top.findNode("coverTip")
     m.strip = m.top.findNode("strip")
     m.sArt = m.top.findNode("sArt")
     m.sEyebrow = m.top.findNode("sEyebrow")
@@ -110,7 +111,12 @@ end sub
 
 sub showTime()
     p = muPlayer()
-    if p.duration > 0 then m.coverFill.width = 600 * p.position / p.duration else m.coverFill.width = 0
+    fw = 0
+    if p.duration > 0 then fw = Int(598 * p.position / p.duration)
+    if fw < 15 then fw = 15
+    m.coverClip.clippingRect = [0, 0, fw - 12, 10]
+    m.coverTip.translation = [1 + fw - 12, 1]
+    m.coverTip.visible = true
 end sub
 
 sub onMessage()
