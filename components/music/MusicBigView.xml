@@ -7,8 +7,8 @@
     <Poster id="backdrop" width="1920" height="1080" loadDisplayMode="scaleToZoom" opacity="0.4" />
     <Poster width="1920" height="1080" uri="pkg:/images/shade.png" opacity="0.6" />
     <MusicNowPanel id="panel" layout="big" active="true" />
-    <Label id="nextTitle" translation="[96, 820]" color="0xB5AF8CFF" text="Up next" />
-    <Rectangle id="nextRule" translation="[220, 840]" width="1604" height="2" color="0xD9A06655" />
+    <Label id="nextTitle" translation="[96, 808]" color="0xB5AF8CFF" text="Up next" />
+    <Poster id="nextRule" uri="pkg:/images/w/twig-1580-s5.png" translation="[236, 770]" width="1620" height="120" />
     <Group id="next" translation="[96, 870]" />
   </children>
   <interface>

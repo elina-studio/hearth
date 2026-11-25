@@ -5,7 +5,7 @@
   <children>
     <Rectangle width="1920" height="1080" color="0x0B0E09FF" />
     <Label id="title" translation="[100, 150]" color="0xEDE6CAFF" text="Last.fm" />
-    <Rectangle id="rule" translation="[320, 186]" width="1500" height="3" color="0x6E4526FF" />
+    <Poster id="rule" uri="pkg:/images/w/twig-1500-s5.png" translation="[300, 116]" width="1540" height="120" />
     <Label id="sub" translation="[100, 230]" width="900" wrap="true" color="0xB5AF8CFF" />
     <Group id="dyn" />
     <Label id="note" translation="[100, 960]" width="1700" color="0xE0B34AFF" />
