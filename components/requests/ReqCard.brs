@@ -4,6 +4,7 @@ sub init()
     m.top.findNode("tileSub").font = hFont("regular", 20)
     m.chipText = m.top.findNode("chipText")
     m.chipText.font = hFont("caps", 21)
+    m.top.findNode("scoreText").font = hFont("bold", 20)
     m.poster = m.top.findNode("poster")
     m.cap = m.top.findNode("cap")
     m.cap.font = hFont("bold", 21)
@@ -54,6 +55,9 @@ sub draw()
         fb.font = hFont("caps", 30)
     end if
     m.poster.uri = ""
+    sc = m.top.findNode("score")
+    sc.visible = (c.score <> invalid and c.score <> "" and c.kind = "media")
+    if sc.visible then m.top.findNode("scoreText").text = c.score
     onLoad()
     drawChip(c.chip)
     p = c.progress

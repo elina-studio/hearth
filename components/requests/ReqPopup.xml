@@ -13,6 +13,7 @@
         <Label id="eyebrow" color="0xD9A066FF" />
         <Poster id="star" uri="pkg:/images/requests/star.png" width="22" height="22" blendColor="0xD9A066FF" visible="false" />
         <Label id="rating" color="0xD9A066FF" />
+        <Label id="rt" color="0xF0907CFF" />
         <Label id="title" translation="[0, 34]" width="660" wrap="true" maxLines="2" color="0xEDE6CAFF" />
         <Label id="overview" translation="[0, 124]" width="660" wrap="true" maxLines="3" color="0xB5AF8CFF" />
         <Group id="items" translation="[0, 250]" />
@@ -26,6 +27,7 @@
     <function name="handleKey" />
     <function name="checked" />
     <function name="setLabel" />
+    <function name="setRt" />
   </interface>
   <script type="text/brightscript" uri="pkg:/source/util.brs" />
   <script type="text/brightscript" uri="pkg:/components/requests/ReqPopup.brs" />

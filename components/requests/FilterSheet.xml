@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Filter and sort side sheet for the Discover lists (layout B).
+     Set "config" = { title, genres: [{ name }], providers: [{ id, name, logo }] (may be empty), filters: { genres: [names], provider: "", minRating: 0, sort: "popular" } }.
+     The room forwards keys with callFunc("handleKey", key). OK on the last button or Back sets "result" (the chosen filters). -->
+<component name="FilterSheet" extends="Group">
+  <children>
+    <Rectangle width="1920" height="1080" translation="[0, -150]" color="0x05060499" />
+    <Poster id="panelBg" uri="pkg:/images/tile.9.png" blendColor="0x141A11FF" translation="[1000, -100]" width="870" height="980" />
+    <Group id="content" translation="[1034, -76]" />
+  </children>
+  <interface>
+    <field id="config" type="assocarray" onChange="build" />
+    <field id="result" type="assocarray" alwaysNotify="true" />
+    <function name="handleKey" />
+  </interface>
+  <script type="text/brightscript" uri="pkg:/source/util.brs" />
+  <script type="text/brightscript" uri="pkg:/components/requests/FilterSheet.brs" />
+</component>
