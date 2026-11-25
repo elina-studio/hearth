@@ -34,18 +34,52 @@ sub init()
         hPlex("check", {}, "onUserChecked")
     else
         m.next = "setup"
+        m.warmDone = true
     end if
 end sub
 
 sub goNext()
     if not m.introDone or m.next = "" then return
+    ' the lantern keeps burning until the rooms have their first data (warmDone), or the time limit below passes
+    if m.next = "hub" and not m.warmDone then return
     if m.next = "hub" then showHub() else signOut()
+end sub
+
+' Launch warm-up: the Hub is built behind the intro so every room loads its data before the first screen.
+' At most 20 seconds in all; if Plex is slow or down the Hub opens anyway.
+sub startWarm()
+    if m.hub <> invalid then return
+    m.warmDone = false
+    m.warmClock = CreateObject("roTimespan")
+    m.hub = CreateObject("roSGNode", "HubScreen")
+    m.hub.observeField("warm", "onWarm")
+    t = CreateObject("roSGNode", "Timer")
+    t.duration = 20
+    t.observeField("fire", "onWarmLimit")
+    m.top.appendChild(t)
+    t.control = "start"
+    m.warmTimer = t
+end sub
+
+sub onWarm()
+    if m.hub = invalid or not m.hub.warm then return
+    print "[hearth] rooms warm after "; m.warmClock.TotalMilliseconds(); " ms"
+    m.warmDone = true
+    goNext()
+end sub
+
+sub onWarmLimit()
+    if m.warmDone then return
+    print "[hearth] warm-up limit reached, opening anyway"
+    m.warmDone = true
+    goNext()
 end sub
 
 sub onUserChecked(event as object)
     t = hTaskFrom(event)
     ' a 401 means the login is gone; offline or slow still opens the hub, which shows the offline banner
     if t.status = 401 then m.next = "setup" else m.next = "hub"
+    if m.next = "hub" then startWarm() else m.warmDone = true
     goNext()
 end sub
 
@@ -53,7 +87,11 @@ sub showHub()
     while m.stack.getChildCount() > 0
         m.stack.removeChildIndex(m.stack.getChildCount() - 1)
     end while
-    pushScreen(CreateObject("roSGNode", "HubScreen"))
+    hub = m.hub
+    m.hub = invalid
+    if m.warmTimer <> invalid then m.warmTimer.control = "stop"
+    if hub = invalid then hub = CreateObject("roSGNode", "HubScreen")
+    pushScreen(hub)
 end sub
 
 sub signOut()

@@ -53,6 +53,8 @@
   </children>
   <interface>
     <field id="request" type="assocarray" alwaysNotify="true" />
+    <!-- true once every room has its first data (launch warm-up) -->
+    <field id="warm" type="boolean" value="false" />
     <function name="onShown" />
     <function name="remoteGo" />
   </interface>

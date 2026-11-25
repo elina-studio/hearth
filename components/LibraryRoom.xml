@@ -32,6 +32,8 @@
   <interface>
     <field id="kind" type="string" onChange="refresh" />
     <field id="request" type="assocarray" alwaysNotify="true" />
+    <!-- set once the first data has arrived (or there is nothing to load); the launch warm-up waits for it -->
+    <field id="ready" type="boolean" value="false" />
     <function name="focusIn" />
     <function name="refresh" />
   </interface>

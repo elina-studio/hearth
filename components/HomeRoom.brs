@@ -855,6 +855,8 @@ end sub
 
 sub onLatest(event as object)
     t = hTaskFrom(event)
+    ' launch warm-up: the shelves are filled once the library list is known (an earlier answer is refreshed after it)
+    if m.global.libraries <> invalid and m.global.libraries.count() > 0 then m.top.ready = true
     m.new = []
     if t.ok then m.new = t.response.Items
     fillRow(m.latest, m.new)

@@ -54,7 +54,12 @@ end sub
 
 sub onShown(unused as dynamic)
     room = m.rooms[m.current]
-    if room <> invalid then room.callFunc("refresh", invalid)
+    ' the first time the hub appears the rooms were just warmed up: don't fetch it all a second time
+    if m.shownOnce = invalid and m.top.warm
+        m.shownOnce = true
+    else if room <> invalid
+        room.callFunc("refresh", invalid)
+    end if
     if m.zone = "pills"
         m.pillsGroup.getChild(m.pillIndex).setFocus(true)
     else if room <> invalid
@@ -204,44 +209,93 @@ end sub
 
 sub onLibraries(event as object)
     t = hTaskFrom(event)
-    if not t.ok then return
+    if not t.ok
+        ' Plex unreachable: nothing to warm, let the app open (it shows its offline notes)
+        m.top.warm = true
+        return
+    end if
     libs = {}
     for each v in t.response.Items
         ct = v.CollectionType
         if ct <> invalid and libs[ct] = invalid then libs[ct] = v.Id
     end for
     m.global.libraries = libs
+    ' first launch only: build every room now so they all load their data in the background
+    if m.warmRooms = invalid then startWarm()
     for each k in m.rooms
         m.rooms[k].callFunc("refresh", invalid)
     end for
+    checkWarm()
+end sub
+
+' Build a room once and keep it. Rooms start loading their own data as soon as they exist.
+function makeRoom(name as string) as object
+    room = m.rooms[name]
+    if room <> invalid then return room
+    if name = "Home"
+        room = CreateObject("roSGNode", "HomeRoom")
+    else if name = "Movies" or name = "Shows"
+        room = CreateObject("roSGNode", "LibraryRoom")
+        if name = "Movies" then room.kind = "movies" else room.kind = "tvshows"
+    else if name = "Search"
+        room = CreateObject("roSGNode", "SearchRoom")
+    else if name = "Requests"
+        room = CreateObject("roSGNode", "RequestsRoom")
+    else if name = "Music"
+        room = CreateObject("roSGNode", "MusicRoom")
+    else if name = "Photos"
+        room = CreateObject("roSGNode", "PhotosRoom")
+    else if name = "Ambiance"
+        room = CreateObject("roSGNode", "AmbianceRoom")
+    else
+        room = CreateObject("roSGNode", "PlaceholderRoom")
+        room.name = name
+    end if
+    room.observeField("request", "onRoomRequest")
+    m.rooms[name] = room
+    return room
+end function
+
+' ---------- launch warm-up ----------
+' While the lantern intro plays, every room is built (hidden) and fetches its first screen of data, so rooms open instantly.
+' m.top.warm turns true when each room has answered (or has nothing to load); HearthScene waits for it, with a time limit.
+sub startWarm()
+    m.warmRooms = ["Home", "Shows", "Movies", "Music", "Requests", "Ambiance", "Photos"]
+    for each n in m.warmRooms
+        room = makeRoom(n)
+        room.observeField("ready", "onRoomReady")
+    end for
+    checkWarm()
+end sub
+
+sub onRoomReady()
+    checkWarm()
+end sub
+
+sub checkWarm()
+    if m.top.warm or m.warmRooms = invalid then return
+    libs = m.global.libraries
+    for each n in m.warmRooms
+        room = m.rooms[n]
+        if room <> invalid and not room.ready
+            ' no library of that kind on the server: nothing to preload
+            absent = false
+            if libs <> invalid and libs.count() > 0
+                if n = "Shows" and libs.tvshows = invalid then absent = true
+                if n = "Movies" and libs.movies = invalid then absent = true
+                if n = "Music" and libs.music = invalid then absent = true
+                if n = "Photos" and libs.photos = invalid then absent = true
+            end if
+            if not absent then return
+        end if
+    end for
+    print "[hearth] warm-up done: all rooms have their first data"
+    m.top.warm = true
 end sub
 
 ' Build (once) and show a room. focus=false keeps focus on the pills (preview).
 sub showRoom(name as string, focus as boolean)
-    room = m.rooms[name]
-    if room = invalid
-        if name = "Home"
-            room = CreateObject("roSGNode", "HomeRoom")
-        else if name = "Movies" or name = "Shows"
-            room = CreateObject("roSGNode", "LibraryRoom")
-            if name = "Movies" then room.kind = "movies" else room.kind = "tvshows"
-        else if name = "Search"
-            room = CreateObject("roSGNode", "SearchRoom")
-        else if name = "Requests"
-            room = CreateObject("roSGNode", "RequestsRoom")
-        else if name = "Music"
-            room = CreateObject("roSGNode", "MusicRoom")
-        else if name = "Photos"
-            room = CreateObject("roSGNode", "PhotosRoom")
-        else if name = "Ambiance"
-            room = CreateObject("roSGNode", "AmbianceRoom")
-        else
-            room = CreateObject("roSGNode", "PlaceholderRoom")
-            room.name = name
-        end if
-        room.observeField("request", "onRoomRequest")
-        m.rooms[name] = room
-    end if
+    room = makeRoom(name)
     if m.roomHolder.getChildCount() > 0 then m.roomHolder.removeChildIndex(0)
     m.roomHolder.appendChild(room)
     m.shown = name

@@ -290,6 +290,7 @@ end function
 
 sub onList(event as object)
     t = taskFrom(event)
+    m.top.ready = true
     parts = t.tag.Split("|")
     key = parts[0]
     if m.gen[key] <> Val(parts[1]) then return
@@ -1289,6 +1290,7 @@ end sub
 ' ================================================================ setup (no key yet)
 
 sub showSetup(problem as string)
+    m.top.ready = true
     m.loaded = false
     m.cards = {}
     m.top.findNode("main").visible = false

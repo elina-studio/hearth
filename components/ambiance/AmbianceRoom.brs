@@ -81,6 +81,7 @@ end sub
 
 sub onClips(event as object)
     t = hTaskFrom(event)
+    m.top.ready = true
     if not t.ok or t.response.Clips = invalid
         print "[ambiance] clips request failed, status "; t.status
         m.clipsAsked = false

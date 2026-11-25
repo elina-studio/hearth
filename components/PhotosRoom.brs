@@ -70,6 +70,7 @@ end sub
 
 ' Nothing to show yet: say exactly what to do
 sub showEmpty()
+    m.top.ready = true
     m.winTimer.control = "stop"
     m.eyebrow.text = "THE WINDOW"
     m.title.text = "NO PHOTOS YET"
@@ -190,6 +191,7 @@ end function
 ' ---------- albums ----------
 sub onAlbums(event as object)
     t = pTaskFrom(event)
+    m.top.ready = true
     if not t.ok then return
     list = t.response.Items
     if list = invalid then list = []

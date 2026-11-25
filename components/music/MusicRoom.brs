@@ -180,6 +180,7 @@ end sub
 sub refresh(unused = invalid as dynamic)
     if not pxReady()
         m.empty.text = "Sign in to Plex first. Hearth's setup links it with a short code at plex.tv/link."
+        m.top.ready = true
         return
     end if
     s = muPlayer().section
@@ -277,6 +278,7 @@ end sub
 
 sub build()
     m.builtOnce = true
+    m.top.ready = true
     m.buildTimer.control = "stop"
     order = []
     if m.hubOrder <> invalid then order.append(m.hubOrder)
