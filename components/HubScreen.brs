@@ -2,7 +2,7 @@ sub init()
     m.names = ["Home", "Shows", "Movies", "Music", "Requests", "Ambiance", "Photos", "Search"]
     m.pillsGroup = m.top.findNode("pills")
     ' x and width of each pre-rendered label PNG (2px side padding), from the whimsy spec
-    m.tabX = [280, 420, 578, 750, 899, 1111, 1332, 1504]
+    m.tabX = [100, 240, 398, 570, 719, 931, 1152, 1324]
     m.tabW = [101, 120, 133, 110, 174, 182, 134, 136]
     for i = 0 to m.names.count() - 1
         p = m.pillsGroup.createChild("Poster")
