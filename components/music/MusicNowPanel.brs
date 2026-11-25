@@ -76,8 +76,8 @@ sub build()
         x = 780
         w = 1040
         setText(m.eyebrow, [x, 200], w, "caps", 30)
-        setText(m.title, [x, 236], w, "bold", 92)
-        setText(m.sub, [x, 352], w, "regular", 38)
+        setText(m.title, [x, 238], w, "bold", 56)
+        setText(m.sub, [x, 318], w, "regular", 32)
         m.barX = x
         m.barW = w
         m.track.translation = [x, 420]
