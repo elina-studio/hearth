@@ -52,11 +52,12 @@ def configured():
     return bool(API_KEY and API_SECRET)
 
 
-def _call(params, post=True):
+def _call(params, post=True, sign=True, timeout=10):
     p = dict(params)
     p["api_key"] = API_KEY
-    sig = "".join(k + str(p[k]) for k in sorted(p)) + API_SECRET
-    p["api_sig"] = hashlib.md5(sig.encode("utf-8")).hexdigest()
+    if sign:   # read-only calls (charts, similar artists) don't need a signature
+        sig = "".join(k + str(p[k]) for k in sorted(p)) + API_SECRET
+        p["api_sig"] = hashlib.md5(sig.encode("utf-8")).hexdigest()
     p["format"] = "json"
     data = urllib.parse.urlencode(p).encode("utf-8")
     if post:
@@ -64,7 +65,7 @@ def _call(params, post=True):
     else:
         req = urllib.request.Request(API + "?" + data.decode(), headers={"User-Agent": UA})
     try:
-        with urllib.request.urlopen(req, timeout=10) as r:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
             return json.loads(r.read().decode("utf-8", "replace"))
     except urllib.error.HTTPError as e:
         try:

@@ -44,26 +44,40 @@ def _save(d):
 
 
 def _get(method, **kw):
+    """A read-only Last.fm call, retried: Last.fm often answers 8 "Operation failed" on big accounts and then works a moment later."""
     p = {"method": method}
     p.update(kw)
-    for _ in range(3):
-        r = lastfm._call(p, post=False)
-        if r.get("error") in lastfm.RETRY:
-            time.sleep(2)
+    r = {}
+    for attempt in range(5):
+        r = lastfm._call(p, post=False, sign=False, timeout=30)
+        if r.get("error") in lastfm.RETRY or r.get("error") == 8:
+            time.sleep(2 + attempt * 3)
             continue
         return r
     return r
 
 
 def _top(user, period, limit):
-    r = _get("user.getTopArtists", user=user, period=period, limit=limit)
-    out = []
-    for a in (r.get("topartists", {}).get("artist") or []):
-        try:
-            out.append({"name": a["name"], "mbid": a.get("mbid", ""), "plays": int(a.get("playcount", 0))})
-        except (KeyError, ValueError):
-            pass
-    return out
+    """Your top artists for a period, asked 50 at a time (one big request makes Last.fm fail on 20 years of scrobbles).
+    If a later page fails, keep what came back."""
+    out, page = [], 1
+    while len(out) < limit:
+        r = _get("user.getTopArtists", user=user, period=period, limit=50, page=page)
+        got = (r.get("topartists") or {}).get("artist") or []
+        if not got:
+            if page == 1:
+                print("[discover] Last.fm top artists (%s) failed: %s" % (period, r.get("message", "empty answer")), flush=True)
+            break
+        for a in got:
+            try:
+                out.append({"name": a["name"], "mbid": a.get("mbid", ""), "plays": int(a.get("playcount", 0))})
+            except (KeyError, ValueError):
+                pass
+        if len(got) < 50:
+            break
+        page += 1
+        time.sleep(0.3)
+    return out[:limit]
 
 
 def build():
