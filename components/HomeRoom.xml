@@ -5,17 +5,18 @@
 <component name="HomeRoom" extends="Group">
   <children>
     <Group id="content">
-      <!-- a short hero band (about a quarter of the screen); its art fades into the night on the left -->
+      <!-- a short hero panel on the left half only (build 104); its art stays inside it and fades into the night
+           on the left. Tonight has its own panel on the right. -->
       <!-- rough-edged hero panel (whimsy spec 6); the art is cut to the same rough edge with a mask -->
-      <Poster uri="pkg:/images/w/panel-hero-1728x250.png" translation="[84, -12]" width="1752" height="274" />
-      <MaskGroup maskUri="pkg:/images/w/panel-1728x250.png" maskSize="[1752, 274]" maskOffset="[84, -12]">
-        <Poster id="heroArt" translation="[96, 0]" width="1728" height="250" loadDisplayMode="scaleToZoom" opacity="0.85" />
-        <Poster uri="pkg:/images/fade-left.png" translation="[96, 0]" width="1150" height="250" />
+      <Poster uri="pkg:/images/w/panel-hero-716x250.png" translation="[84, -12]" width="740" height="274" />
+      <MaskGroup maskUri="pkg:/images/w/panel-716x250.png" maskSize="[740, 274]" maskOffset="[84, -12]">
+        <Poster id="heroArt" translation="[96, 0]" width="716" height="250" loadDisplayMode="scaleToZoom" opacity="0.85" />
+        <Poster uri="pkg:/images/fade-left.png" translation="[96, 0]" width="716" height="250" />
       </MaskGroup>
 
       <Label id="greeting" translation="[96, 0]" visible="false" color="0xD9A066FF" />
       <Label id="heroEyebrow" translation="[136, 20]" width="600" color="0xE0B34AFF" />
-      <ScrollingLabel id="heroTitle" translation="[136, 48]" maxWidth="900" height="96" repeatCount="-1" scrollSpeed="70" color="0xEDE6CAFF" />
+      <ScrollingLabel id="heroTitle" translation="[136, 48]" maxWidth="680" height="96" repeatCount="-1" scrollSpeed="70" color="0xEDE6CAFF" />
       <Group id="heroProgress" translation="[136, 136]">
         <Rectangle width="300" height="6" color="0xFFFFFF26" />
         <Rectangle id="heroBar" width="0" height="6" color="0xE0B34AFF" />
@@ -34,7 +35,7 @@
 
       <!-- Tonight: three picks (a short episode, a film, a playlist) inline with Continue, right of a thin divider -->
       <Group id="tonight" translation="[870, 0]" visible="false">
-        <Poster uri="pkg:/images/tile-v2.9.png" blendColor="0x0B0E09C8" translation="[-44, 6]" width="1002" height="238" />
+        <Poster uri="pkg:/images/tile-v2.9.png" blendColor="0x141A11FF" translation="[-26, -12]" width="980" height="274" />
         <Poster uri="pkg:/images/icons/icon-moon.png" translation="[0, 12]" width="28" height="28" blendColor="0xE0B34AFF" />
         <Label id="tnTitle" translation="[42, 6]" height="40" vertAlign="center" color="0xEDE6CAFF" text="Tonight" />
         <Label id="tnNote" translation="[608, 10]" width="300" height="32" vertAlign="center" horizAlign="right" color="0xB5AF8CFF" />

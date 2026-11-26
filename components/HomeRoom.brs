@@ -273,7 +273,6 @@ sub pickTonight()
         end if
     end for
     m.top.findNode("tonight").visible = out.count() > 0
-    if m.heroText <> invalid then setHeroTitle(m.heroText)
     if m.tn >= out.count() then m.tn = 0
 end sub
 
@@ -910,15 +909,8 @@ end sub
 
 ' Hero title: 70, then 56, then 46 on one line; longer still scrolls
 sub setHeroTitle(t as string)
-    m.heroText = t
-    ' the Tonight picks start at x 826, so the title gets 680 beside them and 900 when they are not showing
-    w = 900
-    sizes = [70, 56, 46]
-    if m.top.findNode("tonight").visible
-        w = 680
-        sizes = [70, 56, 46, 38]
-    end if
-    drop = hFitTitle(m.heroTitle, t, "caps", sizes, w)
+    ' the hero panel is the left half only (x 84 to 824), so the title gets 680
+    drop = hFitTitle(m.heroTitle, t, "caps", [70, 56, 46, 38], 680)
     m.heroTitle.translation = [136, 48 + drop]
 end sub
 
