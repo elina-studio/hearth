@@ -28,6 +28,7 @@ sub begin(unused = invalid as dynamic)
     m.top.findNode("thumb").uri = hImage(it, "Thumb", 256)
     m.focus = 0
     m.left = m.top.seconds
+    m.base = m.left
     m.clock = CreateObject("roTimespan")
     m.top.visible = true
     paint()
@@ -58,8 +59,18 @@ function metaLine(it as object) as string
     return mins.toStr() + " min · ends " + h.toStr() + ":" + mm + " " + ap
 end function
 
+' The video was paused or resumed: the countdown waits with it, so a paused episode never jumps to the next one
+sub onHold()
+    if m.clock = invalid then return
+    if not m.top.hold
+        m.base = m.left
+        m.clock.Mark()
+    end if
+end sub
+
 sub onTick()
-    left = m.top.seconds - m.clock.TotalMilliseconds() / 1000.0
+    if m.top.hold then return
+    left = m.base - m.clock.TotalMilliseconds() / 1000.0
     if left <= 0
         m.tick.control = "stop"
         m.left = 0
@@ -131,6 +142,7 @@ function onKeyEvent(key as string, press as boolean) as boolean
         if on
             m.clock = CreateObject("roTimespan")
             m.left = m.top.seconds
+            m.base = m.left
             m.tick.control = "start"
         else
             m.tick.control = "stop"

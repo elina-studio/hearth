@@ -214,6 +214,8 @@ end sub
 
 sub onState()
     s = m.video.state
+    ' the Up next countdown waits while the video is paused
+    m.upnext.hold = (s = "paused")
     if s = "playing"
         m.status.visible = false
         if not m.started

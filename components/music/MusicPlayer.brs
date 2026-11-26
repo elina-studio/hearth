@@ -240,7 +240,13 @@ sub runPending(p as object)
     m.label = p.label
     m.loadKind = p.tag
     m.shuffleOnLoad = (p.shuffle = true)
-    pxApi(p.path, p.query, "onTracks", p.tag)
+    t = pxApi(p.path, p.query, "onTracks", p.tag)
+    ' two albums picked quickly: only the newest pick may start playing (its label and shuffle flag are the ones kept above)
+    if p.tag <> "queueNext" and p.tag <> "queueEnd"
+        if m.playLoads = invalid then m.playLoads = {}
+        m.playLoads[t.key] = true
+        m.playLoadKey = t.key
+    end if
 end sub
 
 sub saveLastPlay(mode as string, kind as string, id as string, label as string)
@@ -320,6 +326,11 @@ sub onTracks(event as object)
     if t.tag = "search"
         playSearchHit(t)
         return
+    end if
+    if m.playLoads <> invalid and m.playLoads[t.key] <> invalid
+        m.playLoads.delete(t.key)
+        ' an older pick answering late: the newer one wins
+        if t.key <> m.playLoadKey then return
     end if
     tracks = pxTracks(pxItems(t))
     if t.tag = "queueNext" or t.tag = "queueEnd"

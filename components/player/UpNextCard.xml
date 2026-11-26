@@ -31,6 +31,7 @@
     <field id="item" type="assocarray" />
     <field id="autoplay" type="boolean" value="true" onChange="paint" />
     <field id="seconds" type="integer" value="15" />
+    <field id="hold" type="boolean" value="false" onChange="onHold" />
     <field id="action" type="string" alwaysNotify="true" />
     <function name="begin" />
     <function name="halt" />
