@@ -21,6 +21,7 @@ sub init()
     m.flyAt = -1
     m.settledAt = -1
     m.roomHolder = m.top.findNode("roomHolder")
+    m.warmHolder = m.top.findNode("warmHolder")
     m.clock = m.top.findNode("clock")
     m.clock.font = hFont("clock", 54)
     m.clockFly = m.top.findNode("clockFly")
@@ -263,6 +264,8 @@ sub startWarm()
     m.warmRooms = ["Home", "Shows", "Movies", "Music", "Requests", "Ambiance", "Photos"]
     for each n in m.warmRooms
         room = makeRoom(n)
+        ' park it in the tree (off screen) so images load; Home is already in the roomHolder
+        if room.getParent() = invalid then m.warmHolder.appendChild(room)
         room.observeField("ready", "onRoomReady")
     end for
     checkWarm()
@@ -297,7 +300,15 @@ end sub
 sub showRoom(name as string, focus as boolean)
     room = makeRoom(name)
     if m.roomHolder.getChildCount() > 0 then m.roomHolder.removeChildIndex(0)
+    p = room.getParent()
+    if p <> invalid then p.removeChild(room)
     m.roomHolder.appendChild(room)
+    ' belt and braces: any poster that did not finish loading while the room was parked is asked again
+    if m.kicked = invalid then m.kicked = {}
+    if m.kicked[name] = invalid
+        m.kicked[name] = true
+        kickImages(room)
+    end if
     m.shown = name
     updateChip()
     room.opacity = 1.0
@@ -501,4 +512,21 @@ sub onWeather(event as object)
     m.wxIcon.uri = wxIconFor(t.response.state)
     m.weather.text = s
     layoutWeather()
+end sub
+
+' Ask again for every poster that is not loaded yet (same address, so no extra requests for the ones that are fine).
+sub kickImages(node as object)
+    for i = 0 to node.getChildCount() - 1
+        c = node.getChild(i)
+        if c <> invalid
+            if c.subtype() = "Poster"
+                u = c.uri
+                if u <> "" and c.loadStatus <> "ready" and Left(u, 4) = "http"
+                    c.uri = ""
+                    c.uri = u
+                end if
+            end if
+            kickImages(c)
+        end if
+    end for
 end sub

@@ -2,6 +2,9 @@
 <!-- The hub: room pills, clock, and the current room underneath. -->
 <component name="HubScreen" extends="Group">
   <children>
+    <!-- launch warm-up: rooms wait here, in the render tree but far off screen, so their posters really load (a room that is
+         not in the tree gets no images). showRoom moves a room out of here the first time it is opened. -->
+    <Group id="warmHolder" translation="[-6000, 150]" />
     <Group id="roomHolder" translation="[0, 150]" />
     <Rectangle id="topShade" width="1920" height="150" color="0x0B0E09E6" />
     <!-- room bar (whimsy spec 2-3): pre-rendered DW Pica caps labels centred on 960; the settled room gets a glow,
