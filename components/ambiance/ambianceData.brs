@@ -85,6 +85,7 @@ function ambMerge(clips as object) as object
         md = ambClipMood(c.file)
         if md = "" then md = ambClipMood(c.Name)
         c._md = md
+        print "[ambiance] clip '"; c.file; "' -> mood '"; md; "' score "; ambClipScore(c); " codec "; c.videoCodec; " "; c.width; "x"; c.height
         if md <> ""
             if best[md] = invalid or ambClipScore(c) > ambClipScore(best[md]) then best[md] = c
         end if
@@ -103,6 +104,9 @@ function ambMerge(clips as object) as object
         else
             extra.push({ mood: "plex" + c.Id.toStr(), title: c.Name, sub: "Your own footage", still: "pkg:/images/amb/col-window.jpg", plexStill: c.thumb, video: "", credit: "", clip: c })
         end if
+    end for
+    for each it in items
+        if it.clip <> invalid then print "[ambiance] mood "; it.mood; " plays '"; it.clip.file; "'" else print "[ambiance] mood "; it.mood; " has NO clip"
     end for
     out = []
     for each it in items
