@@ -138,7 +138,7 @@ sub paint()
     m.row.translation = [100 - first * 292, 680]
 end sub
 
-function onKeyEvent(key as string, press as boolean) as boolean
+function hKeyInner(key as string, press as boolean) as boolean
     if not press then return false
     if key = "left"
         if m.f > 0 then m.f = m.f - 1
@@ -156,4 +156,9 @@ function onKeyEvent(key as string, press as boolean) as boolean
         return false
     end if
     return true
+end function
+
+' menu sound for whatever the handler above took (source/util.brs hKeySfx)
+function onKeyEvent(key as string, press as boolean) as boolean
+    return hKeySfx(key, press, hKeyInner(key, press))
 end function

@@ -457,7 +457,7 @@ sub onLeaveClosed()
     m.pillsGroup.getChild(m.pillIndex).setFocus(true)
 end sub
 
-function onKeyEvent(key as string, press as boolean) as boolean
+function hKeyInner(key as string, press as boolean) as boolean
     if not press then return false
     if m.zone <> "pills" then return false
     n = m.names.count()
@@ -486,25 +486,44 @@ function onKeyEvent(key as string, press as boolean) as boolean
         end if
         return true
     else if key = "options"
-        d = CreateObject("roSGNode", "StandardMessageDialog")
-        d.title = "Hearth"
-        srv = m.global.plexServerName
-        if srv = invalid or srv = "" then srv = m.global.plexServer
-        if srv = invalid or srv = "" then srv = "Plex"
-        d.message = ["Signed in to " + srv]
-        d.buttons = ["Close", "Sign out"]
-        d.observeField("buttonSelected", "onMenu")
-        m.dialog = d
-        m.top.getScene().dialog = d
+        openMenu()
         return true
     end if
     return false
 end function
 
+' The * menu on the room bar: Plex sign-in, the menu sounds switch, sign out.
+sub openMenu()
+    d = CreateObject("roSGNode", "StandardMessageDialog")
+    d.title = "Hearth"
+    srv = m.global.plexServerName
+    if srv = invalid or srv = "" then srv = m.global.plexServer
+    if srv = invalid or srv = "" then srv = "Plex"
+    d.message = ["Signed in to " + srv]
+    if m.global.sfxOn then snd = "Menu sounds: On" else snd = "Menu sounds: Off"
+    d.buttons = ["Close", snd, "Sign out"]
+    d.observeField("buttonSelected", "onMenu")
+    m.dialog = d
+    m.top.getScene().dialog = d
+end sub
+
 sub onMenu()
     choice = m.dialog.buttonSelected
     m.dialog.close = true
-    if choice = 1 then m.top.request = { action: "signOut" } else m.pillsGroup.getChild(m.pillIndex).setFocus(true)
+    if choice = 1
+        ' flip the switch, save it, and show the menu again with the new state
+        on = not m.global.sfxOn
+        m.global.sfxOn = on
+        reg = CreateObject("roRegistrySection", "hearth")
+        if on then reg.Write("uiSounds", "on") else reg.Write("uiSounds", "off")
+        reg.Flush()
+        if on then hSfx("select")
+        openMenu()
+    else if choice = 2
+        m.top.request = { action: "signOut" }
+    else
+        m.pillsGroup.getChild(m.pillIndex).setFocus(true)
+    end if
 end sub
 
 sub loadWeather()
@@ -562,3 +581,8 @@ sub kickImages(node as object)
         end if
     end for
 end sub
+
+' menu sound for whatever the handler above took (source/util.brs hKeySfx)
+function onKeyEvent(key as string, press as boolean) as boolean
+    return hKeySfx(key, press, hKeyInner(key, press))
+end function

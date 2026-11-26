@@ -345,7 +345,7 @@ function timeStep(mins as integer, key as string) as integer
     return (t + 1440) mod 1440
 end function
 
-function onKeyEvent(key as string, press as boolean) as boolean
+function hKeyInner(key as string, press as boolean) as boolean
     if not press
         if key = m.holdKey then m.holdKey = ""
         return false
@@ -669,3 +669,8 @@ sub onDeleted(event as object)
     t = hTaskFrom(event)
     if t.ok or t.status = 404 then m.note.text = "Deleted from Home Assistant." else m.note.text = "Couldn't delete it (" + t.status.toStr() + ")."
 end sub
+
+' menu sound for whatever the handler above took (source/util.brs hKeySfx)
+function onKeyEvent(key as string, press as boolean) as boolean
+    return hKeySfx(key, press, hKeyInner(key, press))
+end function

@@ -477,7 +477,7 @@ sub commit()
 end sub
 
 ' ---------- keys ----------
-function onKeyEvent(key as string, press as boolean) as boolean
+function hKeyInner(key as string, press as boolean) as boolean
     if not m.top.visible then return false
     if not press
         if (key = "left" or key = "right") and m.holdKey = key
@@ -561,5 +561,10 @@ end function
 
 ' Called by the player for a key pressed while the overlay was hidden.
 sub nudge(key as dynamic)
-    onKeyEvent(key, true)
+    hKeyInner(key, true) ' no menu sound while the video plays
 end sub
+
+' menu sound for whatever the handler above took (source/util.brs hKeySfx)
+function onKeyEvent(key as string, press as boolean) as boolean
+    return hKeySfx(key, press, hKeyInner(key, press))
+end function

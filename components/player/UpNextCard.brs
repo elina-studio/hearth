@@ -118,7 +118,7 @@ sub paint()
     end if
 end sub
 
-function onKeyEvent(key as string, press as boolean) as boolean
+function hKeyInner(key as string, press as boolean) as boolean
     if not press or not m.top.visible then return false
     if key = "left" or key = "right"
         if key = "left" then m.focus = 0 else m.focus = 1
@@ -152,4 +152,9 @@ function onKeyEvent(key as string, press as boolean) as boolean
     end if
     ' play/pause etc. still reach the video
     return false
+end function
+
+' menu sound for whatever the handler above took (source/util.brs hKeySfx)
+function onKeyEvent(key as string, press as boolean) as boolean
+    return hKeySfx(key, press, hKeyInner(key, press))
 end function

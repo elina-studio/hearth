@@ -1304,7 +1304,7 @@ function firstRow(from as integer) as integer
     return -1
 end function
 
-function onKeyEvent(key as string, press as boolean) as boolean
+function hKeyInner(key as string, press as boolean) as boolean
     if not press then return false
     if hMediaKey(key) then return false
     if m.spkOpen
@@ -1370,3 +1370,8 @@ sub hideFocus()
         m.rows[r].active = false
     end for
 end sub
+
+' menu sound for whatever the handler above took (source/util.brs hKeySfx)
+function onKeyEvent(key as string, press as boolean) as boolean
+    return hKeySfx(key, press, hKeyInner(key, press))
+end function

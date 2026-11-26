@@ -637,7 +637,7 @@ sub onOptions()
     hOptionsChosen()
 end sub
 
-function onKeyEvent(key as string, press as boolean) as boolean
+function hKeyInner(key as string, press as boolean) as boolean
     if not press then return false
     if hMediaKey(key) then return false
 
@@ -792,3 +792,8 @@ sub showPill(i as integer)
         paint()
     end if
 end sub
+
+' menu sound for whatever the handler above took (source/util.brs hKeySfx)
+function onKeyEvent(key as string, press as boolean) as boolean
+    return hKeySfx(key, press, hKeyInner(key, press))
+end function

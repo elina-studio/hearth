@@ -535,7 +535,7 @@ sub toBar()
     m.zone = "bar"
 end sub
 
-function onKeyEvent(key as string, press as boolean) as boolean
+function hKeyInner(key as string, press as boolean) as boolean
     if not press then return false
     if hMediaKey(key) then return false
     if m.zone = "bar" and key <> "back"
@@ -692,3 +692,8 @@ sub setArtistName(t as string)
     drop = hFitTitle(m.name, t, "caps", [64, 52, 40], 760)
     m.name.translation = [244, 50 + drop]
 end sub
+
+' menu sound for whatever the handler above took (source/util.brs hKeySfx)
+function onKeyEvent(key as string, press as boolean) as boolean
+    return hKeySfx(key, press, hKeyInner(key, press))
+end function

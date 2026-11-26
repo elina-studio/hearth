@@ -5,6 +5,11 @@
     <Poster id="bg" uri="pkg:/images/bg.jpg" width="1920" height="1080" />
     <Group id="stack" />
     <ContinueRibbon id="ribbon" />
+    <!-- menu sounds: thumb piano, one node per sound so a fast tick never cuts off a pluck (Roku plays up to 4 at once) -->
+    <SoundEffect id="sfxMove" uri="pkg:/sounds/ui-move.wav" volume="50" />
+    <SoundEffect id="sfxSelect" uri="pkg:/sounds/ui-select.wav" volume="50" />
+    <SoundEffect id="sfxBack" uri="pkg:/sounds/ui-back.wav" volume="50" />
+    <SoundEffect id="sfxDead" uri="pkg:/sounds/ui-deadend.wav" volume="50" />
   </children>
   <interface>
     <field id="exitApp" type="boolean" value="false" />

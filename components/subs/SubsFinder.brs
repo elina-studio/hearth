@@ -704,7 +704,7 @@ end function
 
 ' ---------------------------------------------------------------- keys
 
-function onKeyEvent(key as string, press as boolean) as boolean
+function hKeyInner(key as string, press as boolean) as boolean
     if not press or not m.top.visible then return false
     if key = "back" or key = "options"
         close()
@@ -866,4 +866,9 @@ function fmtCount(n as integer) as string
         s = Left(s, Len(s) - 3)
     end while
     return s + out
+end function
+
+' menu sound for whatever the handler above took (source/util.brs hKeySfx)
+function onKeyEvent(key as string, press as boolean) as boolean
+    return hKeySfx(key, press, hKeyInner(key, press))
 end function
