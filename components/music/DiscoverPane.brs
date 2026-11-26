@@ -56,7 +56,9 @@ sub init()
 end sub
 
 sub load(unused as dynamic)
-    if m.loaded then return
+    ' ask again when the NAS had nothing the first time (it was still building, or Last.fm wasn't paired yet)
+    if m.loaded and m.data <> invalid and (m.data.built <> invalid and m.data.built > 0) then return
+    if m.loaded and m.data = invalid then return
     m.loaded = true
     m.note.text = "Asking the NAS" + Chr(8230)
     nasCall("GET", "/api/discover", "", "onData", "discover")
