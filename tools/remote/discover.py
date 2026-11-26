@@ -70,10 +70,13 @@ def build():
     try:
         user = lastfm._load().get("user", "")
         if not user or not lastfm.configured():
+            _fail("no Last.fm user paired yet" if not user else "no Last.fm key on the helper")
             return
         recent = _top(user, "12month", 100)
         allt = _top(user, "overall", 300)
         if not recent and not allt:
+            r = _get("user.getTopArtists", user=user, period="overall", limit=1)
+            _fail("Last.fm gave no top artists for %s: %s" % (user, r.get("message", "empty answer")))
             return
         score = {}
         info = {}
@@ -109,11 +112,21 @@ def build():
             e["score"] = round(e["score"], 3)
             e.pop("best", None)
         d = _load()
+        d.pop("error", None)
         d.update({"loved": loved, "recs": recs, "built": int(time.time()), "user": user})
         _save(d)
         print("[discover] built: %d loved, %d recommended" % (len(loved), len(recs)), flush=True)
     finally:
         _building = False
+
+
+def _fail(msg):
+    print("[discover] build failed:", msg, flush=True)
+    with lock:
+        d = _load()
+        d["error"] = msg
+        d["tried"] = int(time.time())
+        _save(d)
 
 
 def get(refresh=False):
@@ -122,7 +135,7 @@ def get(refresh=False):
         threading.Thread(target=build, daemon=True).start()
     hidden = {h.lower() for h in d.get("hidden", [])}
     return {"loved": d.get("loved", []), "recs": [e for e in d.get("recs", []) if e["name"].lower() not in hidden],
-            "built": d.get("built", 0), "user": d.get("user", ""), "building": _building}
+            "built": d.get("built", 0), "user": d.get("user", ""), "building": _building, "error": d.get("error", "")}
 
 
 def albums(artist):
