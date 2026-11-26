@@ -15,7 +15,9 @@ sub runTask()
     else
         b = m.top.body
         if m.top.bodyText <> "" then b = m.top.bodyText
-        r = fetch(m.top.method, m.top.path, m.top.query, b)
+        q = m.top.query
+        if m.top.queryText <> "" then q = m.top.queryText
+        r = fetch(m.top.method, m.top.path, q, b)
         finish(r.status, r.data)
     end if
 end sub
@@ -105,7 +107,9 @@ function fetchOnce(method as string, path as string, query as dynamic, body as d
     port = CreateObject("roMessagePort")
     xfer.setMessagePort(port)
     url = m.base + path
-    if query <> invalid and query.count() > 0
+    if type(query) = "roString" or type(query) = "String"
+        if query <> "" then url = url + "?" + query
+    else if query <> invalid and query.count() > 0
         parts = []
         for each k in query
             v = query[k]

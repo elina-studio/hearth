@@ -6,6 +6,8 @@
     <field id="method" type="string" value="GET" />
     <field id="path" type="string" />
     <field id="query" type="assocarray" />
+    <!-- query string already built (keeps the capitals in names like sortBy, which an assocarray would lowercase) -->
+    <field id="queryText" type="string" />
     <field id="body" type="assocarray" />
     <!-- JSON text for POST bodies; an assocarray field can lose the keys' capitals, which Overseerr rejects -->
     <field id="bodyText" type="string" />

@@ -122,8 +122,8 @@ sub refresh(unused as dynamic)
         end for
         oApi("GET", "/api/v1/genres/movie", invalid, invalid, "onGenres", "movie")
         oApi("GET", "/api/v1/genres/tv", invalid, invalid, "onGenres", "tv")
-        oApi("GET", "/api/v1/watchproviders/movies", { watchRegion: watchRegion() }, invalid, "onProviders", "movie")
-        oApi("GET", "/api/v1/watchproviders/tv", { watchRegion: watchRegion() }, invalid, "onProviders", "tv")
+        oApi("GET", "/api/v1/watchproviders/movies", "watchRegion=" + watchRegion(), invalid, "onProviders", "movie")
+        oApi("GET", "/api/v1/watchproviders/tv", "watchRegion=" + watchRegion(), invalid, "onProviders", "tv")
     end if
     loadMine()
     loadNew()
@@ -233,7 +233,11 @@ sub oApi(method as string, path as string, query as dynamic, body as dynamic, cb
     t = CreateObject("roSGNode", "OverseerrTask")
     t.method = method
     t.path = path
-    if query <> invalid then t.query = query
+    if type(query) = "roString" or type(query) = "String"
+        t.queryText = query
+    else if query <> invalid
+        t.query = query
+    end if
     if body <> invalid
         if type(body) = "roString" or type(body) = "String" then t.bodyText = body else t.body = body
     end if
@@ -311,6 +315,7 @@ sub onList(event as object)
         return
     end if
     page = Val(parts[2])
+    print "[hearth-filter] answer "; key; " page "; page; " status "; t.status; " ok "; t.ok
     for each c in discoverCards(t)
         id = c.data.mediaType + c.data.id.toStr()
         if m.seen[key][id] = invalid
@@ -330,6 +335,7 @@ end sub
 
 sub publishList(key as string)
     m.cards[key] = clientFilter(key, m.acc[key])
+    print "[hearth-filter] publish "; key; " "; m.cards[key].count(); " cards of "; m.acc[key].count()
     m.problem = ""
     paintRail()
     if currentList().key = key then showList()
@@ -374,9 +380,13 @@ sub loadList(key as string)
 end sub
 
 sub fetchPage(key as string, page as integer)
-    q = { page: page.toStr() }
+    ' The query goes as one text, not an assocarray: an assocarray lowercases its keys (sortBy -> sortby), and Overseerr
+    ' ignores the lowercase versions, so every filter except genre silently did nothing.
+    q = ["page=" + page.toStr()]
     addFilterQuery(q, key)
-    oApi("GET", listByKey(key).path, q, invalid, "onList", key + "|" + m.gen[key].toStr() + "|" + page.toStr())
+    qs = q.join("&")
+    print "[hearth-filter] ask "; key; " page "; page; " ?"; qs
+    oApi("GET", listByKey(key).path, qs, invalid, "onList", key + "|" + m.gen[key].toStr() + "|" + page.toStr())
 end sub
 
 ' Movies and shows are narrowed by Overseerr itself; Trending can't be, so it is narrowed here (clientFilter)
@@ -390,33 +400,39 @@ sub addFilterQuery(q as object, key as string)
         id = genreId(kind, name)
         if id <> "" then ids.push(id)
     end for
-    if ids.count() > 0 then q.genre = ids.join(",")
+    if ids.count() > 0 then qp(q, "genre", ids.join(","))
     if f.provider <> ""
-        q.watchProviders = f.provider
-        q.watchRegion = watchRegion()
+        qp(q, "watchProviders", f.provider)
+        qp(q, "watchRegion", watchRegion())
     end if
+    votes = 0
     if f.minRating > 0
-        q.voteAverageGte = f.minRating.toStr()
-        q.voteCountGte = "100"
+        qp(q, "voteAverageGte", f.minRating.toStr())
+        votes = 100
     end if
     today = CreateObject("roDateTime").ToISOString().Left(10)
     if f.sort = "rating"
-        q.sortBy = "vote_average.desc"
-        if f.minRating <= 0 then q.voteCountGte = "300"
+        qp(q, "sortBy", "vote_average.desc")
+        if votes = 0 then votes = 300
     else if f.sort = "newest"
         if kind = "movie"
-            q.sortBy = "primary_release_date.desc"
-            q.primaryReleaseDateLte = today
+            qp(q, "sortBy", "primary_release_date.desc")
+            qp(q, "primaryReleaseDateLte", today)
         else
-            q.sortBy = "first_air_date.desc"
-            q.firstAirDateLte = today
+            qp(q, "sortBy", "first_air_date.desc")
+            qp(q, "firstAirDateLte", today)
         end if
-        q.voteCountGte = "20"
+        if votes = 0 then votes = 20
     else if f.sort = "az"
-        if kind = "movie" then q.sortBy = "original_title.asc" else q.sortBy = "original_name.asc"
-        q.voteCountGte = "20"
+        if kind = "movie" then qp(q, "sortBy", "original_title.asc") else qp(q, "sortBy", "original_name.asc")
+        if votes = 0 then votes = 20
     end if
+    if votes > 0 then qp(q, "voteCountGte", votes.toStr())
 end sub
+sub qp(q as object, name as string, value as string)
+    q.push(name + "=" + CreateObject("roUrlTransfer").Escape(value))
+end sub
+
 
 function genreId(kind as string, name as string) as string
     for each g in m.genres[kind]
@@ -481,7 +497,14 @@ function sortCards(cards as object, field as string, desc as boolean) as object
             if not before then exit while
             i = i - 1
         end while
-        out.Insert(i, c)
+        ' roArray has no Insert: add at the end and shift the later ones up
+        out.push(c)
+        j = out.count() - 1
+        while j > i
+            out[j] = out[j - 1]
+            j = j - 1
+        end while
+        out[i] = c
     end for
     return out
 end function
@@ -1405,6 +1428,12 @@ function onKeyEvent(key as string, press as boolean) as boolean
         return true
     end if
     if z = "sheet"
+        if m.sheet = invalid
+            print "[hearth-filter] sheet key with no sheet; back to the bar"
+            m.zone = "bar"
+            refreshFocus()
+            return true
+        end if
         m.sheet.callFunc("handleKey", key)
         return true
     end if
@@ -1693,6 +1722,7 @@ sub openSheet()
     if key = "movies" then provs = m.provs.movie
     if key = "tv" then provs = m.provs.tv
     closeSheet()
+    print "[hearth-filter] open sheet for "; key; " genres "; genres.count(); " providers "; provs.count()
     s = m.sheetHolder.createChild("FilterSheet")
     s.config = { title: currentList().name, genres: genres, providers: provs, filters: m.filters[key] }
     s.observeField("result", "onSheetResult")
@@ -1713,6 +1743,7 @@ sub onSheetResult(event as object)
     key = currentList().key
     old = m.filters[key]
     changed = (FormatJson(f) <> FormatJson(old))
+    print "[hearth-filter] sheet closed for "; key; " changed="; changed; " "; FormatJson(f)
     closeSheet()
     m.zone = "bar"
     if changed
