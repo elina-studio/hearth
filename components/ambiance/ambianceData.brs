@@ -51,6 +51,10 @@ end function
 function ambMerge(clips as object) as object
     items = ambMoods()
     extra = []
+    print "[ambiance] merge input: "; clips.count(); " clips"
+    for each c in clips
+        print "[ambiance]   in: file '"; c.file; "' name '"; c.Name; "' id "; c.Id
+    end for
     ' a TV-friendly copy named "<name>-tv.mp4" (made with the ffmpeg command) stands in for "<name>.<ext>"
     tvOf = {}
     for each c in clips
@@ -76,6 +80,7 @@ function ambMerge(clips as object) as object
         end if
     end for
     clips = picked
+    print "[ambiance] merge picked: "; clips.count()
     ' Several clips can start with the same mood word (say "Rain on glass.mov" from the phone and
     ' "rain-tv.mp4" made for the TV). The first one in Plex's title order used to win, which could be the
     ' 4K HEVC original this TV can't play: the mood then fell back to a picture. Pick the best one:
