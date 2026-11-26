@@ -121,6 +121,7 @@ sub open(unused = invalid as dynamic)
     m.bzIds = invalid
     m.bzError = ""
     m.busy = false
+    m.autoClose = false
     m.bzAsked = false
     m.plexRaw = invalid
     m.searched = false
@@ -265,7 +266,7 @@ sub merge()
             if isTrue(s.downloaded) then tags.push("already here")
             sortKey = downloads
             if exact then sortKey = sortKey + 1000000000
-            plex.push({ from: "plex", key: s.key, name: name, provider: "Plex · " + prov, score: downloads, scoreText: fmtCount(downloads), sortKey: sortKey, tags: tags })
+            plex.push({ from: "plex", key: s.key, have: isTrue(s.downloaded), name: name, provider: "Plex · " + prov, score: downloads, scoreText: fmtCount(downloads), sortKey: sortKey, tags: tags })
         end for
     end if
     bzTop = []
@@ -322,6 +323,15 @@ end sub
 
 sub pick(r as object)
     if m.busy then return
+    ' already on the title: turn that track on and go back to the video instead of downloading it again
+    if isTrue(r.have)
+        ex = existingTrack(r)
+        if ex <> invalid
+            print "[hearth-subs] already downloaded; turning on stream "; strOf(ex.id)
+            useExisting(ex)
+            return
+        end if
+    end if
     m.busy = true
     m.busyRow = r
     r.state = "Downloading…"
@@ -343,6 +353,29 @@ sub onPlexDownloaded(event as object)
         return
     end if
     startPolling(30)
+end sub
+
+' a subtitle already on the title: the one this result points at, else a normal one in the searched language
+function existingTrack(r as dynamic) as dynamic
+    list = streamList(m.item)
+    if r <> invalid and r.key <> invalid
+        for each s in list
+            if strOf(s.key) = strOf(r.key) then return s
+        end for
+    end if
+    for each s in list
+        lang = LCase(strOf(s.languageCode))
+        if Left(lang, 2) = m.lang and not isTrue(s.forced) then return s
+    end for
+    return invalid
+end function
+
+' turn an existing track on and return to the video
+sub useExisting(s as object)
+    m.poll.control = "stop"
+    m.busy = false
+    choose({ kind: "track", stream: s })
+    close()
 end sub
 
 sub onBazarrDownloaded(event as object)
@@ -373,7 +406,14 @@ sub onPoll()
     m.tries = m.tries - 1
     if m.tries < 0
         m.poll.control = "stop"
-        failed("Downloaded, but Plex hasn't listed it yet. Close this and open it again in a minute.")
+        ' nothing new appeared: if the language is already on the title, use that track
+        ex = existingTrack(m.busyRow)
+        if ex <> invalid
+            print "[hearth-subs] no new stream after download; using the existing one "; strOf(ex.id)
+            useExisting(ex)
+            return
+        end if
+        failed("Downloaded, but Plex hasn't listed it yet. Press Back to return to the video, or Left for the tracks.")
         return
     end if
     hPlex("item", { id: m.item.Id }, "onPolled")
@@ -406,6 +446,7 @@ sub onPolled(event as object)
     m.busy = false
     m.busyRow.state = "Turned on"
     m.lastNew = newest
+    m.autoClose = true
     paint()
     m.top.result = { action: "downloaded", stream: newest }
 end sub
@@ -437,6 +478,11 @@ sub onReloaded(event as object)
         end if
     end if
     paint()
+    ' the new subtitle is on: go back to the video (it restarts to load the file)
+    if m.autoClose
+        m.autoClose = false
+        close()
+    end if
 end sub
 
 sub failed(msg as string)
@@ -506,6 +552,7 @@ sub switchTab(t as integer)
     m.sel = 0
     m.first = 0
     m.message = ""
+    if t = 0 then m.zone = "list"
     if t = 1 and not m.searched then search()
     paint()
 end sub
@@ -682,7 +729,9 @@ function onKeyEvent(key as string, press as boolean) as boolean
             end if
         end if
     else if m.zone = "chips"
-        if key = "left" and m.chip > 0 then m.chip = m.chip - 1
+        if key = "left"
+            if m.chip > 0 then m.chip = m.chip - 1 else switchTab(0)
+        end if
         if key = "right" and m.chip < 2 then m.chip = m.chip + 1
         if key = "up" then m.zone = "tabs"
         if key = "down" and list.count() > 0
