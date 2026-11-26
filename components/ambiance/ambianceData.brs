@@ -62,13 +62,17 @@ function ambMerge(clips as object) as object
         if Len(b) > 3 and Right(b, 3) = "-tv" then tvOf[Left(b, Len(b) - 3)] = c
     end for
     picked = []
-    for each c in clips
+    ' Index loops on purpose: a "for each" over clips with another "for each" over clips inside it
+    ' ends the outer loop early on this Roku (the clip after a "-tv" copy, e.g. "rainy day", was lost).
+    nClips = clips.count()
+    for ci = 0 to nClips - 1
+        c = clips[ci]
         b = ambBase(c.file)
         if Len(b) > 3 and Right(b, 3) = "-tv"
             ' only used through its original, unless the original isn't in the library
             hasOrig = false
-            for each o in clips
-                if ambBase(o.file) = Left(b, Len(b) - 3) then hasOrig = true
+            for oi = 0 to nClips - 1
+                if ambBase(clips[oi].file) = Left(b, Len(b) - 3) then hasOrig = true
             end for
             if not hasOrig then picked.push(c)
         else if tvOf[b] <> invalid
