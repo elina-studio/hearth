@@ -159,7 +159,7 @@ class Handler(BaseHTTPRequestHandler):
                 rest = urllib.parse.urlencode([(k, v) for k, vs in q.items() if k != "t" for v in vs])
                 self.send_response(302)
                 secure = "; Secure" if self.server.is_https else ""
-                self.send_header("Set-Cookie", "%s=%s; Path=/; Max-Age=31536000; HttpOnly; SameSite=Strict%s" % (guard.COOKIE, guard.TOKEN, secure))
+                self.send_header("Set-Cookie", "%s=%s; Path=/; Max-Age=31536000; HttpOnly; SameSite=Lax%s" % (guard.COOKIE, guard.TOKEN, secure))
                 self.send_header("Location", path + ("?" + rest if rest else ""))
                 self.send_header("Cache-Control", "no-store")
                 self.send_header("Content-Length", "0")
@@ -172,9 +172,17 @@ class Handler(BaseHTTPRequestHandler):
         elif path.startswith(("/api/", "/px/")):
             self.send_json({"error": "locked: open the helper with the house key first"}, 401)
         else:
+            sent = (q.get("t") or [""])[0]
+            cookie = guard._cookie(self.headers.get("Cookie"))
+            if sent:
+                why = "The key in this link doesn't match the helper's key (%d characters; it should be 48). Print a fresh link with show-link.sh." % len(sent)
+            elif cookie:
+                why = "Your browser sent a key, but it is an old one. Open a fresh link with ?t=..."
+            else:
+                why = "No key arrived. If you just opened a link, your browser may be blocking cookies for this address."
             self.send_html("<!doctype html><meta name=viewport content='width=device-width'><body style='font:18px Georgia,serif;background:#0b100c;color:#e6dfc8;padding:32px'>"
                            "<h2>Hearth</h2><p>This page needs the house key. Open the link that ends in <code>?t=...</code> "
-                           "(the setup step printed it).</p><p style='opacity:.6;font-size:15px'>This device's address: %s</p>" % self.client_address[0], 401)
+                           "(show-link.sh prints it).</p><p>%s</p><p style='opacity:.6;font-size:15px'>This device's address: %s</p>" % (why, self.client_address[0]), 401)
         return False
 
     def send_json(self, obj, code=200):

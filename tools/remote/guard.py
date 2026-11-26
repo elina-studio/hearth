@@ -6,7 +6,7 @@ and the Last.fm pairing pages:
     restore its saved keys after a reinstall, ask for lyrics, round pictures and scrobble;
   - the projector (PROJECTOR_IP) may use its own page (/hearth, /px, /api/pj) the same way;
   - a phone or the projector page opens the helper once with  http://<nas>:8765/?t=<house key>
-    and the helper keeps it in a cookie (HttpOnly, SameSite=Strict) from then on;
+    and the helper keeps it in a cookie (HttpOnly, SameSite=Lax) from then on;
   - scripts send it as the header  X-Hearth-Token.
 Too many wrong tries from one address are locked out for a minute.
 The key lives in DATA_DIR/helper-token (made on first start, mode 600) or the HELPER_TOKEN setting.
