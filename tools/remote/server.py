@@ -32,6 +32,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import guard
 import lastfm
 import discover
+import shelf
 import lyrics
 import web
 
@@ -286,9 +287,28 @@ class Handler(BaseHTTPRequestHandler):
         elif path == "/api/discover":
             q = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
             self.send_json(discover.get(bool((q.get("refresh") or [""])[0])))
+        elif path == "/api/discover/img":
+            q = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            one = lambda k: (q.get(k) or [""])[0]
+            body = shelf.image(artist=one("artist"), album=one("album"), url=one("u"), rg=one("rg"))
+            if body is None:
+                return self.send_json({"error": "no picture"}, 404)
+            self.send_response(200)
+            self.send_header("Content-Type", "image/jpeg")
+            self.send_header("Cache-Control", "max-age=604800")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
         elif path == "/api/discover/albums":
             q = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
-            self.send_json(discover.albums((q.get("artist") or [""])[0]))
+            self.send_json(shelf.albums((q.get("artist") or [""])[0]))
+        elif path == "/api/discover/selftest":
+            body = shelf.selftest_text().encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
         elif path == "/api/lastfm/status":
             self.send_json(lastfm.status())
         elif path in ("/lastfm", "/lastfm/done"):
@@ -393,6 +413,12 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_json(lastfm.event(req))
             if path == "/api/discover/hide":
                 return self.send_json(discover.hide(str(req.get("name", ""))))
+            if path == "/api/discover/unhide":
+                return self.send_json(discover.unhide(str(req.get("name", ""))))
+            if path == "/api/discover/request":
+                if req.get("artist"):
+                    return self.send_json(shelf.request_missing(str(req["artist"])))
+                return self.send_json(shelf.request_album(req.get("albumId") or req.get("albumid") or 0))
             if path == "/api/lastfm/disconnect":
                 lastfm.disconnect()
                 return self.send_json({"ok": True})

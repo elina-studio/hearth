@@ -1,33 +1,35 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Music > Discover (mockup C2). Two chips, "Artists you love" and "Recommended", a list of artists on the left and the
-     focused artist on the right. Lists come from the NAS helper (Last.fm: tools/remote/discover.py). Getting albums opens
-     the existing Request screen on that artist, so requesting works exactly as it does everywhere else. -->
+<!-- Music > Discover (mockups/music/discover-v2). Four chips: Artists you love, Recommended, New releases, Missing.
+     Artist views: a list of artists on the left (8 rows, with a count), the focused artist on the right with its
+     albums as a grid of covers, the missing ones first and the ones you own dimmed and marked IN LIBRARY.
+     Everything comes from the NAS helper (tools/remote/discover.py + shelf.py), which reads Lidarr, Plex and Last.fm
+     and serves the pictures. Pane is 1150 wide; screen position = pane position + (690, 242). -->
 <component name="DiscoverPane" extends="Group">
   <children>
     <Group id="chips" translation="[0, 0]" />
-    <Group id="list" translation="[8, 82]" />
-    <Rectangle id="listClip" visible="false" />
-    <Group id="detail" translation="[500, 0]" visible="false">
-      <Label id="kick" translation="[0, 6]" width="660" maxLines="1" color="0xE0B34AFF" />
-      <Label id="title" translation="[0, 38]" width="660" maxLines="1" color="0xEDE6CAFF" />
-      <Label id="meta" translation="[0, 108]" width="660" maxLines="1" color="0xB5AF8CFF" />
-      <Group id="btns" translation="[0, 160]" />
-      <Group id="albums" translation="[0, 250]" />
+    <Group id="list" translation="[8, 96]" />
+    <Group id="detail" translation="[500, 96]" visible="false">
+      <Label id="kick" translation="[0, 0]" width="650" maxLines="1" color="0xE0B34AFF" />
+      <Label id="title" translation="[0, 22]" width="650" maxLines="1" color="0xEDE6CAFF" />
+      <Label id="meta" translation="[0, 82]" width="650" maxLines="1" color="0xB5AF8CFF" />
+      <Group id="btns" translation="[0, 128]" />
+      <Group id="grid" translation="[0, 216]" />
+      <Label id="gridNote" translation="[0, 226]" width="620" wrap="true" color="0xB5AF8CFF" />
     </Group>
-    <Group id="rel" translation="[8, 82]" />
-    <Label id="relEmpty" translation="[8, 100]" width="1100" wrap="true" color="0xB5AF8CFF" />
-    <Label id="note" translation="[8, 90]" width="1100" wrap="true" color="0xB5AF8CFF" />
-    <Label id="toast" translation="[0, 790]" width="1150" color="0xE0B34AFF" />
-    <KeyHints id="relHints" translation="[1150, 782]" visible="false" />
-    <Timer id="toastTimer" duration="4" repeat="false" />
-    <Timer id="recheck" duration="15" repeat="false" />
+    <Group id="rel" translation="[0, 96]" />
+    <Label id="note" translation="[8, 104]" width="1100" wrap="true" color="0xB5AF8CFF" />
+    <Label id="count" translation="[8, 786]" width="640" maxLines="1" color="0xB5AF8CFF" />
+    <Label id="toast" translation="[8, 784]" width="700" maxLines="1" color="0xE0B34AFF" />
+    <KeyHints id="hints" translation="[1150, 776]" visible="false" />
+    <Timer id="toastTimer" duration="5" repeat="false" />
+    <Timer id="recheck" duration="12" repeat="false" />
     <Timer id="pvTimer" duration="0.35" repeat="false" />
   </children>
   <interface>
     <field id="active" type="boolean" value="false" onChange="paint" />
-    <field id="known" type="array" onChange="onKnown" />
+    <field id="known" type="array" />
     <!-- Plex artists: lower-case name to round photo URL ("" when Plex has no photo) -->
-    <field id="owned" type="assocarray" />
+    <field id="owned" type="assocarray" onChange="onOwned" />
     <field id="request" type="assocarray" alwaysNotify="true" />
     <function name="load" />
     <function name="handleKey" />

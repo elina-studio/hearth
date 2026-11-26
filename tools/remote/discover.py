@@ -5,9 +5,13 @@ Source: the Last.fm account paired on the phone (lastfm.json holds the user name
   recs    = Last.fm "similar artists" of your top 25, scored by (how much you play the source) x (how close the match)
             minus artists you already play a lot (your top 300 all time) and anyone you pressed "Not for me" on
 Built once a day in the background and kept in DATA_DIR/discover.json, so the TV opens instantly.
-  GET  /api/discover                 -> {loved, recs, built, user, fresh, plays}   (?refresh=1 rebuilds now)
-  GET  /api/discover/albums?artist=  -> that artist's top albums (Last.fm), cached
-  POST /api/discover/hide {name}     -> never recommend that artist again
+  GET  /api/discover                 -> {loved, recs, missing, releases, hidden, built, building, filling, error, ...}
+                                        (?refresh=1 rebuilds now). What you own and what's missing comes from shelf.py.
+  GET  /api/discover/albums?artist=  -> that artist's albums, missing first, each have / req / miss / ext
+  POST /api/discover/request {albumId} or {artist}  -> ask Lidarr for one album, or all an artist's missing ones
+  POST /api/discover/hide {name} / unhide {name}    -> keep an artist out of every Discover list / bring them back
+  GET  /api/discover/img?artist= | album= | rg= | u=  -> one picture, shrunk and kept on the NAS
+  GET  /api/discover/selftest        -> plain text, one line per source
 """
 import datetime
 import json
@@ -20,6 +24,7 @@ import urllib.request
 import urllib.error
 
 import lastfm
+import shelf
 
 FILE = os.path.join(lastfm.DATA_DIR, "discover.json")
 lock = threading.RLock()
@@ -200,7 +205,7 @@ def _build():
             for a in lst:
                 score[a["name"]] = score.get(a["name"], 0) + w * a["plays"] / top
                 info.setdefault(a["name"], a)
-        loved = sorted(info.values(), key=lambda a: -score[a["name"]])[:40]
+        loved = sorted(info.values(), key=lambda a: -score[a["name"]])[:100]
         for a in loved:
             a["score"] = round(score[a["name"]], 3)
         known = {a["name"].lower() for a in allt}
@@ -242,6 +247,7 @@ def _build():
                 d["built"] = int(time.time()) - BUILD_EVERY + 3 * 3600   # try Last.fm again in a few hours, not a day
             _save(d)
         print("[discover] built: %d loved, %d recommended" % (len(loved), len(recs)), flush=True)
+        threading.Thread(target=fill, daemon=True).start()
         # then new releases: the artists you play (top 300 all time) and the top 40 recommended, checked on MusicBrainz
         who = [(a["name"], a.get("mbid", ""), "yours") for a in allt] + [(e["name"], e.get("mbid", ""), "recommended") for e in recs[:40]]
         with lock:
@@ -331,6 +337,38 @@ def _fail(msg):
         _save(d)
 
 
+_filling = False
+
+
+def fill():
+    """Look up the albums of every loved / recommended artist Lidarr doesn't manage (Deezer, about 2 a second)."""
+    global _filling
+    with lock:
+        if _filling:
+            return
+        _filling = True
+    try:
+        lib = shelf.library(wait=True) or {"artists": {}}
+        d = _load()
+        n = 0
+        for e in d.get("loved", []) + d.get("recs", []):
+            if shelf.norm(e["name"]) in lib["artists"] or shelf.disco_cached(e["name"]):
+                continue
+            shelf.discography(e["name"])
+            n += 1
+            time.sleep(0.3)
+        if n:
+            print("[discover] looked up the albums of %d artists" % n, flush=True)
+    except Exception as e:
+        print("[discover] album lookup failed:", e, flush=True)
+    finally:
+        _filling = False
+
+
+def _img(name):
+    return "/api/discover/img?artist=" + urllib.parse.quote(name, safe="")
+
+
 def get(refresh=False):
     d = _load()
     stale = not d.get("freshBuilt") and time.time() - d.get("freshTried", 0) > 3600
@@ -339,39 +377,98 @@ def get(refresh=False):
     if (refresh or retry or (d.get("built") and stale)) and not _building:
         threading.Thread(target=build, daemon=True).start()
         started = True
-    hidden = {h.lower() for h in d.get("hidden", [])}
-    return {"loved": d.get("loved", []), "recs": [e for e in d.get("recs", []) if e["name"].lower() not in hidden],
+    if refresh:
+        shelf.invalidate()
+    summ = shelf.summary()            # {} until Lidarr has answered (it is read in the background)
+    state = shelf.library_state()
+    shelves = shelf.plex_albums()
+    hidden = {shelf.norm(h) for h in d.get("hidden", [])}
+    plays = d.get("plays", {})
+    pending = 0
+    disco = shelf._disco_load()
+
+    def row(e, key):
+        """name + what's left to get, or None when nothing is (or it can't be known yet)."""
+        nonlocal pending
+        s = summ.get(key)
+        if s and s["albums"]:
+            return {"name": e["name"], "togo": s["togo"], "albums": s["albums"], "lid": s["lid"], "img": _img(e["name"])}
+        hit = shelf.disco_cached(e["name"], disco)
+        if hit is None:
+            pending += 1
+            return {"name": e["name"], "togo": -1, "albums": 0, "lid": s["lid"] if s else 0, "img": _img(e["name"])}
+        shelf_have = shelves.get(key, set())
+        togo = sum(1 for a in hit["a"] if shelf.base_title(a["title"]) not in shelf_have)
+        return {"name": e["name"], "togo": togo, "albums": len(hit["a"]), "lid": s["lid"] if s else 0, "img": _img(e["name"])}
+
+    loved = []
+    for e in d.get("loved", []):
+        key = shelf.norm(e["name"])
+        if key in hidden:
+            continue
+        r = row(e, key)
+        # an artist whose albums you already have all of has nothing to offer here; unknown ones stay until looked up
+        if r["togo"] == 0 and r["albums"] > 0:
+            continue
+        r["plays"] = e.get("plays", 0)
+        loved.append(r)
+        if len(loved) >= 40:
+            break
+    recs = []
+    for e in d.get("recs", []):
+        key = shelf.norm(e["name"])
+        if key in hidden or key in shelves or (summ.get(key) or {}).get("have"):
+            continue   # already on your shelf: not a discovery
+        r = row(e, key)
+        r["because"] = e.get("because", "")
+        recs.append(r)
+    missing = []
+    for key, s in summ.items():
+        if s["togo"] and key not in hidden:
+            missing.append({"name": s["name"], "togo": s["togo"], "albums": s["albums"], "lid": s["lid"],
+                            "plays": plays.get(s["name"].lower(), 0), "img": _img(s["name"])})
+    # most played first, so one prolific composer is one row far down, not a wall
+    missing.sort(key=lambda m: (-m["plays"], -m["togo"], m["name"].lower()))
+    new, seen = [], set()
+    for a in shelf.recent():
+        if shelf.norm(a["artist"]) in hidden:
+            continue
+        seen.add((shelf.norm(a["artist"]), shelf.base_title(a["title"])))
+        new.append(a)
+    for f in d.get("fresh", []):
+        key = (shelf.norm(f.get("artist", "")), shelf.base_title(f.get("title", "")))
+        if key in seen or key[0] in hidden:
+            continue
+        seen.add(key)
+        have = key[1] in shelves.get(key[0], set())
+        new.append({"title": f.get("title", ""), "artist": f.get("artist", ""), "date": f.get("date", ""),
+                    "kind": f.get("kind", "album"), "state": "have" if have else "ext", "id": 0,
+                    "why": f.get("why", ""), "img": "/api/discover/img?rg=" + f.get("rgid", "")})
+    new.sort(key=lambda a: a["date"], reverse=True)
+    if pending and d.get("built") and not _filling:
+        threading.Thread(target=fill, daemon=True).start()
+    return {"source": d.get("source", "lastfm"), "loved": loved, "recs": recs, "missing": missing, "releases": new,
+            "hidden": d.get("hidden", []),
             "built": d.get("built", 0), "user": d.get("user", ""), "building": _building or started,
-            "error": "" if started else d.get("error", ""),
-            "fresh": d.get("fresh", []), "freshBuilt": d.get("freshBuilt", 0), "plays": d.get("plays", {})}
-
-
-def albums(artist):
-    d = _load()
-    c = d.setdefault("albums", {})
-    hit = c.get(artist.lower())
-    if hit and time.time() - hit["t"] < 7 * 86400:
-        return {"albums": hit["a"]}
-    r = _get("artist.getTopAlbums", artist=artist, limit=8, autocorrect=1)
-    out = []
-    for a in (r.get("topalbums", {}).get("album") or []):
-        n = a.get("name", "")
-        if n and n != "(null)":
-            out.append({"name": n, "plays": a.get("playcount", "")})
-    if out:
-        with lock:
-            d = _load()
-            d.setdefault("albums", {})[artist.lower()] = {"t": time.time(), "a": out}
-            _save(d)
-    return {"albums": out}
+            "filling": bool(_filling or state["busy"] or (pending and d.get("built")) or not state["ready"]),
+            "shelferr": state["error"],
+            "error": "" if started else d.get("error", ""), "freshbuilt": d.get("freshBuilt", 0)}
 
 
 def hide(name):
     with lock:
         d = _load()
         h = d.setdefault("hidden", [])
-        if name and name.lower() not in [x.lower() for x in h]:
+        if name and shelf.norm(name) not in [shelf.norm(x) for x in h]:
             h.append(name)
+        _save(d)
+    return {"ok": True}
+
+
+def unhide(name):
+    with lock:
+        d = _load()
+        d["hidden"] = [x for x in d.get("hidden", []) if shelf.norm(x) != shelf.norm(name)]
         _save(d)
     return {"ok": True}
 

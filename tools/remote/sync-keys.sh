@@ -80,6 +80,15 @@ printf '%s' "$OUT" > "$J" && chmod 600 "$J" && echo "saved on the NAS helper"
 [ -n "$K_sonarr" ]    && curl -s -X POST -G --data-urlencode "sonarrUrl=http://192.168.254.41:8989" --data-urlencode "sonarrKey=$K_sonarr" "http://$TV:8060/input"
 [ -n "$K_ha" ]        && curl -s -X POST -G --data-urlencode "haUrl=$HAU" --data-urlencode "haToken=$K_ha" --data-urlencode "haEntity=$HAE" "http://$TV:8060/input"
 echo "sent to the TV (Hearth must be open for the TV to take them)"
+echo
+echo "Checking everything Music > Discover leans on (the first look at Lidarr can take a few minutes)..."
+T=$(cat $D/hearth-remote/data/helper-token 2>/dev/null)
+curl -s -m 20 -H "X-Hearth-Token: $T" "http://127.0.0.1:8765/api/discover?refresh=1" >/dev/null
+R=$(curl -s -m 420 -H "X-Hearth-Token: $T" "http://127.0.0.1:8765/api/discover/selftest")
+case "$R" in
+  *OK*|*FAIL*) echo "$R" ;;
+  *) echo "  The helper didn't answer the check. Send me this whole output." ;;
+esac
 EOF
 )
 B=$(printf '%s' "$REMOTE" | base64 | tr -d '\n')
