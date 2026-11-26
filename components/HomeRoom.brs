@@ -273,6 +273,7 @@ sub pickTonight()
         end if
     end for
     m.top.findNode("tonight").visible = out.count() > 0
+    if m.heroText <> invalid then setHeroTitle(m.heroText)
     if m.tn >= out.count() then m.tn = 0
 end sub
 
@@ -485,14 +486,14 @@ sub showMusic()
         art.uri = ""
         if lp <> invalid
             eb.text = "PICK UP WHERE YOU LEFT OFF"
-            ti.text = lp.label
+            setMusicTitle(ti, pxStr(lp.label))
             su.text = "OK to play it again"
             prv.uri = "pkg:/images/icons/home-play.png"
             lk.uri = "pkg:/images/music/icons/shuffle.png"
             lk.visible = true
         else
             eb.text = "LISTEN NOW"
-            ti.text = when + " music"
+            setMusicTitle(ti, when + " music")
             su.text = "Shuffle, rediscover, or favourites"
             prv.uri = "pkg:/images/music/icons/shuffle.png"
             lk.visible = false
@@ -525,7 +526,7 @@ sub showMusic()
         tog.uri = "pkg:/images/icons/home-play.png"
     end if
     if mp.liked = "like" then lk.blendColor = "0xE0B34AFF" else lk.blendColor = "0xEDE6CAFF"
-    ti.text = pxStr(tr.title)
+    setMusicTitle(ti, pxStr(tr.title))
     line = pxStr(tr.artist)
     if tr.album <> invalid and tr.album <> "" then line = line + " · " + tr.album
     su.text = line
@@ -901,6 +902,26 @@ sub pickHero()
     showHero()
 end sub
 
+' Now Playing card title: 30, then 26, then 22 on one line; longer still scrolls
+sub setMusicTitle(ti as object, t as string)
+    drop = hFitTitle(ti, t, "bold", [30, 26, 22], 350)
+    ti.translation = [228, 64 + drop]
+end sub
+
+' Hero title: 70, then 56, then 46 on one line; longer still scrolls
+sub setHeroTitle(t as string)
+    m.heroText = t
+    ' the Tonight picks start at x 826, so the title gets 680 beside them and 900 when they are not showing
+    w = 900
+    sizes = [70, 56, 46]
+    if m.top.findNode("tonight").visible
+        w = 680
+        sizes = [70, 56, 46, 38]
+    end if
+    drop = hFitTitle(m.heroTitle, t, "caps", sizes, w)
+    m.heroTitle.translation = [136, 48 + drop]
+end sub
+
 sub showHero()
     if m.heroItems.count() = 0
         m.heroArt.uri = ""
@@ -908,11 +929,11 @@ sub showHero()
         m.pager.visible = false
         if m.offline
             m.heroEyebrow.text = "CAN'T REACH YOUR LIBRARY"
-            m.heroTitle.text = "TRY AGAIN IN A MOMENT"
+            setHeroTitle("TRY AGAIN IN A MOMENT")
             setButtons([["retry", "Try again", "home-restart"]])
         else
             m.heroEyebrow.text = "WELCOME HOME"
-            m.heroTitle.text = "NOTHING HERE YET"
+            setHeroTitle("NOTHING HERE YET")
             setButtons([])
         end if
         paint()
@@ -927,7 +948,7 @@ sub showHero()
         eyebrow = eyebrow + " · " + item.ProductionYear.toStr()
     end if
     m.heroEyebrow.text = UCase(eyebrow)
-    m.heroTitle.text = UCase(hTitle(item))
+    setHeroTitle(UCase(hTitle(item)))
     m.heroArt.uri = hImageAny(item, ["Backdrop", "Thumb", "Primary"], 1920)
     pct = hPercent(item)
     m.heroProgress.visible = pct > 0

@@ -14,7 +14,7 @@
       <Rectangle width="200" height="200" color="0x1D2418FF" />
       <Poster id="pvArt" width="200" height="200" loadDisplayMode="scaleToZoom" loadWidth="200" loadHeight="200" />
       <Poster width="200" height="200" uri="pkg:/images/music/round-mask-panel.png" />
-      <Label id="pvName" translation="[236, 0]" width="700" maxLines="1" color="0xEDE6CAFF" />
+      <ScrollingLabel id="pvName" translation="[236, 0]" maxWidth="740" height="88" repeatCount="-1" scrollSpeed="70" color="0xEDE6CAFF" />
       <Label id="pvSub" translation="[236, 84]" width="700" maxLines="1" color="0xB5AF8CFF" />
       <Group id="pvButtons" translation="[236, 132]" />
       <Poster uri="pkg:/images/w/twig-760-s6.png" translation="[96, 232]" width="800" height="120" />

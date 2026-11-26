@@ -28,10 +28,19 @@ sub build()
         rating.translation = [x + 30, 0]
         rating.text = md.rating
     end if
-    m.top.findNode("title").text = UCase(md.title)
+    ' title: 64, then 52 on one line; longer takes two lines at 44 and everything under it moves down
+    ttl = md.title
+    if ttl = invalid then ttl = ""
+    fit = hFitTitle2(m.top.findNode("title"), UCase(ttl), "caps", [64, 52, 44], 660)
+    m.top.findNode("title").translation = [0, 34 + fit.drop]
+    m.push = 0
+    if fit.lines = 2 then m.push = fit.height - 80
+    if m.push < 0 then m.push = 0
     ov = md.overview
     if ov = invalid then ov = ""
     m.top.findNode("overview").text = ov
+    m.top.findNode("overview").translation = [0, 124 + m.push]
+    m.items.translation = [0, 250 + m.push]
     m.top.findNode("poster").uri = md.poster
     m.list = md.items
     m.sel = 0
@@ -40,7 +49,7 @@ sub build()
     ' hints under the list
     hints = m.top.findNode("hints")
     hints.removeChildrenIndex(hints.getChildCount(), 0)
-    y = 250 + m.list.count() * 84 + 14
+    y = 250 + m.push + m.list.count() * 84 + 14
     hints.translation = [0, y]
     x = 0
     if md.hints <> invalid

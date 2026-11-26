@@ -419,13 +419,19 @@ sub showItems(items as object)
 end sub
 
 ' ---------- strip ----------
+' Strip title: 64, then 52, then 40 on one line; longer still scrolls
+sub setStripTitle(t as string)
+    drop = hFitTitle(m.title, t, "caps", [64, 52, 40], 1240)
+    m.title.translation = [96, 30 + drop]
+end sub
+
 sub showInfo()
     if m.index < m.items.count() then m.item = m.items[m.index]
     it = m.item
     if it = invalid or it.genreName <> invalid
         if it <> invalid
             m.eyebrow.text = "GENRE"
-            m.title.text = UCase(it.genreName)
+            setStripTitle(UCase(it.genreName))
             m.overview.text = "OK shows everything in " + it.genreName + "."
             m.art.uri = ""
         end if
@@ -441,7 +447,7 @@ sub showInfo()
     if it.OfficialRating <> invalid and it.OfficialRating <> "" then bits.push(it.OfficialRating)
     if it.Type = "Episode" then bits.unshift(hSubtitle(it))
     m.eyebrow.text = UCase(bits.join(" · "))
-    m.title.text = UCase(hTitle(it))
+    setStripTitle(UCase(hTitle(it)))
     ov = it.Overview
     if ov = invalid then ov = ""
     m.overview.text = ov

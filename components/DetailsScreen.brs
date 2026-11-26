@@ -259,7 +259,17 @@ end sub
 ' ---------------------------------------------------------------- header
 
 sub fillHeaderBasic(it as object)
-    m.title.text = UCase(hTitle(it))
+    ' title: 64, then 52, then 40 on one line; longer takes two lines at 40 and the rest of the header moves down
+    fit = hFitTitle2(m.title, UCase(hTitle(it)), "caps", [64, 52, 40], 1480)
+    m.title.translation = [0, 88 + fit.drop]
+    d = 0
+    if fit.lines = 2 then d = fit.height - 78
+    if d < 0 then d = 0
+    if d > 44 then d = 44
+    m.meta.translation = [0, 166 + d]
+    m.tags.translation = [0, 206 + d]
+    m.overview.translation = [0, 250 + d]
+    m.actionsBox.translation = [0, 334 + d]
     m.poster.uri = hImageAny(it, ["Primary"], 300)
     ov = it.Overview
     if ov = invalid then ov = ""

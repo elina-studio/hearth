@@ -264,7 +264,8 @@ sub focusArtist(i as integer, now as boolean)
     m.btn = 0
     showPreview(true)
     m.pvArt.uri = poster(a)
-    m.pvName.text = UCase(a.artistName)
+    drop = hFitTitle(m.pvName, UCase(a.artistName), "caps", [64, 52, 40], 740)
+    m.pvName.translation = [236, drop]
     m.pvSub.text = artistLine(a, "")
     m.pvAlbums.removeChildrenIndex(m.pvAlbums.getChildCount(), 0)
     m.pvNote.text = "Looking up albums" + Chr(8230)

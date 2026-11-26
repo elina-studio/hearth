@@ -80,7 +80,7 @@ sub load(unused = invalid as dynamic)
     end for
     m.top.findNode("albTwig").uri = "pkg:/images/w/twig-420-s" + ((th mod 4) + 4).toStr() + ".png"
     if id = "" then return
-    m.name.text = "Loading" + Chr(8230)
+    setArtistName("Loading" + Chr(8230))
     pxApi("/library/metadata/" + id, {}, "onArtist")
     pxApi("/library/metadata/" + id + "/children", {}, "onAlbums")
 end sub
@@ -89,13 +89,13 @@ sub onArtist(event as object)
     t = hTaskFrom(event)
     items = pxItems(t)
     if items.Count() = 0
-        m.name.text = ""
+        setArtistName("")
         if t.status <= 0 then say("Can't reach Plex.") else say("Couldn't open this artist.")
         return
     end if
     a = items[0]
     m.artist = a
-    m.name.text = UCase(pxStr(a.title))
+    setArtistName(UCase(pxStr(a.title)))
     m.art.uri = pxImage(a.thumb, 120, 120)
     if a.art <> invalid then m.backdrop.uri = pxImage(a.art, 640, 360, 30)
     sec = muPlayer().section
@@ -270,7 +270,15 @@ sub pickAlbum(i as integer)
     al = m.albums[i]
     md = al.md
     m.cover.uri = pxImage(md.thumb, 150, 150)
-    m.aTitle.text = pxStr(md.title)
+    ' album title: 48, then 40, then 34 on one line; longer takes two lines at 34 with the line under it moved down
+    fit = hFitTitle2(m.aTitle, pxStr(md.title), "bold", [48, 40, 34], 600)
+    if fit.lines = 2
+        m.aTitle.translation = [180, 8]
+        m.aSub.translation = [180, 8 + fit.height + 2]
+    else
+        m.aTitle.translation = [180, 26 + fit.drop]
+        m.aSub.translation = [180, 88]
+    end if
     bits = []
     if md.year <> invalid then bits.push(md.year.toStr())
     if md.leafCount <> invalid then bits.push(md.leafCount.toStr() + " songs")
@@ -678,3 +686,9 @@ function newestFirst(list as object) as object
     return out
 end function
 
+
+' Artist name: 64, then 52, then 40 on one line; longer still scrolls
+sub setArtistName(t as string)
+    drop = hFitTitle(m.name, t, "caps", [64, 52, 40], 760)
+    m.name.translation = [244, 50 + drop]
+end sub

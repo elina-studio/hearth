@@ -6,7 +6,7 @@
   <children>
     <!-- info strip -->
     <Label id="eyebrow" translation="[96, 0]" width="1200" color="0xD9A066FF" />
-    <Label id="title" translation="[96, 30]" width="1240" maxLines="1" color="0xEDE6CAFF" />
+    <ScrollingLabel id="title" translation="[96, 30]" maxWidth="1240" height="88" repeatCount="-1" scrollSpeed="70" color="0xEDE6CAFF" />
     <Label id="overview" translation="[96, 104]" width="1240" wrap="true" maxLines="2" color="0xB5AF8CFF" />
     <Group id="buttons" translation="[96, 178]" />
     <Rectangle translation="[1468, 0]" width="356" height="200" color="0x141A11FF" />

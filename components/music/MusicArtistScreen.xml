@@ -8,7 +8,7 @@
     <Rectangle translation="[96, 44]" width="120" height="120" color="0x1D2418FF" />
     <Poster id="art" translation="[96, 44]" width="120" height="120" loadDisplayMode="scaleToZoom" />
     <Poster translation="[96, 44]" width="120" height="120" uri="pkg:/images/music/round-mask.png" />
-    <Label id="name" translation="[244, 50]" width="760" maxLines="1" color="0xEDE6CAFF" />
+    <ScrollingLabel id="name" translation="[244, 50]" maxWidth="760" height="88" repeatCount="-1" scrollSpeed="70" color="0xEDE6CAFF" />
     <Label id="sub" translation="[244, 126]" width="760" maxLines="1" color="0xB5AF8CFF" />
     <Group id="buttons" translation="[0, 72]" />
     <!-- section header (whimsy spec): Fell italic title with its own twig -->

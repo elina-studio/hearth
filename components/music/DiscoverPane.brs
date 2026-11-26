@@ -523,7 +523,8 @@ sub showDetail(e as object)
     else
         m.kick.text = "ARTISTS YOU LOVE"
     end if
-    m.title.text = e.name
+    drop = hFitTitle(m.title, pxStr(e.name), "bold", [44, 38, 32], 650)
+    m.title.translation = [0, 22 + drop]
     if changed
         m.gsel = 0
         m.gtop = 0

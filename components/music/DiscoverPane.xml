@@ -10,7 +10,7 @@
     <Group id="list" translation="[8, 96]" />
     <Group id="detail" translation="[500, 96]" visible="false">
       <Label id="kick" translation="[0, 0]" width="650" maxLines="1" color="0xE0B34AFF" />
-      <Label id="title" translation="[0, 22]" width="650" maxLines="1" color="0xEDE6CAFF" />
+      <ScrollingLabel id="title" translation="[0, 22]" maxWidth="650" height="60" repeatCount="-1" scrollSpeed="60" color="0xEDE6CAFF" />
       <Label id="meta" translation="[0, 82]" width="650" maxLines="1" color="0xB5AF8CFF" />
       <Group id="btns" translation="[0, 128]" />
       <Group id="grid" translation="[0, 216]" />

@@ -420,3 +420,67 @@ function isHiddenItem(md as dynamic) as boolean
     end for
     return false
 end function
+
+' ---------- titles that fit (build 103) ----------
+' Width in pixels of one line of text. Uses one hidden Label per component as a ruler.
+function hTextWidth(ttl as string, kind as string, size as integer) as integer
+    if ttl = "" then return 0
+    p = m.hProbe
+    if p = invalid
+        p = m.top.createChild("Label")
+        p.opacity = 0
+        m.hProbe = p
+    end if
+    p.font = hFontCached(kind, size)
+    p.text = ttl
+    w = Int(p.boundingRect().width)
+    p.text = ""
+    return w
+end function
+
+' The biggest of the sizes at which the text fits on one line, or 0 when none does
+function hFitSize(ttl as string, kind as string, sizes as object, width as integer) as integer
+    for each s in sizes
+        if hTextWidth(ttl, kind, s) <= width then return s
+    end for
+    return 0
+end function
+
+' One-line title. Steps down through the sizes until the text fits. When even the smallest is too wide, a
+' ScrollingLabel scrolls it and a Label ends it in an ellipsis. Returns how far to drop the label (pixels) so a
+' smaller title sits where the big one's lower half would be.
+function hFitTitle(node as object, ttl as string, kind as string, sizes as object, width as integer) as integer
+    fitSz = hFitSize(ttl, kind, sizes, width)
+    if fitSz = 0 then fitSz = sizes[sizes.count() - 1]
+    node.font = hFontCached(kind, fitSz)
+    if node.subtype() = "ScrollingLabel"
+        node.maxWidth = width
+    else
+        node.width = width
+    end if
+    node.text = ttl
+    return Int((sizes[0] - fitSz) * 0.8)
+end function
+
+' Title that may take two lines at the smallest size. Returns { lines, height, drop }: height is the space the
+' title takes, so the caller can move what sits under it; drop is as in hFitTitle (0 for two lines).
+function hFitTitle2(node as object, ttl as string, kind as string, sizes as object, width as integer) as object
+    fitSz = hFitSize(ttl, kind, sizes, width)
+    node.width = width
+    if fitSz > 0
+        node.wrap = false
+        node.maxLines = 1
+        node.font = hFontCached(kind, fitSz)
+        node.text = ttl
+        return { lines: 1, height: Int(fitSz * 1.35), drop: Int((sizes[0] - fitSz) * 0.8) }
+    end if
+    fitSz = sizes[sizes.count() - 1]
+    node.wrap = true
+    node.maxLines = 2
+    node.font = hFontCached(kind, fitSz)
+    node.text = ttl
+    h = Int(node.boundingRect().height)
+    ' the measured height can be missing on the first frame; two lines of this font are about 2.7 x the size
+    if h < Int(fitSz * 2.4) or h > Int(fitSz * 3) then h = Int(fitSz * 2.7)
+    return { lines: 2, height: h, drop: 0 }
+end function

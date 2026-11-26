@@ -760,7 +760,7 @@ sub showList()
     m.empty.text = ""
     if l.key = "search"
         setHeader("SEARCH OVERSEERR", "", "")
-        m.title.text = ""
+        setHeadTitle("")
         paintResults()
         return
     end if
@@ -791,9 +791,15 @@ sub showList()
     end if
 end sub
 
+' Header title: 60, then 50, then 40 on one line; longer still scrolls
+sub setHeadTitle(t as string)
+    drop = hFitTitle(m.title, t, "caps", [60, 50, 40], 1280)
+    m.title.translation = [0, 34 + drop]
+end sub
+
 sub setHeader(eyebrow as string, rating as string, title as string)
     m.eyebrow.text = eyebrow
-    m.title.text = UCase(title)
+    setHeadTitle(UCase(title))
     has = (rating <> "")
     m.star.visible = has
     m.rating.visible = has

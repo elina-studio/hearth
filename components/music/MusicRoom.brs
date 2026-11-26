@@ -938,7 +938,8 @@ sub showNew()
     m.spotArt.uri = top.image
     when = LCase(muWhen(top.item.addedAt))
     m.spotEyebrow.text = "JUST ARRIVED  ·  " + UCase(when)
-    m.spotTitle.text = top.title
+    drop = hFitTitle(m.spotTitle, pxStr(top.title), "bold", [50, 42, 36], 860)
+    m.spotTitle.translation = [256, 60 + drop]
     line = pxStr(top.item.parentTitle)
     if top.item.leafCount <> invalid then line = line + "  ·  " + top.item.leafCount.toStr() + " songs"
     if top.tag <> "" then line = line + "  ·  Requested"

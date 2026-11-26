@@ -19,7 +19,7 @@
       <Poster uri="pkg:/images/w/panel-v2.9.png" translation="[10, 10]" width="232" height="232" blendColor="0x1D2418FF" />
       <Poster id="spotArt" translation="[22, 22]" width="208" height="208" loadDisplayMode="scaleToZoom" />
       <Label id="spotEyebrow" translation="[256, 28]" width="860" color="0xD9A066FF" />
-      <Label id="spotTitle" translation="[256, 60]" width="860" maxLines="1" color="0xEDE6CAFF" />
+      <ScrollingLabel id="spotTitle" translation="[256, 60]" maxWidth="860" height="68" repeatCount="-1" scrollSpeed="60" color="0xEDE6CAFF" />
       <Label id="spotSub" translation="[256, 124]" width="860" maxLines="1" color="0xB5AF8CFF" />
       <Group id="spotChips" translation="[256, 166]" />
     </Group>
