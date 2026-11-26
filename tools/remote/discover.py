@@ -43,13 +43,15 @@ def _save(d):
     os.replace(tmp, FILE)
 
 
-def _get(method, **kw):
-    """A read-only Last.fm call, retried: Last.fm often answers 8 "Operation failed" on big accounts and then works a moment later."""
+def _get(method, tries=3, signed=False, **kw):
+    """A read-only Last.fm call, retried: Last.fm often answers 8 "Operation failed" and then works a moment later."""
     p = {"method": method}
     p.update(kw)
+    if signed:
+        p["sk"] = lastfm._load().get("session", "")
     r = {}
-    for attempt in range(5):
-        r = lastfm._call(p, post=False, sign=False, timeout=30)
+    for attempt in range(tries):
+        r = lastfm._call(p, post=False, sign=signed, timeout=30)
         if r.get("error") in lastfm.RETRY or r.get("error") == 8:
             time.sleep(2 + attempt * 3)
             continue
@@ -57,27 +59,64 @@ def _get(method, **kw):
     return r
 
 
-def _top(user, period, limit):
-    """Your top artists for a period, asked 50 at a time (one big request makes Last.fm fail on 20 years of scrobbles).
-    If a later page fails, keep what came back."""
+def _artists(r):
+    """The artist list out of any of the Last.fm answers used here."""
+    for k in ("topartists", "artists", "weeklyartistchart"):
+        if isinstance(r.get(k), dict):
+            a = r[k].get("artist") or []
+            return a if isinstance(a, list) else [a]
+    return []
+
+
+def _paged(limit, method, **kw):
     out, page = [], 1
     while len(out) < limit:
-        r = _get("user.getTopArtists", user=user, period=period, limit=50, page=page)
-        got = (r.get("topartists") or {}).get("artist") or []
+        r = _get(method, page=page, limit=50, **kw)
+        got = _artists(r)
         if not got:
             if page == 1:
-                print("[discover] Last.fm top artists (%s) failed: %s" % (period, r.get("message", "empty answer")), flush=True)
+                return [], r.get("message", "empty answer")
             break
         for a in got:
             try:
                 out.append({"name": a["name"], "mbid": a.get("mbid", ""), "plays": int(a.get("playcount", 0))})
-            except (KeyError, ValueError):
+            except (KeyError, ValueError, TypeError):
                 pass
         if len(got) < 50:
             break
         page += 1
         time.sleep(0.3)
-    return out[:limit]
+    return out[:limit], ""
+
+
+def _top(user, period, limit):
+    """Your top artists for a period. Last.fm's own top-artists call fails ("Operation failed") on some big accounts,
+    so fall back to other calls that give the same play counts: signed top artists, then your library (all time) or the
+    weekly chart for the last year (12 months). Logs which one worked."""
+    tries = [("top artists", lambda: _paged(limit, "user.getTopArtists", user=user, period=period)),
+             ("top artists, signed in", lambda: _paged(limit, "user.getTopArtists", user=user, period=period, signed=True))]
+    if period == "overall":
+        tries.append(("library", lambda: _paged(limit, "library.getArtists", user=user)))
+    else:
+        now = int(time.time())
+        def chart():
+            r = _get("user.getWeeklyArtistChart", user=user, **{"from": now - 365 * 86400, "to": now})
+            got = []
+            for a in _artists(r):
+                try:
+                    got.append({"name": a["name"], "mbid": a.get("mbid", ""), "plays": int(a.get("playcount", 0))})
+                except (KeyError, ValueError, TypeError):
+                    pass
+            got.sort(key=lambda a: -a["plays"])
+            return got[:limit], r.get("message", "empty answer")
+        tries.append(("weekly chart, last 12 months", chart))
+    for label, fn in tries:
+        out, err = fn()
+        if out:
+            print("[discover] %s: %d artists from Last.fm %s" % (period, len(out), label), flush=True)
+            return out
+        print("[discover] Last.fm %s (%s) failed: %s" % (label, period, err), flush=True)
+    return []
 
 
 def build():
@@ -105,8 +144,7 @@ def _build():
         recent = _top(user, "12month", 100)
         allt = _top(user, "overall", 300)
         if not recent and not allt:
-            r = _get("user.getTopArtists", user=user, period="overall", limit=1)
-            _fail("Last.fm gave no top artists for %s: %s" % (user, r.get("message", "empty answer")))
+            _fail("Last.fm wouldn't give the top artists for %s by any of its routes (the NAS log lists each try)" % user)
             return
         score = {}
         info = {}
@@ -121,8 +159,15 @@ def _build():
         known = {a["name"].lower() for a in allt}
         hidden = {h.lower() for h in _load().get("hidden", [])}
         rec = {}
+        misses = 0
         for src in loved[:25]:
             r = _get("artist.getSimilar", artist=src["name"], limit=30, autocorrect=1)
+            if r.get("error"):
+                misses += 1
+                print("[discover] similar to %s failed: %s" % (src["name"], r.get("message", "")), flush=True)
+                if misses >= 4 and not rec:
+                    break   # Last.fm is refusing these right now; save the loved list rather than wait
+                continue
             for s in (r.get("similarartists", {}).get("artist") or []):
                 n = s.get("name", "")
                 if not n or n.lower() in known or n.lower() in hidden:
