@@ -2,7 +2,7 @@
 # One command that puts EVERY key back, on the TV and in the NAS helper's saved copy (so every launch can restore them).
 #   bash <(curl -sL https://raw.githubusercontent.com/elina-studio/hearth/<commit>/tools/remote/sync-keys.sh)
 # It reads each key from its own app on the NAS (Sonarr, Radarr, Lidarr, Overseerr, Bazarr, Plex), rewrites
-# /volume1/docker/hearth-remote/data/hearth-keys.json with all of them (keeping the Home Assistant details already saved there),
+# /volume1/docker/hearth-remote/data/hearth-keys.json with all of them (keeping the Home Assistant details saved there by ha-weather.sh, and sending them to the TV too),
 # and sends them to the TV. One ssh, one sudo password. No key is ever printed.
 NAS="Elina@192.168.254.41"
 REMOTE=$(cat <<'EOF'
@@ -49,6 +49,8 @@ printf '%s' "$OUT" > "$J" && chmod 600 "$J" && echo "saved on the NAS helper"
 [ -n "$K_bazarr" ]    && curl -s -X POST -G --data-urlencode "bazarrUrl=http://192.168.254.41:6767" --data-urlencode "bazarrKey=$K_bazarr" "http://$TV:8060/input"
 [ -n "$K_radarr" ]    && curl -s -X POST -G --data-urlencode "radarrUrl=http://192.168.254.41:7878" --data-urlencode "radarrKey=$K_radarr" "http://$TV:8060/input"
 [ -n "$K_sonarr" ]    && curl -s -X POST -G --data-urlencode "sonarrUrl=http://192.168.254.41:8989" --data-urlencode "sonarrKey=$K_sonarr" "http://$TV:8060/input"
+HT=$(old haToken)
+[ -n "$HT" ] && curl -s -X POST -G --data-urlencode "haUrl=$(old haUrl)" --data-urlencode "haToken=$HT" --data-urlencode "haEntity=$(old haEntity)" "http://$TV:8060/input"
 echo "sent to the TV (Hearth must be open for the TV to take them)"
 EOF
 )

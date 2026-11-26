@@ -26,6 +26,7 @@ sub init()
     m.clock.font = hFont("clock", 54)
     m.clockFly = m.top.findNode("clockFly")
     m.weather = m.top.findNode("weather")
+    m.wxLooked = false
     m.weather.font = hFont("book", 26)
     m.wxIcon = m.top.findNode("wxIcon")
     m.buildTag = m.top.findNode("buildTag")
@@ -504,6 +505,11 @@ sub onWeather(event as object)
     t = pTaskFrom(event)
     if not t.ok or t.response.state = invalid
         print "[weather] failed: HTTP " + t.status.toStr() + " (-1 = no answer, 401 = bad token, 404 = wrong entity)"
+        ' 404 = that entity name does not exist in Home Assistant: look for the real weather entity once
+        if t.status = 404 and not m.wxLooked
+            m.wxLooked = true
+            pHa("/api/states", "onWeatherList")
+        end if
         return
     end if
     s = pWeatherWord(t.response.state)
@@ -513,6 +519,13 @@ sub onWeather(event as object)
     m.wxIcon.uri = wxIconFor(t.response.state)
     m.weather.text = s
     layoutWeather()
+end sub
+
+sub onWeatherList(event as object)
+    t = pTaskFrom(event)
+    e = pPickWeather(t.response.items)
+    print "[weather] looked through Home Assistant, weather entity: '" + e + "'"
+    if e <> "" then loadWeather()
 end sub
 
 ' Ask again for every poster that is not loaded yet (same address, so no extra requests for the ones that are fine).

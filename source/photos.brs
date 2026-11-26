@@ -129,6 +129,27 @@ function pPhotoCaption(item as object) as string
     return Left(d, 4)
 end function
 
+' From Home Assistant's list of everything (/api/states), the weather entity to use: the home one if there is one, else the first.
+' Saves it on the TV so the next call goes straight to it. Returns "" when HA has no weather entity at all.
+function pPickWeather(items as dynamic) as string
+    if items = invalid or type(items) <> "roArray" then return ""
+    best = ""
+    for each it in items
+        if type(it) = "roAssociativeArray" and it.entity_id <> invalid
+            id = it.entity_id.toStr()
+            if Left(id, 8) = "weather."
+                if best = "" or id = "weather.forecast_home" or id = "weather.home" then best = id
+            end if
+        end if
+    end for
+    if best <> ""
+        reg = CreateObject("roRegistrySection", "hearth")
+        reg.Write("haEntity", best)
+        reg.Flush()
+    end if
+    return best
+end function
+
 ' Weather words for Home Assistant conditions
 function pWeatherWord(s as string) as string
     w = {

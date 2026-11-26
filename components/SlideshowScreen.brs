@@ -16,6 +16,7 @@ sub init()
     m.date = m.top.findNode("date")
     m.date.font = hFont("fell", 36)
     m.weather = m.top.findNode("weather")
+    m.wxLooked = false
     m.weather.font = hFont("book", 28)
     m.album = m.top.findNode("album")
     m.album.font = hFont("caps", 28)
@@ -447,6 +448,10 @@ sub onWeather(event as object)
     if not t.ok or t.response.state = invalid
         m.weather.text = ""
         layoutWeather()
+        if t.status = 404 and not m.wxLooked
+            m.wxLooked = true
+            pHa("/api/states", "onWeatherList")
+        end if
         return
     end if
     m.wxIcon.uri = pWxIcon(t.response.state)
@@ -457,6 +462,11 @@ sub onWeather(event as object)
     end if
     m.weather.text = s
     layoutWeather()
+end sub
+
+sub onWeatherList(event as object)
+    t = pTaskFrom(event)
+    if pPickWeather(t.response.items) <> "" then loadWeather()
 end sub
 
 ' Weather line: gold icon, then text, right-aligned to 1824
