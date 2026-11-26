@@ -84,6 +84,7 @@ sub init()
     m.pageNo = {}
     m.busy = {}
     m.inflight = {}
+    m.fresh = {}
     m.more = {}
     m.totalPages = {}
     m.loadedAt = {}
@@ -321,6 +322,8 @@ sub onList(event as object)
             ' a filter Overseerr wouldn't run: say so instead of leaving the old cards up as if nothing happened
             m.listError[key] = "Overseerr couldn't do that search (error " + t.status.toStr() + ")."
             m.acc[key] = []
+            if m.fresh[key] = invalid then m.fresh[key] = 0
+            m.fresh[key] = m.fresh[key] + 1
             publishList(key)
         end if
         return
@@ -338,6 +341,10 @@ sub onList(event as object)
     m.more[key] = false
     m.inflight.delete(key)
     m.moreText.visible = false
+    if page = 1
+        if m.fresh[key] = invalid then m.fresh[key] = 0
+        m.fresh[key] = m.fresh[key] + 1
+    end if
     if t.response.totalResults <> invalid then m.totals[key] = t.response.totalResults
     if t.response.totalPages <> invalid then m.totalPages[key] = t.response.totalPages
     publishList(key)
@@ -791,7 +798,12 @@ sub buildGrid()
     key = currentList().key
     cards = m.cards[key]
     stamp = key + "|" + m.ver.toStr()
-    if isDiscover(key) and m.gen[key] <> invalid then stamp = key + "|g" + m.gen[key].toStr()
+    ' fresh counts how many times page 1 has arrived: new results rebuild the grid, later pages only add to it
+    if isDiscover(key) and m.gen[key] <> invalid
+        fr = 0
+        if m.fresh[key] <> invalid then fr = m.fresh[key]
+        stamp = key + "|g" + m.gen[key].toStr() + "|f" + fr.toStr()
+    end if
     if stamp = m.builtFor and cards <> invalid
         ' same list, maybe more pages: paintGrid adds whatever rows are now near the screen
         paintGrid()
