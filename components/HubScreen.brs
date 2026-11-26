@@ -214,8 +214,23 @@ sub onLibraries(event as object)
     if not t.ok
         ' Plex unreachable: nothing to warm, let the app open (it shows its offline notes)
         m.top.warm = true
+        ' ...and keep asking, so Movies, Shows and the rest fill in by themselves once Plex is back
+        if not m.global.hasField("plexDown") then m.global.addFields({ plexDown: false })
+        m.global.plexDown = true
+        if m.libRetry = invalid
+            m.libRetry = CreateObject("roSGNode", "Timer")
+            m.libRetry.duration = 15
+            m.libRetry.repeat = false
+            m.libRetry.observeField("fire", "loadLibraries")
+        end if
+        m.libRetry.control = "start"
+        ' Movies and Shows wait on the library list: let them say why they're empty
+        for each k in ["Movies", "Shows"]
+            if m.rooms[k] <> invalid then m.rooms[k].callFunc("refresh", invalid)
+        end for
         return
     end if
+    if m.global.hasField("plexDown") then m.global.plexDown = false
     libs = {}
     for each v in t.response.Items
         ct = v.CollectionType
@@ -473,7 +488,10 @@ function onKeyEvent(key as string, press as boolean) as boolean
     else if key = "options"
         d = CreateObject("roSGNode", "StandardMessageDialog")
         d.title = "Hearth"
-        d.message = ["Signed in to " + m.global.server]
+        srv = m.global.plexServerName
+        if srv = invalid or srv = "" then srv = m.global.plexServer
+        if srv = invalid or srv = "" then srv = "Plex"
+        d.message = ["Signed in to " + srv]
         d.buttons = ["Close", "Sign out"]
         d.observeField("buttonSelected", "onMenu")
         m.dialog = d

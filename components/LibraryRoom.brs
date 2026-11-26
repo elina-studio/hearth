@@ -267,8 +267,17 @@ sub refresh(unused as dynamic)
     libs = m.global.libraries
     if libs = invalid or libs[m.top.kind] = invalid
         m.empty.text = "Loading your library…"
+        if m.global.hasField("plexDown") and m.global.plexDown = true
+            m.empty.text = "Can't reach Plex. Check the server is on. Hearth tries again every 15 seconds."
+            m.top.ready = true
+        end if
         ' the library list has arrived and this kind isn't in it: nothing to wait for
-        if libs <> invalid and libs.count() > 0 then m.top.ready = true
+        if libs <> invalid and libs.count() > 0
+            m.top.ready = true
+            what = "Movies"
+            if m.top.kind = "tvshows" then what = "TV Shows"
+            m.empty.text = "Plex has no " + what + " library yet. Add one in Plex, then open Hearth again."
+        end if
         return
     end if
     m.section = libs[m.top.kind]

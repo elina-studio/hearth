@@ -162,7 +162,10 @@ end sub
 
 sub onSeasons(event as object)
     t = hTaskFrom(event)
-    if not t.ok then return
+    if not t.ok
+        hMessage("Seasons", "Couldn't load the seasons from Plex (status " + t.status.toStr() + "). Press Back and open the show again.")
+        return
+    end if
     ' specials (season 0) go last
     list = []
     specials = invalid
