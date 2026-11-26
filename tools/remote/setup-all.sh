@@ -5,7 +5,7 @@
 # Open Hearth on the TV first (it only takes keys while the app is running). Asks for the NAS passwords as it goes.
 SHA=${1:?need the commit}
 BASE=https://raw.githubusercontent.com/elina-studio/hearth/$SHA/tools/remote
-export HEARTH_BRANCH=${HEARTH_BRANCH:-claude/project-thread-1503b3}
+export HEARTH_BRANCH=${HEARTH_BRANCH:-claude/project-thread-dcn6uh}
 echo "=== Part 1: update the helper ==="
 bash <(curl -sL "$BASE/deploy.sh") || { echo "Helper update failed, keys not touched."; exit 1; }
 echo
