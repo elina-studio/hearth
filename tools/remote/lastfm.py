@@ -208,9 +208,34 @@ def flush():
         _save(d)
 
 
+def collect():
+    """Last.fm shows its own "Application authenticated" page and doesn't always send the browser back to /lastfm/done,
+    so while a pairing is waiting, ask Last.fm ourselves whether the token has been allowed yet."""
+    d = _load()
+    p = d.get("pending")
+    if not p or d.get("session") or time.time() - p.get("at", 0) > 3600:
+        return
+    ok, who = finish(p["token"])
+    if ok:
+        print("[lastfm] paired as", who, flush=True)
+        try:
+            import discover
+            threading.Thread(target=discover.build, daemon=True).start()
+        except Exception as e:
+            print("[lastfm] couldn't start the Discover build:", e, flush=True)
+
+
 def worker():
+    n = 0
     while True:
-        time.sleep(60)
+        time.sleep(4)
+        try:
+            collect()
+        except Exception as e:
+            print("lastfm collect:", e, flush=True)
+        n += 1
+        if n % 15:
+            continue
         try:
             flush()
         except Exception as e:
@@ -238,6 +263,9 @@ def phone_page():
 
 
 def done_page(token):
+    st = status()
+    if st["state"] == "connected":
+        return PAGE % ("<p>Done. Connected as <b>%s</b>. Look at the TV.</p>" % st["user"])
     ok, who = finish(token) if token else (False, "No token")
     if ok:
         return PAGE % ("<p>Done. Connected as <b>%s</b>. Look at the TV.</p>" % who)
