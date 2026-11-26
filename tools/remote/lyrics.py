@@ -90,7 +90,7 @@ def _lrclib(artist, title, album, duration):
                     best = h
         return best
     except Exception:
-        return None
+        return False  # couldn't ask at all (offline, timeout): not the same as "no lyrics exist"
 
 
 def find(artist, title, album="", duration=0, file=""):
@@ -117,6 +117,9 @@ def find(artist, title, album="", duration=0, file=""):
             text = ""
     if not text:
         h = _lrclib(artist, title, album, duration)
+        if h is False:
+            # don't remember a network failure as "no lyrics" for a week: ask again next time
+            return res
         if h:
             text = h.get("syncedLyrics") or h.get("plainLyrics") or ""
             if text:
