@@ -360,7 +360,46 @@ sub hFbStatus(event as object)
     p = event.getRoSGNode()
     g = p.getParent()
     if g <> invalid and g.hasField("fb") then g.fb.visible = (p.loadStatus <> "ready")
-    if p.loadStatus = "failed" then print "[hearth-img] failed: "; Left(p.uri, 110)
+    if p.loadStatus = "failed"
+        print "[hearth-img] failed: "; Left(p.uri, 110)
+        hFbRetryLater(p, g)
+    end if
+end sub
+
+' A poster that failed (Plex's image transcoder drops requests when many arrive at once) is asked again after 2, 5 and 10 seconds,
+' as long as it still shows the same picture and is on a visible, still-attached tile.
+sub hFbRetryLater(p as object, g as dynamic)
+    if g = invalid or p.uri = "" or Left(p.uri, 4) <> "http" then return
+    if not p.hasField("hTries") then p.addFields({ hTries: 0, hTriesUri: "" })
+    if p.hTriesUri <> p.uri
+        p.hTriesUri = p.uri
+        p.hTries = 0
+    end if
+    n = p.hTries
+    if n >= 3 then return
+    p.hTries = n + 1
+    d = [2, 5, 10]
+    t = CreateObject("roSGNode", "Timer")
+    t.duration = d[n]
+    t.repeat = false
+    t.addFields({ poster: p, wantUri: p.uri })
+    t.observeField("fire", "hFbRetry")
+    g.appendChild(t)
+    t.control = "start"
+end sub
+
+sub hFbRetry(event as object)
+    t = event.getRoSGNode()
+    p = t.poster
+    g = t.getParent()
+    if g <> invalid then g.removeChild(t)
+    if p = invalid then return
+    if p.uri = t.wantUri and p.loadStatus = "failed"
+        print "[hearth-img] retry "; p.hTries; ": "; Left(p.uri, 110)
+        u = p.uri
+        p.uri = ""
+        p.uri = u
+    end if
 end sub
 
 ' Names kept out of every shelf and list (Home, Music New/albums, search): matched anywhere in an item's title, album or artist.
