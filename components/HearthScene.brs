@@ -23,6 +23,7 @@ sub init()
     m.global.observeField("remote", "onRemote")
     m.ribbon = m.top.findNode("ribbon")
     m.music.observeField("track", "onMusicTrack")
+    initSfx()
 
     ' the lantern intro plays while the saved login is checked
     m.introDone = false
@@ -244,7 +245,7 @@ sub onRemote()
 end sub
 
 ' Outside video, Play, Rewind, Fast forward and Replay always control the music.
-function onKeyEvent(key as string, press as boolean) as boolean
+function hKeyInner(key as string, press as boolean) as boolean
     if press and key = "back"
         top = topScreen()
         if top <> invalid and top.subtype() = "MoodScreen"
@@ -391,4 +392,44 @@ sub lastContinue()
     else if d.kind = "photos"
         handle({ action: "slideshow", albumId: d.albumId, albumName: d.albumName })
     end if
+end sub
+
+' Every key goes through here first: the inner handler, then a menu sound (source/util.brs hKeySfx).
+' Arrows nobody handled reach this scene last, so they get the faint dead-end tick.
+function onKeyEvent(key as string, press as boolean) as boolean
+    handled = hKeyInner(key, press)
+    if press and not handled and (key = "up" or key = "down" or key = "left" or key = "right") then hSfx("deadend")
+    return hKeySfx(key, press, handled)
+end function
+
+' ---------- menu sounds ----------
+sub initSfx()
+    m.sfxNodes = { move: m.top.findNode("sfxMove"), select: m.top.findNode("sfxSelect"), back: m.top.findNode("sfxBack"), deadend: m.top.findNode("sfxDead") }
+    m.sfxClock = CreateObject("roTimespan")
+    m.sfxLast = ""
+    m.global.addFields({ sfxOn: m.reg.Read("uiSounds") <> "off" })
+    m.global.addField("sfx", "string", true)
+    m.global.observeField("sfx", "onSfx")
+end sub
+
+sub onSfx()
+    name = m.global.sfx
+    if not m.global.sfxOn then return
+    node = m.sfxNodes[name]
+    if node = invalid then return
+    ' a held arrow repeats fast: one tick every 60 ms is plenty
+    if name = m.sfxLast and m.sfxClock.TotalMilliseconds() < 60 then return
+    top = topScreen()
+    if top <> invalid
+        kind = top.subtype()
+        ' quiet while a mood or the slideshow fills the screen, and while a video is actually playing
+        if kind = "MoodScreen" or kind = "SlideshowScreen" then return
+        if kind = "PlayerScreen"
+            v = top.findNode("video")
+            if v <> invalid and v.state = "playing" then return
+        end if
+    end if
+    m.sfxLast = name
+    m.sfxClock.Mark()
+    node.control = "play"
 end sub

@@ -168,7 +168,7 @@ sub activate()
     end if
 end sub
 
-function onKeyEvent(key as string, press as boolean) as boolean
+function hKeyInner(key as string, press as boolean) as boolean
     if not press then return false
     if key = "left" or key = "right"
         if key = "left" then d = -1 else d = 1
@@ -188,4 +188,9 @@ function onKeyEvent(key as string, press as boolean) as boolean
         return true
     end if
     return false
+end function
+
+' menu sound for whatever the handler above took (source/util.brs hKeySfx)
+function onKeyEvent(key as string, press as boolean) as boolean
+    return hKeySfx(key, press, hKeyInner(key, press))
 end function

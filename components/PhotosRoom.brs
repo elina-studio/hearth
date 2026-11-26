@@ -267,7 +267,7 @@ sub openSelected()
     end if
 end sub
 
-function onKeyEvent(key as string, press as boolean) as boolean
+function hKeyInner(key as string, press as boolean) as boolean
     if not press then return false
     if hMediaKey(key) then return false
     if key = "back"
@@ -303,4 +303,9 @@ function onKeyEvent(key as string, press as boolean) as boolean
         return false
     end if
     return true
+end function
+
+' menu sound for whatever the handler above took (source/util.brs hKeySfx)
+function onKeyEvent(key as string, press as boolean) as boolean
+    return hKeySfx(key, press, hKeyInner(key, press))
 end function

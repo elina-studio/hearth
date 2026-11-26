@@ -547,7 +547,7 @@ sub runButton()
     end if
 end sub
 
-function onKeyEvent(key as string, press as boolean) as boolean
+function hKeyInner(key as string, press as boolean) as boolean
     if not press then return false
     if key = "play" and m.zone = "grid" and m.index < m.items.count()
         it = m.items[m.index]
@@ -915,3 +915,8 @@ sub hSubsChanged(label as string)
     end if
     showButtons()
 end sub
+
+' menu sound for whatever the handler above took (source/util.brs hKeySfx)
+function onKeyEvent(key as string, press as boolean) as boolean
+    return hKeySfx(key, press, hKeyInner(key, press))
+end function

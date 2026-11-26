@@ -609,7 +609,7 @@ sub playNext()
     m.top.item = nxt
 end sub
 
-function onKeyEvent(key as string, press as boolean) as boolean
+function hKeyInner(key as string, press as boolean) as boolean
     if not press then return false
     if key = "OK" and m.skipOn = true and m.skipBtn.visible and m.earMode <> true and not m.ov.visible and not m.sheet.visible and not m.chapters.visible and not m.upnext.visible
         doSkip()
@@ -678,3 +678,8 @@ sub doSkip()
     print "[hearth-play] skip intro to "; Int(m.skipTo); " s"
     seekTo(m.skipTo)
 end sub
+
+' menu sound for whatever the handler above took (source/util.brs hKeySfx)
+function onKeyEvent(key as string, press as boolean) as boolean
+    return hKeySfx(key, press, hKeyInner(key, press))
+end function

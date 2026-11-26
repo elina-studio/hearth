@@ -704,7 +704,7 @@ sub toPills()
     m.top.request = { action: "pills" }
 end sub
 
-function onKeyEvent(key as string, press as boolean) as boolean
+function hKeyInner(key as string, press as boolean) as boolean
     if not press then return false
     if muMediaKey(key) then return true
     if m.zone = "queue"
@@ -1074,3 +1074,8 @@ sub sendKnown()
     m.disc.owned = owned
     m.disc.known = known
 end sub
+
+' menu sound for whatever the handler above took (source/util.brs hKeySfx)
+function onKeyEvent(key as string, press as boolean) as boolean
+    return hKeySfx(key, press, hKeyInner(key, press))
+end function

@@ -484,3 +484,26 @@ function hFitTitle2(node as object, ttl as string, kind as string, sizes as obje
     if h < Int(fitSz * 2.4) or h > Int(fitSz * 3) then h = Int(fitSz * 2.7)
     return { lines: 2, height: h, drop: 0 }
 end function
+
+' ---------- menu sounds (thumb piano, sounds/ui-*.wav) ----------
+' Any component asks for a sound by name; HearthScene plays it (onSfx) unless menu sounds are off
+' (registry hearth/uiSounds = "off", switched from the Hub * menu) or a video or mood is on screen.
+sub hSfx(name as string)
+    g = m.global
+    if g = invalid or not g.hasField("sfx") then return
+    g.sfx = name
+end sub
+
+' Called with the result of a screen's key handler: only a key the handler took makes a sound.
+function hKeySfx(key as string, down as boolean, handled as boolean) as boolean
+    if down and handled
+        if key = "OK" or key = "options"
+            hSfx("select")
+        else if key = "back"
+            hSfx("back")
+        else if key = "up" or key = "down" or key = "left" or key = "right"
+            hSfx("move")
+        end if
+    end if
+    return handled
+end function

@@ -327,7 +327,12 @@ sub leave()
 end sub
 
 ' the intro always runs its full 10 seconds; buttons are swallowed until then
-function onKeyEvent(key as string, press as boolean) as boolean
+function hKeyInner(key as string, press as boolean) as boolean
     if m.top.mode <> "intro" then return false
     return true
+end function
+
+' menu sound for whatever the handler above took (source/util.brs hKeySfx)
+function onKeyEvent(key as string, press as boolean) as boolean
+    return hKeySfx(key, press, hKeyInner(key, press))
 end function
