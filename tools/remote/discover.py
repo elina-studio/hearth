@@ -73,6 +73,17 @@ def build():
             return
         _building = True
     try:
+        _build()
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        _fail("%s: %s" % (type(e).__name__, e))
+    finally:
+        _building = False
+
+
+def _build():
+    if True:
         user = lastfm._load().get("user", "")
         if not user or not lastfm.configured():
             _fail("no Last.fm user paired yet" if not user else "no Last.fm key on the helper")
@@ -135,8 +146,6 @@ def build():
             d.update({"fresh": fresh, "freshBuilt": int(time.time())})
             _save(d)
         print("[discover] new releases: %d from %d artists" % (len(fresh), len(who)), flush=True)
-    finally:
-        _building = False
 
 
 MB = "https://musicbrainz.org/ws/2/release-group/"
@@ -217,11 +226,15 @@ def _fail(msg):
 def get(refresh=False):
     d = _load()
     stale = not d.get("freshBuilt") and time.time() - d.get("freshTried", 0) > 3600
-    if (refresh or not d.get("built") or stale) and not _building:
+    retry = not d.get("built") and time.time() - d.get("tried", 0) > 120
+    started = False
+    if (refresh or retry or (d.get("built") and stale)) and not _building:
         threading.Thread(target=build, daemon=True).start()
+        started = True
     hidden = {h.lower() for h in d.get("hidden", [])}
     return {"loved": d.get("loved", []), "recs": [e for e in d.get("recs", []) if e["name"].lower() not in hidden],
-            "built": d.get("built", 0), "user": d.get("user", ""), "building": _building, "error": d.get("error", ""),
+            "built": d.get("built", 0), "user": d.get("user", ""), "building": _building or started,
+            "error": "" if started else d.get("error", ""),
             "fresh": d.get("fresh", []), "freshBuilt": d.get("freshBuilt", 0), "plays": d.get("plays", {})}
 
 

@@ -18,6 +18,8 @@ sub init()
     m.toast.font = hFont("bold", 26)
     m.toastTimer = m.top.findNode("toastTimer")
     m.toastTimer.observeField("fire", "hideToast")
+    m.recheck = m.top.findNode("recheck")
+    m.recheck.observeField("fire", "onRecheck")
     m.pvTimer = m.top.findNode("pvTimer")
     m.pvTimer.observeField("fire", "loadAlbums")
     m.chipNodes = []
@@ -62,8 +64,15 @@ sub load(unused as dynamic)
     if m.loaded and m.data <> invalid and (m.data.built <> invalid and m.data.built > 0) then return
     if m.loaded and m.data = invalid then return
     m.loaded = true
-    m.note.text = "Asking the NAS" + Chr(8230)
+    if m.data = invalid then m.note.text = "Asking the NAS" + Chr(8230)
     nasCall("GET", "/api/discover", "", "onData", "discover")
+end sub
+
+' while the NAS is still building, ask again every 15 s as long as the tab is on screen
+sub onRecheck()
+    if not m.top.visible then return
+    m.loaded = false
+    load(invalid)
 end sub
 
 sub onData(event as object)
@@ -133,8 +142,13 @@ sub redraw()
     if items = invalid or items.Count() = 0
         m.detail.visible = false
         if m.data = invalid then return
-        if m.data.building = true or (m.data.built = 0 and m.data.user = "")
-            m.note.text = "The NAS is still working out your lists from Last.fm. Come back in a few minutes."
+        err = ""
+        if m.data.error <> invalid then err = m.data.error
+        if m.data.building <> true and m.data.built = 0 and err <> ""
+            m.note.text = "The NAS couldn't build your lists from Last.fm: " + err + ". It tries again each time you open this tab."
+        else if m.data.building = true or m.data.built = 0
+            m.note.text = "The NAS is working out your lists from Last.fm. This page updates by itself."
+            m.recheck.control = "start"
         else if m.data.user = ""
             m.note.text = "Pair Last.fm first (Music > * options > Last.fm), then your lists appear here."
         else
