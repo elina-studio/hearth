@@ -64,7 +64,7 @@ sub draw()
     y = section("Genre", y)
     list = [{ kind: "genreAny", label: "Any" }]
     for each g in cfg.genresBy[ek]
-        list.push({ kind: "genre", value: g, label: g })
+        list.push({ kind: "genre", value: g, label: g, icon: "pkg:/images/requests/genre/" + genreIcon(g) + ".png" })
     end for
     y = flow(list, y, maxW)
     provs = cfg.providersBy[ek]
@@ -135,6 +135,7 @@ function flow(list as object, y as integer, maxW as integer) as integer
         w = probe.boundingRect().width + 40
         if it.logo <> invalid and it.logo <> "" then w = w + 38
         if it.star = true then w = w + 28
+        if it.icon <> invalid then w = w + 34
         if it.wide <> invalid and it.wide > w then w = it.wide
         if x + w > maxW and x > 0
             m.rows.push(row)
@@ -180,6 +181,14 @@ sub makeChip(it as object)
         it.st.translation = [18, 14]
         tx = 46
     end if
+    if it.icon <> invalid
+        it.ic = g.createChild("Poster")
+        it.ic.uri = it.icon
+        it.ic.width = 26
+        it.ic.height = 26
+        it.ic.translation = [16, 11]
+        tx = 50
+    end if
     it.lab = g.createChild("Label")
     it.lab.font = hFontCached("bold", 22)
     it.lab.text = it.label
@@ -213,6 +222,7 @@ sub refresh()
         end if
         it.lab.color = ink
         if it.st <> invalid then it.st.blendColor = ink
+        if it.ic <> invalid then it.ic.blendColor = ink
         it.ring.visible = (i = m.focus)
     end for
 end sub
@@ -318,3 +328,13 @@ end function
 sub finish()
     m.top.result = { kind: m.sel.kind, genres: m.sel.genres, provider: m.sel.provider, minRating: m.sel.minRating, sort: m.sel.sort }
 end sub
+
+' Which line icon a genre gets (shows have a few genres movies don't); anything unknown gets the tag
+function genreIcon(name as string) as string
+    n = LCase(name)
+    for each k in ["action", "adventure", "animation", "comedy", "crime", "documentary", "drama", "family", "fantasy", "history", "horror", "music", "mystery", "romance", "thriller", "war", "western", "kids", "news"]
+        if Instr(1, n, k) > 0 then return k
+    end for
+    if Instr(1, n, "sci") > 0 then return "scifi"
+    return "tag"
+end function
