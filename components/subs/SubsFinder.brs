@@ -293,7 +293,7 @@ sub merge()
                 end if
                 score = numOf(s.score)
                 if score < 0 then score = 0
-                r = { from: "bazarr", provider: "Bazarr · " + strOf(s.provider), subtitle: s.subtitle, hi: s.hearing_impaired, forced: s.forced, name: name, score: score, scoreText: score.toStr() + "%", bar: score, tags: tags }
+                r = { from: "bazarr", provider: "Bazarr · " + strOf(s.provider), prov: s.provider, subtitle: s.subtitle, hi: s.hearing_impaired, forced: s.forced, name: name, score: score, scoreText: score.toStr() + "%", bar: score, tags: tags }
                 if score >= 90 then bzTop.push(r) else bzRest.push(r)
             end if
         end for
@@ -340,7 +340,7 @@ sub pick(r as object)
     if r.from = "plex"
         hPlex("subDownload", { id: m.item.Id, key: r.key }, "onPlexDownloaded")
     else
-        bazarr("download", { ids: m.bzIds, provider: r.provider, subtitle: r.subtitle, hi: r.hi, forced: r.forced }, "onBazarrDownloaded")
+        bazarr("download", { ids: m.bzIds, provider: r.prov, subtitle: r.subtitle, hi: r.hi, forced: r.forced }, "onBazarrDownloaded")
     end if
     paint()
 end sub
@@ -689,15 +689,9 @@ end sub
 
 function bazarrNote(err as string) as string
     if err = "nokey"
-        ip = "<TV IP>"
-        addrs = CreateObject("roDeviceInfo").GetIPAddrs()
-        for each k in addrs
-            ip = addrs[k]
-        end for
-        q = Chr(34)
-        return "Bazarr isn't set up yet. With Hearth open, run this on your Mac:" + Chr(10) + "curl -X POST -G --data-urlencode " + q + "bazarrKey=YOUR-KEY" + q + " http://" + ip + ":8060/input"
+        return "Bazarr's key isn't on this TV, and the Hearth helper on the NAS has no saved copy either. Run Hearth's key sync on your Mac (tools/remote/sync-keys.sh), then search again. Plex results still work."
     else if err = "badkey"
-        return "Bazarr said the key is wrong. Send it again with the curl command."
+        return "Bazarr refused the saved key, and the NAS helper's copy is the same. Run Hearth's key sync on your Mac (tools/remote/sync-keys.sh), then search again."
     else if err = "notfound"
         return "Bazarr doesn't have this title. It only covers shows in Sonarr and movies in Radarr."
     else if err = "noepisode"
