@@ -433,10 +433,12 @@ end sub
 ' ---------- actions ----------
 sub playTrack(k as integer)
     al = m.albums[m.sel]
+    if al = invalid or al.tracks = invalid or k >= al.tracks.Count() then return
     muSend("load", { tracks: pxTracks(al.tracks), start: k, label: pxStr(al.md.title) })
 end sub
 
 sub playAlbum(i as integer, shuffle as boolean)
+    if i < 0 or i >= m.albums.Count() then return
     md = m.albums[i].md
     muSend("playContainer", { kind: "album", id: pxStr(md.ratingKey), shuffle: shuffle, label: pxStr(md.title) })
 end sub
@@ -452,6 +454,7 @@ sub doTop(a as string)
 end sub
 
 sub albumOptions(i as integer)
+    if i < 0 or i >= m.albums.Count() then return
     m.optAlbum = i
     m.optTrack = -1
     d = CreateObject("roSGNode", "StandardMessageDialog")
@@ -465,6 +468,7 @@ sub albumOptions(i as integer)
 end sub
 
 sub trackOptions(i as integer, k as integer)
+    if i < 0 or i >= m.albums.Count() or m.albums[i].tracks = invalid or k >= m.albums[i].tracks.Count() then return
     m.optAlbum = i
     m.optTrack = k
     md = m.albums[i].tracks[k]
@@ -587,6 +591,11 @@ end function
 ' Left/Right across columns, Left from the left column goes back to the albums.
 sub songKey(key as string)
     al = m.albums[m.sel]
+    if al = invalid or al.tracks = invalid or m.songNodes.Count() = 0
+        ' the list was rebuilt under us (albums still loading): back to the album list
+        m.zone = "albums"
+        return
+    end if
     total = al.tracks.Count()
     count = m.songNodes.Count()
     rows = colRows(total)

@@ -829,6 +829,11 @@ sub contentKey(key as string)
         return
     end if
     if m.tab = 0
+        if m.rows.count() = 0 or m.row >= m.rows.count()
+            m.row = 0
+            m.zone = upZone()
+            return
+        end if
         if key = "up"
             if m.row = 0 then m.zone = upZone() else m.row = m.row - 1
         else if key = "down"

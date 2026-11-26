@@ -14,6 +14,19 @@ sub lfmInit()
     m.lfmStart = 0
     lfmReload()
     m.top.observeField("position", "lfmTick")
+    ' never set on this TV (a reinstall): the NAS helper knows whether Last.fm is connected
+    if CreateObject("roRegistrySection", "hearth").Read("lastfmOn") = "" then nasCall("GET", "/api/lastfm/status", "", "onLfmStatus", "")
+end sub
+
+sub onLfmStatus(event as object)
+    t = hTaskFrom(event)
+    if not t.ok or t.response = invalid or t.response.state <> "connected" then return
+    reg = CreateObject("roRegistrySection", "hearth")
+    if reg.Read("lastfmOn") <> "" then return
+    reg.Write("lastfmOn", "1")
+    reg.Flush()
+    print "[hearth lastfm] the NAS helper is connected to Last.fm: scrobbling turned on"
+    lfmReload()
 end sub
 
 sub lfmReload()

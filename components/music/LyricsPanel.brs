@@ -46,6 +46,7 @@ end function
 
 sub start(unused as dynamic)
     p = m.global.music
+    if p = invalid then return
     p.observeFieldScoped("track", "onTrack")
     p.observeFieldScoped("position", "onTick")
     p.observeFieldScoped("command", "onCmd")
@@ -56,6 +57,7 @@ end sub
 
 sub lyricsStop(unused as dynamic)
     p = m.global.music
+    if p = invalid then return
     p.unobserveFieldScoped("track")
     p.unobserveFieldScoped("position")
     p.unobserveFieldScoped("command")
