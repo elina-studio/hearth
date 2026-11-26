@@ -120,7 +120,8 @@ sub restoreKeys()
     n = 0
     for each k in ok
         ' fill in only what the TV is missing; a key typed or sent later always wins
-        if data[k] <> invalid and type(data[k]) = "String" and data[k] <> "" and reg.Read(k) = ""
+        t = type(data[k])
+        if (t = "String" or t = "roString") and data[k] <> "" and reg.Read(k) = ""
             reg.Write(k, data[k])
             n = n + 1
         end if
