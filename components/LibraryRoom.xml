@@ -24,7 +24,7 @@
     <Group id="gridClip" translation="[0, 330]" clippingRect="[0, -16, 1920, 550]">
       <Group id="grid" translation="[96, 0]" />
     </Group>
-    <Label id="empty" translation="[96, 360]" width="1500" color="0xB5AF8CFF" />
+    <Label id="empty" translation="[96, 360]" width="1500" wrap="true" color="0xB5AF8CFF" />
     <Label id="count" translation="[1424, 270]" width="400" horizAlign="right" color="0xB5AF8CFF" />
     <!-- key hints along the bottom (left-aligned at x 96; hidden while the A to Z letter row pushes the grid down) -->
     <KeyHints id="hints" translation="[96, 868]" />
