@@ -12,13 +12,18 @@ function queueCommand(c as object) as boolean
         f = c.from
         t = c.to
         if f < 0 or f >= n or t < 0 or t >= n or f = t then return true
-        out = []
-        for each x in q
-            out.push(x)
+        ' roArray has no Insert: build the new order by hand
+        item = q[f]
+        rest = []
+        for i = 0 to n - 1
+            if i <> f then rest.push(q[i])
         end for
-        item = out[f]
-        out.delete(f)
-        out.insert(t, item)
+        out = []
+        for i = 0 to rest.count() - 1
+            if i = t then out.push(item)
+            out.push(rest[i])
+        end for
+        if t >= rest.count() then out.push(item)
         ni = cur
         if f = cur
             ni = t
