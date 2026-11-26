@@ -7,7 +7,7 @@ sub init()
     m.uri = ""
     ' follow the shared music player, when the Music room provides one
     if m.global.hasField("music") and m.global.music <> invalid
-        m.global.music.observeField("state", "update")
+        m.global.music.observeFieldScoped("state", "update")
     end if
 end sub
 

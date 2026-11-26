@@ -21,9 +21,9 @@ sub init()
     m.focus = 1
     mp = musicNode()
     if mp <> invalid
-        mp.observeField("state", "paint")
-        mp.observeField("track", "paint")
-        mp.observeField("castDelay", "paint")
+        mp.observeFieldScoped("state", "paint")
+        mp.observeFieldScoped("track", "paint")
+        mp.observeFieldScoped("castDelay", "paint")
     end if
 end sub
 

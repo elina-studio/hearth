@@ -59,8 +59,9 @@ sub init()
     end for
     mp = m.global.music
     if mp <> invalid
-        mp.observeField("state", "showMusic")
-        mp.observeField("track", "showMusic")
+        ' scoped: a plain unobserveField later would also drop every other screen's observers on the player
+        mp.observeFieldScoped("state", "showMusic")
+        mp.observeFieldScoped("track", "showMusic")
     end if
 
     m.queue = []      ' photos from the current batch
@@ -612,7 +613,7 @@ sub cleanup()
     m.weatherTimer.control = "stop"
     mp = m.global.music
     if mp <> invalid
-        mp.unobserveField("state")
-        mp.unobserveField("track")
+        mp.unobserveFieldScoped("state")
+        mp.unobserveFieldScoped("track")
     end if
 end sub

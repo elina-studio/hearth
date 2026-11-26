@@ -43,7 +43,7 @@ sub init()
     m.yielded = false
     m.drift = m.top.findNode("drift")
     m.still.scaleRotateCenter = [960, 540]
-    if m.global.hasField("music") and m.global.music <> invalid then m.global.music.observeField("track", "paintState")
+    if m.global.hasField("music") and m.global.music <> invalid then m.global.music.observeFieldScoped("track", "paintState")
     m.clock = m.top.findNode("clock")
     m.clock.font = hFont("bold", 40)
     m.hudIn = m.top.findNode("hudIn")
@@ -635,7 +635,7 @@ sub leave()
     ' a pending start timer must not begin the video after we've gone, and the music observer goes with us
     m.useVideo = false
     mp = musicNode()
-    if mp <> invalid then mp.unobserveField("track")
+    if mp <> invalid then mp.unobserveFieldScoped("track")
     m.sound.active = false
     m.scene.running = false
     m.video.control = "stop"
