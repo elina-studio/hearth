@@ -10,8 +10,9 @@ sub build()
     if cfg = invalid then return
     m.cfg = cfg
     f = cfg.filters
-    m.sel = { genres: [], provider: "", minRating: 0, sort: "popular" }
+    m.sel = { kind: "movie", genres: [], provider: "", minRating: 0, sort: "popular" }
     if f <> invalid
+        if f.kind <> invalid then m.sel.kind = f.kind
         for each g in f.genres
             m.sel.genres.push(g)
         end for
@@ -36,17 +37,41 @@ sub draw()
     t.color = "0xEDE6CAFF"
     t.width = maxW
     y = 62
+    if cfg.pickKind = true
+        y = section("Show", y)
+        list = [{ kind: "kind", value: "all", label: "Trending now" }, { kind: "kind", value: "movie", label: "Movies" }, { kind: "kind", value: "tv", label: "Shows" }]
+        y = flow(list, y, maxW)
+    end if
+    ek = m.sel.kind
+    if ek = "all"
+        l = m.content.createChild("Label")
+        l.font = hFontCached("regular", 24)
+        l.color = "0xB5AF8CFF"
+        l.text = "Pick Movies or Shows to narrow Trending by genre, streaming service, rating or sort."
+        l.width = maxW
+        l.wrap = true
+        l.translation = [0, y + 6]
+        y = y + 90
+        list = [{ kind: "done", label: "Show results", wide: 560 }]
+        y = flow(list, y, maxW)
+        for each it in m.items
+            makeChip(it)
+        end for
+        refresh()
+        return
+    end if
     ' Genre (several can be on at once: both must match)
     y = section("Genre", y)
     list = [{ kind: "genreAny", label: "Any" }]
-    for each g in cfg.genres
-        list.push({ kind: "genre", value: g.name, label: g.name })
+    for each g in cfg.genresBy[ek]
+        list.push({ kind: "genre", value: g, label: g })
     end for
     y = flow(list, y, maxW)
-    if cfg.providers <> invalid and cfg.providers.count() > 0
+    provs = cfg.providersBy[ek]
+    if provs <> invalid and provs.count() > 0
         y = section("Streaming on", y)
         list = [{ kind: "provider", value: "", label: "Any" }]
-        for each p in cfg.providers
+        for each p in provs
             list.push({ kind: "provider", value: p.id.toStr(), label: p.name, logo: p.logo })
         end for
         y = flow(list, y, maxW)
@@ -74,6 +99,7 @@ end sub
 
 function isOn(it as object) as boolean
     k = it.kind
+    if k = "kind" then return m.sel.kind = it.value
     if k = "genreAny" then return m.sel.genres.count() = 0
     if k = "genre" then return hasGenre(it.value)
     if k = "provider" then return m.sel.provider = it.value
@@ -232,7 +258,22 @@ end sub
 
 sub press(it as object)
     k = it.kind
-    if k = "genreAny"
+    if k = "kind"
+        if m.sel.kind <> it.value
+            m.sel.kind = it.value
+            m.sel.genres = []
+            m.sel.provider = ""
+            if it.value = "all"
+                m.sel.minRating = 0
+                m.sel.sort = "popular"
+            end if
+            m.focus = 0
+            draw()
+            m.focus = indexOfKind(it.value)
+            refresh()
+        end if
+        return
+    else if k = "genreAny"
         m.sel.genres = []
     else if k = "genre"
         out = []
@@ -249,7 +290,17 @@ sub press(it as object)
     else if k = "sort"
         m.sel.sort = it.value
     else if k = "reset"
-        m.sel = { genres: [], provider: "", minRating: 0, sort: "popular" }
+        m.sel.genres = []
+        m.sel.provider = ""
+        m.sel.minRating = 0
+        m.sel.sort = "popular"
+        if m.cfg.pickKind = true then m.sel.kind = "all"
+        if m.cfg.pickKind = true
+            m.focus = 0
+            draw()
+            refresh()
+            return
+        end if
     else if k = "done"
         finish()
         return
@@ -257,6 +308,13 @@ sub press(it as object)
     refresh()
 end sub
 
+function indexOfKind(v as string) as integer
+    for i = 0 to m.items.count() - 1
+        if m.items[i].kind = "kind" and m.items[i].value = v then return i
+    end for
+    return 0
+end function
+
 sub finish()
-    m.top.result = { genres: m.sel.genres, provider: m.sel.provider, minRating: m.sel.minRating, sort: m.sel.sort }
+    m.top.result = { kind: m.sel.kind, genres: m.sel.genres, provider: m.sel.provider, minRating: m.sel.minRating, sort: m.sel.sort }
 end sub

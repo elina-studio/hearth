@@ -12,6 +12,7 @@
         <Label id="title" translation="[0, 34]" width="1280" maxLines="1" color="0xEDE6CAFF" />
       </Group>
       <Group id="tabs" translation="[540, 128]" visible="false" />
+      <Label id="moreText" translation="[1260, 20]" width="520" horizAlign="right" text="Loading more…" color="0xB5AF8CFF" visible="false" />
       <Group id="filterBar" translation="[540, 128]" visible="false">
         <Poster id="barBg" uri="pkg:/images/pill.9.png" width="236" height="52" blendColor="0xFFFFFF12" />
         <Poster id="barIcon" uri="pkg:/images/requests/list.png" width="24" height="24" translation="[22, 14]" blendColor="0xEDE6CAFF" />

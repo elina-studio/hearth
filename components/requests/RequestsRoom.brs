@@ -77,12 +77,20 @@ sub init()
     m.ver = 0
     m.builtFor = ""
     ' Discover lists: up to 5 pages (about 100 titles), narrowed by the filter sheet
-    m.filters = { trending: newFilters(), movies: newFilters(), tv: newFilters() }
+    m.filters = { trending: newFilters("all"), movies: newFilters("movie"), tv: newFilters("tv") }
     m.gen = {}
     m.acc = {}
     m.seen = {}
     m.pageNo = {}
     m.busy = {}
+    m.inflight = {}
+    m.more = {}
+    m.totalPages = {}
+    m.loadedAt = {}
+    m.up = CreateObject("roTimespan")
+    m.nodes = {}
+    m.moreText = m.top.findNode("moreText")
+    m.moreText.font = hFont("regular", 24)
     m.listError = {}
     m.genres = { movie: [], tv: [] }
     m.provs = { movie: [], tv: [] }
@@ -242,6 +250,7 @@ sub oApi(method as string, path as string, query as dynamic, body as dynamic, cb
         if type(body) = "roString" or type(body) = "String" then t.bodyText = body else t.body = body
     end if
     t.tag = tag
+    m.lastTask = t
     keep(t, cb)
 end sub
 
@@ -301,6 +310,8 @@ sub onList(event as object)
     key = parts[0]
     if m.gen[key] <> Val(parts[1]) then return
     m.busy[key] = false
+    m.more[key] = false
+    m.moreText.visible = false
     if checkProblem(t) then return
     if not t.ok
         if Val(parts[2]) = 1 and m.cards[key] = invalid
@@ -324,13 +335,14 @@ sub onList(event as object)
         end if
     end for
     m.pageNo[key] = page
-    if page = 1
-        m.totals[key] = invalid
-        if t.response.totalResults <> invalid then m.totals[key] = t.response.totalResults
-    end if
+    m.more[key] = false
+    m.inflight.delete(key)
+    m.moreText.visible = false
+    if t.response.totalResults <> invalid then m.totals[key] = t.response.totalResults
+    if t.response.totalPages <> invalid then m.totalPages[key] = t.response.totalPages
     publishList(key)
-    total = t.response.totalPages
-    if page < 5 and total <> invalid and page < total then fetchPage(key, page + 1)
+    ' the second page comes straight away so there is always something past the first screen; the rest as you scroll
+    if page = 1 then maybeMore(key)
 end sub
 
 sub publishList(key as string)
@@ -341,8 +353,25 @@ sub publishList(key as string)
     if currentList().key = key then showList()
 end sub
 
-function newFilters() as object
-    return { genres: [], provider: "", minRating: 0, sort: "popular" }
+function newFilters(kind as string) as object
+    return { kind: kind, genres: [], provider: "", minRating: 0, sort: "popular" }
+end function
+
+' "movie" / "tv" for the list being narrowed; "all" for the plain Trending feed
+function effKind(key as string) as string
+    if key = "movies" then return "movie"
+    if key = "tv" then return "tv"
+    if key = "trending" then return m.filters.trending.kind
+    return ""
+end function
+
+' Trending has no filters of its own in Overseerr; once narrowed it asks the movie or show Discover list instead
+function listPath(key as string) as string
+    if key = "trending"
+        if m.filters.trending.kind = "movie" then return "/api/v1/discover/movies"
+        if m.filters.trending.kind = "tv" then return "/api/v1/discover/tv"
+    end if
+    return listByKey(key).path
 end function
 
 function isFilterable(key as string) as boolean
@@ -370,13 +399,47 @@ end function
 sub loadList(key as string)
     if m.gen[key] = invalid then m.gen[key] = 0
     m.gen[key] = m.gen[key] + 1
+    ' a search that is still running for the old filters is stopped, not just ignored
+    stopList(key)
     m.acc[key] = []
     m.seen[key] = {}
     m.pageNo[key] = 0
+    m.totalPages[key] = 0
+    m.more[key] = false
+    m.loadedAt[key] = m.up.TotalSeconds()
     m.busy[key] = true
     m.listError[key] = ""
     if currentList().key = key and isFilterable(key) then paintBar()
     fetchPage(key, 1)
+end sub
+
+sub stopList(key as string)
+    t = m.inflight[key]
+    if t <> invalid
+        t.control = "STOP"
+        if t.key <> invalid then m.tasks.delete(t.key)
+        m.inflight.delete(key)
+    end if
+end sub
+
+' Lists are asked again when you come back to them after a few minutes, so Trending and Popular stay fresh
+sub touchList(key as string)
+    if not isDiscover(key) or m.busy[key] = true or m.setup.visible then return
+    if m.loadedAt[key] = invalid then return
+    if m.up.TotalSeconds() - m.loadedAt[key] > 300
+        print "[hearth-filter] refresh "; key; " (older than 5 minutes)"
+        loadList(key)
+    end if
+end sub
+
+' Near the end of the grid: ask Overseerr for the next page, as long as it has more
+sub maybeMore(key as string)
+    if not isDiscover(key) or m.more[key] = true or m.busy[key] = true then return
+    if m.pageNo[key] = invalid or m.pageNo[key] < 1 then return
+    if m.pageNo[key] >= m.totalPages[key] then return
+    m.more[key] = true
+    m.moreText.visible = true
+    fetchPage(key, m.pageNo[key] + 1)
 end sub
 
 sub fetchPage(key as string, page as integer)
@@ -385,16 +448,19 @@ sub fetchPage(key as string, page as integer)
     q = ["page=" + page.toStr()]
     addFilterQuery(q, key)
     qs = q.join("&")
-    print "[hearth-filter] ask "; key; " page "; page; " ?"; qs
-    oApi("GET", listByKey(key).path, qs, invalid, "onList", key + "|" + m.gen[key].toStr() + "|" + page.toStr())
+    path = listPath(key)
+    print "[hearth-filter] ask "; path; " page "; page; " ?"; qs
+    oApi("GET", path, qs, invalid, "onList", key + "|" + m.gen[key].toStr() + "|" + page.toStr())
+    m.inflight[key] = m.lastTask
 end sub
+
 
 ' Movies and shows are narrowed by Overseerr itself; Trending can't be, so it is narrowed here (clientFilter)
 sub addFilterQuery(q as object, key as string)
-    if key <> "movies" and key <> "tv" then return
+    if key <> "movies" and key <> "tv" and key <> "trending" then return
     f = m.filters[key]
-    kind = "movie"
-    if key = "tv" then kind = "tv"
+    kind = effKind(key)
+    if kind <> "movie" and kind <> "tv" then return
     ids = []
     for each name in f.genres
         id = genreId(kind, name)
@@ -408,7 +474,7 @@ sub addFilterQuery(q as object, key as string)
     votes = 0
     if f.minRating > 0
         qp(q, "voteAverageGte", f.minRating.toStr())
-        votes = 100
+        votes = 50
     end if
     today = CreateObject("roDateTime").ToISOString().Left(10)
     if f.sort = "rating"
@@ -442,27 +508,7 @@ function genreId(kind as string, name as string) as string
 end function
 
 function clientFilter(key as string, cards as object) as object
-    if key <> "trending" then return cards
-    f = m.filters.trending
-    out = []
-    for each c in cards
-        ok = true
-        if f.minRating > 0 and (c.vote = invalid or c.vote < f.minRating) then ok = false
-        if ok
-            for each name in f.genres
-                if not cardHasGenre(c, name) then ok = false
-            end for
-        end if
-        if ok then out.push(c)
-    end for
-    if f.sort = "rating"
-        out = sortCards(out, "vote", true)
-    else if f.sort = "newest"
-        out = sortCards(out, "date", true)
-    else if f.sort = "az"
-        out = sortCards(out, "title", false)
-    end if
-    return out
+    return cards
 end function
 
 function cardHasGenre(c as object, name as string) as boolean
@@ -727,29 +773,17 @@ sub buildGrid()
     key = currentList().key
     cards = m.cards[key]
     stamp = key + "|" + m.ver.toStr()
-    if isDiscover(key) and m.gen[key] <> invalid
-        ' the same search keeps its cards and just adds the new pages (re-sorted Trending rebuilds)
-        stamp = key + "|g" + m.gen[key].toStr()
-        if key = "trending" and m.filters.trending.sort <> "popular" then stamp = stamp + "|" + m.pageNo.trending.toStr()
-    end if
+    if isDiscover(key) and m.gen[key] <> invalid then stamp = key + "|g" + m.gen[key].toStr()
     if stamp = m.builtFor and cards <> invalid
-        for i = m.grid.getChildCount() to cards.count() - 1
-            n = m.grid.createChild("ReqCard")
-            n.translation = [(i mod m.cols) * m.pitchX, Int(i / m.cols) * gridPitchY()]
-            n.card = cards[i]
-        end for
+        ' same list, maybe more pages: paintGrid adds whatever rows are now near the screen
         paintGrid()
         return
     end if
     m.builtFor = stamp
     m.grid.removeChildrenIndex(m.grid.getChildCount(), 0)
+    m.nodes = {}
     if cards = invalid then return
     if m.gridIndex >= cards.count() then m.gridIndex = 0
-    for i = 0 to cards.count() - 1
-        n = m.grid.createChild("ReqCard")
-        n.translation = [(i mod m.cols) * m.pitchX, Int(i / m.cols) * gridPitchY()]
-        n.card = cards[i]
-    end for
     paintGrid()
 end sub
 
@@ -759,20 +793,46 @@ function gridPitchY() as integer
     return m.pitchY
 end function
 
+' Cards are made only for the rows near the screen (a few rows either side of the focused one), so a list can
+' run to thousands of titles without thousands of nodes.
 sub paintGrid()
-    n = m.grid.getChildCount()
+    cards = m.cards[currentList().key]
+    if cards = invalid then return
     row = Int(m.gridIndex / m.cols)
     ' keep the focused row as the first or second row on screen
     top = row - 1
     if top < 0 then top = 0
     m.grid.translation = [0, -top * gridPitchY()]
-    for i = 0 to n - 1
-        c = m.grid.getChild(i)
+    lo = (top - 2) * m.cols
+    hi = (top + 6) * m.cols - 1
+    if lo < 0 then lo = 0
+    if hi > cards.count() - 1 then hi = cards.count() - 1
+    gone = []
+    for each k in m.nodes
+        i = Val(k)
+        if i < lo or i > hi then gone.push(k)
+    end for
+    for each k in gone
+        m.grid.removeChild(m.nodes[k])
+        m.nodes.delete(k)
+    end for
+    for i = lo to hi
+        k = i.toStr()
+        c = m.nodes[k]
+        if c = invalid
+            c = m.grid.createChild("ReqCard")
+            c.translation = [(i mod m.cols) * m.pitchX, Int(i / m.cols) * gridPitchY()]
+            c.card = cards[i]
+            m.nodes[k] = c
+        end if
         r = Int(i / m.cols)
         c.focused = (m.focused and m.zone = "grid" and i = m.gridIndex)
         if r >= top - 1 and r <= top + 3 then c.load = true
     end for
-    if m.zone = "grid" then showCardInfo()
+    if m.zone = "grid"
+        showCardInfo()
+        if cards.count() - m.gridIndex <= m.cols * 3 then maybeMore(currentList().key)
+    end if
 end sub
 
 function currentCard() as object
@@ -1382,6 +1442,7 @@ end sub
 
 sub focusIn(unused as dynamic)
     retryLists()
+    touchList(currentList().key)
     m.focused = true
     m.top.setFocus(true)
     refreshFocus()
@@ -1510,10 +1571,12 @@ function railKey(key as string) as boolean
         end if
         m.railIndex = m.railIndex - 1
         m.gridIndex = 0
+        touchList(currentList().key)
     else if key = "down"
         if m.railIndex < n - 1
             m.railIndex = m.railIndex + 1
             m.gridIndex = 0
+            touchList(currentList().key)
         end if
     else if key = "back"
         toPills()
@@ -1598,23 +1661,26 @@ end function
 
 function filtersActive(key as string) as boolean
     f = m.filters[key]
+    if key = "trending" and f.kind <> "all" then return true
     return f.genres.count() > 0 or f.provider <> "" or f.minRating > 0 or f.sort <> "popular"
 end function
 
 function filterSummary(key as string) as string
     f = m.filters[key]
     parts = []
+    if key = "trending" and f.kind = "movie" then parts.push("movies")
+    if key = "trending" and f.kind = "tv" then parts.push("shows")
     if f.genres.count() > 0 then parts.push(f.genres.join(" + "))
     if f.provider <> ""
         kind = "movie"
-        if key = "tv" then kind = "tv"
+        if effKind(key) = "tv" then kind = "tv"
         for each p in m.provs[kind]
             if p.id.toStr() = f.provider then parts.push("on " + p.name)
         end for
     end if
     if f.minRating > 0 then parts.push("rated " + f.minRating.toStr() + ".0+")
     names = { popular: "most popular", rating: "top rated", newest: "newest", az: "A to Z" }
-    parts.push(names[f.sort])
+    if key <> "trending" or f.kind <> "all" then parts.push(names[f.sort])
     text = parts.join(" · ")
     if m.busy[key] = true then return "Asking Overseerr… · " + text
     if filtersActive(key)
@@ -1622,7 +1688,9 @@ function filterSummary(key as string) as string
         if Len(text) > 48 then text = Left(text, 46) + "…"
         return text
     end if
-    return filterCountShown(key).toStr() + " titles · " + text
+    n = filterCountShown(key)
+    if m.totals[key] <> invalid and m.totals[key] > n then n = m.totals[key]
+    return reqThousands(n) + " titles · " + text
 end function
 
 function filterCountShown(key as string) as integer
@@ -1634,14 +1702,9 @@ end function
 ' movies and shows are narrowed by Overseerr, so "of" is its total for these filters (more than 100 means the cap was hit)
 function filterCountLine(key as string) as string
     shown = filterCountShown(key)
-    total = invalid
-    if key = "trending"
-        if m.acc[key] <> invalid then total = m.acc[key].count()
-    else
-        total = m.totals[key]
-    end if
+    total = m.totals[key]
     if total = invalid or total < shown then total = shown
-    return "Filtered · " + shown.toStr() + " of " + reqThousands(total)
+    return "Filtered · " + reqThousands(total) + " titles"
 end function
 
 function reqThousands(n as integer) as string
@@ -1705,31 +1768,23 @@ end function
 sub openSheet()
     key = currentList().key
     if not isFilterable(key) then return
-    genres = []
-    seen = {}
-    kinds = ["movie", "tv"]
-    if key = "movies" then kinds = ["movie"]
-    if key = "tv" then kinds = ["tv"]
-    for each kind in kinds
+    gb = { movie: [], tv: [] }
+    for each kind in ["movie", "tv"]
         for each g in m.genres[kind]
-            if seen[g.name] = invalid
-                seen[g.name] = true
-                genres.push({ name: g.name })
-            end if
+            gb[kind].push(g.name)
         end for
     end for
-    provs = []
-    if key = "movies" then provs = m.provs.movie
-    if key = "tv" then provs = m.provs.tv
+    pb = { movie: m.provs.movie, tv: m.provs.tv }
     closeSheet()
-    print "[hearth-filter] open sheet for "; key; " genres "; genres.count(); " providers "; provs.count()
+    print "[hearth-filter] open sheet for "; key; " genres "; gb.movie.count(); "/"; gb.tv.count(); " providers "; pb.movie.count(); "/"; pb.tv.count()
     s = m.sheetHolder.createChild("FilterSheet")
-    s.config = { title: currentList().name, genres: genres, providers: provs, filters: m.filters[key] }
+    s.config = { title: currentList().name, genresBy: gb, providersBy: pb, pickKind: (key = "trending"), filters: m.filters[key] }
     s.observeField("result", "onSheetResult")
     m.sheet = s
     m.zoneBeforeSheet = m.zone
     m.zone = "sheet"
 end sub
+
 
 sub closeSheet()
     if m.sheet <> invalid
