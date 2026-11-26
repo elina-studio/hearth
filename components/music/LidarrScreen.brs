@@ -54,6 +54,11 @@ end sub
 sub start()
     if not hasKey()
         showSetup("")
+        ' the NAS helper may hold the key: ask it once; when it has one, onKeyArrived switches this screen over
+        if m.keysTask = invalid
+            m.keysTask = CreateObject("roSGNode", "KeysTask")
+            m.keysTask.control = "RUN"
+        end if
         return
     end if
     m.setup.visible = false

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Fills in keys the TV is missing from the NAS helper's saved copy, off the render thread.
+     A room that finds its key missing runs this once; the key then arrives through m.global (overseerrKey, lidarrKey)
+     exactly as if it had been sent from the Mac. -->
+<component name="KeysTask" extends="Task">
+  <interface>
+    <field id="wrote" type="stringarray" />
+    <field id="done" type="boolean" alwaysNotify="true" />
+  </interface>
+  <script type="text/brightscript" uri="pkg:/source/keys.brs" />
+  <script type="text/brightscript" uri="pkg:/components/KeysTask.brs" />
+</component>

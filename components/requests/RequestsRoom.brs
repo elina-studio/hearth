@@ -116,6 +116,13 @@ end sub
 sub refresh(unused as dynamic)
     if apiKey() = ""
         showSetup("")
+        ' the NAS helper may hold the key (a reinstall, or the NAS was off at launch): ask it once per visit.
+        ' When it has one, the key arrives through m.global.overseerrKey and this screen gives way to the room.
+        if m.keysTask = invalid
+            m.keysTask = CreateObject("roSGNode", "KeysTask")
+            m.keysTask.observeField("done", "onKeysTried")
+            m.keysTask.control = "RUN"
+        end if
         return
     end if
     if m.setup.visible
@@ -280,6 +287,11 @@ function baseUrl() as string
     if u = invalid or u = "" then u = "http://192.168.254.41:5055"
     return u
 end function
+
+sub onKeysTried()
+    ' free the slot so the next visit can ask again
+    m.keysTask = invalid
+end sub
 
 sub onKeyArrived()
     m.loaded = false
@@ -592,7 +604,8 @@ sub onProviders(event as object)
     wanted = [{ k: "netflix", n: "Netflix" }, { k: "max", n: "Max" }, { k: "disney", n: "Disney+" }, { k: "prime video", n: "Prime" }, { k: "apple tv", n: "Apple TV+" }, { k: "hulu", n: "Hulu" }, { k: "paramount", n: "Paramount+" }, { k: "peacock", n: "Peacock" }, { k: "tubi", n: "Tubi" }]
     for each w in wanted
         for each p in t.response.results
-            nm = LCase(p.name)
+            nm = ""
+            if p.name <> invalid then nm = LCase(p.name)
             hit = (Instr(1, nm, w.k) > 0)
             if w.k = "max" then hit = (nm = "max" or nm = "hbo max")
             if hit and Instr(1, nm, "ads") = 0 and Instr(1, nm, "channel") = 0

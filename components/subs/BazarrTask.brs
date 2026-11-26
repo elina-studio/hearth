@@ -20,6 +20,8 @@ sub runTask()
     out = {}
     status = 0
     err = ""
+    ' missing on the TV: the NAS helper may hold it
+    if m.apiKey = "" then m.apiKey = hKeyFromNas("bazarrKey", "")
     if m.apiKey = ""
         err = "nokey"
     else if m.top.op = "search"
@@ -222,7 +224,21 @@ function formBody(form as object) as string
     return parts.join("&")
 end function
 
+' One call; when Bazarr refuses the key (401) and the NAS helper holds a different one, it is saved and the call is made again.
 function req(method as string, path as string, query as object, body as string, timeout as integer) as object
+    r = reqOnce(method, path, query, body, timeout)
+    if r.status = 401 and m.healed <> true
+        m.healed = true
+        fresh = hKeyFromNas("bazarrKey", m.apiKey)
+        if fresh <> ""
+            m.apiKey = fresh
+            r = reqOnce(method, path, query, body, timeout)
+        end if
+    end if
+    return r
+end function
+
+function reqOnce(method as string, path as string, query as object, body as string, timeout as integer) as object
     xfer = CreateObject("roUrlTransfer")
     port = CreateObject("roMessagePort")
     xfer.setMessagePort(port)

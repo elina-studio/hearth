@@ -17,6 +17,11 @@ sub runTask()
         who = "Sonarr"
     end if
     if Right(base, 1) = "/" then base = Left(base, Len(base) - 1)
+    keyName = "sonarrKey"
+    if movie then keyName = "radarrKey"
+    ' the key is missing on the TV: the NAS helper may hold it
+    if key = "" then key = hKeyFromNas(keyName, "")
+    healed = false
     if key = ""
         print "[hearth-arr] no "; who; " key on the TV, so the download waits for "; who; "'s own search"
         finish(false, "no key")
@@ -40,8 +45,14 @@ sub runTask()
             end if
         end if
         if id <> invalid then exit for
-        ' a wrong key will not fix itself in 40 s
-        if r.status = 401 or r.status = 403 then exit for
+        ' a wrong key will not fix itself in 40 s: take the NAS helper's copy once, else stop
+        if r.status = 401 or r.status = 403
+            fresh = ""
+            if not healed then fresh = hKeyFromNas(keyName, key)
+            healed = true
+            if fresh = "" then exit for
+            key = fresh
+        end if
         sleep(4000)
     end for
     if id = invalid
