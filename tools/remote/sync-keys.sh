@@ -83,4 +83,4 @@ echo "sent to the TV (Hearth must be open for the TV to take them)"
 EOF
 )
 B=$(printf '%s' "$REMOTE" | base64 | tr -d '\n')
-ssh -t "$NAS" "echo $B | base64 -d > /tmp/hearth-sync.sh && sudo sh /tmp/hearth-sync.sh; rm -f /tmp/hearth-sync.sh"
+ssh -t -o ControlMaster=auto -o ControlPath=/tmp/hearth-ssh-%r-%h -o ControlPersist=300 "$NAS" "echo $B | base64 -d > /tmp/hearth-sync.sh && sudo sh /tmp/hearth-sync.sh; rm -f /tmp/hearth-sync.sh"
