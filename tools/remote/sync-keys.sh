@@ -1,8 +1,8 @@
 #!/bin/bash
 # One command that puts EVERY key back, on the TV and in the NAS helper's saved copy (so every launch can restore them).
 #   bash <(curl -sL https://raw.githubusercontent.com/elina-studio/hearth/<commit>/tools/remote/sync-keys.sh)
-# It reads each key from its own app on the NAS (Sonarr, Radarr, Lidarr, Overseerr, Bazarr, Plex), rewrites
-# /volume1/docker/hearth-remote/data/hearth-keys.json with all of them (keeping the Home Assistant details saved there by ha-weather.sh, and sending them to the TV too),
+# It reads each key from its own app on the NAS (Sonarr, Radarr, Lidarr, Overseerr, Bazarr, Plex, Home Assistant), rewrites
+# /volume1/docker/hearth-remote/data/hearth-keys.json with all of them,
 # and sends them to the TV. One ssh, one sudo password. No key is ever printed.
 NAS="Elina@192.168.254.41"
 REMOTE=$(cat <<'EOF'
@@ -26,6 +26,35 @@ old() { grep -oE "\"$1\": *\"[^\"]*\"" "$J" 2>/dev/null | head -1 | sed -E 's/.*
 for n in overseerr lidarr bazarr radarr sonarr; do
   eval "[ -z \"\$K_$n\" ] && K_$n=\$(old ${n}Key)"
 done
+# Home Assistant (weather + speakers): reuse the saved token if HA still takes it, otherwise sign a fresh one from a
+# long-lived token HA already has (its own auth store holds the signing key), so nobody has to make one by hand.
+DK=/usr/local/bin/docker
+HAU="$(old haUrl)"; [ -z "$HAU" ] && HAU="http://192.168.254.41:8123"
+hacode() { curl -s -o /dev/null -m 8 -w '%{http_code}' -H "Authorization: Bearer $1" "$HAU/api/$2"; }
+K_ha="$(old haToken)"
+[ -n "$K_ha" ] && [ "$(hacode "$K_ha" "")" != "200" ] && K_ha=""
+if [ -z "$K_ha" ]; then
+  HAC=$($DK ps --format '{{.Names}}' 2>/dev/null | grep -i -m1 -E '^home-?assistant$')
+  cat > /tmp/hearth-ha.py <<'PY'
+import json, time, jwt
+a = json.load(open("/config/.storage/auth"))["data"]
+users = {u["id"]: u for u in a.get("users", [])}
+ll = [t for t in a.get("refresh_tokens", []) if t.get("token_type") == "long_lived_access_token"
+      and users.get(t.get("user_id"), {}).get("is_active", True)]
+ll.sort(key=lambda t: ("hearth" in (t.get("client_name") or "").lower(), t.get("created_at") or ""), reverse=True)
+if ll:
+    t, now = ll[0], int(time.time())
+    print(jwt.encode({"iss": t["id"], "iat": now, "exp": now + int(t.get("access_token_expiration") or 315360000)}, t["jwt_key"], algorithm="HS256"))
+PY
+  [ -n "$HAC" ] && K_ha=$($DK exec -i "$HAC" python3 - < /tmp/hearth-ha.py 2>/dev/null)
+  rm -f /tmp/hearth-ha.py
+  [ -n "$K_ha" ] && [ "$(hacode "$K_ha" "")" != "200" ] && K_ha=""
+fi
+HAE="$(old haEntity)"; [ -z "$HAE" ] && HAE="weather.forecast_home"
+if [ -n "$K_ha" ] && [ "$(hacode "$K_ha" "states/$HAE")" != "200" ]; then
+  e=$(curl -s -m 8 -H "Authorization: Bearer $K_ha" "$HAU/api/states" | grep -o '"entity_id": *"weather\.[^"]*"' | head -1 | sed 's/.*"\(weather\.[^"]*\)"/\1/')
+  [ -n "$e" ] && HAE="$e"
+fi
 OUT="{"
 add() { [ -n "$2" ] && OUT="$OUT\"$1\":\"$2\","; }
 add plexToken "$K_plex"; add plexServerToken "$K_plex"
@@ -36,12 +65,12 @@ add lidarrUrl "http://192.168.254.41:8686";    add lidarrKey "$K_lidarr"
 add bazarrUrl "http://192.168.254.41:6767";    add bazarrKey "$K_bazarr"
 add radarrUrl "http://192.168.254.41:7878";    add radarrKey "$K_radarr"
 add sonarrUrl "http://192.168.254.41:8989";    add sonarrKey "$K_sonarr"
-add haUrl "$(old haUrl)"; add haToken "$(old haToken)"; add haEntity "$(old haEntity)"
+if [ -n "$K_ha" ]; then add haUrl "$HAU"; add haToken "$K_ha"; add haEntity "$HAE"; fi
 OUT="${OUT%,}}"
 for n in plex overseerr lidarr bazarr radarr sonarr; do
   eval "v=\$K_$n"; [ -n "$v" ] && echo "  found $n" || echo "  MISSING $n (not changed)"
 done
-[ -n "$(old haToken)" ] && echo "  kept Home Assistant" || echo "  Home Assistant token not saved (not changed)"
+if [ -n "$K_ha" ]; then echo "  found Home Assistant (weather: $HAE, HTTP $(hacode "$K_ha" "states/$HAE"))"; else echo "  MISSING Home Assistant: no working token and no long-lived token in HA to sign one from"; fi
 mkdir -p "$D/hearth-remote/data"
 printf '%s' "$OUT" > "$J" && chmod 600 "$J" && echo "saved on the NAS helper"
 [ -n "$K_overseerr" ] && curl -s -X POST -G --data-urlencode "overseerrUrl=http://192.168.254.41:5055" --data-urlencode "overseerrKey=$K_overseerr" "http://$TV:8060/input"
@@ -49,8 +78,7 @@ printf '%s' "$OUT" > "$J" && chmod 600 "$J" && echo "saved on the NAS helper"
 [ -n "$K_bazarr" ]    && curl -s -X POST -G --data-urlencode "bazarrUrl=http://192.168.254.41:6767" --data-urlencode "bazarrKey=$K_bazarr" "http://$TV:8060/input"
 [ -n "$K_radarr" ]    && curl -s -X POST -G --data-urlencode "radarrUrl=http://192.168.254.41:7878" --data-urlencode "radarrKey=$K_radarr" "http://$TV:8060/input"
 [ -n "$K_sonarr" ]    && curl -s -X POST -G --data-urlencode "sonarrUrl=http://192.168.254.41:8989" --data-urlencode "sonarrKey=$K_sonarr" "http://$TV:8060/input"
-HT=$(old haToken)
-[ -n "$HT" ] && curl -s -X POST -G --data-urlencode "haUrl=$(old haUrl)" --data-urlencode "haToken=$HT" --data-urlencode "haEntity=$(old haEntity)" "http://$TV:8060/input"
+[ -n "$K_ha" ]        && curl -s -X POST -G --data-urlencode "haUrl=$HAU" --data-urlencode "haToken=$K_ha" --data-urlencode "haEntity=$HAE" "http://$TV:8060/input"
 echo "sent to the TV (Hearth must be open for the TV to take them)"
 EOF
 )
