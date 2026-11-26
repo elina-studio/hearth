@@ -78,6 +78,10 @@ sub onData(event as object)
     m.data = t.response
     if m.data.loved = invalid then m.data.loved = []
     if m.data.recs = invalid then m.data.recs = []
+    if m.data.fresh = invalid then m.data.fresh = []
+    if m.data.plays = invalid then m.data.plays = {}
+    mergeNew()
+    if m.relData["missing"] <> invalid then m.relData["missing"] = sortMissing(m.relData["missing"])
     redraw()
 end sub
 
@@ -442,19 +446,29 @@ end function
 
 sub loadRel()
     if not lidarrKeyOk()
-        m.relEmpty.text = "Connect Lidarr first (Music > Request shows the one-time steps)."
+        if m.mode = "new" then mergeNew()
+        if m.mode = "new" and relItems().Count() > 0
+            m.relEmpty.text = ""
+        else
+            m.relEmpty.text = "Connect Lidarr first (Music > Request shows the one-time steps)."
+        end if
         return
     end if
-    if m.relData[m.mode] <> invalid
+    asked = m.relData[m.mode] <> invalid
+    if m.mode = "new" then asked = (m.lidarrNew <> invalid)
+    if asked
         m.relEmpty.text = ""
         return
     end if
-    m.relEmpty.text = "Asking Lidarr" + Chr(8230)
+    if m.relAsk = invalid then m.relAsk = {}
+    if m.relAsk[m.mode] = true then return
+    m.relAsk[m.mode] = true
+    if relItems().Count() = 0 then m.relEmpty.text = "Asking Lidarr" + Chr(8230)
     if m.mode = "new"
         q = { "start": isoDay(-45), "end": isoDay(120), "unmonitored": "true", "includeArtist": "true" }
         dApi("GET", "/calendar", q, invalid, "onRel", "new")
     else
-        q = { page: "1", pageSize: "150", sortKey: "releaseDate", sortDirection: "descending", includeArtist: "true", monitored: "false" }
+        q = { page: "1", pageSize: "400", sortKey: "releaseDate", sortDirection: "descending", includeArtist: "true", monitored: "false" }
         dApi("GET", "/wanted/missing", q, invalid, "onRel", "missing")
     end if
 end sub
@@ -485,6 +499,11 @@ end function
 
 sub onRel(event as object)
     t = hTaskFrom(event)
+    if m.relAsk <> invalid then m.relAsk[t.tag] = false
+    if not t.ok and t.tag = "new" and relItems().Count() > 0 and m.mode = "new"
+        m.lidarrNew = []
+        return
+    end if
     if t.status = 401
         m.relEmpty.text = "Lidarr didn't accept the saved key."
         return
@@ -511,24 +530,20 @@ sub onRel(event as object)
             if st = "req" and al.monitored = true then st = "pend"
             if st = "req" and when > now then st = "pre"
             if not (t.tag = "new" and st = "have" and when < now - 21 * 86400)
-                out.push({ id: al.id, title: pxStr(al.title), artist: artist, kind: kind, when: when, state: st, cover: coverUrl(al), future: (when > now) })
+                rating = 0
+                if al.ratings <> invalid and al.ratings.value <> invalid then rating = al.ratings.value
+                out.push({ id: al.id, key: al.id.toStr(), title: pxStr(al.title), artist: artist, kind: kind, when: when, state: st, cover: coverUrl(al), future: (when > now), rating: rating, why: "" })
             end if
         end if
     end for
     if t.tag = "new"
-        ' coming soon first (soonest on top), then what came out recently (newest on top)
-        soon = []
-        past = []
-        for each x in out
-            if x.future then soon.push(x) else past.push(x)
-        end for
-        soon.SortBy("when")
-        past.SortBy("when", "r")
-        out = []
-        out.Append(soon)
-        out.Append(past)
+        m.lidarrNew = out
+        mergeNew()
+        out = m.relData["new"]
+    else
+        out = sortMissing(out)
+        m.relData[t.tag] = out
     end if
-    m.relData[t.tag] = out
     if t.tag = m.mode
         if out.Count() = 0
             if t.tag = "new" then m.relEmpty.text = "Nothing new from your artists in the last six weeks or the next four months." else m.relEmpty.text = "You have every album Lidarr knows about."
@@ -538,6 +553,59 @@ sub onRel(event as object)
         paint()
     end if
 end sub
+
+' New releases = Lidarr's calendar plus what MusicBrainz says your Last.fm artists (top 300 + top 40 recommended)
+' put out lately or have coming. Lidarr's copy wins when both have the same album, since OK can request it directly.
+sub mergeNew()
+    now = CreateObject("roDateTime").AsSeconds()
+    all = []
+    seen = {}
+    if m.lidarrNew <> invalid
+        for each x in m.lidarrNew
+            seen[LCase(x.artist) + "|" + LCase(x.title)] = true
+            all.push(x)
+        end for
+    end if
+    if m.data <> invalid and m.data.fresh <> invalid
+        for each f in m.data.fresh
+            k = LCase(pxStr(f.artist)) + "|" + LCase(pxStr(f.title))
+            if seen[k] = invalid
+                seen[k] = true
+                when = dateSecs(pxStr(f.date))
+                cover = ""
+                if pxStr(f.rgid) <> "" then cover = "https://coverartarchive.org/release-group/" + pxStr(f.rgid) + "/front-250"
+                all.push({ id: 0, key: "mb" + pxStr(f.rgid), title: pxStr(f.title), artist: pxStr(f.artist), kind: LCase(pxStr(f.kind)), when: when, state: "ext", cover: cover, future: (when > now), rating: 0, why: pxStr(f.why) })
+            end if
+        end for
+    end if
+    if m.lidarrNew = invalid and all.Count() = 0 then return
+    ' coming soon first (soonest on top), then what came out recently (newest on top)
+    soon = []
+    past = []
+    for each x in all
+        if x.future then soon.push(x) else past.push(x)
+    end for
+    soon.SortBy("when")
+    past.SortBy("when", "r")
+    out = []
+    out.Append(soon)
+    out.Append(past)
+    m.relData["new"] = out
+end sub
+
+' Missing: artists you play most on Last.fm first, then Lidarr's album rating, then newest
+function sortMissing(items as object) as object
+    plays = {}
+    if m.data <> invalid and m.data.plays <> invalid then plays = m.data.plays
+    for each x in items
+        p = plays[LCase(x.artist)]
+        if p = invalid then p = 0
+        x.plays = p
+        x.rank = p * 1000.0 + x.rating * 10.0 + x.when / 1000000000.0
+    end for
+    items.SortBy("rank", "r")
+    return items
+end function
 
 function dateSecs(iso as string) as integer
     if Len(iso) < 10 then return 0
@@ -626,6 +694,8 @@ sub drawRel()
         k = x.kind
         if k = "ep" then k = "EP"
         sl.text = x.artist + " · " + k
+        if x.why = "recommended" then sl.text = sl.text + " · recommended"
+        if m.mode = "missing" and x.plays > 0 then sl.text = sl.text + " · " + x.plays.toStr() + " plays"
         dl = g.createChild("Label")
         dl.font = hFont("regular", 23)
         dl.translation = [740, 20]
@@ -639,7 +709,7 @@ sub drawRel()
         al.width = 190
         al.horizAlign = "right"
         st = x.state
-        if m.requested[x.id.toStr()] = true then st = "pend"
+        if m.requested[x.key] = true then st = "pend"
         if st = "have"
             al.color = "0xA3A35AFF"
             al.text = "IN LIBRARY"
@@ -658,7 +728,12 @@ sub requestRel()
     if items.Count() = 0 then return
     x = items[m.relSel]
     st = x.state
-    if m.requested[x.id.toStr()] = true then st = "pend"
+    if m.requested[x.key] = true then st = "pend"
+    if st = "ext"
+        ' Lidarr doesn't follow this artist yet: open the request screen on them
+        m.top.request = { action: "musicView", mode: "request", term: x.artist }
+        return
+    end if
     if st = "have" or st = "pend"
         say(x.title + " is already " + iif(st = "have", "in your library.", "requested."))
         return
@@ -667,7 +742,7 @@ sub requestRel()
     m.relBusy = true
     m.reqItem = x
     say("Asking Lidarr for " + x.title + Chr(8230))
-    dApi("PUT", "/album/monitor", {}, { albumIds: [x.id], monitored: true }, "onRelMonitored", x.id.toStr())
+    dApi("PUT", "/album/monitor", {}, { albumIds: [x.id], monitored: true }, "onRelMonitored", x.key)
 end sub
 
 sub onRelMonitored(event as object)

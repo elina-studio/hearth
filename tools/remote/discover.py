@@ -5,14 +5,19 @@ Source: the Last.fm account paired on the phone (lastfm.json holds the user name
   recs    = Last.fm "similar artists" of your top 25, scored by (how much you play the source) x (how close the match)
             minus artists you already play a lot (your top 300 all time) and anyone you pressed "Not for me" on
 Built once a day in the background and kept in DATA_DIR/discover.json, so the TV opens instantly.
-  GET  /api/discover                 -> {loved, recs, built, user}   (?refresh=1 rebuilds now)
+  GET  /api/discover                 -> {loved, recs, built, user, fresh, plays}   (?refresh=1 rebuilds now)
   GET  /api/discover/albums?artist=  -> that artist's top albums (Last.fm), cached
   POST /api/discover/hide {name}     -> never recommend that artist again
 """
+import datetime
 import json
 import os
 import threading
 import time
+import urllib.parse
+import urllib.request
+
+import urllib.error
 
 import lastfm
 
@@ -111,13 +116,93 @@ def build():
         for e in recs:
             e["score"] = round(e["score"], 3)
             e.pop("best", None)
-        d = _load()
-        d.pop("error", None)
-        d.update({"loved": loved, "recs": recs, "built": int(time.time()), "user": user})
-        _save(d)
+        with lock:
+            d = _load()
+            d.pop("error", None)
+            plays = {a["name"].lower(): a["plays"] for a in allt}
+            d.update({"loved": loved, "recs": recs, "plays": plays, "built": int(time.time()), "user": user})
+            _save(d)
         print("[discover] built: %d loved, %d recommended" % (len(loved), len(recs)), flush=True)
+        # then new releases: the artists you play (top 300 all time) and the top 40 recommended, checked on MusicBrainz
+        who = [(a["name"], a.get("mbid", ""), "yours") for a in allt] + [(e["name"], e.get("mbid", ""), "recommended") for e in recs[:40]]
+        with lock:
+            d = _load()
+            d["freshTried"] = int(time.time())
+            _save(d)
+        fresh = scan_fresh(who)
+        with lock:
+            d = _load()
+            d.update({"fresh": fresh, "freshBuilt": int(time.time())})
+            _save(d)
+        print("[discover] new releases: %d from %d artists" % (len(fresh), len(who)), flush=True)
     finally:
         _building = False
+
+
+MB = "https://musicbrainz.org/ws/2/release-group/"
+SKIP = {"compilation", "live", "remix", "dj-mix", "mixtape/street", "demo", "soundtrack", "spokenword", "interview", "audiobook"}
+
+
+def _mb(query):
+    url = MB + "?" + urllib.parse.urlencode({"query": query, "fmt": "json", "limit": 25})
+    req = urllib.request.Request(url, headers={"User-Agent": lastfm.UA, "Accept": "application/json"})
+    for attempt in range(3):
+        try:
+            with urllib.request.urlopen(req, timeout=15) as r:
+                return json.loads(r.read().decode("utf-8", "replace"))
+        except urllib.error.HTTPError as e:
+            if e.code in (429, 503):
+                time.sleep(3 + attempt * 3)
+                continue
+            return {}
+        except Exception:
+            time.sleep(2)
+    return {}
+
+
+def _day(s):
+    """'2026-11-20' -> date; '2026-11' -> the 1st of that month; a bare year is too vague to call new."""
+    try:
+        if len(s) == 10:
+            return datetime.date.fromisoformat(s)
+        if len(s) == 7:
+            return datetime.date.fromisoformat(s + "-01")
+    except ValueError:
+        pass
+    return None
+
+
+def scan_fresh(who, back=60, ahead=180):
+    """Albums and EPs released in the last `back` days or due in the next `ahead`, for each (name, mbid, why).
+    MusicBrainz allows about one request a second, so this takes a few minutes for ~340 artists."""
+    today = datetime.date.today()
+    lo, hi = today - datetime.timedelta(days=back), today + datetime.timedelta(days=ahead)
+    rng = "firstreleasedate:[%s TO %s]" % (lo.isoformat(), hi.isoformat())
+    out, seen = [], set()
+    for name, mbid, why in who:
+        if mbid:
+            q = "arid:%s AND %s AND (primarytype:album OR primarytype:ep)" % (mbid, rng)
+        else:
+            q = 'artist:"%s" AND %s AND (primarytype:album OR primarytype:ep)' % (name.replace('"', ""), rng)
+        r = _mb(q)
+        time.sleep(1.1)
+        for g in r.get("release-groups") or []:
+            if {t.lower() for t in g.get("secondary-types") or []} & SKIP:
+                continue
+            day = _day(g.get("first-release-date", ""))
+            if not day or day < lo or day > hi:
+                continue
+            credit = "".join(c.get("name", "") + c.get("joinphrase", "") for c in g.get("artist-credit") or []) or name
+            if not mbid and credit.lower() != name.lower():
+                continue   # a name search can match someone else
+            key = (credit.lower(), g.get("title", "").lower())
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append({"title": g.get("title", ""), "artist": credit, "date": day.isoformat(),
+                        "kind": (g.get("primary-type") or "Album").lower(), "rgid": g.get("id", ""), "why": why})
+    out.sort(key=lambda x: x["date"], reverse=True)
+    return out
 
 
 def _fail(msg):
@@ -131,11 +216,13 @@ def _fail(msg):
 
 def get(refresh=False):
     d = _load()
-    if (refresh or not d.get("built")) and not _building:
+    stale = not d.get("freshBuilt") and time.time() - d.get("freshTried", 0) > 3600
+    if (refresh or not d.get("built") or stale) and not _building:
         threading.Thread(target=build, daemon=True).start()
     hidden = {h.lower() for h in d.get("hidden", [])}
     return {"loved": d.get("loved", []), "recs": [e for e in d.get("recs", []) if e["name"].lower() not in hidden],
-            "built": d.get("built", 0), "user": d.get("user", ""), "building": _building, "error": d.get("error", "")}
+            "built": d.get("built", 0), "user": d.get("user", ""), "building": _building, "error": d.get("error", ""),
+            "fresh": d.get("fresh", []), "freshBuilt": d.get("freshBuilt", 0), "plays": d.get("plays", {})}
 
 
 def albums(artist):
