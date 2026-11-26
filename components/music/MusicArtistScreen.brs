@@ -73,6 +73,12 @@ end sub
 ' ---------- loading ----------
 sub load(unused = invalid as dynamic)
     id = m.top.artistId
+    ' this artist's own twig under "Albums" (the same one every visit)
+    th = 0
+    for ci = 1 to Len(id)
+        th = (th * 31 + Asc(Mid(id, ci, 1))) mod 1009
+    end for
+    m.top.findNode("albTwig").uri = "pkg:/images/w/twig-420-s" + ((th mod 4) + 4).toStr() + ".png"
     if id = "" then return
     m.name.text = "Loading" + Chr(8230)
     pxApi("/library/metadata/" + id, {}, "onArtist")

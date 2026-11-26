@@ -301,11 +301,19 @@ sub build()
     m.shelves.removeChildrenIndex(m.shelves.getChildCount(), 0)
     m.rows = []
     y = 0
+    prevSeed = 0
     for each name in order
         items = m.results[name]
         if items <> invalid and items.count() > 0
             r = m.shelves.createChild("CardRow")
             r.translation = [0, y]
+            ' each shelf gets its own twig: a pick that depends on the shelf's name but is never the same as the shelf above
+            nh = 0
+            for ci = 1 to Len(name)
+                nh = (nh * 31 + Asc(Mid(name, ci, 1))) mod 1009
+            end for
+            prevSeed = (prevSeed + 1 + (nh mod 3)) mod 4
+            r.seed = prevSeed
             r.viewWidth = 1150
             r.noMoss = true
             r.title = name
