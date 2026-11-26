@@ -34,6 +34,8 @@ sub init()
         x = x + c.width + 18
     end for
     m.rel = m.top.findNode("rel")
+    m.relHints = m.top.findNode("relHints")
+    m.relHints.keys = [{ text: "OK", label: "Request" }, { icon: "asterisk", label: "Hide this artist" }]
     m.relEmpty = m.top.findNode("relEmpty")
     m.relEmpty.font = hFont("regular", 26)
     m.relRows = []
@@ -81,7 +83,8 @@ sub onData(event as object)
     if m.data.fresh = invalid then m.data.fresh = []
     if m.data.plays = invalid then m.data.plays = {}
     mergeNew()
-    if m.relData["missing"] <> invalid then m.relData["missing"] = sortMissing(m.relData["missing"])
+    if m.missAll <> invalid then m.missAll = sortMissing(m.missAll)
+    applyHide()
     redraw()
 end sub
 
@@ -381,6 +384,8 @@ function handleKey(key as string) as string
             m.zone = "chips"
         else if key = "OK"
             requestRel()
+        else if key = "options"
+            toggleRelHide()
         end if
     else if m.zone = "list"
         items = names()
@@ -541,8 +546,9 @@ sub onRel(event as object)
         mergeNew()
         out = m.relData["new"]
     else
-        out = sortMissing(out)
-        m.relData[t.tag] = out
+        m.missAll = sortMissing(out)
+        applyHide()
+        out = m.relData["missing"]
     end if
     if t.tag = m.mode
         if out.Count() = 0
@@ -590,7 +596,70 @@ sub mergeNew()
     out = []
     out.Append(soon)
     out.Append(past)
-    m.relData["new"] = out
+    hid = relHidden()
+    keep = []
+    for each x in out
+        if hid[LCase(x.artist)] = invalid then keep.push(x)
+    end for
+    m.relData["new"] = keep
+end sub
+
+' Artists hidden from New releases and Missing with the * button. Kept on the TV.
+function relHidden() as object
+    if m.relHid = invalid
+        m.relHid = {}
+        j = ParseJson(CreateObject("roRegistrySection", "hearth").Read("discRelHide"))
+        if j <> invalid
+            for each n in j
+                m.relHid[LCase(n)] = n
+            end for
+        end if
+    end if
+    return m.relHid
+end function
+
+sub saveRelHidden()
+    hidList = []
+    for each k in m.relHid
+        hidList.push(m.relHid[k])
+    end for
+    reg = CreateObject("roRegistrySection", "hearth")
+    reg.Write("discRelHide", FormatJson(hidList))
+    reg.Flush()
+end sub
+
+sub applyHide()
+    if m.missAll <> invalid
+        hid = relHidden()
+        keep = []
+        for each x in m.missAll
+            if hid[LCase(x.artist)] = invalid then keep.push(x)
+        end for
+        m.relData["missing"] = keep
+    end if
+    mergeNew()
+end sub
+
+' * on a row: hide that artist from both lists; * again while the note is up brings them back
+sub toggleRelHide()
+    if m.lastHid <> "" and m.lastHid <> invalid and m.toast.text <> ""
+        relHidden().Delete(LCase(m.lastHid))
+        saveRelHidden()
+        say(m.lastHid + " is back.")
+        m.lastHid = ""
+        applyHide()
+        return
+    end if
+    items = relItems()
+    if items.Count() = 0 then return
+    a = items[m.relSel].artist
+    if a = "" then return
+    relHidden()[LCase(a)] = a
+    saveRelHidden()
+    m.lastHid = a
+    applyHide()
+    say(a + " hidden from New releases and Missing. Press * again to undo.")
+    if relItems().Count() = 0 then m.zone = "chips"
 end sub
 
 ' Missing: artists you play most on Last.fm first, then Lidarr's album rating, then newest
@@ -639,6 +708,7 @@ end function
 sub drawRel()
     m.rel.removeChildrenIndex(m.rel.getChildCount(), 0)
     items = relItems()
+    m.relHints.visible = (m.top.active and m.zone = "rows" and m.toast.text = "" and items.Count() > 0)
     if items.Count() = 0 then return
     if m.relSel >= items.Count() then m.relSel = items.Count() - 1
     visible = 7
@@ -739,6 +809,7 @@ sub requestRel()
         return
     end if
     if m.relBusy = true then return
+    m.lastHid = ""
     m.relBusy = true
     m.reqItem = x
     say("Asking Lidarr for " + x.title + Chr(8230))
@@ -793,10 +864,13 @@ end sub
 
 sub say(text as string)
     m.toast.text = text
+    m.relHints.visible = false
     m.toastTimer.control = "stop"
     m.toastTimer.control = "start"
 end sub
 
 sub hideToast()
     m.toast.text = ""
+    m.lastHid = ""
+    paint()
 end sub
