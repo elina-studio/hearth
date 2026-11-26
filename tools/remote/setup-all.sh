@@ -8,6 +8,7 @@ BASE=https://raw.githubusercontent.com/elina-studio/hearth/$SHA/tools/remote
 export HEARTH_BRANCH=${HEARTH_BRANCH:-claude/project-thread-dcn6uh}
 echo "=== Part 1: update the helper ==="
 bash <(curl -sL "$BASE/deploy.sh")
+[ $? = 3 ] && { echo "Stopped: the helper could not be rebuilt, keys not touched."; exit 1; }
 # deploy.sh also fails when it merely can't show the house key; what matters is that the new helper is up and locked
 C=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 http://192.168.254.41:8765/api/keys)
 [ "$C" = "401" ] || { echo "Helper update failed (it answered '$C'), keys not touched."; exit 1; }

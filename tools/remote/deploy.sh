@@ -11,7 +11,9 @@ echo "1/4 Signing in to the NAS (ssh password, then the sudo password)..."
 R "sudo -v" || exit 1
 
 echo "2/4 Updating the helper (about a minute)..."
-R "mkdir -p /volume1/docker/hearth-remote && rm -rf /tmp/hearth-dl && mkdir /tmp/hearth-dl && cd /tmp/hearth-dl && curl -sL https://github.com/elina-studio/hearth/archive/refs/heads/$BRANCH.tar.gz | tar xz && cp -r hearth-*/tools/remote/. /volume1/docker/hearth-remote/ && cd /volume1/docker/hearth-remote && sudo /usr/local/bin/docker compose up -d --build >/tmp/hearth-build.log 2>&1; echo build exit code \$?; tail -3 /tmp/hearth-build.log" || exit 1
+R "mkdir -p /volume1/docker/hearth-remote && rm -rf /tmp/hearth-dl && mkdir /tmp/hearth-dl && cd /tmp/hearth-dl && curl -sL https://github.com/elina-studio/hearth/archive/refs/heads/$BRANCH.tar.gz | tar xz && cp -r hearth-*/tools/remote/. /volume1/docker/hearth-remote/ && cd /volume1/docker/hearth-remote && sudo /usr/local/bin/docker compose up -d --build >/tmp/hearth-build.log 2>&1; echo build exit code \$?; tail -3 /tmp/hearth-build.log" | tee /tmp/hearth-deploy.out
+# the old helper keeps answering when a rebuild fails, so check the rebuild itself, not only that something answers
+grep -q "build exit code 0" /tmp/hearth-deploy.out || { echo "The helper did NOT update (the rebuild failed, the lines above say why). The old helper is still running."; exit 3; }
 
 echo "3/4 Waiting for the helper..."
 for i in $(seq 1 30); do
