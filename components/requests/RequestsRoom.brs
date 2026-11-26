@@ -1101,14 +1101,18 @@ sub openPopupFor(c as object)
     overview = d.overview
     if d.note <> invalid then overview = d.note
     rs = rqNum(d.requestStatus)
+    ' a request of yours (it has an id) that is not already playable can be cancelled or removed
+    canCancel = (d.requestId <> invalid and rs >= 1 and d.mediaStatus <> 5 and d.mediaStatus <> 4)
+    if canCancel and rs <= 2 then items.push({ label: "Cancel request", icon: "cancel", tag: "cancel" })
     if rs = 1
-        items.push({ label: "Cancel request", icon: "cancel", tag: "cancel" })
+        ' waiting for approval: nothing else to offer
     else if d.mediaStatus = 2 or d.mediaStatus = 3
         if rs < 0 then overview = "Already requested and on its way. " + nz(d.overview)
     else if rs = 3 or rs = 4 or rs < 0
         ' not asked yet, or declined or failed: offer to ask (again)
         addRequestItems(items, d)
     end if
+    if canCancel and rs > 2 then items.push({ label: "Remove request", icon: "cancel", tag: "cancel" })
     if d.mediaStatus = 5 or d.mediaStatus = 4 then items.push({ label: "Open in Plex", icon: "play", tag: "plex" })
     items.push({ label: "More like this", icon: "spark", tag: "like" })
     items.push({ label: "Close", icon: "close", tag: "back" })
@@ -1212,12 +1216,27 @@ sub onPicked()
     else if a = "choose"
         chooseSeasons(c)
     else if a = "cancel"
+        confirmCancel(c)
+    else if a = "cancelyes"
         oApi("DELETE", "/api/v1/request/" + d.requestId.toStr(), invalid, invalid, "onCancelled", d.title)
     else if a = "like"
         moreLike(d)
     else if a = "plex"
         openInPlex(d)
     end if
+end sub
+
+' One question before a request is deleted, so a slip of the thumb does not cancel it
+sub confirmCancel(c as object)
+    d = c.data
+    word = "Cancel"
+    if rqNum(d.requestStatus) > 2 then word = "Remove"
+    items = [
+        { label: "Yes, " + LCase(word) + " it", icon: "cancel", tag: "cancelyes" }
+        { label: "Keep it", icon: "check", tag: "back" }
+    ]
+    m.popCard = c
+    showPopup({ eyebrow: UCase(word) + " REQUEST", rating: "", title: d.title, overview: "This stops the request in Overseerr. Anything already downloaded stays in Plex.", poster: rqImage(d.poster, "w342"), items: items, hints: [{ icon: "back", text: "Back to keep it" }] })
 end sub
 
 sub chooseSeasons(c as object)
@@ -1318,9 +1337,27 @@ end sub
 
 sub onCancelled(event as object)
     t = taskFrom(event)
-    if t.ok then flash("check", "Cancelled " + t.tag, "") else flash("warn", "Couldn't cancel " + t.tag, "error " + t.status.toStr())
+    ' 404 means Overseerr no longer has it, which is what was wanted
+    if t.ok or t.status = 404
+        flash("check", "Cancelled " + t.tag, "")
+        ' take it off the screen now; the slow ask below may still hold the old list
+        if m.cards["mine"] <> invalid
+            keepCards = []
+            for each c in m.cards["mine"]
+                if c.title <> t.tag then keepCards.push(c)
+            end for
+            m.cards["mine"] = keepCards
+            m.mineSig = ""
+            m.ver = m.ver + 1
+            if currentList().key = "mine" then showList()
+        end if
+    else
+        flash("warn", "Couldn't cancel " + t.tag, "error " + t.status.toStr())
+    end if
+    m.mineBusy = false
     loadMine()
 end sub
+
 
 ' Redraw one card's chip wherever it is on screen (the card data itself keeps its old chip for undo)
 sub setChip(c as object, chip as object)
