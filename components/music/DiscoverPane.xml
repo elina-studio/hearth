@@ -14,8 +14,10 @@
       <Group id="btns" translation="[0, 160]" />
       <Group id="albums" translation="[0, 250]" />
     </Group>
+    <Group id="rel" translation="[8, 82]" />
+    <Label id="relEmpty" translation="[8, 100]" width="1100" wrap="true" color="0xB5AF8CFF" />
     <Label id="note" translation="[8, 90]" width="1100" wrap="true" color="0xB5AF8CFF" />
-    <Label id="toast" translation="[0, 700]" width="1150" color="0xE0B34AFF" />
+    <Label id="toast" translation="[0, 790]" width="1150" color="0xE0B34AFF" />
     <Timer id="toastTimer" duration="4" repeat="false" />
     <Timer id="pvTimer" duration="0.35" repeat="false" />
   </children>

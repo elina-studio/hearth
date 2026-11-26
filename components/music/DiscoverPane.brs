@@ -21,7 +21,8 @@ sub init()
     m.pvTimer = m.top.findNode("pvTimer")
     m.pvTimer.observeField("fire", "loadAlbums")
     m.chipNodes = []
-    for each t in [["Artists you love", "star"], ["Recommended", "wave"]]
+    m.MODES = ["loved", "recs", "new", "missing"]
+    for each t in [["Artists you love", "star"], ["Recommended", "wave"], ["New releases", "clock"], ["Missing", "plus"]]
         c = m.chips.createChild("MusicChip")
         c.icon = t[1]
         c.text = t[0]
@@ -32,6 +33,14 @@ sub init()
         c.translation = [x, 12]
         x = x + c.width + 18
     end for
+    m.rel = m.top.findNode("rel")
+    m.relEmpty = m.top.findNode("relEmpty")
+    m.relEmpty.font = hFont("regular", 26)
+    m.relRows = []
+    m.relSel = 0
+    m.relTop = 0
+    m.relData = {}
+    m.requested = {}
     m.btnNodes = []
     m.ROWS = 6
     m.mode = "loved"     ' or "recs"
@@ -93,8 +102,22 @@ function filtered() as object
     return out
 end function
 
+function isRel() as boolean
+    return m.mode = "new" or m.mode = "missing"
+end function
+
 sub redraw()
     m.recsF = invalid
+    if isRel()
+        m.list.removeChildrenIndex(m.list.getChildCount(), 0)
+        m.detail.visible = false
+        m.note.text = ""
+        loadRel()
+        paint()
+        return
+    end if
+    m.rel.removeChildrenIndex(m.rel.getChildCount(), 0)
+    m.relEmpty.text = ""
     m.list.removeChildrenIndex(m.list.getChildCount(), 0)
     items = invalid
     if m.data <> invalid then items = names()
@@ -303,11 +326,15 @@ sub drawAlbums(list as object)
 end sub
 
 sub paint()
-    for i = 0 to 1
+    for i = 0 to m.chipNodes.Count() - 1
         c = m.chipNodes[i]
-        c.on = ((i = 0 and m.mode = "loved") or (i = 1 and m.mode = "recs"))
-        c.focused = (m.top.active and m.zone = "chips" and ((i = 0 and m.mode = "loved") or (i = 1 and m.mode = "recs")))
+        c.on = (m.MODES[i] = m.mode)
+        c.focused = (m.top.active and m.zone = "chips" and m.MODES[i] = m.mode)
     end for
+    if isRel()
+        drawRel()
+        return
+    end if
     for i = 0 to m.btnNodes.Count() - 1
         m.btnNodes[i].focused = (m.top.active and m.zone = "btns" and i = m.btn)
     end for
@@ -319,19 +346,35 @@ end sub
 
 ' returns "up" or "left" when focus should leave the pane, "" otherwise
 function handleKey(key as string) as string
-    if m.data = invalid
+    if m.data = invalid and not isRel()
         if key = "up" then return "up"
         if key = "left" then return "left"
         return ""
     end if
     if m.zone = "chips"
         if key = "up" then return "up"
+        i = modeIndex()
         if key = "left"
-            if m.mode = "recs" then switchMode("loved") else return "left"
+            if i > 0 then switchMode(m.MODES[i - 1]) else return "left"
         else if key = "right"
-            switchMode("recs")
+            if i < m.MODES.Count() - 1 then switchMode(m.MODES[i + 1])
         else if key = "down" or key = "OK"
-            if names().Count() > 0 then m.zone = "list"
+            if isRel()
+                if relItems().Count() > 0 then m.zone = "rows"
+            else if names().Count() > 0
+                m.zone = "list"
+            end if
+        end if
+    else if m.zone = "rows"
+        items = relItems()
+        if key = "up"
+            if m.relSel > 0 then m.relSel = m.relSel - 1 else m.zone = "chips"
+        else if key = "down"
+            if m.relSel < items.Count() - 1 then m.relSel = m.relSel + 1
+        else if key = "left"
+            m.zone = "chips"
+        else if key = "OK"
+            requestRel()
         end if
     else if m.zone = "list"
         items = names()
@@ -363,13 +406,294 @@ function handleKey(key as string) as string
     return ""
 end function
 
+function modeIndex() as integer
+    for i = 0 to m.MODES.Count() - 1
+        if m.MODES[i] = m.mode then return i
+    end for
+    return 0
+end function
+
 sub switchMode(mode as string)
     if mode = m.mode then return
     m.mode = mode
     m.sel = 0
     m.top0 = 0
+    m.relSel = 0
+    m.relTop = 0
+    m.zone = "chips"
     redraw()
 end sub
+
+' ---------- New releases and Missing: straight from Lidarr ----------
+' New releases = Lidarr's calendar for artists you follow (45 days back, 120 ahead).
+' Missing = albums of artists Lidarr has that nobody is looking for (unmonitored, no files).
+' OK on a row asks Lidarr for it: monitor the album, and search now unless it isn't out yet.
+function lidarrKeyOk() as boolean
+    return CreateObject("roRegistrySection", "hearth").Read("lidarrKey") <> ""
+end function
+
+function relItems() as object
+    d = m.relData[m.mode]
+    if d = invalid then return []
+    return d
+end function
+
+sub loadRel()
+    if not lidarrKeyOk()
+        m.relEmpty.text = "Connect Lidarr first (Music > Request shows the one-time steps)."
+        return
+    end if
+    if m.relData[m.mode] <> invalid
+        m.relEmpty.text = ""
+        return
+    end if
+    m.relEmpty.text = "Asking Lidarr" + Chr(8230)
+    if m.mode = "new"
+        q = { "start": isoDay(-45), "end": isoDay(120), "unmonitored": "true", "includeArtist": "true" }
+        dApi("GET", "/calendar", q, invalid, "onRel", "new")
+    else
+        q = { page: "1", pageSize: "150", sortKey: "releaseDate", sortDirection: "descending", includeArtist: "true", monitored: "false" }
+        dApi("GET", "/wanted/missing", q, invalid, "onRel", "missing")
+    end if
+end sub
+
+function isoDay(offset as integer) as string
+    dt = CreateObject("roDateTime")
+    dt.FromSeconds(dt.AsSeconds() + offset * 86400)
+    return dt.ToISOString().Left(10)
+end function
+
+function dApi(method as string, path as string, query as object, body as dynamic, cb as string, tag = "" as string) as object
+    t = CreateObject("roSGNode", "LidarrTask")
+    t.method = method
+    qs = pxQuery(query)
+    if qs <> "" then path = path + "?" + qs
+    t.path = path
+    if method <> "GET" then t.timeout = 60000
+    if body <> invalid then t.bodyText = FormatJson(body)
+    t.tag = tag
+    t.observeField("done", cb)
+    if m.hTasks = invalid then m.hTasks = {}
+    key = "d" + Rnd(1000000).toStr()
+    m.hTasks[key] = t
+    t.key = key
+    t.control = "RUN"
+    return t
+end function
+
+sub onRel(event as object)
+    t = hTaskFrom(event)
+    if t.status = 401
+        m.relEmpty.text = "Lidarr didn't accept the saved key."
+        return
+    end if
+    if not t.ok
+        m.relEmpty.text = "Can't reach Lidarr right now (error " + t.status.toStr() + ")."
+        return
+    end if
+    raw = invalid
+    if t.response.Items <> invalid then raw = t.response.Items else raw = t.response.records
+    if raw = invalid then raw = []
+    now = CreateObject("roDateTime").AsSeconds()
+    out = []
+    for each al in raw
+        kind = LCase(pxStr(al.albumType))
+        if kind = "album" or kind = "ep" or kind = ""
+            have = 0
+            if al.statistics <> invalid and al.statistics.trackFileCount <> invalid then have = al.statistics.trackFileCount
+            when = dateSecs(pxStr(al.releaseDate))
+            artist = ""
+            if al.artist <> invalid then artist = pxStr(al.artist.artistName)
+            st = "req"
+            if have > 0 then st = "have"
+            if st = "req" and al.monitored = true then st = "pend"
+            if st = "req" and when > now then st = "pre"
+            if not (t.tag = "new" and st = "have" and when < now - 21 * 86400)
+                out.push({ id: al.id, title: pxStr(al.title), artist: artist, kind: kind, when: when, state: st, cover: coverUrl(al), future: (when > now) })
+            end if
+        end if
+    end for
+    if t.tag = "new"
+        ' coming soon first (soonest on top), then what came out recently (newest on top)
+        soon = []
+        past = []
+        for each x in out
+            if x.future then soon.push(x) else past.push(x)
+        end for
+        soon.SortBy("when")
+        past.SortBy("when", "r")
+        out = []
+        out.Append(soon)
+        out.Append(past)
+    end if
+    m.relData[t.tag] = out
+    if t.tag = m.mode
+        if out.Count() = 0
+            if t.tag = "new" then m.relEmpty.text = "Nothing new from your artists in the last six weeks or the next four months." else m.relEmpty.text = "You have every album Lidarr knows about."
+        else
+            m.relEmpty.text = ""
+        end if
+        paint()
+    end if
+end sub
+
+function dateSecs(iso as string) as integer
+    if Len(iso) < 10 then return 0
+    dt = CreateObject("roDateTime")
+    dt.FromISO8601String(Left(iso, 10) + "T00:00:00")
+    return dt.AsSeconds()
+end function
+
+function coverUrl(al as object) as string
+    if al.images = invalid then return ""
+    for each im in al.images
+        if LCase(pxStr(im.coverType)) = "cover" and pxStr(im.remoteUrl) <> "" then return pxStr(im.remoteUrl)
+    end for
+    return ""
+end function
+
+function dayText(secs as integer) as string
+    if secs = 0 then return ""
+    dt = CreateObject("roDateTime")
+    dt.FromSeconds(secs)
+    now = CreateObject("roDateTime").AsSeconds()
+    diff = Int((secs - now) / 86400)
+    if diff = 0 or (secs <= now and now - secs < 86400) then return "Today"
+    mon = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    t = mon[dt.GetMonth() - 1] + " " + dt.GetDayOfMonth().toStr()
+    if secs > now and diff < 7 then t = Left(dt.GetWeekday(), 3) + ", " + t
+    if Abs(secs - now) > 300 * 86400 then t = t + ", " + dt.GetYear().toStr()
+    return t
+end function
+
+sub drawRel()
+    m.rel.removeChildrenIndex(m.rel.getChildCount(), 0)
+    items = relItems()
+    if items.Count() = 0 then return
+    if m.relSel >= items.Count() then m.relSel = items.Count() - 1
+    visible = 7
+    if m.relSel < m.relTop then m.relTop = m.relSel
+    if m.relSel >= m.relTop + visible then m.relTop = m.relSel - visible + 1
+    for i = 0 to visible - 1
+        idx = m.relTop + i
+        if idx >= items.Count() then exit for
+        x = items[idx]
+        foc = (idx = m.relSel and m.top.active and m.zone = "rows")
+        g = m.rel.createChild("Group")
+        g.translation = [0, i * 100]
+        bg = g.createChild("Poster")
+        bg.translation = [-12, -12]
+        bg.width = 1174
+        bg.height = 100
+        bg.uri = "pkg:/images/w/panel-v3.9.png"
+        bg.blendColor = "0x141A11FF"
+        if foc
+            rg = g.createChild("Poster")
+            rg.translation = [-12, -12]
+            rg.width = 1174
+            rg.height = 100
+            rg.uri = "pkg:/images/w/button-outline" + hVar(idx) + ".9.png"
+            rg.blendColor = "0xD9A066FF"
+        end if
+        art = g.createChild("Rectangle")
+        art.translation = [14, 10]
+        art.width = 64
+        art.height = 64
+        art.color = avatarColor(x.title)
+        if x.cover <> ""
+            cp = g.createChild("Poster")
+            cp.translation = [14, 10]
+            cp.width = 64
+            cp.height = 64
+            cp.loadDisplayMode = "scaleToZoom"
+            cp.uri = x.cover
+        end if
+        tl = g.createChild("Label")
+        tl.font = hFont("bold", 28)
+        tl.translation = [96, 6]
+        tl.width = 660
+        tl.maxLines = 1
+        tl.color = "0xEDE6CAFF"
+        tl.text = x.title
+        sl = g.createChild("Label")
+        sl.font = hFont("regular", 22)
+        sl.translation = [96, 44]
+        sl.width = 660
+        sl.maxLines = 1
+        sl.color = "0xB5AF8CFF"
+        k = x.kind
+        if k = "ep" then k = "EP"
+        sl.text = x.artist + " · " + k
+        dl = g.createChild("Label")
+        dl.font = hFont("regular", 23)
+        dl.translation = [740, 20]
+        dl.width = 200
+        dl.horizAlign = "right"
+        dl.color = "0xB5AF8CFF"
+        dl.text = dayText(x.when)
+        al = g.createChild("Label")
+        al.font = hFont("bold", 22)
+        al.translation = [960, 20]
+        al.width = 190
+        al.horizAlign = "right"
+        st = x.state
+        if m.requested[x.id.toStr()] = true then st = "pend"
+        if st = "have"
+            al.color = "0xA3A35AFF"
+            al.text = "IN LIBRARY"
+        else if st = "pend"
+            al.color = "0xE0B34AFF"
+            al.text = "REQUESTED"
+        else
+            if foc then al.color = "0xE0B34AFF" else al.color = "0xEDE6CAFF"
+            if st = "pre" then al.text = "GET WHEN OUT" else al.text = "REQUEST"
+        end if
+    end for
+end sub
+
+sub requestRel()
+    items = relItems()
+    if items.Count() = 0 then return
+    x = items[m.relSel]
+    st = x.state
+    if m.requested[x.id.toStr()] = true then st = "pend"
+    if st = "have" or st = "pend"
+        say(x.title + " is already " + iif(st = "have", "in your library.", "requested."))
+        return
+    end if
+    if m.relBusy = true then return
+    m.relBusy = true
+    m.reqItem = x
+    say("Asking Lidarr for " + x.title + Chr(8230))
+    dApi("PUT", "/album/monitor", {}, { albumIds: [x.id], monitored: true }, "onRelMonitored", x.id.toStr())
+end sub
+
+sub onRelMonitored(event as object)
+    t = hTaskFrom(event)
+    m.relBusy = false
+    if not t.ok
+        say("Lidarr said no (error " + t.status.toStr() + ").")
+        return
+    end if
+    m.requested[t.tag] = true
+    x = m.reqItem
+    if x <> invalid and not x.future
+        dApi("POST", "/command", {}, { name: "AlbumSearch", albumIds: [x.id] }, "onRelSearched")
+        say(x.title + " requested. Lidarr is searching.")
+    else if x <> invalid
+        say(x.title + " will be fetched when it comes out.")
+    end if
+    paint()
+end sub
+
+sub onRelSearched(event as object)
+    hTaskFrom(event)
+end sub
+
+function iif(c as boolean, a as string, b as string) as string
+    if c then return a
+    return b
+end function
 
 sub doButton()
     items = names()
