@@ -1268,7 +1268,7 @@ const arrivedWhen = secs => {
   const md = d.toLocaleDateString([], { month: 'short', day: 'numeric' }); return { band: md.toUpperCase(), text: md, today: false };
 };
 const RQ_FILT = ['trending', 'movies', 'tv'];
-const rqNF = () => ({ genres: [], provider: '', minRating: 0, sort: 'popular' });
+const rqNF = kind => ({ kind: kind || 'movie', genres: [], provider: '', minRating: 0, sort: 'popular' });
 // The streaming services worth showing (TMDB has hundreds), in a fixed order, without the "with ads" and channel variants
 function rqPickProviders(all) {
   const out = [];
@@ -1304,7 +1304,7 @@ function roomRequests(room, tok) {
       <div class="rsres"><div class="rsh" id="rsh"></div><div id="rsl"></div></div></div>
     <div class="rmusic" id="rm">${ricon('note')}<h3>ASK LIDARR FOR AN ARTIST</h3><p>Music requests aren't on the projector yet. Use the TV for those for now.</p></div>
     <div class="rtoast" id="rto"><span id="rtt2"></span><em id="rth"></em></div></div>`;
-  const S = RQ = RQ && RQ.keep ? Object.assign(RQ, { room }) : { room, idx: 2, cards: {}, details: {}, newTab: 0, newAll: null, text: '', query: '', pending: null, seq: 0, keep: true, filters: { trending: rqNF(), movies: rqNF(), tv: rqNF() }, gen: {}, acc: {}, pageNo: {}, genres: { movie: [], tv: [] }, provs: { movie: [], tv: [] }, rt: {} };
+  const S = RQ = RQ && RQ.keep ? Object.assign(RQ, { room }) : { room, idx: 2, cards: {}, details: {}, newTab: 0, newAll: null, text: '', query: '', pending: null, seq: 0, keep: true, filters: { trending: rqNF('all'), movies: rqNF('movie'), tv: rqNF('tv') }, gen: {}, acc: {}, seen: {}, pageNo: {}, totalPages: {}, moreBusy: {}, busy: {}, listError: {}, totals: {}, loadedAt: {}, genres: { movie: [], tv: [] }, provs: { movie: [], tv: [] }, rt: {} };
   S.room = room; S.tok = tok; S.over = null;
   const $r = s => $(s, room);
   S.cur = () => RLISTS[S.idx];
@@ -1321,6 +1321,7 @@ function roomRequests(room, tok) {
   };
   S.show = () => {
     const l = S.cur(); S.paintRail();
+    if (RQ_FILT.includes(l.key) && !S.busy[l.key] && S.loadedAt[l.key] && Date.now() - S.loadedAt[l.key] > 300000) S.loadList(l.key);
     const k = l.key, ov_ = S.over;
     $r('#rs').style.display = k === 'search' && !ov_ ? 'block' : 'none';
     $r('#rm').style.display = k === 'music' && !ov_ ? 'flex' : 'none';
@@ -1342,6 +1343,7 @@ function roomRequests(room, tok) {
     if (!cards) { $r('#rg #rgg') && ($r('#rgg').innerHTML = ''); $r('#rem').textContent = S.problem || (k === 'new' ? 'Asking Plex…' : 'Asking Overseerr…'); return; }
     if (k === 'new') { const want = RTABS[S.newTab][0]; S.draw(cards.filter(c => !want || c.data.kind === want)); } else S.draw(cards);
     if (!cards.length && RQ_FILT.includes(k) && S.active(k)) $r('#rem').textContent = 'Nothing matches those filters. Open Filter & sort to change them.';
+    else if (!cards.length && S.listError[k]) $r('#rem').textContent = S.listError[k] + ' Open Filter & sort to change the filters.';
     else if (!cards.length) $r('#rem').textContent = k === 'mine' ? 'No requests yet. Pick something in Trending or Search and press OK.' : k === 'new' ? "Nothing new here yet. Things you request show up here once they've downloaded." : 'Nothing here right now.';
   };
   S.draw = cards => {
@@ -1365,48 +1367,67 @@ function roomRequests(room, tok) {
     for (const kind of ['movie', 'tv']) ov('GET', `/api/v1/watchproviders/${kind === 'movie' ? 'movies' : 'tv'}?watchRegion=US`).then(j => { S.provs[kind] = rqPickProviders(j.results || []); }).catch(() => {});
     S.loadMine(); S.loadNew();
   };
-  /* Discover lists: up to 5 pages (about 100 titles); movies and shows are narrowed by Overseerr, Trending here */
+  /* Discover lists: every filter is a live Overseerr query; pages load as you scroll (Trending, once narrowed, asks the movie or show Discover list) */
+  S.eff = key => key === 'movies' ? 'movie' : key === 'tv' ? 'tv' : key === 'trending' ? S.filters.trending.kind : '';
+  S.pathFor = key => key === 'trending' && S.filters.trending.kind === 'movie' ? '/api/v1/discover/movies' : key === 'trending' && S.filters.trending.kind === 'tv' ? '/api/v1/discover/tv' : RLISTS.find(l => l.key === key).path;
   S.loadList = key => {
-    const g = S.gen[key] = (S.gen[key] || 0) + 1; S.acc[key] = []; const seen = new Set(); S.pageNo[key] = 0;
-    const path = RLISTS.find(l => l.key === key).path;
-    const page = p => {
-      ov('GET', path + '?' + S.query_(key, p)).then(j => {
-        if (S.gen[key] !== g) return;
-        for (const r of (j.results || [])) { if (r.mediaType === undefined && r.title !== undefined) r.mediaType = 'movie'; if (r.mediaType !== 'movie' && r.mediaType !== 'tv') continue; const id = r.mediaType + r.id; if (!seen.has(id)) { seen.add(id); S.acc[key].push(rqMediaCard(r)); } }
-        S.problem = ''; S.pageNo[key] = p; S.cards[key] = S.clientFilter(key, S.acc[key]);
-        if (RQ === S && S.room === room) { S.paintRail(); if (S.cur().key === key && !S.over) { const f = document.querySelector('#room .rc.on'); const at = f ? +f.dataset.i : -1; S.show(); if (at >= 0) setFocus($$('.rc', room)[at] || null); } }
-        if (p < 5 && j.totalPages && p < j.totalPages) page(p + 1);
-      }).catch(e => { if (S.gen[key] !== g) return; if (e.status === 401 || e.status === 403 || e.status === 503) S.problem = 'Overseerr is not letting this in (' + e.message + '). Re-send the Overseerr key from the phone.'; else S.problem = "Can't reach Overseerr: " + e.message; if (S.cur().key === key) S.show(); });
-    };
-    page(1);
+    S.gen[key] = (S.gen[key] || 0) + 1; S.acc[key] = []; S.seen[key] = new Set(); S.pageNo[key] = 0; S.totalPages[key] = 0; S.moreBusy[key] = false; S.loadedAt[key] = Date.now(); S.busy[key] = true; S.listError[key] = '';
+    S.page(key, 1);
   };
+  S.page = (key, p) => {
+    const g = S.gen[key], path = S.pathFor(key);
+    ov('GET', path + '?' + S.query_(key, p)).then(j => {
+      if (S.gen[key] !== g) return;
+      S.busy[key] = false; S.moreBusy[key] = false;
+      const fresh = [];
+      for (const r of (j.results || [])) {
+        if (r.mediaType === undefined && r.title !== undefined) r.mediaType = 'movie';
+        if (r.mediaType !== 'movie' && r.mediaType !== 'tv') continue;
+        const id = r.mediaType + r.id;
+        if (!S.seen[key].has(id)) { S.seen[key].add(id); const c = rqMediaCard(r); S.acc[key].push(c); fresh.push(c); }
+      }
+      S.problem = ''; S.pageNo[key] = p; S.totalPages[key] = j.totalPages || 0; S.totals[key] = j.totalResults; S.cards[key] = S.acc[key];
+      if (RQ === S && S.room === room) {
+        S.paintRail();
+        if (S.cur().key === key && !S.over) {
+          if (p === 1) S.show();
+          else { const n = $$('.rc', room).length; $r('#rgg').insertAdjacentHTML('beforeend', fresh.map((c, i) => S.cardHTML(c, n + i)).join('')); S.shown = S.acc[key]; $r('#rfs').textContent = S.summary(key); }
+        }
+      }
+      if (p === 1) S.more(key);
+    }).catch(e => {
+      if (S.gen[key] !== g) return; S.busy[key] = false; S.moreBusy[key] = false;
+      if (e.status === 401 || e.status === 403 || e.status === 503) S.problem = 'Overseerr is not letting this in (' + e.message + '). Re-send the Overseerr key from the phone.';
+      else if (p === 1 && S.cards[key]) { S.listError[key] = "Overseerr couldn't do that search (" + e.message + ')'; S.acc[key] = []; S.cards[key] = []; }
+      else S.problem = "Can't reach Overseerr: " + e.message;
+      if (S.cur().key === key) S.show();
+    });
+  };
+  S.more = key => { if (S.moreBusy[key] || S.busy[key] || !S.pageNo[key] || S.pageNo[key] >= S.totalPages[key]) return; S.moreBusy[key] = true; S.page(key, S.pageNo[key] + 1); };
   S.query_ = (key, p) => {
-    const q = new URLSearchParams({ page: p }); if (key !== 'movies' && key !== 'tv') return q.toString();
-    const f = S.filters[key], kind = key === 'tv' ? 'tv' : 'movie';
+    const q = new URLSearchParams({ page: p }), kind = S.eff(key);
+    if (kind !== 'movie' && kind !== 'tv') return q.toString();
+    const f = S.filters[key];
     const ids = f.genres.map(n => (S.genres[kind].find(g => g.name === n) || {}).id).filter(Boolean); if (ids.length) q.set('genre', ids.join(','));
     if (f.provider) { q.set('watchProviders', f.provider); q.set('watchRegion', 'US'); }
-    if (f.minRating > 0) { q.set('voteAverageGte', f.minRating); q.set('voteCountGte', 100); }
+    let votes = 0; if (f.minRating > 0) { q.set('voteAverageGte', f.minRating); votes = 50; }
     const today = new Date().toISOString().slice(0, 10);
-    if (f.sort === 'rating') { q.set('sortBy', 'vote_average.desc'); if (!f.minRating) q.set('voteCountGte', 300); }
-    else if (f.sort === 'newest') { if (kind === 'movie') { q.set('sortBy', 'primary_release_date.desc'); q.set('primaryReleaseDateLte', today); } else { q.set('sortBy', 'first_air_date.desc'); q.set('firstAirDateLte', today); } q.set('voteCountGte', 20); }
-    else if (f.sort === 'az') { q.set('sortBy', kind === 'movie' ? 'original_title.asc' : 'original_name.asc'); q.set('voteCountGte', 20); }
+    if (f.sort === 'rating') { q.set('sortBy', 'vote_average.desc'); votes = votes || 300; }
+    else if (f.sort === 'newest') { if (kind === 'movie') { q.set('sortBy', 'primary_release_date.desc'); q.set('primaryReleaseDateLte', today); } else { q.set('sortBy', 'first_air_date.desc'); q.set('firstAirDateLte', today); } votes = votes || 20; }
+    else if (f.sort === 'az') { q.set('sortBy', kind === 'movie' ? 'original_title.asc' : 'original_name.asc'); votes = votes || 20; }
+    if (votes) q.set('voteCountGte', votes);
     return q.toString();
   };
-  S.clientFilter = (key, cards) => {
-    if (key !== 'trending') return cards; const f = S.filters.trending;
-    const idsFor = n => ['movie', 'tv'].map(k => (S.genres[k].find(g => g.name === n) || {}).id).filter(Boolean);
-    let out = cards.filter(c => (!f.minRating || c.vote >= f.minRating) && f.genres.every(n => idsFor(n).some(id => c.genreIds.includes(id))));
-    if (f.sort === 'rating') out = out.slice().sort((a, b) => b.vote - a.vote); else if (f.sort === 'newest') out = out.slice().sort((a, b) => b.date.localeCompare(a.date)); else if (f.sort === 'az') out = out.slice().sort((a, b) => a.title.localeCompare(b.title));
-    return out;
-  };
-  S.active = key => { const f = S.filters[key]; return f.genres.length > 0 || !!f.provider || f.minRating > 0 || f.sort !== 'popular'; };
+  S.active = key => { const f = S.filters[key]; return (key === 'trending' && f.kind !== 'all') || f.genres.length > 0 || !!f.provider || f.minRating > 0 || f.sort !== 'popular'; };
   S.summary = key => {
-    const f = S.filters[key], parts = [], kind = key === 'tv' ? 'tv' : 'movie';
+    const f = S.filters[key], parts = [], kind = S.eff(key) === 'tv' ? 'tv' : 'movie';
+    if (key === 'trending' && f.kind !== 'all') parts.push(f.kind === 'tv' ? 'shows' : 'movies');
     if (f.genres.length) parts.push(f.genres.join(' + '));
     if (f.provider) { const p = S.provs[kind].find(x => String(x.id) === f.provider); if (p) parts.push('on ' + p.name); }
     if (f.minRating) parts.push('rated ' + f.minRating + '.0+');
-    parts.push({ popular: 'most popular', rating: 'top rated', newest: 'newest', az: 'A to Z' }[f.sort]);
-    return ((S.cards[key] || []).length) + ' titles · ' + parts.join(' · ');
+    if (key !== 'trending' || f.kind !== 'all') parts.push({ popular: 'most popular', rating: 'top rated', newest: 'newest', az: 'A to Z' }[f.sort]);
+    const n = Math.max((S.cards[key] || []).length, S.totals[key] || 0);
+    return (S.busy[key] ? 'Asking Overseerr… · ' : (S.active(key) ? 'Filtered · ' : '') + n.toLocaleString() + ' titles · ') + parts.join(' · ');
   };
   S.sheet = () => {
     const key = S.cur().key; S.fkey = key; S.fw = JSON.parse(JSON.stringify(S.filters[key]));
@@ -1414,11 +1435,13 @@ function roomRequests(room, tok) {
     S.drawSheet(); firstFocus(L.el);
   };
   S.drawSheet = () => {
-    const key = S.fkey, f = S.fw, names = [], seen = new Set();
-    for (const kind of key === 'movies' ? ['movie'] : key === 'tv' ? ['tv'] : ['movie', 'tv']) for (const g of S.genres[kind]) if (!seen.has(g.name)) { seen.add(g.name); names.push(g.name); }
+    const key = S.fkey, f = S.fw, ek = f.kind;
     const chip = (k, v, label, on, extra) => `<div class="fx rfc ${on ? 'sel' : ''}" data-a="rqfc" data-k="${k}" data-v="${esc(v)}">${extra || ''}<span>${esc(label)}</span></div>`;
-    const provs = key === 'movies' ? S.provs.movie : key === 'tv' ? S.provs.tv : [];
-    $('#rfp').innerHTML = `<div class="rfh">${esc(RLISTS.find(l => l.key === key).name)}</div>
+    const head = `<div class="rfh">${esc(RLISTS.find(l => l.key === key).name)}</div>`;
+    const kinds = key === 'trending' ? `<div class="rfs">Show</div><div class="rfrow">${[['all', 'Trending now'], ['movie', 'Movies'], ['tv', 'Shows']].map(([v, t]) => chip('kind', v, t, f.kind === v)).join('')}</div>` : '';
+    if (ek === 'all') { $('#rfp').innerHTML = head + kinds + `<div class="rfs" style="font:24px HearthText;color:var(--muted)">Pick Movies or Shows to narrow Trending by genre, streaming service, rating or sort.</div><div class="rfrow rfend"><div class="fx rfc sel wide" data-a="rqfdone"><span>Show results</span></div></div>`; return; }
+    const names = S.genres[ek].map(g => g.name), provs = S.provs[ek] || [];
+    $('#rfp').innerHTML = head + kinds + `
       <div class="rfs">Genre</div><div class="rfrow">${chip('any', '', 'Any', !f.genres.length)}${names.map(n => chip('genre', n, n, f.genres.includes(n))).join('')}</div>
       ${provs.length ? `<div class="rfs">Streaming on</div><div class="rfrow">${chip('prov', '', 'Any', !f.provider)}${provs.map(p => chip('prov', String(p.id), p.name, f.provider === String(p.id), `<img src="${tmdb(p.logoPath, 'w92')}" alt="">`)).join('')}</div>` : ''}
       <div class="rfs">Rating (TMDB)</div><div class="rfrow">${[[0, 'Any'], [6, '6.0+'], [7, '7.0+'], [8, '8.0+']].map(([v, t]) => chip('rate', v, t, f.minRating === v, v ? '<i class="rfstar">★</i>' : '')).join('')}</div>
@@ -1427,9 +1450,11 @@ function roomRequests(room, tok) {
   };
   S.fchip = el => {
     const f = S.fw, k = el.dataset.k, v = el.dataset.v;
-    if (k === 'any') f.genres = []; else if (k === 'genre') f.genres = f.genres.includes(v) ? f.genres.filter(x => x !== v) : f.genres.concat(v);
+    if (k === 'kind') { if (f.kind !== v) { f.kind = v; f.genres = []; f.provider = ''; if (v === 'all') { f.minRating = 0; f.sort = 'popular'; } } }
+    else if (k === 'any') f.genres = [];
+    else if (k === 'genre') f.genres = f.genres.includes(v) ? f.genres.filter(x => x !== v) : f.genres.concat(v);
     else if (k === 'prov') f.provider = v; else if (k === 'rate') f.minRating = +v; else if (k === 'sort') f.sort = v;
-    else if (k === 'reset') Object.assign(f, rqNF());
+    else if (k === 'reset') Object.assign(f, rqNF(S.fkey === 'trending' ? 'all' : S.fkey === 'tv' ? 'tv' : 'movie'));
     S.drawSheet(); const again = $$('#rfp .rfc').find(e => e.dataset.k === k && e.dataset.v === v) || $('#rfp .rfc'); setFocus(again);
   };
   S.applyFilters = () => {
@@ -1558,7 +1583,7 @@ function roomRequests(room, tok) {
   };
   S.tab = i => { S.newTab = i; S.show(); };
   RQLeave = () => { if (S.undo()) return true; if (S.over) { S.over = null; S.show(); setFocus($$('.rc', room)[0] || null); return true; } return false; };
-  RQInfo = i => { if (RQ === S && S.room === room) S.info(i); };
+  RQInfo = i => { if (RQ === S && S.room === room) { S.info(i); const k = S.cur().key; if (RQ_FILT.includes(k) && S.shown && S.shown.length - i <= 18) S.more(k); } };
   S.pollT = setInterval(() => { if (cur !== 'Requests' || RQ !== S) { clearInterval(S.pollT); return; } if (S.cur().key === 'mine' && S.mineActive && !layers.length) S.loadMine(); }, 10000);
   if (!$('#rg', room)) return;
   S.show(); S.load();
