@@ -496,8 +496,26 @@ sub addFilterQuery(q as object, key as string)
     if votes > 0 then qp(q, "voteCountGte", votes.toStr())
 end sub
 sub qp(q as object, name as string, value as string)
-    q.push(name + "=" + CreateObject("roUrlTransfer").Escape(value))
+    q.push(name + "=" + urlEnc(value))
 end sub
+
+' Percent-encodes by hand: roUrlTransfer can only be made on a Task thread, and this runs on the render thread
+function urlEnc(s as string) as string
+    out = ""
+    hex = "0123456789ABCDEF"
+    for i = 1 to Len(s)
+        ch = Mid(s, i, 1)
+        a = Asc(ch)
+        if (a >= 48 and a <= 57) or (a >= 65 and a <= 90) or (a >= 97 and a <= 122) or ch = "-" or ch = "_" or ch = "." or ch = "~"
+            out = out + ch
+        else if a < 128
+            out = out + "%" + Mid(hex, Int(a / 16) + 1, 1) + Mid(hex, (a mod 16) + 1, 1)
+        else
+            out = out + "%3F"
+        end if
+    end for
+    return out
+end function
 
 
 function genreId(kind as string, name as string) as string
