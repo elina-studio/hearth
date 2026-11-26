@@ -360,6 +360,7 @@ sub hFbStatus(event as object)
     p = event.getRoSGNode()
     g = p.getParent()
     if g <> invalid and g.hasField("fb") then g.fb.visible = (p.loadStatus <> "ready")
+    if p.loadStatus = "failed" then print "[hearth-img] failed: "; Left(p.uri, 110)
 end sub
 
 ' Names kept out of every shelf and list (Home, Music New/albums, search): matched anywhere in an item's title, album or artist.

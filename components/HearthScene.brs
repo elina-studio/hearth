@@ -79,7 +79,9 @@ sub onUserChecked(event as object)
     t = hTaskFrom(event)
     ' a 401 means the login is gone; offline or slow still opens the hub, which shows the offline banner
     if t.status = 401 then m.next = "setup" else m.next = "hub"
-    if m.next = "hub" then startWarm() else m.warmDone = true
+    ' Preloading is off: a Hub built before it is on screen never gets its posters (builds 81-88 showed placeholders).
+    ' Rooms load lazily when opened, as before. startWarm is kept for a later, tested attempt.
+    m.warmDone = true
     goNext()
 end sub
 

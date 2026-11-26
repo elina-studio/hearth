@@ -222,7 +222,7 @@ sub onLibraries(event as object)
     end for
     m.global.libraries = libs
     ' first launch only: build every room now so they all load their data in the background
-    if m.warmRooms = invalid then startWarm()
+    ' (rooms are built lazily when opened; startWarm stays unused until preloading is retested)
     for each k in m.rooms
         m.rooms[k].callFunc("refresh", invalid)
     end for
