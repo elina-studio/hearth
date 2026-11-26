@@ -89,6 +89,46 @@ def _paged(limit, method, **kw):
     return out[:limit], ""
 
 
+def _plex_top(limit):
+    """Artists by how many times their tracks were played in Plex (every music library), most played first."""
+    try:
+        import web
+        k = web.keys()
+        base = (k.get("plexServer") or "http://192.168.254.41:32400").rstrip("/")
+        tok = k.get("plexServerToken") or k.get("plexToken") or ""
+        if not tok:
+            print("[discover] no Plex token saved on the helper", flush=True)
+            return []
+
+        def px(path):
+            sep = "&" if "?" in path else "?"
+            req = urllib.request.Request(base + path + sep + "X-Plex-Token=" + urllib.parse.quote(tok),
+                                         headers={"Accept": "application/json"})
+            with urllib.request.urlopen(req, timeout=60) as r:
+                return json.loads(r.read().decode("utf-8", "replace")).get("MediaContainer", {})
+
+        plays = {}
+        for sec in px("/library/sections").get("Directory", []):
+            if sec.get("type") != "artist":
+                continue
+            mc = px("/library/sections/%s/all?type=10&sort=viewCount:desc&X-Plex-Container-Start=0&X-Plex-Container-Size=8000" % sec["key"])
+            for t in mc.get("Metadata", []):
+                n = t.get("viewCount") or 0
+                if not n:
+                    break   # sorted by plays, so the rest were never played
+                a = t.get("grandparentTitle") or ""
+                if a.lower() in ("various artists", "va", "unknown artist", ""):
+                    a = t.get("originalTitle") or ""
+                if a and a.lower() not in ("various artists", "unknown artist"):
+                    plays[a] = plays.get(a, 0) + int(n)
+        out = [{"name": a, "mbid": "", "plays": n} for a, n in plays.items()]
+        out.sort(key=lambda a: -a["plays"])
+        return out[:limit]
+    except Exception as e:
+        print("[discover] Plex play counts failed:", e, flush=True)
+        return []
+
+
 def _top(user, period, limit):
     """Your top artists for a period. Last.fm's own top-artists call fails ("Operation failed") on some big accounts,
     so fall back to other calls that give the same play counts: signed top artists, then your library (all time) or the
@@ -143,9 +183,16 @@ def _build():
             return
         recent = _top(user, "12month", 100)
         allt = _top(user, "overall", 300)
+        source = "lastfm"
         if not recent and not allt:
-            _fail("Last.fm wouldn't give the top artists for %s by any of its routes (the NAS log lists each try)" % user)
-            return
+            # Last.fm won't hand over your charts right now: use what you've played in Plex so the lists still appear.
+            # Last.fm is asked again on the next daily rebuild.
+            allt = _plex_top(300)
+            source = "plex"
+            if not allt:
+                _fail("Last.fm wouldn't give the top artists for %s, and Plex had no play counts either" % user)
+                return
+            print("[discover] using Plex play counts for %d artists until Last.fm answers" % len(allt), flush=True)
         score = {}
         info = {}
         for lst, w in ((recent, 0.6), (allt[:100], 0.4)):
@@ -190,7 +237,9 @@ def _build():
             d = _load()
             d.pop("error", None)
             plays = {a["name"].lower(): a["plays"] for a in allt}
-            d.update({"loved": loved, "recs": recs, "plays": plays, "built": int(time.time()), "user": user})
+            d.update({"loved": loved, "recs": recs, "plays": plays, "built": int(time.time()), "user": user, "source": source})
+            if source != "lastfm":
+                d["built"] = int(time.time()) - BUILD_EVERY + 3 * 3600   # try Last.fm again in a few hours, not a day
             _save(d)
         print("[discover] built: %d loved, %d recommended" % (len(loved), len(recs)), flush=True)
         # then new releases: the artists you play (top 300 all time) and the top 40 recommended, checked on MusicBrainz
