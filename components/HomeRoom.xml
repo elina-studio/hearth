@@ -77,9 +77,10 @@
       <Group id="reqCard" translation="[730, 276]">
         <Poster uri="pkg:/images/tile-v2.9.png" blendColor="0x141A11F2" width="532" height="230" />
         <Poster uri="pkg:/images/icons/home-down.png" translation="[28, 30]" width="28" height="28" blendColor="0xB5AF8CFF" />
-        <Label id="reqEyebrow" translation="[64, 28]" height="32" vertAlign="center" color="0xB5AF8CFF" text="REQUESTS" />
-        <Group id="reqLines" translation="[28, 70]" />
-        <Label id="reqFoot" translation="[28, 184]" width="476" color="0xE0B34AFF" />
+        <Label id="reqEyebrow" translation="[64, 28]" height="32" vertAlign="center" color="0xB5AF8CFF" text="NEWLY DOWNLOADED" />
+        <Label id="reqNote" translation="[28, 28]" width="476" height="32" vertAlign="center" horizAlign="right" color="0xA3A35AFF" />
+        <Group id="reqLines" translation="[28, 66]" />
+        <Label id="reqEmpty" translation="[28, 100]" width="476" horizAlign="center" color="0xB5AF8CFF" />
         <Poster id="reqRing" uri="pkg:/images/ring-v4.9.png" blendColor="0xE0B34AFF" translation="[-10, -10]" width="552" height="250" visible="false" />
       </Group>
 
@@ -94,7 +95,7 @@
       <CardRow id="nextUp" translation="[96, 540]" title="Next up" icon="pkg:/images/icons/home-play.png" countNoun="to watch" seed="0" />
       <CardRow id="latest" translation="[96, 880]" title="Recently added" icon="pkg:/images/icons/home-flame.png" countNoun="new" seed="1" />
       <CardRow id="musicRow" translation="[96, 1220]" title="Music · new albums" icon="pkg:/images/icons/home-note.png" countNoun="albums" seed="2" cardWidth="240" cardHeight="240" />
-      <CardRow id="reqRow" translation="[96, 1560]" title="Requests" icon="pkg:/images/icons/home-down.png" countNoun="requests" seed="3" cardWidth="200" cardHeight="300" />
+      <CardRow id="reqRow" translation="[96, 1560]" title="Newly downloaded" icon="pkg:/images/icons/home-down.png" countNoun="new" seed="3" cardWidth="200" cardHeight="300" />
       <CardRow id="photoRow" translation="[96, 1900]" title="Photos · lately" icon="pkg:/images/icons/home-cal.png" countNoun="photos" seed="0" />
     </Group>
     <Animation id="scroll" duration="0.22" easeFunction="outQuad">

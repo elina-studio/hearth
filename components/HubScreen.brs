@@ -410,6 +410,7 @@ sub onRoomRequest(event as object)
         m.pillIndex = indexOf(r.name)
         showRoom(r.name, true)
         if r.search <> invalid and r.name = "Requests" then m.rooms["Requests"].searchTerm = r.search
+        if r.tab = "new" and r.name = "Requests" then m.rooms["Requests"].callFunc("openNew", invalid)
     else
         m.top.request = r
     end if

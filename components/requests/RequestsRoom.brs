@@ -1478,6 +1478,22 @@ sub focusIn(unused as dynamic)
     refreshFocus()
 end sub
 
+' Home's "Newly downloaded" card lands here: the New tab, All, with focus on the newest poster
+sub openNew(unused as dynamic)
+    if m.setup.visible then return
+    for i = 0 to m.lists.count() - 1
+        if m.lists[i].key = "new" then m.railIndex = i
+    end for
+    m.newTab = 0
+    m.gridIndex = 0
+    if m.newAll <> invalid then filterNew()
+    paintRail()
+    showList()
+    c = m.cards["new"]
+    if c <> invalid and c.count() > 0 then m.zone = "grid" else m.zone = "rail"
+    refreshFocus()
+end sub
+
 sub refreshFocus()
     if m.setup.visible
         m.keyKb.active = (m.focused and m.zone = "setup")

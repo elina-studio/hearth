@@ -28,7 +28,6 @@ sub init()
     end for
     m.top.findNode("musicTitle").font = hFont("bold", 30)
     m.top.findNode("musicSub").font = hFont("regular", 24)
-    m.top.findNode("reqFoot").font = hFont("regular", 26)
     m.mRings = [m.top.findNode("mRing0"), m.top.findNode("mRing1"), m.top.findNode("mRing2"), m.top.findNode("mRing3"), m.top.findNode("mRing4")]
     m.mDash = [0, 1, 2, 8, 9]
     m.mRing5 = m.top.findNode("mRing5")
@@ -626,131 +625,121 @@ sub musicCommand(cmd as string)
     if mp <> invalid then mp.command = { cmd: cmd }
 end sub
 
-' ---------- Requests: up to 3 on the way, and how many recent ones are ready ----------
+' ---------- Requests card: what just finished downloading (newest first), plus a count of what is still on the way ----------
 sub buildReqLines()
-    m.reqLines = []
+    m.reqNote = m.top.findNode("reqNote")
+    m.reqNote.font = hFont("regular", 22)
+    m.reqEmpty = m.top.findNode("reqEmpty")
+    m.reqEmpty.font = hFont("regular", 26)
+    m.reqEmpty.text = "Looking for new arrivals..."
+    m.reqCells = []
     holder = m.top.findNode("reqLines")
-    for i = 0 to 2
+    for i = 0 to 4
         g = holder.createChild("Group")
-        g.translation = [0, i * 38]
-        name = g.createChild("Label")
-        name.font = hFont("regular", 26)
-        name.width = 290
-        name.maxLines = 1
-        name.color = "0xEDE6CAFF"
-        track = g.createChild("Rectangle")
-        track.translation = [300, 16]
-        track.width = 110
-        track.height = 6
-        track.color = "0xFFFFFF1F"
-        fill = g.createChild("Rectangle")
-        fill.translation = [300, 16]
-        fill.height = 6
-        fill.color = "0xA3A35AFF"
-        note = g.createChild("Label")
-        note.font = hFont("regular", 26)
-        note.width = 160
-        note.translation = [316, 0]
-        note.horizAlign = "right"
-        g.addFields({ name: name, track: track, fill: fill, note: note })
+        g.translation = [i * 98, 0]
+        back = g.createChild("Rectangle")
+        back.width = 84
+        back.height = 126
+        back.color = "0xFFFFFF14"
+        pic = g.createChild("Poster")
+        pic.width = 84
+        pic.height = 126
+        pic.loadDisplayMode = "scaleToZoom"
+        nm = g.createChild("Label")
+        nm.font = hFont("regular", 18)
+        nm.width = 90
+        nm.height = 24
+        nm.translation = [0, 130]
+        nm.maxLines = 1
+        nm.color = "0xEDE6CAFF"
+        g.addFields({ pic: pic, name: nm })
         g.visible = false
-        m.reqLines.push(g)
+        m.reqCells.push(g)
     end for
 end sub
 
+' Overseerr is only used for the little "downloading" count in the corner; the posters come from Plex
 sub loadRequests()
-    foot = m.top.findNode("reqFoot")
     reg = CreateObject("roRegistrySection", "hearth")
-    if reg.Read("overseerrKey") = ""
-        foot.text = "Open Requests to link Overseerr"
-        return
+    if reg.Read("overseerrKey") <> "" and m.tasks.req = invalid
+        t = CreateObject("roSGNode", "OverseerrTask")
+        t.mode = "requests"
+        t.query = { take: "20" }
+        m.tasks.req = t
+        t.observeField("done", "onRequests")
+        t.control = "RUN"
     end if
-    if m.tasks.req <> invalid then return
-    t = CreateObject("roSGNode", "OverseerrTask")
-    t.mode = "requests"
-    t.query = { take: "10" }
-    m.tasks.req = t
-    t.observeField("done", "onRequests")
-    t.control = "RUN"
+    if m.tasks.arr = invalid
+        m.tasks.arr = true
+        hPlex("arrived", { limit: 12 }, "onArrivedHome")
+    end if
 end sub
 
 sub onRequests(event as object)
     t = event.getRoSGNode()
     m.tasks.delete("req")
-    foot = m.top.findNode("reqFoot")
-    for each g in m.reqLines
-        g.visible = false
-    end for
-    if not t.ok or t.response = invalid or t.response.results = invalid
-        foot.text = "Couldn't reach Overseerr"
-        return
-    end if
-    shown = 0
-    ready = 0
+    if not t.ok or t.response = invalid or t.response.results = invalid then return
+    going = 0
+    failed = 0
     for each r in t.response.results
         q = r.request
-        ms = -1
-        if q.media <> invalid then ms = rqNum(q.media.status)
-        rs = rqNum(q.status)
-        if ms = 5
-            ready = ready + 1
-        else if rs <> 3 and shown < 3
-            g = m.reqLines[shown]
-            title = r.info.title
-            if title = invalid or title = "" then title = "Untitled"
-            g.name.text = title
-            pct = rqProgress(q.media)
-            if rs = 4
-                g.note.text = "failed"
-                g.note.color = "0xF0907CFF"
-                pct = -1
-            else if pct >= 0
-                g.note.text = pct.toStr() + "%"
-                g.note.color = "0xA3A35AFF"
-            else if rs = 1
-                g.note.text = "waiting"
-                g.note.color = "0xB5AF8CFF"
-            else
-                g.note.text = "approved"
-                g.note.color = "0xB5AF8CFF"
-            end if
-            g.track.visible = pct >= 0
-            g.fill.visible = pct >= 0
-            if pct >= 0
-                g.fill.width = Int(110 * pct / 100)
-                g.note.translation = [316, 0]
-                g.note.width = 160
-                g.name.color = "0xEDE6CAFF"
-            else
-                g.name.color = "0xB5AF8CFF"
-            end if
-            g.visible = true
-            shown = shown + 1
+        if rqNum(q.status) = 4
+            failed = failed + 1
+        else if rqNum(q.status) <> 3 and rqProgress(q.media) >= 0
+            going = going + 1
         end if
     end for
-    if shown = 0
-        m.reqLines[0].name.text = "Nothing on the way"
-        m.reqLines[0].name.color = "0xB5AF8CFF"
-        m.reqLines[0].note.text = ""
-        m.reqLines[0].track.visible = false
-        m.reqLines[0].fill.visible = false
-        m.reqLines[0].visible = true
+    if failed > 0
+        m.reqNote.color = "0xF0907CFF"
+        m.reqNote.text = failed.toStr() + " failed"
+    else if going > 0
+        m.reqNote.color = "0xA3A35AFF"
+        m.reqNote.text = going.toStr() + " downloading"
+    else
+        m.reqNote.text = ""
+    end if
+end sub
+
+sub onArrivedHome(event as object)
+    t = hTaskFrom(event)
+    m.tasks.delete("arr")
+    items = []
+    seen = {}
+    if t.ok and t.response <> invalid and t.response.Items <> invalid
+        for each it in t.response.Items
+            key = it.Id
+            if it.Type = "Episode" and it.SeriesId <> invalid then key = it.SeriesId
+            if key <> invalid and seen[key] = invalid
+                c = rqArrivedCard(it, hImage(it, "Primary", 200))
+                if c <> invalid
+                    seen[key] = true
+                    items.push(c)
+                end if
+            end if
+        end for
+    end if
+    for i = 0 to 4
+        g = m.reqCells[i]
+        if i < items.count()
+            g.pic.uri = items[i].image
+            g.name.text = items[i].title
+            g.visible = true
+        else
+            g.visible = false
+        end if
+    end for
+    if items.count() > 0
+        m.reqEmpty.text = ""
+    else if not t.ok
+        m.reqEmpty.text = "Couldn't reach Plex"
+    else
+        m.reqEmpty.text = "Nothing new yet"
     end if
     rcards = []
-    for each r in t.response.results
-        if r.info <> invalid and r.info.title <> invalid and r.info.title <> ""
-            c = rqRequestCard(r.request, r.info)
-            rcards.push({ title: c.title, sub: c.chip.text, image: c.image, progress: 0, item: c.data })
-        end if
+    for each c in items
+        rcards.push({ title: c.title, sub: c.chip.text, image: c.image, progress: 0, item: c.data })
     end for
     setRow(3, rcards)
-    if ready = 1
-        foot.text = "1 ready to watch"
-    else if ready > 1
-        foot.text = ready.toStr() + " ready to watch"
-    else
-        foot.text = "OK opens Requests"
-    end if
 end sub
 
 ' ---------- Set the mood ----------
@@ -1157,7 +1146,7 @@ sub activate()
             mp = m.global.music
             if mp <> invalid then mp.command = { cmd: "radioStart", kind: "song" }
         else if m.dash = 3
-            m.top.request = { action: "room", name: "Requests" }
+            m.top.request = { action: "room", name: "Requests", tab: "new" }
         else
             m.top.request = { action: "mood", mood: m.moodKeys[m.dash - 4] }
         end if
@@ -1170,7 +1159,7 @@ sub activate()
             mp = m.global.music
             if mp <> invalid then mp.command = { cmd: "playContainer", kind: "album", id: card.item.Id.toStr(), shuffle: false, label: card.title }
         else if m.row = 3
-            m.top.request = { action: "room", name: "Requests" }
+            m.top.request = { action: "room", name: "Requests", tab: "new" }
         else if m.row = 4
             m.top.request = { action: "room", name: "Photos" }
         else

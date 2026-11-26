@@ -72,6 +72,7 @@
     <field id="searchTerm" type="string" alwaysNotify="true" onChange="onSearchTerm" />
     <function name="focusIn" />
     <function name="refresh" />
+    <function name="openNew" />
   </interface>
   <script type="text/brightscript" uri="pkg:/source/util.brs" />
   <script type="text/brightscript" uri="pkg:/components/requests/reqdata.brs" />
