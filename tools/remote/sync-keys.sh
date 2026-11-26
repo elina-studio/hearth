@@ -5,7 +5,8 @@
 # /volume1/docker/hearth-remote/data/hearth-keys.json with all of them,
 # and sends them to the TV. One ssh, one sudo password. No key is ever printed.
 NAS="Elina@192.168.254.41"
-REMOTE=$(cat <<'EOF'
+# read, not $(cat <<EOF): the bash on a Mac (3.2) can't parse some script text inside $( )
+IFS= read -r -d '' REMOTE <<'EOF'
 D=/volume1/docker
 TV=192.168.254.9
 J=$D/hearth-remote/data/hearth-keys.json
@@ -85,11 +86,11 @@ echo "Checking everything Music > Discover leans on (the first look at Lidarr ca
 T=$(cat $D/hearth-remote/data/helper-token 2>/dev/null)
 curl -s -m 20 -H "X-Hearth-Token: $T" "http://127.0.0.1:8765/api/discover?refresh=1" >/dev/null
 R=$(curl -s -m 420 -H "X-Hearth-Token: $T" "http://127.0.0.1:8765/api/discover/selftest")
-case "$R" in
-  *OK*|*FAIL*) echo "$R" ;;
-  *) echo "  The helper didn't answer the check. Send me this whole output." ;;
-esac
+if printf '%s' "$R" | grep -q -e OK -e FAIL; then
+  echo "$R"
+else
+  echo "  The helper didn't answer the check. Send me this whole output."
+fi
 EOF
-)
 B=$(printf '%s' "$REMOTE" | base64 | tr -d '\n')
 ssh -t -o ControlMaster=auto -o ControlPath=/tmp/hearth-ssh-%r-%h -o ControlPersist=300 "$NAS" "echo $B | base64 -d > /tmp/hearth-sync.sh && sudo sh /tmp/hearth-sync.sh; rm -f /tmp/hearth-sync.sh"

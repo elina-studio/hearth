@@ -4,7 +4,8 @@
 # While it waits, open http://192.168.254.41:8765/lastfm on any computer or phone at home and allow Hearth.
 # The house key is read on the NAS and never printed.
 NAS="Elina@192.168.254.41"
-REMOTE=$(cat <<'EOF'
+# read, not $(cat <<EOF): the bash on a Mac (3.2) can't parse some script text inside $( )
+IFS= read -r -d '' REMOTE <<'EOF'
 U=http://127.0.0.1:8765
 H="X-Hearth-Token: $(cat /volume1/docker/hearth-remote/data/helper-token 2>/dev/null)"
 get() { curl -s -m 15 -H "$H" "$U$1"; }
@@ -47,6 +48,5 @@ while [ $i -lt 60 ]; do
 done
 echo "The lists still aren't built after 5 minutes. Send me the output of this command."
 EOF
-)
 B=$(printf '%s' "$REMOTE" | base64 | tr -d '\n')
 ssh -t "$NAS" "echo $B | base64 -d > /tmp/hearth-pair.sh && sudo sh /tmp/hearth-pair.sh; rm -f /tmp/hearth-pair.sh"

@@ -24,15 +24,8 @@ done
 if [ "$C" != "401" ]; then echo "The lock did not come up (got '$C'). Tell me and paste the lines above."; exit 1; fi
 echo "   Locked: the keys page now says 401 to strangers."
 
-echo "4/4 Reading your house key..."
-echo "   (if it asks for the sudo password again, type it and press Enter; nothing shows as you type)"
-KEY=$(ssh -t $CTL "$NAS" "sudo cat /volume1/docker/hearth-remote/data/helper-token" | tr -d '\r' | grep -oE '[0-9a-f]{48}' | head -1)
-[ ${#KEY} -lt 48 ] && { echo "Couldn't read the house key. Tell me."; exit 1; }
-C2=$(curl -s -o /dev/null -w "%{http_code}" -H "X-Hearth-Token: $KEY" http://192.168.254.41:8765/api/keys)
-echo "   With the key: $C2 (200 is right)."
-echo
-echo "Save these two links in 1Password (they are your key; don't paste them anywhere else):"
-echo "  Phone remote:    http://192.168.254.41:8765/?t=$KEY"
-echo "  Projector page:  http://192.168.254.41:8765/hearth/?t=$KEY"
+echo "4/4 Checking the house key (if it asks for the sudo password, type it and press Enter; nothing shows as you type)..."
+# one NAS session does it all: a second ssh that only hands the key back comes up empty on this NAS
+R 'K=$(sudo cat /volume1/docker/hearth-remote/data/helper-token 2>/dev/null | tr -d "\r\n"); if [ -z "$K" ]; then echo "   Could not read the house key (the helper itself is fine)."; exit 0; fi; C=$(curl -s -o /dev/null -w "%{http_code}" -H "X-Hearth-Token: $K" http://127.0.0.1:8765/api/keys); echo "   With the key: $C (200 is right)."; echo; echo "Save these two links in 1Password (they are your key; do not paste them anywhere else):"; echo "  Phone remote:    http://192.168.254.41:8765/?t=$K"; echo "  Projector page:  http://192.168.254.41:8765/hearth/?t=$K"'
 echo
 echo "Open each once on its device. The TV needs nothing."
