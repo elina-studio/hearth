@@ -3,7 +3,7 @@
 ECP on :18060, dev web on :18080 (screenshots, install), debug log on :18085.
 It is not the app: it only prints HWALK lines shaped like the real trace, so the walk script's logic can be checked.
 Usage: python3 tools/walk/fake_tv.py [--crash-at N] [--error-at N]"""
-import socket, threading, sys, time, hashlib
+import socket, threading, sys, time, hashlib, re, io, zipfile
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 ROOMS = ["HomeRoom", "LibraryRoom", "LibraryRoom", "MusicRoom", "RequestsRoom", "AmbianceRoom", "PhotosRoom", "SearchRoom"]
@@ -13,6 +13,8 @@ ZONES = {"LibraryRoom": ["buttons", "tabs", "chips", "grid"], "HomeRoom": ["hero
 args = sys.argv[1:]
 CRASH_AT = int(args[args.index("--crash-at") + 1]) if "--crash-at" in args else -1
 ERROR_AT = int(args[args.index("--error-at") + 1]) if "--error-at" in args else -1
+SILENT = "--silent-install" in args  # install works but the TV answers nothing (seen live Nov 27)
+INSTALLED = ["110"]
 
 class App:
     def __init__(self):
@@ -126,6 +128,8 @@ class ECP(BaseHTTPRequestHandler):
         if self.path.startswith("/query/active-app"):
             app = '<app id="dev" type="appl">Hearth</app>' if APP.running else '<app>Roku</app>'
             self.reply("<active-app>%s</active-app>" % app)
+        elif self.path.startswith("/query/apps"):
+            self.reply('<apps><app id="dev" type="appl" version="0.1.%s">Hearth</app></apps>' % INSTALLED[0])
         elif self.path.startswith("/query/device-info"):
             self.reply("<device-info><model-name>Fake Roku</model-name></device-info>")
         else: self.reply("", 404)
@@ -146,7 +150,9 @@ class Web(BaseHTTPRequestHandler):
         if self.path == "/plugin_inspect": self.reply('<img src="pkgs/dev.jpg?time=%d">' % time.time())
         elif self.path == "/plugin_install":
             APP.launch(False)
-            self.reply("<font color=red>Install Success.</font>")
+            m = re.search(rb"build_version=(\d+)", zipfile.ZipFile(io.BytesIO(body[body.find(b"PK\x03\x04"):body.rfind(b"\r\n--")])).read("manifest")) if b"PK" in body else None
+            if m: INSTALLED[0] = m.group(1).decode()
+            self.reply("" if SILENT else "<font color=red>Install Success.</font>")
         else: self.reply("", 404)
 
 def log_server():

@@ -65,11 +65,26 @@ if [ "$NOINSTALL" != "1" ]; then
     curl -sfL -m 120 -o "$ZIP" "$RAW/$COMMIT/tools/walk/hearth-walk-build.zip" || { echo "Could not download the build for commit $COMMIT."; exit 1; }
   fi
   say "Installing on the TV..."
-  INS=$(curl -s -m 120 --digest -K "$CFG" -F "mysubmit=Install" -F "archive=@$ZIP" "$WEB/plugin_install")
-  if echo "$INS" | grep -qi "Install Failure\|Compilation Failed"; then
-    echo "INSTALL FAILED:"; echo "$INS" | sed -e 's/<[^>]*>/ /g' | tr -s ' \n' ' ' | head -c 600; echo; exit 2
+  WANT=$(unzip -p "$ZIP" manifest 2>/dev/null | tr -d '\r' | grep '^build_version=' | cut -d= -f2)
+  OK=0
+  for TRY in 1 2; do
+    INS=$(curl -s -m 240 --digest -K "$CFG" -F "mysubmit=Install" -F "archive=@$ZIP" "$WEB/plugin_install")
+    if echo "$INS" | grep -qi "Install Failure\|Compilation Failed"; then
+      echo "INSTALL FAILED:"; echo "$INS" | sed -e 's/<[^>]*>/ /g' | tr -s ' \n' ' ' | head -c 600; echo; exit 2
+    fi
+    if echo "$INS" | grep -qi "Install Success\|Application Received\|Identical to previous"; then OK=1; break; fi
+    # no clear answer: the TV may still have installed it. Ask it which dev build it now has.
+    sleep 3
+    HAVE=$(curl -s -m 8 "$ECP/query/apps" | grep -o '<app id="dev"[^>]*' | grep -o 'version="[^"]*"' | cut -d'"' -f2)
+    if [ -n "$WANT" ] && [ "${HAVE##*.}" = "$WANT" ]; then OK=1; break; fi
+    if [ "$TRY" = "1" ]; then say "The TV did not answer the install (it has build ${HAVE:-none}). Trying once more..."; fi
+  done
+  if [ "$OK" != "1" ]; then
+    echo "The TV gave no install answer, and it still has build ${HAVE:-none} instead of $WANT."
+    echo "What the TV said: $(echo "$INS" | sed -e 's/<[^>]*>/ /g' | tr -s ' \n' ' ' | head -c 300)"
+    echo "Wake the TV with the remote (press Home once), then run the same command again."
+    exit 2
   fi
-  echo "$INS" | grep -qi "Install Success\|Application Received\|Identical to previous" || { echo "The TV gave no install answer."; exit 2; }
   say "Installed."
   sleep 3
 fi
