@@ -69,6 +69,8 @@ function castCommand(c as object) as boolean
         m.castAlignTimer.control = "start"
     else if cmd = "castResync"
         castAlign()
+    else if cmd = "castMood"
+        castMood(pxStr(c.id))
     else if cmd = "tvYield"
         tvYield()
     else if cmd = "tvRejoin"
@@ -533,6 +535,26 @@ sub tvYield()
         m.out = m.audio
         m.top.state = "paused"
         m.tvYieldResume = live
+    end if
+end sub
+
+' Ambiance: a mood's video has the TV's one player, so the song can go to a speaker instead (and back off).
+' Turning the speaker on starts the song there from where it stopped; the TV stays out of it until tvRejoin.
+sub castMood(id as string)
+    if id = "" then return
+    if m.top.queue = invalid or m.top.queue.count() = 0 then return
+    isOn = false
+    for each r in m.top.rooms
+        if r.id = id and r.on = true then isOn = true
+    end for
+    if not isOn and m.tvYielded = true and not castActive()
+        ' the song was only waiting for the TV: it is "playing" again, on the speaker
+        m.top.state = "playing"
+        castToggle(id)
+        castStartClock()
+    else
+        ' off again: with no speaker left, playIndex sees the lent screen and leaves the song waiting
+        castToggle(id)
     end if
 end sub
 
