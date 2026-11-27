@@ -18,6 +18,8 @@ sub init()
     m.items = []
     m.tiles = []
     m.focus = 0
+    m.clock = CreateObject("roTimespan")
+    m.lastKey = -1000
 end sub
 
 ' open({ current: "57" }): draws the tiles and puts focus on the look in use
@@ -28,6 +30,7 @@ sub open(args as object)
     end for
     m.grid.removeChildrenIndex(m.grid.getChildCount(), 0)
     m.tiles = []
+    m.stars = vizStars()
     for i = 0 to m.items.Count() - 1
         m.tiles.push(makeTile(i, m.items[i]))
     end for
@@ -59,6 +62,7 @@ function makeTile(i as integer, it as object) as object
     bg.width = m.tw
     bg.height = m.th
     bg.color = "0x1D2418FF"
+    pic = invalid
     if it.n = "shuffle"
         ic = t.createChild("Poster")
         ic.uri = "pkg:/images/music/icons/shuffle.png"
@@ -66,9 +70,11 @@ function makeTile(i as integer, it as object) as object
         ic.height = 56
         ic.translation = [(m.tw - 56) / 2, (m.th - 56) / 2]
         ic.blendColor = "0xE0B34AFF"
+    pic = invalid
     else
+        ' the picture is loaded only while its row is on screen (see redraw): 68 pictures at once,
+        ' with the visualizer video playing behind, ran the TV out of picture memory when scrolling fast
         pic = t.createChild("Poster")
-        pic.uri = "pkg:/images/music/viz/" + it.n + ".jpg"
         pic.width = m.tw
         pic.height = m.th
         pic.loadDisplayMode = "scaleToZoom"
@@ -97,12 +103,15 @@ function makeTile(i as integer, it as object) as object
     name.font = hFont("regular", 22)
     name.color = "0xB5AF8CFF"
     name.text = it.label
-    return { ring: ring, star: star, starBg: starBg, inUse: inUse, name: name }
+    return { ring: ring, star: star, starBg: starBg, inUse: inUse, name: name, pic: pic, row: Int(i / m.cols) }
 end function
 
 sub redraw()
-    stars = vizStars()
+    stars = m.stars
     choice = vizChoice()
+    row = Int(m.focus / m.cols)
+    if row < m.rowTop then m.rowTop = row
+    if row > m.rowTop + m.rows - 1 then m.rowTop = row - m.rows + 1
     for i = 0 to m.tiles.Count() - 1
         it = m.items[i]
         t = m.tiles[i]
@@ -113,10 +122,12 @@ sub redraw()
         t.starBg.visible = starred
         t.inUse.visible = (it.n = choice)
         if f then t.name.color = "0xEDE6CAFF" else t.name.color = "0xB5AF8CFF"
+        if t.pic <> invalid
+            want = ""
+            if t.row >= m.rowTop - 1 and t.row <= m.rowTop + m.rows then want = "pkg:/images/music/viz/" + it.n + ".jpg"
+            if t.pic.uri <> want then t.pic.uri = want
+        end if
     end for
-    row = Int(m.focus / m.cols)
-    if row < m.rowTop then m.rowTop = row
-    if row > m.rowTop + m.rows - 1 then m.rowTop = row - m.rows + 1
     m.grid.translation = [0, -m.rowTop * (m.th + m.gy)]
     it = m.items[m.focus]
     n = stars.Count()
@@ -136,6 +147,12 @@ sub redraw()
 end sub
 
 function handleKey(key as string) as boolean
+    ' a held arrow repeats faster than the TV can redraw; take at most one step every 90 ms
+    if key = "up" or key = "down" or key = "left" or key = "right"
+        now = m.clock.TotalMilliseconds()
+        if now - m.lastKey < 90 then return true
+        m.lastKey = now
+    end if
     last = m.items.Count() - 1
     f = m.focus
     if key = "back"
@@ -146,6 +163,7 @@ function handleKey(key as string) as boolean
         it = m.items[f]
         if it.n <> "shuffle"
             vizSetStar(it.n, vizStars()[it.n] <> true)
+            m.stars = vizStars()
             redraw()
         end if
     else if key = "left"
