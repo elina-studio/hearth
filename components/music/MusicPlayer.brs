@@ -634,6 +634,7 @@ sub onPosition()
     m.top.position = m.audio.position
     if m.audio.duration > 0 then m.top.duration = m.audio.duration
     afterPosition()
+    mixCheckPending()
 end sub
 
 sub afterPosition()

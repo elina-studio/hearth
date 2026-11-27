@@ -16,6 +16,7 @@ sub mixInit()
     m.mixReq = invalid
     m.mixSkip = ""
     m.mixPrefetched = ""
+    m.mixPending = invalid
     m.vizFor = {}
 end sub
 
@@ -48,8 +49,8 @@ sub mixOn(c as object)
     if m.mix <> invalid and m.mix.video.isSameNode(v) and m.mix.kind = pxStr(c.kind)
         ' asked again (the fire clip is ready now): try this song again where it is
         m.mixSkip = ""
-        if m.out.isSameNode(m.audio) and (m.top.state = "playing" or m.top.state = "buffering") and not castActive()
-            playIndex(m.top.index, m.top.position)
+        if m.out.isSameNode(m.audio) and m.top.state = "playing" and not castActive()
+            mixSwitch()
         end if
         return
     end if
@@ -58,11 +59,16 @@ sub mixOn(c as object)
     m.mixSkip = ""
     v.observeField("state", "onMixVideoState")
     v.observeField("position", "onMixVideoPos")
+    ' fresh positions keep the lyrics on time
+    v.notificationInterval = 0.25
     m.top.mixState = "off"
-    ' a song already playing moves over to the joined stream where it is
-    live = (m.top.state = "playing" or m.top.state = "buffering")
-    if live and m.top.queue <> invalid and m.top.queue.count() > 0 and not castActive()
-        playIndex(m.top.index, m.top.position)
+    ' a song already playing keeps playing, and moves over to the joined stream a few seconds on
+    if m.top.queue <> invalid and m.top.queue.count() > 0 and not castActive()
+        if m.top.state = "playing"
+            mixSwitch()
+        else if m.top.state = "buffering"
+            playIndex(m.top.index, m.top.position)
+        end if
     end if
 end sub
 
@@ -78,6 +84,7 @@ sub mixOff()
     v.control = "stop"
     m.mix = invalid
     m.mixReq = invalid
+    mixClearPending()
     m.mixSeq = m.mixSeq + 1
     m.top.mixState = "off"
     if wasMixing or m.top.state = "buffering"
@@ -95,8 +102,12 @@ sub mixLook(look as string)
     if tr = invalid or look = "" then return
     m.vizFor[tr.id] = look
     m.top.vizLook = look
-    if m.mix <> invalid and m.mix.kind = "viz" and (m.top.state = "playing" or m.top.state = "buffering")
-        playIndex(m.top.index, m.top.position)
+    if m.mix <> invalid and m.mix.kind = "viz" and not castActive()
+        if m.top.state = "playing"
+            mixSwitch()
+        else if m.top.state = "buffering"
+            playIndex(m.top.index, m.top.position)
+        end if
     end if
 end sub
 
@@ -113,6 +124,7 @@ end function
 sub mixStopVideo()
     m.mixSeq = m.mixSeq + 1
     m.mixReq = invalid
+    mixClearPending()
     if m.mix <> invalid and not m.out.isSameNode(m.audio)
         m.out = m.audio
         m.mix.video.control = "stop"
@@ -123,9 +135,14 @@ sub mixPlay(i as integer, startAt as float)
     tr = m.top.queue[i]
     ss = Int(startAt)
     m.mixSeq = m.mixSeq + 1
-    m.mixReq = { seq: m.mixSeq, index: i, ss: ss, id: tr.id }
+    ' the stream starts on a whole second; the part of a second left over is skipped inside it
+    m.mixReq = { seq: m.mixSeq, index: i, ss: ss, id: tr.id, at: startAt, live: false }
     m.top.state = "buffering"
     m.top.mixState = "starting"
+    nasCall("GET", "/api/mix/start?" + mixQuery(tr, ss), "", "onMixStart", m.mixSeq.toStr())
+end sub
+
+function mixQuery(tr as object, ss as integer) as string
     q = "kind=" + m.mix.kind + "&file=" + pxEscape(tr.file) + "&ss=" + ss.toStr()
     if m.mix.kind = "viz"
         look = vizLookFor(tr)
@@ -134,7 +151,74 @@ sub mixPlay(i as integer, startAt as float)
     else
         q = q + "&clip=" + pxEscape(m.mix.clip)
     end if
-    nasCall("GET", "/api/mix/start?" + q, "", "onMixStart", m.mixSeq.toStr())
+    return q
+end function
+
+' Mid-song (the view opened, the fire clip got ready, a new look): the song keeps playing where it is,
+' and the joined stream is asked to start a few seconds further on. When it is ready and the song gets
+' there, the TV changes over at that exact spot, so nothing repeats and the lyrics stay on time.
+sub mixSwitch()
+    tr = m.top.track
+    if m.mix = invalid or tr = invalid or not mixWanted(tr) then return
+    ss = Int(m.top.position) + 4
+    ' too close to the end: the next song starts on the joined stream anyway
+    if m.top.duration > 0 and ss > m.top.duration - 3 then return
+    m.mixSeq = m.mixSeq + 1
+    mixClearPending()
+    m.mixReq = { seq: m.mixSeq, index: m.top.index, ss: ss, id: tr.id, at: ss, live: true }
+    ' a new look: the old one stays on screen until the change-over
+    if m.out.isSameNode(m.audio) then m.top.mixState = "starting"
+    nasCall("GET", "/api/mix/start?" + mixQuery(tr, ss), "", "onMixStart", m.mixSeq.toStr())
+end sub
+
+' the joined stream is ready ahead of the song: wait for the song to get there, watching closely
+sub mixWait(p as object)
+    m.mixPending = p
+    m.out.notificationInterval = 0.1
+    mixCheckPending()
+end sub
+
+sub mixClearPending()
+    if m.mixPending = invalid then return
+    m.mixPending = invalid
+    m.audio.notificationInterval = 1
+    if m.mix <> invalid then m.mix.video.notificationInterval = 0.25
+end sub
+
+' called on every position tick while a change-over is waiting
+sub mixCheckPending()
+    p = m.mixPending
+    if p = invalid then return
+    tr = m.top.track
+    if tr = invalid or tr.id <> p.id or m.top.index <> p.index
+        mixClearPending()
+        return
+    end if
+    if m.top.position < p.ss - 0.12 then return
+    mixClearPending()
+    mixJoin(p.url, p.kind, p.ss, m.top.position)
+end sub
+
+' start the joined stream (which begins at song second ss) at song second at
+sub mixJoin(url as string, kind as string, ss as integer, at as float)
+    c = CreateObject("roSGNode", "ContentNode")
+    c.url = url
+    c.streamFormat = "hls"
+    tr = m.top.track
+    if tr <> invalid then c.title = tr.title
+    off = at - ss
+    if off > 0.05 then c.playStart = off
+    m.mixBase = ss
+    m.top.mixKind = kind
+    wasAudio = m.out.isSameNode(m.audio)
+    ' the old stream's "stopped" must not read as the song stopping
+    m.top.state = "buffering"
+    m.out = m.mix.video
+    if wasAudio then m.audio.control = "stop"
+    m.mix.video.content = c
+    m.mix.video.control = "play"
+    m.top.mixState = "on"
+    print "[music] joined stream ("; kind; ") from "; ss; " s, in at "; at
 end sub
 
 sub onMixStart(event as object)
@@ -144,18 +228,23 @@ sub onMixStart(event as object)
     m.mixReq = invalid
     resp = t.response
     if t.ok and resp.url <> invalid and resp.url <> ""
-        c = CreateObject("roSGNode", "ContentNode")
-        c.url = resp.url
-        c.streamFormat = "hls"
         tr = m.top.track
-        if tr <> invalid then c.title = tr.title
-        m.mixBase = r.ss
-        m.top.mixKind = pxStr(resp.kind)
-        m.out = m.mix.video
-        m.mix.video.content = c
-        m.mix.video.control = "play"
-        m.top.mixState = "on"
-        print "[music] joined stream ("; m.top.mixKind; ") from "; r.ss; " s"
+        if tr = invalid or tr.id <> r.id then return
+        if r.live = true
+            ' the song is still playing: change over when it reaches the stream's start
+            if m.top.state <> "playing"
+                ' paused meanwhile: resume() starts the joined stream where the song is
+                if m.out.isSameNode(m.audio) then m.top.mixState = "off"
+                return
+            end if
+            if m.top.position < r.ss - 0.12
+                mixWait({ url: resp.url, kind: pxStr(resp.kind), ss: r.ss, id: r.id, index: r.index })
+            else
+                mixJoin(resp.url, pxStr(resp.kind), r.ss, m.top.position)
+            end if
+            return
+        end if
+        mixJoin(resp.url, pxStr(resp.kind), r.ss, r.at)
         return
     end if
     why = ""
@@ -163,6 +252,13 @@ sub onMixStart(event as object)
     if why = "" and t.status <= 0 then why = "the NAS helper didn't answer"
     if why = "" then why = "the NAS helper said " + t.status.toStr()
     print "[music] no joined stream: "; why
+    if r.live = true
+        ' the song never stopped: it just carries on as it is (with the old look, if one is on)
+        if not m.out.isSameNode(m.audio) then return
+        m.top.mixNote = why
+        m.top.mixState = "failed"
+        return
+    end if
     mixFallBack(why)
 end sub
 
@@ -196,6 +292,7 @@ sub onMixVideoPos()
     tr = m.top.track
     if tr <> invalid and tr.duration > 0 then m.top.duration = tr.duration
     afterPosition()
+    mixCheckPending()
     mixPrefetch()
 end sub
 

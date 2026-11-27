@@ -114,7 +114,7 @@ sub showNow()
     if mode = "hearth"
         names = { both: "FIRE + MUSIC", fire: "FIRE ONLY", music: "MUSIC ONLY" }
         m.sEyebrow.text = "HEARTH  ·  " + names[m.mix] + "  ·  " + n.eyebrow
-        keys = keys + Chr(10) + "* mutes the fire or the music"
+        keys = keys + Chr(10) + "OK mutes the fire or the music"
     else if mode = "milk"
         p = muPlayer()
         how = ""
@@ -127,9 +127,9 @@ sub showNow()
         end if
         m.sEyebrow.text = "VISUALIZER" + how + "  ·  " + n.eyebrow
         if n.track <> invalid then m.vizBack.uri = pxImage(n.track.thumb, 480, 270, 40)
-        keys = keys + Chr(10) + "Left and Right change the look  ·  * looks and options"
+        keys = keys + Chr(10) + "Left and Right change the look  ·  OK all looks and options"
     else
-        keys = keys + Chr(10) + "* music options"
+        keys = keys + Chr(10) + "OK music options"
     end if
     m.sHint.text = keys
     showTime()
@@ -569,7 +569,7 @@ sub mixMenu()
     hShowDialog(d)
 end sub
 
-' * in the Visualizer: the look picker first, then the usual music options
+' OK (or *) in the Visualizer: the look picker first, then the usual music options
 sub vizMenu()
     d = CreateObject("roSGNode", "HearthDialog")
     d.title = "Visualizer"
@@ -639,7 +639,8 @@ function hKeyInner(key as string, press as boolean) as boolean
         showStrip()
         return true
     end if
-    if key = "options"
+    ' OK as well as *: while a video plays the TV keeps * for its own picture menu
+    if key = "options" or key = "OK"
         if m.top.mode = "hearth"
             mixMenu()
         else if m.top.mode = "milk"

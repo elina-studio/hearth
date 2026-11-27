@@ -54,7 +54,7 @@ def viz(name):
     d.text((280, 898), "VISUALIZER  ·  LIVE  ·  NOW PLAYING", font=F("caps", 26), fill=C("D9A066"))
     d.text((280, 936), "Song title", font=F("bold", 40), fill=C("EDE6CA"))
     d.text((280, 990), "Artist  ·  Album", font=F("regular", 26), fill=C("B5AF8C"))
-    hint = ["Play pauses  ·  Rewind and Fast forward change song", "Up shows or hides lyrics  ·  Back closes", "Left and Right change the look  ·  * looks and options"]
+    hint = ["Play pauses  ·  Rewind and Fast forward change song", "Up shows or hides lyrics  ·  Back closes", "Left and Right change the look  ·  OK all looks and options"]
     hf = F("regular", 22); y = 912
     for line in hint:
         # the Label wraps at 604 px, right aligned
