@@ -3,6 +3,9 @@
 <canvas id="c"></canvas>
 <script src="node_modules/butterchurn/lib/butterchurn.min.js"></script>
 <script src="node_modules/butterchurn-presets/lib/butterchurnPresets.min.js"></script>
+<script src="node_modules/butterchurn-presets/lib/butterchurnPresetsExtra.min.js"></script>
+<script src="node_modules/butterchurn-presets/lib/butterchurnPresetsExtra2.min.js"></script>
+<script src="node_modules/butterchurn-presets/lib/butterchurnPresetsMD1.min.js"></script>
 <script>
 // Hearth visualizer page: the renderer (viz.js) drives it one frame at a time with the song's own samples,
 // so the picture follows the music exactly, however fast or slow the machine renders.
@@ -11,7 +14,12 @@ const W = +q.get('w') || 1280, H = +q.get('h') || 720;
 const cv = document.getElementById('c');
 cv.width = W; cv.height = H;
 const bc = butterchurn.default || butterchurn;
-const presets = (butterchurnPresets.default || butterchurnPresets).getPresets();
+// every pack butterchurn-presets ships (the base pack wins when a name is in two)
+const presets = {};
+for (const k of ['butterchurnPresetsMD1', 'butterchurnPresetsExtra2', 'butterchurnPresetsExtra', 'butterchurnPresets']) {
+  const o = window[k];
+  if (o) Object.assign(presets, (o.default || o).getPresets());
+}
 const viz = bc.createVisualizer(new AudioContext(), cv, { width: W, height: H, pixelRatio: 1, textureRatio: 1 });
 const dec = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
 window.hasPreset = name => !!presets[name];

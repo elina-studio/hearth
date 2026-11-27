@@ -286,6 +286,8 @@ class Handler(BaseHTTPRequestHandler):
             mix.loop_play(self, urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query))
         elif path == "/api/viz/status":
             mix.status(self)
+        elif path == "/api/viz/renderer":
+            mix.renderer(self)
         elif path == "/api/round":
             self.round_image()
         elif path == "/api/keys":
@@ -430,7 +432,8 @@ class Handler(BaseHTTPRequestHandler):
             req = json.loads(self.body() or b"{}")
             if path == "/api/viz/hello":
                 mix.hello(self.client_address[0], req)
-                return self.send_json({"ok": True})
+                # the renderer compares this with its own files and updates itself when they differ
+                return self.send_json({"ok": True, "renderer": mix.renderer_version()})
             if path == "/api/lastfm/begin":
                 return self.send_json(lastfm.begin())
             if path == "/api/lastfm/event":

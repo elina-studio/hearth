@@ -289,17 +289,73 @@ async function handle(req, res) {
 async function hello() {
   try {
     const r = await fetch(cfg.helper + '/api/viz/hello', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Hearth-Token': cfg.token },
-      body: JSON.stringify({ port: cfg.port, width: cfg.width, height: cfg.height, measuredFps: cfg.measuredFps || 0, looks: LOOKS.length }), signal: AbortSignal.timeout(5000) });
-    if (!r.ok) log('helper said', r.status, '(check the house key in config.json)');
+      body: JSON.stringify({ port: cfg.port, width: cfg.width, height: cfg.height, measuredFps: cfg.measuredFps || 0, looks: LOOKS.length, renderer: myVersion() }), signal: AbortSignal.timeout(5000) });
+    if (!r.ok) { log('helper said', r.status, '(check the house key in config.json)'); return; }
+    const a = await r.json().catch(() => ({}));
+    if (a.renderer && a.renderer !== myVersion() && !active && !queue.length) await selfUpdate();
   } catch (e) { log('helper not reachable:', e.message); }
 }
 
+// ---------------------------------------------------------------- staying up to date
+// The NAS helper carries the renderer's files from the same Hearth commit as itself. When they differ from
+// these, the renderer takes the helper's copy and starts again, so updating the helper updates the NucBox too.
+const OWN = ['viz.js', 'page.html', 'looks.json', 'package.json', 'package-lock.json'];
+function myVersion() {
+  const h = crypto.createHash('sha1');
+  for (const f of OWN.slice().sort()) {
+    h.update(f + '\0');
+    try { h.update(fs.readFileSync(path.join(HERE, f))); } catch {}
+    h.update('\0');
+  }
+  return h.digest('hex').slice(0, 12);
+}
+
+let updating = false;
+async function selfUpdate() {
+  if (updating) return;
+  updating = true;
+  try {
+    const r = await fetch(cfg.helper + '/api/viz/renderer', { headers: { 'X-Hearth-Token': cfg.token }, signal: AbortSignal.timeout(30000) });
+    if (!r.ok) throw new Error('helper said ' + r.status);
+    const b = await r.json();
+    if (!b.files || !b.files['viz.js']) throw new Error('no files');
+    const oldPkg = fs.existsSync(path.join(HERE, 'package.json')) ? fs.readFileSync(path.join(HERE, 'package.json'), 'utf8') : '';
+    for (const [name, data] of Object.entries(b.files)) {
+      if (!OWN.includes(name)) continue;
+      fs.writeFileSync(path.join(HERE, name), Buffer.from(data, 'base64'));
+    }
+    log('updated the renderer from the helper (' + b.version + ')');
+    if (fs.readFileSync(path.join(HERE, 'package.json'), 'utf8') !== oldPkg) {
+      log('installing its packages...');
+      await new Promise(res => spawn(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['install', '--omit=dev', '--no-audit', '--no-fund'], { cwd: HERE, stdio: 'ignore', shell: true }).on('close', res));
+    }
+    // start the new copy and step aside; it waits a moment for this one to let go of the port
+    let out;
+    try { out = fs.openSync(path.join(HERE, 'serve.log'), 'a'); } catch { out = fs.openSync(path.join(HERE, 'serve-updated.log'), 'a'); }
+    spawn(process.execPath, [path.join(HERE, 'viz.js'), 'serve'], { cwd: HERE, detached: true, stdio: ['ignore', out, out], env: Object.assign({}, process.env, { HEARTH_VIZ_RESTART: '1' }), windowsHide: true }).unref();
+    try { if (browserP) (await browserP).close(); } catch {}
+    process.exit(0);
+  } catch (e) {
+    log('could not update from the helper:', e.message);
+  } finally {
+    updating = false;
+  }
+}
+
 async function serve() {
-  http.createServer((req, res) => handle(req, res).catch(e => { log('error', e.message); try { json(res, 500, { error: 'renderer error' }); } catch {} }))
-    .listen(cfg.port, '0.0.0.0', () => log(`Hearth visualizer on :${cfg.port}, ${cfg.width}x${cfg.height}, helper ${cfg.helper}`));
+  const srv = http.createServer((req, res) => handle(req, res).catch(e => { log('error', e.message); try { json(res, 500, { error: 'renderer error' }); } catch {} }));
+  // after an update the old copy may still hold the port for a moment
+  let tries = 0;
+  srv.on('error', e => {
+    if (e.code === 'EADDRINUSE' && tries++ < 20) { setTimeout(() => srv.listen(cfg.port, '0.0.0.0'), 1000); return; }
+    log('cannot listen:', e.message); process.exit(1);
+  });
+  srv.listen(cfg.port, '0.0.0.0', () => log(`Hearth visualizer on :${cfg.port}, ${cfg.width}x${cfg.height}, helper ${cfg.helper}, renderer ${myVersion()}`));
   browser().catch(e => log('browser did not start:', e.message));
   await hello();
   setInterval(hello, 60000);
+  // looks added since the loops were made get theirs now, between songs
+  setTimeout(() => loops(true).catch(e => log('loops:', e.message)), 30000);
 }
 
 // ---------------------------------------------------------------- bench and loops
@@ -334,9 +390,13 @@ async function bench() {
   (await browser()).close();
 }
 
-// a 30 second loop per look, made seamless by fading the last 3 seconds into the first
-async function loops() {
-  const have = await fetch(cfg.helper + '/api/viz/loops', { headers: { 'X-Hearth-Token': cfg.token } }).then(r => r.json()).catch(() => ({ looks: [] }));
+// a 30 second loop per look, made seamless by fading the last 3 seconds into the first.
+// In the service (keep = true) it makes only the missing ones, between songs, and leaves the browser open.
+async function loops(keep) {
+  let have = await fetch(cfg.helper + '/api/viz/loops', { headers: { 'X-Hearth-Token': cfg.token } }).then(r => r.ok ? r.json() : null).catch(() => null);
+  if (keep && !have) return;
+  if (!have) have = { looks: [] };
+  if (keep && LOOKS.every(l => (have.looks || []).includes(l.n))) return;
   let pcm;
   try {
     const r = await fetch(cfg.helper + '/api/viz/sample', { headers: { 'X-Hearth-Token': cfg.token } });
@@ -355,7 +415,9 @@ async function loops() {
   if (pcm.length < need) pcm = Buffer.concat([pcm, testTone(34).subarray(0, need - pcm.length)]);
   let made = 0;
   for (const look of LOOKS) {
-    if ((have.looks || []).includes(look.n)) { log(`loop ${look.n} ${look.label}: already on the NAS`); continue; }
+    if ((have.looks || []).includes(look.n)) { if (!keep) log(`loop ${look.n} ${look.label}: already on the NAS`); continue; }
+    // a song on the TV comes first
+    while (keep && (active || queue.length)) await new Promise(r => setTimeout(r, 5000));
     const raw = path.join(WORK, `loop-${look.n}-raw.mp4`), out = path.join(WORK, `loop-${look.n}.mp4`);
     const enc = encoder(['-f', 'image2pipe', '-framerate', String(cfg.fps), '-c:v', 'mjpeg', '-i', '-', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '14', '-pix_fmt', 'yuv420p', raw]);
     await drawFrames(pcm, look.preset, cfg.width, cfg.height, enc, null);
@@ -372,7 +434,7 @@ async function loops() {
     fs.rmSync(raw, { force: true }); fs.rmSync(out, { force: true });
   }
   console.log(`RESULT loops made ${made}`);
-  (await browser()).close();
+  if (!keep) (await browser()).close();
 }
 
 const cmd = process.argv[2] || 'serve';

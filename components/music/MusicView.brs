@@ -58,7 +58,105 @@ sub init()
     p.observeFieldScoped("message", "onMessage")
     p.observeFieldScoped("mixState", "onMixState")
     p.observeFieldScoped("vizLook", "onVizLook")
+    p.observeFieldScoped("castCount", "onCastCount")
+    p.observeFieldScoped("rooms", "onRooms")
+    m.castWas = p.castCount
 end sub
+
+' music moved to (or back from) other rooms while a picture is up: speakers carry the song and the TV
+' shows the picture without sound, or the TV takes the song back with the picture
+sub onCastCount()
+    p = muPlayer()
+    now = (p.castCount > 0)
+    was = (m.castWas > 0)
+    m.castWas = p.castCount
+    if now = was then return
+    if m.top.mode = "milk" and m.vizOn
+        stopViz()
+        startViz()
+    else if m.top.mode = "hearth" and m.fireClip <> invalid
+        fireMixStop()
+        stopFire()
+        fireStart()
+    end if
+end sub
+
+' ---------- Play in other rooms, as a popup (the player's room list isn't on this screen) ----------
+sub roomsMenu()
+    p = muPlayer()
+    m.roomIds = []
+    labels = []
+    for each r in p.rooms
+        if r.kind = "speaker"
+            if r.on = true then labels.push(r.name + ": On") else labels.push(r.name + ": Off")
+            m.roomIds.push(r.id)
+        end if
+    end for
+    if m.roomIds.Count() > 1
+        labels.push("Every room") : m.roomIds.push("all")
+    end if
+    labels.push("Done") : m.roomIds.push("done")
+    d = CreateObject("roSGNode", "HearthDialog")
+    d.title = "Play in other rooms"
+    if m.roomIds.Count() = 1
+        d.message = ["Looking for speakers..."]
+    else if p.castCount > 0
+        d.message = ["The speakers play the song; the picture stays on this TV."]
+    else
+        d.message = ["Pick the rooms to play in. The picture stays on this TV."]
+    end if
+    d.buttons = labels
+    m.roomsSigWas = roomsSig()
+    if m.roomFocus <> invalid and m.roomFocus < labels.Count() then d.buttonFocused = m.roomFocus
+    d.observeField("buttonSelected", "onRoomsMenu")
+    d.observeField("wasClosed", "onRoomsClosed")
+    m.roomsDialog = d
+    m.roomsOpen = true
+    hShowDialog(d)
+end sub
+
+sub onRoomsMenu()
+    b = m.roomsDialog.buttonSelected
+    id = m.roomIds[b]
+    m.roomFocus = b
+    if id = "done"
+        m.roomsDialog.close = true
+        return
+    end if
+    if id = "all" then muSend("castAll") else muSend("castToggle", { id: id })
+end sub
+
+sub onRoomsClosed()
+    m.roomsOpen = false
+    m.roomFocus = invalid
+    muRestoreFocus()
+end sub
+
+' the room list changed (found, or a room turned on or off): show it again where the focus was
+sub onRooms()
+    if m.roomsOpen <> true then return
+    ' volume polls rewrite the list too: only redraw when a name or an on/off changed
+    sig = roomsSig()
+    if sig = m.roomsSigWas then return
+    m.roomsDialog.unobserveField("wasClosed")
+    m.roomsDialog.close = true
+    roomsMenu()
+end sub
+
+function roomsSig() as string
+    sig = ""
+    for each r in muPlayer().rooms
+        sig = sig + r.id + ":" + r.name + ":" + (r.on = true).toStr() + "|"
+    end for
+    return sig
+end function
+
+function roomsLabel() as string
+    n = muPlayer().castCount
+    if n = 1 then return "Other rooms: 1 playing"
+    if n > 1 then return "Other rooms: " + n.toStr() + " playing"
+    return "Play in other rooms"
+end function
 
 sub onShown(unused as dynamic)
     m.top.setFocus(true)
@@ -305,17 +403,8 @@ end sub
 
 ' Left/Right: the next or previous look (among the starred ones when there are any) for this song
 sub stepLook(d as integer)
-    pool = []
-    stars = vizStars()
-    for each l in vizLooks()
-        if stars.Count() = 0 or stars[l.n] = true then pool.push(l.n)
-    end for
-    if pool.Count() < 2
-        pool = []
-        for each l in vizLooks()
-            pool.push(l.n)
-        end for
-    end if
+    ' hearted looks or all of them, per the Play setting in the Visualizer menu
+    pool = vizPool()
     cur = muPlayer().vizLook
     if m.vizLoop = true then cur = m.vizLoopLook
     at = -1
@@ -559,6 +648,7 @@ sub mixMenu()
     for i = 0 to 2
         if keys[i] = m.mix then labels.push(names[i] + "  (on)") else labels.push(names[i])
     end for
+    labels.push(roomsLabel())
     labels.push("Music options")
     m.mixKeys = keys
     d = CreateObject("roSGNode", "HearthDialog")
@@ -571,15 +661,42 @@ sub mixMenu()
     hShowDialog(d)
 end sub
 
-' OK (or *) in the Visualizer: the look picker first, then the usual music options
+' OK (or *) in the Visualizer: heart the look on screen, what Next/Shuffle play, the picker, rooms, music options
 sub vizMenu()
+    p = muPlayer()
+    look = p.vizLook
+    if m.vizLoop = true then look = m.vizLoopLook
+    if look = invalid or vizLabel(look) = "" then look = ""
+    hearts = vizHearts()
+    md = vizPlayMode()
+    m.vizActs = []
+    labels = []
+    if look <> ""
+        if hearts[look] = true then labels.push("Unheart " + vizLabel(look)) else labels.push("Heart " + vizLabel(look))
+        m.vizActs.push("heart")
+    end if
+    if md = "hearted" and hearts.Count() > 0
+        labels.push("Play: Hearted looks (" + hearts.Count().toStr() + ")")
+    else
+        labels.push("Play: All looks (" + vizLooks().Count().toStr() + ")")
+    end if
+    m.vizActs.push("play")
+    labels.push("Choose a look...") : m.vizActs.push("choose")
+    labels.push(roomsLabel()) : m.vizActs.push("rooms")
+    labels.push("Music options") : m.vizActs.push("options")
+    labels.push("Close") : m.vizActs.push("close")
     d = CreateObject("roSGNode", "HearthDialog")
     d.title = "Visualizer"
-    c = vizChoice()
-    if c = "shuffle" then now = "Shuffling your starred looks" else now = "Always " + vizLabel(c)
-    if c = "shuffle" and vizStars().Count() = 0 then now = "Shuffling all looks (star some to narrow it)"
+    if look <> "" then now = "Now: " + vizLabel(look) else now = "Starting the visualizer"
+    if vizChoice() <> "shuffle" then now = now + "  ·  kept for every song" else now = now + "  ·  a new look each song"
     d.message = [now]
-    d.buttons = ["Choose a look...", "Music options", "Close"]
+    if m.vizMsg <> invalid
+        d.message = [now, m.vizMsg]
+        m.vizMsg = invalid
+    end if
+    d.buttons = labels
+    if m.vizFocus <> invalid and m.vizFocus < labels.Count() then d.buttonFocused = m.vizFocus
+    m.vizFocus = invalid
     d.observeField("buttonSelected", "onVizMenu")
     d.observeField("wasClosed", "onMuClosed")
     m.vizDialog = d
@@ -588,11 +705,36 @@ end sub
 
 sub onVizMenu()
     b = m.vizDialog.buttonSelected
+    a = m.vizActs[b]
+    m.vizDialog.unobserveField("wasClosed")
     m.vizDialog.close = true
-    if b = 0
+    if a = "heart"
+        p = muPlayer()
+        look = p.vizLook
+        if m.vizLoop = true then look = m.vizLoopLook
+        vizSetHeart(look, vizHearts()[look] <> true)
+        ' the first heart switches Play to hearted looks, unless the setting was chosen before
+        if CreateObject("roRegistrySection", "hearth").Read("vizPlay") = "" and vizHearts().Count() = 1 then vizSetPlayMode("hearted")
+        m.vizFocus = b
+        vizMenu()
+    else if a = "play"
+        if vizPlayMode() = "hearted" and vizHearts().Count() > 0
+            vizSetPlayMode("all")
+        else if vizHearts().Count() = 0
+            m.vizMsg = "Heart a look first. Then Play can stick to your hearted looks."
+        else
+            vizSetPlayMode("hearted")
+        end if
+        m.vizFocus = b
+        vizMenu()
+    else if a = "choose"
         openLooks()
-    else if b = 1
+    else if a = "rooms"
+        openRooms()
+    else if a = "options"
         muOptions(false)
+    else
+        muRestoreFocus()
     end if
 end sub
 
@@ -601,9 +743,17 @@ sub onMix()
     m.mixDialog.close = true
     if b < 3
         setMix(m.mixKeys[b])
+    else if b = 3
+        openRooms()
     else
         muOptions(false)
     end if
+end sub
+
+sub openRooms()
+    muSend("castRefresh")
+    m.roomFocus = invalid
+    roomsMenu()
 end sub
 
 sub muRestoreFocus()

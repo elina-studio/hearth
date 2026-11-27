@@ -6,6 +6,10 @@ sub init()
     m.sub.font = hFont("regular", 28)
     m.top.findNode("hint").font = hFont("regular", 24)
     m.grid = m.top.findNode("grid")
+    ' four rows show at a time; the grid scrolls a row at a time to keep the focus in view
+    m.rows = 4
+    m.rowTop = 0
+    m.top.findNode("clip").clippingRect = [-24, -24, 1704, 3 * 181 + 105 + 84]
     m.cols = 8
     m.tw = 186
     m.th = 105
@@ -70,7 +74,7 @@ function makeTile(i as integer, it as object) as object
     starBg.height = 34
     starBg.color = "0x0B0E09B3"
     star = t.createChild("Poster")
-    star.uri = "pkg:/images/music/icons/star.png"
+    star.uri = "pkg:/images/music/icons/heart.png"
     star.translation = [m.tw - 37, 9]
     star.width = 28
     star.height = 28
@@ -105,20 +109,22 @@ sub redraw()
         t.inUse.visible = (it.n = choice)
         if f then t.name.color = "0xEDE6CAFF" else t.name.color = "0xB5AF8CFF"
     end for
+    row = Int(m.focus / m.cols)
+    if row < m.rowTop then m.rowTop = row
+    if row > m.rowTop + m.rows - 1 then m.rowTop = row - m.rows + 1
+    m.grid.translation = [0, -m.rowTop * (m.th + m.gy)]
     it = m.items[m.focus]
     n = stars.Count()
     if it.n = "shuffle"
         m.title.text = "Shuffle"
-        if n = 0
-            m.sub.text = "A different look for every song, from all " + vizLooks().Count().toStr() + " looks. Star some to narrow it down."
-        else if n = 1
-            m.sub.text = "Every song uses your one starred look. Star more to mix it up."
+        if vizPlayMode() = "hearted" and n > 0
+            m.sub.text = "A different look for every song, from your " + n.toStr() + " hearted looks."
         else
-            m.sub.text = "A different look for every song, from your " + n.toStr() + " starred looks."
+            m.sub.text = "A different look for every song, from all " + vizLooks().Count().toStr() + " looks."
         end if
     else
         m.title.text = it.label
-        if stars[it.n] = true then s = "Starred" else s = "Not starred"
+        if stars[it.n] = true then s = "Hearted" else s = "Not hearted"
         if it.n = choice then s = s + "  ·  In use for every song"
         m.sub.text = s
     end if

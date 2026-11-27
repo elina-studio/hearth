@@ -18,6 +18,7 @@ Routes (server.py):
   GET  /api/viz/loopfile?n=                     a loop on its own (while the song plays on speakers)
   GET  /api/viz/status                          for the setup script
 """
+import base64
 import hashlib
 import http.client
 import json
@@ -267,6 +268,41 @@ def fire_clip(part_key):
 
 
 # ---------------------------------------------------------------- the NucBox
+
+RENDERER = os.environ.get("HEARTH_RENDERER_DIR", "/app/viz")
+RENDERER_FILES = ["viz.js", "page.html", "looks.json", "package.json", "package-lock.json"]
+
+
+def renderer_bundle():
+    """The NucBox renderer's files as this helper carries them, and their version (same hash as viz.js myVersion)."""
+    h = hashlib.sha1()
+    files = {}
+    for f in sorted(RENDERER_FILES):
+        h.update(f.encode() + b"\0")
+        try:
+            with open(os.path.join(RENDERER, f), "rb") as fh:
+                data = fh.read()
+        except OSError:
+            data = None
+        if data is not None:
+            h.update(data)
+            files[f] = data
+        h.update(b"\0")
+    if "viz.js" not in files:
+        return None, {}
+    return h.hexdigest()[:12], files
+
+
+def renderer(h):
+    v, files = renderer_bundle()
+    if not v:
+        return h.send_json({"error": "no renderer files in this helper"}, 404)
+    h.send_json({"version": v, "files": {k: base64.b64encode(d).decode() for k, d in files.items()}})
+
+
+def renderer_version():
+    return renderer_bundle()[0]
+
 
 def hello(ip, body):
     with _lock:

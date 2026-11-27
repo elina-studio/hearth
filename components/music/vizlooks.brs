@@ -74,15 +74,45 @@ sub vizSetStar(n as string, on as boolean)
     r.Flush()
 end sub
 
-' the look for a song: the one picked, or a random starred one (any look when nothing is starred)
+' Hearts are kept under the old registry name vizStars, so looks starred before stay hearted.
+function vizHearts() as object
+    return vizStars()
+end function
+
+sub vizSetHeart(n as string, on as boolean)
+    vizSetStar(n, on)
+end sub
+
+' Play setting: "hearted" or "all" (registry hearth/vizPlay). Unset: hearted once any look is hearted.
+function vizPlayMode() as string
+    md = CreateObject("roRegistrySection", "hearth").Read("vizPlay")
+    if md <> "hearted" and md <> "all"
+        if vizHearts().Count() > 0 then md = "hearted" else md = "all"
+    end if
+    return md
+end function
+
+sub vizSetPlayMode(md as string)
+    r = CreateObject("roRegistrySection", "hearth")
+    r.Write("vizPlay", md)
+    r.Flush()
+end sub
+
+' the looks that Shuffle, Next and Left/Right go through, in list order
+function vizPool() as object
+    hearts = vizHearts()
+    useHearts = (vizPlayMode() = "hearted" and hearts.Count() > 0)
+    pool = []
+    for each l in vizLooks()
+        if not useHearts or hearts[l.n] = true then pool.push(l.n)
+    end for
+    return pool
+end function
+
+' the look for a song: the one picked, or a random one from the pool (hearted looks, or all)
 function vizPick() as string
     c = vizChoice()
     if c <> "shuffle" then return c
-    pool = vizStars().Keys()
-    if pool.Count() = 0
-        for each l in vizLooks()
-            pool.push(l.n)
-        end for
-    end if
+    pool = vizPool()
     return pool[Rnd(pool.Count()) - 1]
 end function

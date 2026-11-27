@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Visualizer look picker (MusicView, * > Choose a look). Eight across, four down: Shuffle first, then every look.
-     OK uses the focused one (Shuffle plays the starred looks in turn), Play/Pause stars or unstars a look,
+<!-- Visualizer look picker (MusicView, * > Choose a look). Eight across, four down: Shuffle first, then every look (rows scroll).
+     OK uses the focused one (Shuffle plays the hearted or all looks, per the Play setting), Play/Pause hearts or unhearts a look,
      Back closes. MusicView keeps focus and forwards keys to handleKey; chosen reports the pick ("close" when closed). -->
 <component name="VizLookPicker" extends="Group">
   <children>
@@ -8,9 +8,11 @@
     <Label id="kicker" translation="[132, 64]" width="900" color="0xD9A066FF" text="VISUALIZER LOOK" />
     <Label id="title" translation="[132, 104]" width="1300" maxLines="1" color="0xEDE6CAFF" />
     <Label id="sub" translation="[132, 184]" width="1500" maxLines="1" color="0xB5AF8CFF" />
-    <Group id="grid" translation="[132, 262]" />
+    <Group id="clip" translation="[132, 262]">
+      <Group id="grid" />
+    </Group>
     <Label id="hint" translation="[132, 992]" width="1656" horizAlign="center" color="0xB5AF8CFF"
-      text="OK uses this look  ·  Play/Pause stars it  ·  Back closes" />
+      text="OK uses this look  ·  Play/Pause hearts it  ·  Back closes" />
   </children>
   <interface>
     <field id="chosen" type="string" alwaysNotify="true" />
