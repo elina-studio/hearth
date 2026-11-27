@@ -84,7 +84,7 @@ sub muOptions(views as boolean)
         coverPic = ""
         if n.track <> invalid then coverPic = pxImage(n.track.thumb, 360, 240)
         muPic("Cover", "cover", coverPic)
-        muPic("Visualizer", "milk", "pkg:/images/music/viz/10.jpg")
+        muPic("Visualizer", "milk", "pkg:/images/music/viz/201.jpg")
         muPic("Hearth fire", "hearth", "pkg:/images/amb/tile-hearth.jpg")
     end if
     muHead("Last.fm")

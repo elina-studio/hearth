@@ -711,7 +711,7 @@ sub vizMenu()
     if look <> ""
         d.now = { art: "pkg:/images/music/viz/" + look + ".jpg", kicker: "On screen", title: vizLabel(look), sub: how }
     else
-        d.now = { art: "pkg:/images/music/viz/10.jpg", kicker: "Starting", title: "The visualizer", sub: how }
+        d.now = { art: "pkg:/images/music/viz/201.jpg", kicker: "Starting", title: "The visualizer", sub: how }
     end if
     if m.vizMsg <> invalid
         d.message = [m.vizMsg]

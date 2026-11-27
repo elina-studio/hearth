@@ -844,7 +844,7 @@ sub panelMore()
     viewsAt = labels.count()
     labels.push("Hearth fire") : m.moreActs.push("hearth") : pics.push("pkg:/images/amb/tile-hearth.jpg")
     labels.push("Cover") : m.moreActs.push("cover") : pics.push(coverPic)
-    labels.push("Visualizer") : m.moreActs.push("milk") : pics.push("pkg:/images/music/viz/10.jpg")
+    labels.push("Visualizer") : m.moreActs.push("milk") : pics.push("pkg:/images/music/viz/201.jpg")
     for k = 0 to 2
         kinds.push("pic")
         subs.push("")
