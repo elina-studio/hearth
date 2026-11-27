@@ -58,7 +58,19 @@ function vizLooks() as object
         { n: "122", label: "Amulet" },
         { n: "123", label: "Big guns" },
         { n: "124", label: "Neon blobs" },
-        { n: "125", label: "Let it grow" }
+        { n: "125", label: "Let it grow" },
+        { n: "126", label: "Moss tide" },
+        { n: "127", label: "Riverbed" },
+        { n: "128", label: "Fern curl" },
+        { n: "129", label: "Green hollow" },
+        { n: "130", label: "Seed light" },
+        { n: "131", label: "Driftwood" },
+        { n: "132", label: "Bark" },
+        { n: "133", label: "Root lines" },
+        { n: "134", label: "Amber stream" },
+        { n: "135", label: "Lichen quilt" },
+        { n: "136", label: "Willow stems" },
+        { n: "137", label: "Leaf cells" }
     ]
 end function
 
