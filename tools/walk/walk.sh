@@ -33,6 +33,7 @@ WEB="http://$TV:$WEB_PORT"
 cleanup() {
   [ -n "$NCPID" ] && kill "$NCPID" 2>/dev/null
   pkill -P $$ 2>/dev/null
+  pkill -f "nc -d $TV $LOG_PORT" 2>/dev/null
   rm -f "$CFG"
 }
 trap cleanup EXIT
@@ -74,7 +75,9 @@ if [ "$NOINSTALL" != "1" ]; then
 fi
 
 # ---------------------------------------------------------------- debug log capture (port 8085, one client at a time)
-( nc "$TV" "$LOG_PORT" | tee "$LOG" | grep --line-buffered HWALK > "$WLOG" ) 2>/dev/null &
+# nc -d: never read the keyboard (a background job's input is closed, and plain nc would hang up at once).
+# The loop reconnects whenever the TV drops the log (it does when the app restarts).
+( while true; do nc -d "$TV" "$LOG_PORT"; sleep 1; done ) 2>/dev/null | tee -a "$LOG" | grep --line-buffered HWALK >> "$WLOG" &
 NCPID=$!
 sleep 2
 
@@ -576,11 +579,17 @@ fi
 say "Launching Hearth with the walk trace..."
 launch
 if ! wait_hub 120; then
-  if ! grep -q 'HWALK trace on' "$WLOG" 2>/dev/null; then
-    echo "No walk trace from the TV. Either another program is holding the TV's log port (close any 'nc $TV $LOG_PORT' windows), or this is not the walk build."
+  echo
+  if [ ! -s "$LOG" ]; then
+    echo "STOPPED: the TV sent no log at all on port $LOG_PORT. Close any other Terminal window running 'nc $TV $LOG_PORT' and run the command again."
+  elif ! grep -q 'HWALK trace on' "$WLOG" 2>/dev/null; then
+    echo "STOPPED: the TV log is coming in, but Hearth never printed the walk trace."
   else
-    echo "Hearth never reached the Hub in 120 s. See $LOG"
+    echo "STOPPED: Hearth never reached the room bar in 120 s."
   fi
+  echo "App on screen now: $(curl -s -m 5 "$ECP/query/active-app" | grep -o '<app[^<]*<' | head -1)"
+  echo "Last lines of the TV log (send me these):"
+  tail -n 25 "$LOG"
   exit 3
 fi
 say "Hub is up. Walking. (about 30 to 40 minutes; every press is screenshotted. Leave the remote alone until it finishes)"
