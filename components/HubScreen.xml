@@ -8,6 +8,8 @@
     <Group id="roomHolder" translation="[0, 150]" />
     <!-- solid, so rows scrolling up never show through behind the room names (UX review item 11) -->
     <Rectangle id="topShade" width="1920" height="150" color="0x0B0E09FF" />
+    <!-- its bottom edge is hand-cut, not ruler-straight (tools/art/header_edge.py) -->
+    <Poster id="topEdge" uri="pkg:/images/w/rough/header-edge.png" translation="[0, 150]" width="1920" height="20" blendColor="0x0B0E09FF" />
     <!-- room bar (whimsy spec 2-3): pre-rendered DW Pica caps labels centred on 960; the settled room gets a glow,
          the firefly and two small friends; on the bar one firefly follows focus -->
     <Poster id="flyGlow" uri="pkg:/images/w/firefly-glow.png" height="62" />

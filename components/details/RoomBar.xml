@@ -5,6 +5,7 @@
 <component name="RoomBar" extends="Group">
   <children>
     <Rectangle width="1920" height="120" color="0x0B0E09FF" />
+    <Poster uri="pkg:/images/w/rough/header-edge.png" translation="[0, 120]" width="1920" height="20" blendColor="0x0B0E09FF" />
     <Poster id="glow" uri="pkg:/images/w/firefly-glow.png" height="62" />
     <Group id="labels" />
     <Poster id="f1" uri="pkg:/images/w/firefly-small.png" width="48" height="48" />
