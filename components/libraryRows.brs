@@ -242,7 +242,7 @@ sub buildRowsList()
             if d.wide then cards.push(hCard(it, "wide")) else cards.push(hCard(it, "tall"))
         end for
         ' the way out to everything: last tile of every row
-        cards.push({ az: true, title: "All " + noun, sub: all.count().toStr() + " titles, A to Z", image: "", progress: 0 })
+        cards.push({ az: true, title: "All " + noun, sub: all.count().toStr() + " titles", image: "", progress: 0 })
         r.cards = cards
         if oldIdx[d.key] <> invalid and oldIdx[d.key] < cards.count() then r.index = oldIdx[d.key]
         if d.key = oldKey then m.rowI = i

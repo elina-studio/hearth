@@ -161,8 +161,8 @@ function hTidyName(raw as string) as string
         tld = LCase(words[0])
         if tld = "org" or tld = "com" or tld = "net" or tld = "to" then words.shift()
     end if
-    ' a leading list number ("05 ...") when a name follows
-    if words.count() > 2 and Len(words[0]) <= 2 and Val(words[0]) > 0 then words.shift()
+    ' a leading list number with a zero ("05 ...") when a name follows; "12 Angry Men" keeps its 12
+    if words.count() > 2 and Len(words[0]) = 2 and Left(words[0], 1) = "0" and Val(words[0]) > 0 then words.shift()
     junk = { "1080p": 1, "720p": 1, "2160p": 1, "480p": 1, "x264": 1, "x265": 1, "h264": 1, "hevc": 1, "bluray": 1, "brrip": 1, "webrip": 1, "web-dl": 1, "hdtv": 1, "dvdrip": 1, "eng": 1, "subs": 1, "latino": 1 }
     out = []
     for wi = 0 to words.count() - 1
