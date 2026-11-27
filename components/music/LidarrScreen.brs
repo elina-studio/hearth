@@ -9,6 +9,8 @@ sub init()
     m.panel = m.top.findNode("panel")
     m.pv = m.top.findNode("pv")
     m.pvArt = m.top.findNode("pvArt")
+    m.pvInit = m.top.findNode("pvInit")
+    m.pvInit.font = hFont("pica", 72)
     m.pvName = m.top.findNode("pvName")
     m.pvName.font = hFont("caps", 64)
     m.pvSub = m.top.findNode("pvSub")
@@ -284,11 +286,35 @@ sub drawMatches()
         l.vertAlign = "center"
         l.maxLines = 1
         l.font = hFont("regular", 28)
-        t = a.artistName
-        if owned(a) then t = t + "  ·  in Lidarr"
-        l.text = t
+        if hOutsideFont(a.artistName) then l.font = hSysFont("regular", 28)
+        l.text = pxStr(a.artistName)
+        ' what tells two artists of the same name apart: Lidarr's own note, else the genre, else the kind of act
+        note = matchNote(a)
+        if owned(a)
+            if note <> "" then note = note + "  ·  "
+            note = note + "in Lidarr"
+        end if
+        nl = g.createChild("Label")
+        nl.font = hFont("regular", 22)
+        nl.height = 48
+        nl.vertAlign = "center"
+        nl.maxLines = 1
+        nl.horizAlign = "right"
+        nl.text = note
+        nw = l.boundingRect().width
+        if nw > 330 then nw = 330
+        l.width = nw + 4
+        nl.width = 590 - nw - 24
+        nl.translation = [16 + nw + 24, 0]
     end for
 end sub
+
+function matchNote(a as object) as string
+    if a.disambiguation <> invalid and a.disambiguation <> "" then return pxStr(a.disambiguation)
+    if a.genres <> invalid and a.genres.Count() > 0 then return pxStr(a.genres[0])
+    if a.artistType <> invalid and a.artistType <> "" then return pxStr(a.artistType)
+    return ""
+end function
 
 ' ---------- the preview panel ----------
 sub showPreview(on as boolean)
@@ -307,6 +333,9 @@ sub focusArtist(i as integer, now as boolean)
     m.btn = 0
     showPreview(true)
     m.pvArt.uri = poster(a)
+    ini = hInitials(pxStr(a.artistName))
+    if hOutsideFont(ini) then ini = ""
+    m.pvInit.text = ini
     drop = hFitTitle(m.pvName, UCase(a.artistName), "caps", [64, 52, 40], 740)
     m.pvName.translation = [236, drop]
     m.pvSub.text = artistLine(a, "")
@@ -665,15 +694,19 @@ sub paint()
     for i = 0 to m.matches.getChildCount() - 1
         g = m.matches.getChild(i)
         l = g.getChild(1)
+        nl = g.getChild(2)
         if i = m.sel and m.zone = "matches"
             g.getChild(0).color = "0xE0B34AFF"
             l.color = "0x1F1606FF"
+            if nl <> invalid then nl.color = "0x1F1606FF"
         else if i = m.sel
             g.getChild(0).color = "0xE0B34A2E"
             l.color = "0xEDE6CAFF"
+            if nl <> invalid then nl.color = "0xB5AF8CFF"
         else
             g.getChild(0).color = "0xE0B34A00"
-            l.color = "0xB5AF8CFF"
+            l.color = "0xEDE6CAFF"
+            if nl <> invalid then nl.color = "0xB5AF8CFF"
         end if
     end for
     for i = 0 to m.btnActions.Count() - 1

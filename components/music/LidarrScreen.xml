@@ -12,6 +12,8 @@
     <Rectangle id="panel" translation="[800, 110]" width="1024" height="880" color="0xFFFFFF08" />
     <Group id="pv" translation="[844, 154]">
       <Rectangle width="200" height="200" color="0x1D2418FF" />
+      <!-- initials until (or instead of) the artist's photo, so the circle is never empty (walk 2, item 24) -->
+      <Label id="pvInit" width="200" height="200" horizAlign="center" vertAlign="center" color="0xD9B25EFF" />
       <Poster id="pvArt" width="200" height="200" loadDisplayMode="scaleToZoom" loadWidth="200" loadHeight="200" />
       <Poster width="200" height="200" uri="pkg:/images/music/round-mask-panel.png" />
       <ScrollingLabel id="pvName" translation="[236, 0]" maxWidth="740" height="88" repeatCount="-1" scrollSpeed="70" color="0xEDE6CAFF" />
