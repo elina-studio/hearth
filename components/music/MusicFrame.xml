@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The shared frame of the Music sub-pages (Radio, Last.fm, Schedules, Request music): where you are at the top,
+     and how to get back at the bottom, in the same place on every page (UX review item 31). -->
+<component name="MusicFrame" extends="Group">
+  <interface>
+    <field id="page" type="string" onChange="paint" />
+    <!-- false where the page needs the bottom rows (Request music: its artist matches run to the bottom) -->
+    <field id="foot" type="boolean" value="true" onChange="paint" />
+  </interface>
+  <children>
+    <Poster id="arrow" uri="pkg:/images/icons/home-left.png" translation="[96, 46]" width="28" height="28" blendColor="0xE0B34AFF" />
+    <Label id="crumb" translation="[134, 40]" height="40" vertAlign="center" color="0xE0B34AFF" />
+    <Rectangle id="footRule" translation="[96, 1010]" width="1728" height="2" color="0xD9A06633" />
+    <Label id="footText" translation="[96, 1022]" width="1728" height="40" vertAlign="center" color="0xB5AF8CFF" text="Back returns to Music" />
+  </children>
+  <script type="text/brightscript" uri="pkg:/source/util.brs" />
+  <script type="text/brightscript" uri="pkg:/components/music/MusicFrame.brs" />
+</component>

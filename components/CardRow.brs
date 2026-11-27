@@ -154,7 +154,20 @@ sub fillSlot(g as object, c as object, w as integer)
     g.poster.uri = img
     title = c.title
     if title = invalid then title = ""
-    g.fb.text = UCase(title)
+    isPerson = false
+    if c.item <> invalid
+        if c.item.Type = "Person" then isPerson = true
+    end if
+    if isPerson
+        ' cast without a photo: big initials instead of a shouted name (UX review item 18)
+        g.fb.font = hFontCached("pica", 64)
+        g.fb.color = "0xD9B25EFF"
+        g.fb.text = hInitials(title)
+    else
+        g.fb.font = hFontCached("book", 28)
+        g.fb.color = "0xEDE6CAFF"
+        g.fb.text = hClean(title)
+    end if
     hasBar = (c.progress <> invalid and c.progress > 0)
     g.bar.visible = hasBar
     if hasBar

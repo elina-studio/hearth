@@ -51,6 +51,7 @@
     </Animation>
   </children>
   <interface>
+    <field id="from" type="string" value="" />
     <field id="item" type="assocarray" onChange="load" />
     <field id="request" type="assocarray" alwaysNotify="true" />
     <function name="onShown" />

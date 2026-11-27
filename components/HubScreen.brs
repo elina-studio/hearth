@@ -3,7 +3,8 @@ sub init()
     m.pillsGroup = m.top.findNode("pills")
     ' x and width of each pre-rendered label PNG (2px side padding), from the whimsy spec
     m.tabX = [100, 240, 398, 570, 719, 931, 1152, 1324]
-    m.tabW = [101, 120, 133, 110, 174, 182, 134, 136]
+    ' Search is a magnifying glass only (owner, Nov 27); its name shows under it while it has focus
+    m.tabW = [101, 120, 133, 110, 174, 182, 134, 60]
     for i = 0 to m.names.count() - 1
         p = m.pillsGroup.createChild("Poster")
         p.translation = [m.tabX[i], 42]
@@ -332,6 +333,7 @@ sub showRoom(name as string, focus as boolean)
     room.opacity = 1.0
     if focus
         m.current = name
+        m.top.room = name
         m.zone = "room"
         paintPills()
         room.callFunc("focusIn", invalid)
@@ -367,6 +369,25 @@ sub paintPills()
     ' one firefly: under the focused label on the bar, else under the settled room
     fi = ci
     if m.zone = "pills" then fi = m.pillIndex
+    ' a gold line under the focused room, so focus reads from the couch (UX review item 9)
+    if m.pillLine = invalid
+        m.pillLine = m.top.createChild("Rectangle")
+        m.pillLine.height = 4
+        m.pillLine.color = "0xE0B34AFF"
+    end if
+    m.pillLine.visible = (m.zone = "pills")
+    if m.searchCap = invalid
+        m.searchCap = m.top.createChild("Label")
+        m.searchCap.font = hFont("bold", 22)
+        m.searchCap.color = "0xFFE7A0FF"
+        m.searchCap.text = "Search"
+        m.searchCap.width = 120
+        m.searchCap.horizAlign = "center"
+        m.searchCap.translation = [m.tabX[7] + 30 - 60, 98]
+    end if
+    m.searchCap.visible = (m.zone = "pills" and fi = 7)
+    m.pillLine.translation = [m.tabX[fi] + 2, 92]
+    m.pillLine.width = m.tabW[fi] - 4
     target = [m.tabX[fi] + Int(m.tabW[fi] / 2) - 32, 64]
     if m.flyAt < 0
         m.flyMain.translation = target
@@ -479,6 +500,7 @@ function hKeyInner(key as string, press as boolean) as boolean
         m.preview.control = "stop"
         if m.pillIndex <> 0 or m.current <> "Home" or m.shown <> "Home"
             m.current = "Home"
+            m.top.room = "Home"
             m.pillIndex = 0
             showRoom("Home", false)
             paintPills()

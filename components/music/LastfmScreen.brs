@@ -121,9 +121,10 @@ sub build()
         nowOn = (reg.Read("lastfmNow") <> "0")
         loveOn = (reg.Read("lastfmLove") <> "0")
         lbl(m.dyn, 100, 330, 600, "WHAT TO SEND", "caps", 24, "0xE0B34AFF")
-        chip("cast", "Scrobble when casting", 380, "cast", castOn)
-        chip("scrobble", "Tell Last.fm what's playing now", 480, "now", nowOn)
-        chip("heart", "Love in the * options", 580, "love", loveOn)
+        ' each switch says On or Off in words, so focus (gold) and state can't be confused (UX review item 14)
+        chip("cast", "Scrobble when casting: " + onOff(castOn), 380, "cast", castOn)
+        chip("scrobble", "Tell Last.fm what's playing now: " + onOff(nowOn), 480, "now", nowOn)
+        chip("heart", "Love in the * options: " + onOff(loveOn), 580, "love", loveOn)
         chip("left", "Disconnect", 740, "disconnect")
         chip("check", "Done", 840, "back")
         ' today
@@ -264,4 +265,9 @@ end function
 ' menu sound for whatever the handler above took (source/util.brs hKeySfx)
 function onKeyEvent(key as string, press as boolean) as boolean
     return hKeySfx(key, press, hKeyInner(key, press))
+end function
+
+function onOff(v as boolean) as string
+    if v then return "On"
+    return "Off"
 end function

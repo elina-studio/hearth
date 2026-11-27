@@ -5,6 +5,7 @@
 <component name="RadioScreen" extends="Group">
   <children>
     <Rectangle width="1920" height="1080" color="0x0B0E09FF" />
+    <MusicFrame page="Radio" />
     <Poster translation="[248, 148]" width="1424" height="760" uri="pkg:/images/w/panel-v3.9.png" blendColor="0x141A11FF" />
     <Label id="title" translation="[304, 190]" color="0xEDE6CAFF" text="Start a radio" />
     <Label id="sub" translation="[304, 262]" color="0xB5AF8CFF" text="Endless songs from your own library that sound like..." />

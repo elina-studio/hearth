@@ -83,5 +83,6 @@
   <script type="text/brightscript" uri="pkg:/source/util.brs" />
   <script type="text/brightscript" uri="pkg:/components/music/plex.brs" />
   <script type="text/brightscript" uri="pkg:/components/music/musicui.brs" />
+  <script type="text/brightscript" uri="pkg:/components/ambiance/ambianceData.brs" />
   <script type="text/brightscript" uri="pkg:/components/music/MusicView.brs" />
 </component>

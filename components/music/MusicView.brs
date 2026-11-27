@@ -164,29 +164,135 @@ sub applyPreset()
     if m.top.mode = "milk" then spin.control = "start"
 end sub
 
-' ---------- hearth: the Ambiance room's fire picture and crackle, with music on top ----------
+' ---------- hearth: your own fire clip from the Ambiance library, with the music on top ----------
+' Never the drawn fire (owner, Nov 27). The TV plays one stream at a time, so:
+'   music playing on the TV  -> a still of the fire clip, with the crackle sound effect
+'   music on speakers (cast) -> the TV lends its screen (tvYield) and the real fire video loops
+' A merged fire + song stream made on the NAS is the later fix for the TV-only case.
 sub startHearth()
-    holder = m.top.findNode("moodHolder")
-    scene = CreateObject("roSGNode", "MoodScene")
-    if scene <> invalid
-        scene.mood = "hearth"
-        holder.appendChild(scene)
-    else
-        m.noFire.text = "The fire arrives with the Ambiance build. Music still plays here."
-        m.noFire.visible = true
-    end if
+    m.noFire.visible = false
     m.sound = CreateObject("roSGNode", "AmbientSound")
     if m.sound <> invalid
         m.sound.mood = "hearth"
-        holder.appendChild(m.sound)
-        m.sound.active = true
+        m.top.findNode("moodHolder").appendChild(m.sound)
+    end if
+    clip = hearthClip()
+    if clip <> invalid
+        showFire(clip)
+    else if m.global.hasField("ambItems")
+        noFireClip()
+    else
+        ' the Ambiance room hasn't asked Plex yet: ask here
+        sec = ""
+        libs = m.global.libraries
+        if libs <> invalid and libs.ambiance <> invalid then sec = libs.ambiance
+        m.noFire.text = "Finding your fire clip..."
+        m.noFire.visible = true
+        hPlex("clips", { section: sec }, "onFireClips")
     end if
     setMix("both")
+end sub
+
+function hearthClip() as dynamic
+    if not m.global.hasField("ambItems") then return invalid
+    for each it in m.global.ambItems
+        if it.mood = "hearth" and it.clip <> invalid then return it.clip
+    end for
+    return invalid
+end function
+
+sub onFireClips(event as object)
+    t = hTaskFrom(event)
+    if m.top.mode <> "hearth" then return
+    if t.ok and t.response.Clips <> invalid and t.response.Clips.count() > 0
+        if not m.global.hasField("ambItems") then m.global.addFields({ ambItems: [] })
+        m.global.ambItems = ambMerge(t.response.Clips)
+    end if
+    clip = hearthClip()
+    if clip <> invalid then showFire(clip) else noFireClip()
+end sub
+
+sub noFireClip()
+    m.noFire.text = "No fire clip in your Plex Ambiance library yet. Add a video whose file name starts with " + Chr(8220) + "fire" + Chr(8221) + " and it shows here, with the music over it."
+    m.noFire.visible = true
+end sub
+
+sub showFire(clip as object)
+    m.noFire.visible = false
+    holder = m.top.findNode("moodHolder")
+    st = holder.createChild("Poster")
+    st.width = 1920
+    st.height = 1080
+    st.loadDisplayMode = "scaleToZoom"
+    pic = clip.art
+    if pic = invalid then pic = clip.thumb
+    if pic <> invalid then st.uri = fullStill(pic)
+    m.fireStill = st
+    p = muPlayer()
+    if p.castCount > 0
+        ' speakers carry the song, so the screen is free for the real fire
+        v = holder.createChild("Video")
+        v.width = 1920
+        v.height = 1080
+        v.enableUI = false
+        v.loop = true
+        v.disableScreenSaver = true
+        v.mute = (m.mix = "music")
+        m.fireConverted = needsConvert(clip)
+        v.content = clipContent(clip, m.fireConverted)
+        v.observeField("state", "onFireVideo")
+        m.fireVideo = v
+        m.fireClip = clip
+        p.command = { cmd: "tvYield" }
+        m.fireYielded = true
+        v.control = "play"
+        m.top.setFocus(true)
+    else
+        if m.sound <> invalid then m.sound.active = true
+    end if
+end sub
+
+sub onFireVideo()
+    v = m.fireVideo
+    if v = invalid then return
+    stt = v.state
+    if stt = "playing"
+        m.fireStill.visible = false
+        if m.sound <> invalid then m.sound.active = false
+        m.top.setFocus(true)
+    else if stt = "error"
+        print "[music] fire video error: "; v.errorMsg
+        if not m.fireConverted
+            ' this file won't play as it is: ask Plex for a converted copy once
+            m.fireConverted = true
+            v.content = clipContent(m.fireClip, true)
+            v.control = "play"
+        else
+            ' keep the still, give the TV back to the music
+            stopFire()
+            if m.sound <> invalid then m.sound.active = true
+        end if
+    end if
+end sub
+
+sub stopFire()
+    if m.fireVideo <> invalid
+        m.fireVideo.unobserveField("state")
+        m.fireVideo.control = "stop"
+        m.fireVideo.visible = false
+        m.fireVideo = invalid
+    end if
+    if m.fireStill <> invalid then m.fireStill.visible = true
+    if m.fireYielded = true
+        m.fireYielded = false
+        muPlayer().command = { cmd: "tvRejoin" }
+    end if
 end sub
 
 sub setMix(mix as string)
     m.mix = mix
     if m.sound <> invalid then m.sound.on = (mix <> "music")
+    if m.fireVideo <> invalid then m.fireVideo.mute = (mix = "music")
     p = muPlayer()
     if mix = "fire"
         muSend("pause")
@@ -240,6 +346,7 @@ end sub
 
 sub leave()
     m.lyrics.callFunc("lyricsStop", invalid)
+    stopFire()
     if m.sound <> invalid
         m.sound.on = false
         m.sound.active = false

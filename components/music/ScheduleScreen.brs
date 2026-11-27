@@ -177,11 +177,14 @@ sub buildButtons()
     g = m.top.findNode("btns")
     m.btnNodes = []
     x = 0
-    for each d in [["check", "Save"], ["play2", "Test now"], ["trash", "Delete"], ["left", "Back"]]
+    ' Delete sits apart at the end so it is never pressed by accident (UX review item 32)
+    m.btnActs = [0, 1, 3, 2]
+    for each d in [["check", "Save"], ["play2", "Test now"], ["left", "Back"], ["trash", "Delete"]]
         c = g.createChild("MusicChip")
         c.icon = d[0]
         c.text = d[1]
         c.big = true
+        if d[1] = "Delete" then x = x + 120
         c.translation = [x, 0]
         x = x + c.width + 16
         m.btnNodes.push(c)
@@ -292,6 +295,10 @@ sub paint()
     for i = 0 to m.rowNodes.Count() - 1
         m.rowNodes[i].ring.visible = (m.row = i)
     end for
+    ' Save looks unavailable until rooms and a playlist are picked (pressing it still says what's missing)
+    sc = cur()
+    ready = (sc <> invalid and sc.rooms.Count() > 0 and sc.plId <> "")
+    if ready then m.btnNodes[0].opacity = 1.0 else m.btnNodes[0].opacity = 0.45
     for i = 0 to m.btnNodes.Count() - 1
         m.btnNodes[i].focused = (m.row = 9 and m.btn = i)
     end for
@@ -407,7 +414,7 @@ function hKeyInner(key as string, press as boolean) as boolean
     else
         if key = "left" and m.btn > 0 then m.btn = m.btn - 1
         if key = "right" and m.btn < 3 then m.btn = m.btn + 1
-        if key = "OK" then doButton(m.btn)
+        if key = "OK" then doButton(m.btnActs[m.btn])
     end if
     refresh()
     return true

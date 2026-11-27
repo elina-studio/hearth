@@ -128,6 +128,8 @@ sub buildVariety()
     m.vName.horizAlign = "right"
     m.vName.font = hFont("bold", 24)
     m.vName.color = "0xEDE6CAFF"
+    ' the chosen setting was cut off at the box edge (UX review item 13); the Start button already reads it back
+    m.vName.visible = false
 end sub
 
 sub buildSkip()

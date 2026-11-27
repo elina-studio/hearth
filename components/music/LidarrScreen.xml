@@ -5,9 +5,9 @@
 <component name="LidarrScreen" extends="Group">
   <children>
     <Rectangle width="1920" height="1080" color="0x0B0E09FF" />
-    <Poster translation="[96, 52]" width="34" height="34" uri="pkg:/images/music/icons/request.png" blendColor="0xD9A066FF" />
-    <Label id="eyebrow" translation="[144, 50]" color="0xE0B34AFF" text="REQUEST MUSIC" />
-    <HearthKeyboard id="kb" translation="[96, 110]" placeholder="Type an artist" />
+    <MusicFrame page="Request music" foot="false" />
+    <Label id="eyebrow" translation="[144, 50]" color="0xE0B34AFF" text="" visible="false" />
+    <HearthKeyboard id="kb" translation="[96, 110]" placeholder="Type an artist" phoneHint="false" />
     <Group id="matches" translation="[96, 836]" />
     <Rectangle id="panel" translation="[800, 110]" width="1024" height="880" color="0xFFFFFF08" />
     <Group id="pv" translation="[844, 154]">

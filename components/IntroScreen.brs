@@ -82,6 +82,7 @@ sub onMode()
         lt = m.top.findNode("leaveTimer")
         lt.observeField("fire", "leave")
         lt.control = "start"
+        m.introClock = CreateObject("roTimespan")
     end if
 end sub
 
@@ -326,9 +327,12 @@ sub leave()
     m.top.request = { action: "introDone" }
 end sub
 
-' the intro always runs its full 10 seconds; buttons are swallowed until then
+' the intro runs 10 seconds; after 3 seconds OK skips it (UX review item 24). Other buttons are swallowed.
 function hKeyInner(key as string, press as boolean) as boolean
     if m.top.mode <> "intro" then return false
+    if press and key = "OK" and m.introClock <> invalid
+        if m.introClock.TotalMilliseconds() >= 3000 then leave()
+    end if
     return true
 end function
 

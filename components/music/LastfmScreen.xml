@@ -4,6 +4,7 @@
 <component name="LastfmScreen" extends="Group">
   <children>
     <Rectangle width="1920" height="1080" color="0x0B0E09FF" />
+    <MusicFrame page="Last.fm" />
     <Label id="title" translation="[100, 150]" color="0xEDE6CAFF" text="Last.fm" />
     <Poster id="rule" uri="pkg:/images/w/twig-1500-s5.png" translation="[300, 116]" width="1540" height="120" />
     <Label id="sub" translation="[100, 230]" width="900" wrap="true" color="0xB5AF8CFF" />

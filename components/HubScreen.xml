@@ -6,7 +6,8 @@
          not in the tree gets no images). showRoom moves a room out of here the first time it is opened. -->
     <Group id="warmHolder" translation="[-6000, 150]" />
     <Group id="roomHolder" translation="[0, 150]" />
-    <Rectangle id="topShade" width="1920" height="150" color="0x0B0E09E6" />
+    <!-- solid, so rows scrolling up never show through behind the room names (UX review item 11) -->
+    <Rectangle id="topShade" width="1920" height="150" color="0x0B0E09FF" />
     <!-- room bar (whimsy spec 2-3): pre-rendered DW Pica caps labels centred on 960; the settled room gets a glow,
          the firefly and two small friends; on the bar one firefly follows focus -->
     <Poster id="flyGlow" uri="pkg:/images/w/firefly-glow.png" height="62" />
@@ -58,6 +59,7 @@
     <field id="request" type="assocarray" alwaysNotify="true" />
     <!-- true once every room has its first data (launch warm-up) -->
     <field id="warm" type="boolean" value="false" />
+    <field id="room" type="string" value="Home" />
     <function name="onShown" />
     <function name="remoteGo" />
   </interface>

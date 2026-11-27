@@ -136,7 +136,9 @@ end sub
 sub runSearch()
     term = m.query.Trim()
     m.seq = m.seq + 1
-    if term = ""
+    ' one letter matches almost nothing useful: keep recent searches and the suggestion chips until there are two
+    ' (UX review item 16, "Nothing for t" after one letter)
+    if Len(term) < 2
         showIdle()
         return
     end if

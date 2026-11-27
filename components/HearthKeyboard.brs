@@ -27,6 +27,19 @@ sub init()
     m.nextSet = invalid
 
     buildKeys()
+    ' the phone remote can type and speak into this keyboard; say so (UX review item 37)
+    ph = m.top.createChild("Label")
+    m.phoneLine = ph
+    ph.font = hFont("regular", 22)
+    ph.color = "0xB5AF8CFF"
+    ph.width = m.width
+    ph.wrap = true
+    ph.translation = [0, 164 + 7 * (m.keyH + m.gap) + 8]
+    host = CreateObject("roRegistrySection", "hearth").Read("nasUrl")
+    if host = "" then host = "http://192.168.254.41:8765"
+    host = host.Replace("http://", "").Replace("https://", "")
+    ph.text = "Or type or speak on your phone: " + host
+    ph.visible = m.top.phoneHint
     onText()
     ' phone remote: live text lands in whichever Hearth keyboard has focus
     m.global.observeField("remote", "onRemote")
@@ -430,3 +443,7 @@ function handleKey(k as string) as string
     paint()
     return ""
 end function
+
+sub onPhoneHint()
+    if m.phoneLine <> invalid then m.phoneLine.visible = m.top.phoneHint
+end sub

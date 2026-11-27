@@ -64,8 +64,12 @@ sub start()
     m.setup.visible = false
     m.kb.visible = true
     m.panel.visible = true
-    m.empty.text = "Type an artist. Pick a match to see their albums and which ones you already have."
+    m.idleText = "Type an artist. Pick a match to see their albums and which ones you already have."
+    m.empty.text = m.idleText
     paint()
+    ' an empty panel until you type was dead space: show what Lidarr got lately and what it still wants (UX review item 33)
+    lApi("GET", "/artist", {}, invalid, "onRecentArtists")
+    lApi("GET", "/wanted/missing", { pageSize: 1 }, invalid, "onWantedCount")
     ' the profiles and folder new artists go into: the first of each
     m.defaults = {}
     lApi("GET", "/qualityprofile", {}, invalid, "onDefaults", "quality")
@@ -157,6 +161,45 @@ end sub
 sub onKbText()
     m.debounce.control = "stop"
     if Len(m.kb.text) >= 2 then m.debounce.control = "start"
+    if m.kb.text = "" and m.results.Count() = 0 and m.idleText <> invalid then m.empty.text = m.idleText
+end sub
+
+sub onRecentArtists(event as object)
+    t = hTaskFrom(event)
+    if not t.ok or t.response = invalid or t.response.Items = invalid then return
+    arts = t.response.Items
+    ' newest first: "added" is an ISO date, so text order is date order
+    sorted = []
+    for each a in arts
+        if a.added <> invalid and a.artistName <> invalid then sorted.push({ k: a.added, n: a.artistName })
+    end for
+    sorted.SortBy("k", "r")
+    names = []
+    for i = 0 to sorted.Count() - 1
+        if i < 8 then names.push(sorted[i].n)
+    end for
+    m.recentNames = names
+    paintIdle()
+end sub
+
+sub onWantedCount(event as object)
+    t = hTaskFrom(event)
+    if not t.ok or t.response = invalid then return
+    if t.response.totalRecords <> invalid then m.wantedN = t.response.totalRecords
+    paintIdle()
+end sub
+
+sub paintIdle()
+    nl = Chr(10)
+    txt = "Type an artist. Pick a match to see their albums and which ones you already have."
+    if m.recentNames <> invalid and m.recentNames.Count() > 0
+        txt = txt + nl + nl + "LATELY ADDED TO LIDARR" + nl + m.recentNames.join(nl)
+    end if
+    if m.wantedN <> invalid and m.wantedN > 0
+        txt = txt + nl + nl + m.wantedN.toStr() + " albums still being looked for."
+    end if
+    m.idleText = txt
+    if m.kb.text = "" and m.results.Count() = 0 and m.empty.text <> "" then m.empty.text = txt
 end sub
 
 sub lookup()

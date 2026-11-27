@@ -266,7 +266,7 @@ sub pickTonight()
         if i < out.count()
             g.art.uri = out[i].image
             g.kick.text = out[i].kick
-            g.ttl.text = out[i].title
+            g.ttl.text = hClean(out[i].title)
             g.visible = true
         else
             g.visible = false
@@ -482,7 +482,9 @@ sub showMusic()
             when = "Evening"
         end if
         lp = lastPlayed()
-        art.uri = ""
+        ' nothing playing: the lantern, not an empty grey square (UX review item 7)
+        art.loadDisplayMode = "scaleToFit"
+        art.uri = "pkg:/images/lantern.png"
         if lp <> invalid
             eb.text = "PICK UP WHERE YOU LEFT OFF"
             setMusicTitle(ti, pxStr(lp.label))
@@ -508,6 +510,7 @@ sub showMusic()
     lk.visible = true
     lk.uri = "pkg:/images/music/icons/heart.png"
     rd.visible = true
+    art.loadDisplayMode = "scaleToZoom"
     prv.uri = "pkg:/images/icons/home-prev.png"
     nxt.uri = "pkg:/images/icons/home-next.png"
     tr = mp.track
@@ -525,9 +528,11 @@ sub showMusic()
         tog.uri = "pkg:/images/icons/home-play.png"
     end if
     if mp.liked = "like" then lk.blendColor = "0xE0B34AFF" else lk.blendColor = "0xEDE6CAFF"
-    setMusicTitle(ti, pxStr(tr.title))
-    line = pxStr(tr.artist)
-    if tr.album <> invalid and tr.album <> "" then line = line + " · " + tr.album
+    setMusicTitle(ti, hClean(pxStr(tr.title)))
+    line = hArtist(pxStr(tr.artist))
+    if tr.album <> invalid and tr.album <> ""
+        if line <> "" then line = line + " · " + hClean(tr.album) else line = hClean(tr.album)
+    end if
     su.text = line
     sp.text = speakerLine()
     u = pxImage(tr.thumb, 180, 180)
@@ -830,6 +835,7 @@ sub onResume(event as object)
     t = hTaskFrom(event)
     m.offline = (t.status <= 0)
     if t.ok then m.resume = t.response.Items else m.resume = []
+    fillNextUp()
     pickHero()
 end sub
 
@@ -837,7 +843,7 @@ sub onNextUp(event as object)
     t = hTaskFrom(event)
     m.next = []
     if t.ok then m.next = t.response.Items
-    fillRow(m.nextUp, m.next)
+    fillNextUp()
     pickHero()
     pickTonight()
 end sub
@@ -849,7 +855,30 @@ sub onLatest(event as object)
     m.new = []
     if t.ok then m.new = t.response.Items
     fillRow(m.latest, m.new)
+    fillNextUp()
     pickHero()
+end sub
+
+' Next up never sits half empty: under 6 cards it tops up with what you're in the middle of,
+' then with new arrivals (UX review item 23). Whatever answer comes last re-fills it.
+sub fillNextUp()
+    list = []
+    seen = {}
+    srcs = [m.next, m.resume, m.new]
+    for si = 0 to 2
+        src = srcs[si]
+        if src <> invalid
+            for each it in src
+                if it.Id <> invalid and not seen.doesExist(it.Id)
+                    if list.count() < 6 or si = 0
+                        seen[it.Id] = true
+                        list.push(it)
+                    end if
+                end if
+            end for
+        end if
+    end for
+    fillRow(m.nextUp, list)
 end sub
 
 sub fillRow(row as object, items as object)

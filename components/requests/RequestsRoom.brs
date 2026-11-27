@@ -685,14 +685,15 @@ sub buildRail()
         ic.height = 28
         ic.translation = [24, 19]
         lab = g.createChild("Label")
-        lab.font = hFont("fell", 36)
+        ' upright and brighter: the grey italic list was hard to read from the couch (UX review item 36)
+        lab.font = hFont("bold", 30)
         lab.text = l.name
         lab.width = 270
         lab.height = 66
         lab.vertAlign = "center"
         lab.translation = [70, 0]
         cnt = g.createChild("Label")
-        cnt.font = hFont("regular", 24)
+        cnt.font = hFont("bold", 28)
         cnt.width = 360
         cnt.height = 66
         cnt.horizAlign = "right"
@@ -726,9 +727,9 @@ sub paintRail()
             lab.color = "0xEDE6CAFF"
             cnt.color = "0xE0B34AFF"
         else
-            ic.blendColor = "0xB5AF8C99"
-            lab.color = "0xB5AF8C99"
-            cnt.color = "0xB5AF8C99"
+            ic.blendColor = "0xB5AF8CFF"
+            lab.color = "0xD5CFAFFF"
+            cnt.color = "0xB5AF8CFF"
         end if
         k = m.lists[i].key
         c = m.cards[k]

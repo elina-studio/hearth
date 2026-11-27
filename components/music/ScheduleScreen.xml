@@ -5,6 +5,7 @@
 <component name="ScheduleScreen" extends="Group">
   <children>
     <Rectangle width="1920" height="1080" color="0x0B0E09FF" />
+    <MusicFrame page="Schedules" />
     <Label id="title" translation="[100, 130]" color="0xEDE6CAFF" />
     <Poster uri="pkg:/images/w/twig-300-s5.png" translation="[540, 96]" width="340" height="120" />
     <Group id="rows" translation="[100, 210]" />

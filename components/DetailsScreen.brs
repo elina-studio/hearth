@@ -282,15 +282,15 @@ sub fillHeader()
     tgt = m.target
     ' the kicker is the path back (Back climbs one step): SHOWS › SUPERNATURAL › NEXT UP S4 E3
     if m.isShow
-        k = "SHOWS  ›  " + UCase(hTitle(it))
+        k = backTo("SHOWS")
         if tgt <> invalid and tgt.Type = "Episode"
-            k = k + "  ›  "
+            k = k + "    "
             if hPercent(tgt) > 0 then k = k + "CONTINUE " else k = k + "NEXT UP "
             k = k + "S" + hNum(tgt.ParentIndexNumber) + " E" + hNum(tgt.IndexNumber)
         end if
     else
-        k = "MOVIES  ›  " + UCase(hTitle(it))
-        if it.Studio <> invalid then k = k + "  ›  " + UCase(it.Studio)
+        k = backTo("MOVIES")
+        if it.Studio <> invalid then k = k + "    " + UCase(it.Studio)
     end if
     m.kicker.text = k
 
@@ -317,11 +317,25 @@ sub fillHeader()
     fillTags()
 end sub
 
+' "‹ MOVIES": where Back takes you. The title is already big below, so it isn't repeated here.
+function backTo(dflt as string) as string
+    f = m.top.from
+    if f = "" or f = "Back" then f = dflt
+    return Chr(8249) + " " + UCase(f)
+end function
+
 sub fillTags()
     m.tags.removeChildrenIndex(m.tags.getChildCount(), 0)
     it = m.full
+    ' two ratings at most: critics and IMDb first, then whatever else Plex has (UX review item 26)
     if it.Ratings <> invalid
-        for each r in it.Ratings
+        pick2 = []
+        for each want in ["Critics", "IMDb", "Audience", "TMDB", "TVDB"]
+            for each r in it.Ratings
+                if r.label = want and pick2.count() < 2 then pick2.push(r)
+            end for
+        end for
+        for each r in pick2
             hRating(m.tags, r.label, r.text)
         end for
     end if
@@ -340,24 +354,14 @@ sub fillTags()
         st = hPlayStreams(part)
         res = resText(media.videoResolution)
         if res <> "" then hTag(row, res, "", "gold")
-        if media.videoCodec <> invalid then hTag(row, codecText(media.videoCodec), "", "plain")
-        if st.video <> invalid and st.video.displayTitle <> invalid
-            dt = LCase(st.video.displayTitle)
-            if Instr(1, dt, "dolby vision") > 0 or Instr(1, dt, "dovi") > 0
-                hTag(row, "Dolby Vision", "", "plain")
-            else if Instr(1, dt, "hdr") > 0
-                hTag(row, "HDR", "", "plain")
-            end if
-        end if
-        a = audioText(st.audio, media)
-        if a <> "" then hTag(row, a, "", "plain")
         cc = ccText(tf)
         if cc <> "" then hTag(row, cc, "", "plain")
         miss = missingFor(tf)
         if miss <> "" then hTag(row, miss, "ccx", "warn")
         d = hPlayDirectCheck(media, st)
+        ' tech badges cut to resolution and captions (UX review item 10); a note only when the file has to convert
         if d.ok
-            hTag(row, "Plays directly", "leaf", "green")
+            ' plays as is: nothing to say
         else if LCase(pStr(media.videoCodec)) = "hevc" or LCase(pStr(media.videoCodec)) = "h265"
             hTag(row, "Will convert to 720p", "wand", "plain")
         else if Left(d.why, 5) = "audio"
@@ -394,12 +398,9 @@ sub buildActions()
         au = audioShort(m.targetFull)
         if au <> "" then list.push({ icon: "audio", text: au, action: "audio" })
     end if
-    if isPlayed(it)
-        list.push({ icon: "checkc", text: "Watched", action: "unwatchAll" })
-    else
-        list.push({ icon: "eye", text: "Mark watched", action: "watchAll" })
-    end if
-    list.push({ icon: "more", text: "", action: "more" })
+    ' Mark watched lives in More: as a main button it sat one press from Resume (UX review item 28)
+    if isPlayed(it) then list.push({ icon: "checkc", text: "Watched", action: "more" })
+    list.push({ icon: "more", text: "More", action: "more" })
     m.actions = list
     m.actionsBox.removeChildrenIndex(m.actionsBox.getChildCount(), 0)
     x = 0
@@ -617,6 +618,17 @@ sub buildBelow()
     end for
     m.belowRows = []
     it = m.full
+    if it.Collections <> invalid
+        for each col in it.Collections
+            r = addBelow("Part of " + col.name, "layers", "titles", [], 200, 300)
+            r.addFields({ collectionId: col.id })
+            hPlex("collection", { id: col.id.toStr() }, "onCollection", col.id.toStr())
+        end for
+    end if
+    sim = addBelow("More like this", "heart", "", [], 200, 300)
+    sim.addFields({ similar: true })
+    hPlex("similar", { id: it.Id }, "onSimilar")
+    ' what to watch next comes before who is in it (UX review item 29)
     if it.People <> invalid and it.People.count() > 0
         cards = []
         for each p in it.People
@@ -635,16 +647,6 @@ sub buildBelow()
         end for
         addBelow("Extras", "film", "", cards, 320, 180)
     end if
-    if it.Collections <> invalid
-        for each col in it.Collections
-            r = addBelow("Part of " + col.name, "layers", "titles", [], 200, 300)
-            r.addFields({ collectionId: col.id })
-            hPlex("collection", { id: col.id.toStr() }, "onCollection", col.id.toStr())
-        end for
-    end if
-    sim = addBelow("More like this", "heart", "", [], 200, 300)
-    sim.addFields({ similar: true })
-    hPlex("similar", { id: it.Id }, "onSimilar")
     layoutBelow()
 end sub
 
@@ -1073,7 +1075,11 @@ function ccShort(it as dynamic) as string
     if it = invalid or it._media = invalid then return "Subtitles"
     st = hSubsStreams(it)
     for each s in st
-        if s.selected = true then return hSubsName(s)
+        ' the language only: a subtitle's own title is often its file name (UX review item 17)
+        if s.selected = true
+            if s.language <> invalid and s.language <> "" then return s.language
+            return "On"
+        end if
     end for
     if st.count() = 0 then return "None"
     return "Off"

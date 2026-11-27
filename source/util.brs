@@ -134,9 +134,41 @@ end function
 ' Display title: series name for episodes
 function hTitle(item as object) as string
     if item = invalid then return ""
-    if item.Type = "Episode" and item.SeriesName <> invalid then return item.SeriesName
+    if item.Type = "Episode" and item.SeriesName <> invalid then return hClean(item.SeriesName)
     if item.Name = invalid then return ""
-    return item.Name
+    return hClean(item.Name)
+end function
+
+' An artist name to show, or "" when Plex only knows it as "[unknown]" (UX review item 34)
+function hArtist(a as dynamic) as string
+    a = hClean(a)
+    if LCase(a) = "[unknown]" or LCase(a) = "unknown artist" or LCase(a) = "unknown" then return ""
+    return a
+end function
+
+' Drop characters the app's fonts can't draw (emoji, pictographs, variation selectors): the TV shows each one as an
+' empty box (UX review item 12, "Fresh" + two boxes). Letters of every language are kept.
+function hClean(t as dynamic) as string
+    if t = invalid then return ""
+    t = t.toStr()
+    n = Len(t)
+    hcPlain = true
+    for i = 1 to n
+        c = Asc(Mid(t, i, 1))
+        if c >= &h2190 then
+            hcPlain = false
+            exit for
+        end if
+    end for
+    if hcPlain then return t
+    out = ""
+    for i = 1 to n
+        ch = Mid(t, i, 1)
+        c = Asc(ch)
+        hcDrop = (c >= &h2190 and c <= &h2BFF) or (c >= &hFE00 and c <= &hFE0F) or c >= &h1F000 or (c >= &hE000 and c <= &hF8FF) or c = &h200D
+        if not hcDrop then out = out + ch
+    end for
+    return out.Trim()
 end function
 
 function hSubtitle(item as object) as string
@@ -362,7 +394,13 @@ end sub
 sub hFbStatus(event as object)
     p = event.getRoSGNode()
     g = p.getParent()
-    if g <> invalid and g.hasField("fb") then g.fb.visible = (p.loadStatus <> "ready")
+    ' while a picture is on its way the tile stays a quiet, slightly lighter block with no text; the title only
+    ' appears if the picture fails or there is none (UX review item 22: titles flashing up looked like errors)
+    st = p.loadStatus
+    if g <> invalid and g.hasField("fb") then g.fb.visible = not (st = "ready" or st = "loading")
+    if g <> invalid and g.hasField("bg")
+        if st = "loading" then g.bg.opacity = 0.6 else g.bg.opacity = 1.0
+    end if
     if p.loadStatus = "failed"
         print "[hearth-img] failed: "; Left(p.uri, 110)
         hFbRetryLater(p, g)
@@ -522,7 +560,7 @@ sub hWalkKey(key as string, handled as boolean)
     sub_ = "?"
     if m.top <> invalid then sub_ = m.top.subtype()
     st = ""
-    for each nm in ["zone", "index", "sel", "btn", "tab", "tabSel", "chip", "letter", "row", "epSel", "belowSel", "pillIndex", "current", "mode", "song", "alb", "f", "focus", "term", "railIndex", "gridIndex", "resIndex"]
+    for each nm in ["zone", "index", "sel", "btn", "tab", "tabSel", "chip", "letter", "row", "epSel", "belowSel", "pillIndex", "current", "mode", "song", "alb", "f", "focus", "term", "railIndex", "gridIndex", "resIndex", "view", "rowI"]
         v = m[nm]
         t = type(v)
         if t = "roString" or t = "String" then st = st + nm + ":" + v + " "
@@ -535,3 +573,17 @@ sub hWalkKey(key as string, handled as boolean)
     if handled then h = "yes"
     print "HWALK key="; key; " handled="; h; " screen="; sub_; " st="; st
 end sub
+
+' "Pedro Pascal" -> "PP", "Zendaya" -> "Z"
+function hInitials(n as string) as string
+    words = hClean(n).Trim().Split(" ")
+    out = ""
+    for each w in words
+        if Len(w) > 0 and Len(out) < 2 then out = out + UCase(Left(w, 1))
+    end for
+    if Len(words) > 2 and Len(out) = 2
+        lw = words[words.count() - 1]
+        if Len(lw) > 0 then out = Left(out, 1) + UCase(Left(lw, 1))
+    end if
+    return out
+end function

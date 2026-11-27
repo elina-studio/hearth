@@ -331,21 +331,35 @@ play_walk() {
   expect_not "left the player" 'stack=[^ ]*PlayerScreen> '
 }
 
-library_walk() { # shows or movies, already inside the room
+library_walk() { # shows or movies, already inside the room (build 112: rows first, A to Z grid behind)
   expect "library room opened" 'LibraryRoom'  || return 1
-  presses Down Down Right Right Left Left Up
-  go_zone Down 'zone:tabs ' 5 && presses Right Left Right Left
-  go_zone Down 'zone:chips ' 3 && presses Right Right Right Left Left Left Up
-  if need "reach the poster grid" Down 'zone:grid ' 8; then
-    presses Right Right Down Down Up Left Up Down
-    press Info; sleep 1; presses Down Back
-    sleep 1
-    press Select
-    sleep 2
-    expect "OK on a poster opens Details" 'stack=[^ ]*DetailsScreen> ' || return 1
+  need "reach the rows" Down 'zone:rows ' 3 || return 1
+  presses Down Down Right Right Left Left Up Up Down
+  press Info; sleep 1; presses Down Back
+  sleep 1
+  # back up to the first row (one Up more would leave for the room bar); OK on its first card opens Details
+  press Up
+  press Select
+  sleep 2
+  if expect "OK on a card opens Details" 'stack=[^ ]*DetailsScreen> '; then
     details_walk
     press Back; sleep 1
     expect "Back from Details returns to the library" 'stack=HubScreen> '
+  fi
+  # the last tile of every row is "All A to Z": Right to the end, OK opens the poster grid
+  # (an extra Back may have left for the room bar: go back down into the room first)
+  sleep 1
+  if last_stack | grep -q 'Group#pills'; then press Down; sleep 1; fi
+  need "reach the rows" Down 'zone:rows ' 3 || return 1
+  i=0; while [ $i -lt 24 ]; do press Right; i=$((i+1)); done
+  press Select; sleep 2
+  if expect "All A to Z opens the poster grid" 'LibraryRoom.*view:grid '; then
+    presses Right Right Down Down Up Left
+    go_zone Up 'zone:tabs ' 6 && presses Right Left Right Left
+    go_zone Down 'zone:chips ' 3 && presses Right Right Right Left Left Left Up
+    go_zone Down 'zone:grid ' 8
+    press Back; sleep 1
+    expect "Back from the grid returns to the rows" 'LibraryRoom.*view:rows '
   fi
 }
 
@@ -420,13 +434,13 @@ if begin P05 "Home hero: OK opens Details or the player"; then
   unwind
 fi
 
-if begin P06 "Shows: tabs, chips, grid, options, Details, Back"; then
+if begin P06 "Shows: rows, options, Details, A to Z grid, Back"; then
   goto_room 1
   library_walk
   unwind
 fi
 
-if begin P07 "Movies: tabs, chips, grid, options, Details, Back"; then
+if begin P07 "Movies: rows, options, Details, A to Z grid, Back"; then
   goto_room 2
   library_walk
   unwind
@@ -434,7 +448,7 @@ fi
 
 if begin P08 "Details to Player: play, pause screen, panels, Back"; then
   goto_room 2
-  if need "reach the poster grid" Down 'zone:grid ' 8; then
+  if need "reach the rows" Down 'zone:rows ' 3; then
     press Select; sleep 3
     if expect "Details opened" 'stack=[^ ]*DetailsScreen> '; then
       sleep 2

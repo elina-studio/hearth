@@ -546,6 +546,9 @@ function norm(md as object) as object
     else if t = "show"
         it.Type = "Series"
         it.SeasonCount = md.childCount
+        ' the library rows sort shows into "not started yet" and "finished" by these
+        it.LeafCount = md.leafCount
+        it.ViewedLeafCount = md.viewedLeafCount
     else if t = "season"
         ' a season stands in for its show
         it.Type = "Series"

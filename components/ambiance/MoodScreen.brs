@@ -119,46 +119,6 @@ sub onMood()
     showHud()
 end sub
 
-' A Plex clip as video content: the file as it is, or (transcode=true) converted by Plex to HLS
-' for files the TV can't play directly. Either way it loops.
-' This TV (TCL 5000X family) has no HEVC decode and a 1080p limit: a phone clip in HEVC or 4K never
-' direct-plays, so skip the failed attempt (10+ s) and go straight to the converted stream.
-function needsConvert(clip as object) as boolean
-    vc = LCase(toStr0(clip.videoCodec))
-    if vc <> "" and vc <> "h264" then return true
-    if clip.width <> invalid and Val(clip.width.toStr()) > 1920 then return true
-    if clip.height <> invalid and Val(clip.height.toStr()) > 1080 then return true
-    return false
-end function
-
-function toStr0(v as dynamic) as string
-    if v = invalid then return ""
-    return v.toStr()
-end function
-
-function clipContent(clip as object, transcode as boolean) as object
-    server = m.global.plexServer
-    token = m.global.plexServerToken
-    c = CreateObject("roSGNode", "ContentNode")
-    if not transcode
-        c.url = server + clip.key + "?X-Plex-Token=" + token
-        if LCase(clip.container) = "mkv" then c.streamFormat = "mkv" else c.streamFormat = "mp4"
-    else
-        q = "path=" + hEscape("/library/metadata/" + clip.Id.toStr()) + "&mediaIndex=0&partIndex=0&protocol=hls&fastSeek=1"
-        q = q + "&directPlay=0&directStream=1&directStreamAudio=1&videoResolution=1280x720&maxVideoBitrate=6000"
-        q = q + "&subtitles=none&session=" + m.global.deviceId + "-amb" + Rnd(100000).toStr()
-        q = q + "&X-Plex-Client-Identifier=" + hEscape(m.global.deviceId) + "&X-Plex-Product=Hearth&X-Plex-Platform=Roku&X-Plex-Token=" + token
-        q = q + "&X-Plex-Client-Profile-Extra=" + hEscape("add-transcode-target(type=videoProfile&context=streaming&protocol=hls&container=mpegts&videoCodec=h264&audioCodec=aac,ac3)")
-        c.url = server + "/video/:/transcode/universal/start.m3u8?" + q
-        c.streamFormat = "hls"
-    end if
-    return c
-end function
-
-function fullStill(path as string) as string
-    return m.global.plexServer + "/photo/:/transcode?width=1280&height=720&minSize=1&upscale=1&url=" + hEscape(path) + "&X-Plex-Token=" + m.global.plexServerToken
-end function
-
 '' Size the video so the whole frame shows (fit, with black bars when its shape isn't 16:9), never cropped:
 ' the owner's footage is framed on purpose (rain on the glass with the window edge in shot).
 sub fillScreen(clip as dynamic)
@@ -290,9 +250,11 @@ sub openControls()
     paintMix()
     m.controls.visible = true
     m.controls.callFunc("open", invalid)
+    ' the bar carries the mood's name and its own key hints, so the big title and hint line step aside (UX review item 38)
+    m.hudIn.control = "stop"
     m.hudOut.control = "stop"
     m.hudTimer.control = "stop"
-    m.hud.opacity = 1
+    m.hud.opacity = 0
     paintState()
 end sub
 
@@ -486,8 +448,9 @@ sub paintState()
         s = "Your music"
         mp = musicNode()
         if mp <> invalid and mp.track <> invalid and mp.track.title <> invalid
-            s = mp.track.title
-            if mp.track.artist <> invalid and mp.track.artist <> "" then s = s + "  ·  " + mp.track.artist
+            s = hClean(mp.track.title)
+            ar = hArtist(mp.track.artist)
+            if ar <> "" then s = s + "  ·  " + ar
         end if
         if mode = "both" then s = s + "   +   " + LCase(ambSoundLabel(m.item).word)
     end if
@@ -515,6 +478,7 @@ function clockText(dt as object) as string
 end function
 
 sub showHud()
+    if m.controls.visible then return
     paintState()
     m.hudOut.control = "stop"
     if m.hud.opacity < 1 then m.hudIn.control = "start"

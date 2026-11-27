@@ -39,7 +39,8 @@
         <Label id="musicTitle" translation="[50, 160]" text="ASK LIDARR FOR AN ARTIST" color="0xE0B34AFF" />
         <Label id="musicSub" translation="[50, 214]" width="600" wrap="true" color="0xB5AF8CFF" text="Press OK to type an artist. Lidarr adds them and looks for their albums." />
       </Group>
-      <Group id="searchPanel" translation="[540, 20]" visible="false">
+      <!-- below the SEARCH OVERSEERR label, not on top of it (UX review item 15) -->
+      <Group id="searchPanel" translation="[540, 60]" visible="false">
         <HearthKeyboard id="kb" placeholder="Type a title" />
         <Label id="resultsHead" translation="[600, 0]" width="690" color="0xB5AF8CFF" />
         <Group id="results" translation="[600, 56]" />

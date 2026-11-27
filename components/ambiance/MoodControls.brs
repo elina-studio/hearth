@@ -79,9 +79,8 @@ sub paint()
     if mp <> invalid
         tr = mp.track
         if tr <> invalid and tr.title <> invalid
-            title = tr.title
-            subt = ""
-            if tr.artist <> invalid then subt = tr.artist
+            title = hClean(tr.title)
+            subt = hArtist(tr.artist)
             if mp.castCount > 0
                 n = mp.castCount
                 w = " speakers"

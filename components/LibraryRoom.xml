@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Movies or Shows (layout "3"): a slim strip about the focused title with Play / Captions / Details
+<!-- Movies or Shows. Opens on rows (libraryRows.brs); "All A to Z" opens the older layout "3": a slim strip about the focused title with Play / Captions / Details
      and its art on the right, then tabs (Continue, New, Unwatched, A to Z, Genres) over a poster grid.
      A to Z adds a row of filter chips and a row of letters (Sort B, Letters B). -->
 <component name="LibraryRoom" extends="Group">
@@ -12,6 +12,12 @@
     <Rectangle translation="[1468, 0]" width="356" height="200" color="0x141A11FF" />
     <Poster id="art" translation="[1468, 0]" width="356" height="200" loadDisplayMode="scaleToZoom" />
     <Poster uri="pkg:/images/fade-left.png" translation="[1468, 0]" width="150" height="200" />
+
+    <!-- rows (the default view, UX review Nov 27): Continue, New, Recently added, ... each ending in an
+         "All A to Z" tile that opens the poster grid below -->
+    <Group id="rowsClip" translation="[0, 222]" clippingRect="[0, -40, 1920, 748]" visible="false">
+      <Group id="rowsBox" translation="[96, 0]" />
+    </Group>
 
     <!-- tabs -->
     <Group id="tabs" translation="[96, 270]" />
@@ -41,4 +47,5 @@
   <script type="text/brightscript" uri="pkg:/components/dialogs.brs" />
   <script type="text/brightscript" uri="pkg:/components/subs.brs" />
   <script type="text/brightscript" uri="pkg:/components/LibraryRoom.brs" />
+  <script type="text/brightscript" uri="pkg:/components/libraryRows.brs" />
 </component>

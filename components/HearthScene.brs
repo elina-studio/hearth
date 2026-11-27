@@ -161,6 +161,13 @@ sub handle(r as object)
         signOut()
     else if a = "details"
         s = CreateObject("roSGNode", "DetailsScreen")
+        ' the kicker names where Back goes (UX review item 27)
+        n = m.stack.getChildCount()
+        if n > 0
+            top = m.stack.getChild(n - 1)
+            if top.subtype() = "HubScreen" then s.from = top.room
+            if top.subtype() = "DetailsScreen" then s.from = "Back"
+        end if
         s.item = r.item
         pushScreen(s)
     else if a = "play"

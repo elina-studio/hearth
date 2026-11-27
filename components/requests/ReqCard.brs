@@ -93,6 +93,8 @@ end sub
 sub drawChip(chip as dynamic)
     g = m.top.findNode("chip")
     g.visible = (chip <> invalid and chip.text <> invalid and chip.text <> "")
+    ' a "+ REQUEST" label on every card was noise: only In library / Requested / problem badges show (UX review item 35)
+    if g.visible and chip.tone = "out" and chip.text = "Request" then g.visible = false
     if not g.visible then return
     bg = m.top.findNode("chipBg")
     icon = m.top.findNode("chipIcon")

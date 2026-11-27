@@ -35,11 +35,16 @@ function muNow() as object
         return { eyebrow: "NOTHING QUEUED", title: "Shuffle my music", sub: "Press Play to start a random mix", track: invalid }
     end if
     if s = "playing" then e = "NOW PLAYING" else if s = "buffering" then e = "LOADING" else e = "PAUSED"
-    sub2 = tr.artist
-    if tr.album <> "" then sub2 = sub2 + "  ·  " + tr.album
+    ' "[unknown]" is Plex's word for a missing artist: show the album alone instead (UX review item 34)
+    artist = hArtist(tr.artist)
+    album = hClean(tr.album)
+    sub2 = artist
+    if album <> ""
+        if sub2 <> "" then sub2 = sub2 + "  ·  " + album else sub2 = album
+    end if
     e = e + "  ·  " + (p.index + 1).toStr() + " OF " + p.queue.count().toStr()
     if p.liked = "like" then e = e + "  ·  LIKED"
-    return { eyebrow: e, title: tr.title, sub: sub2, track: tr }
+    return { eyebrow: e, title: hClean(tr.title), sub: sub2, track: tr }
 end function
 
 function muRepeatLabel() as string

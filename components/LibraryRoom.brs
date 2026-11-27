@@ -55,6 +55,7 @@ sub init()
     buildLetters()
     m.hints = m.top.findNode("hints")
     m.hintSig = ""
+    rowsInit()
 end sub
 
 ' ---------- slots ----------
@@ -65,9 +66,10 @@ sub buildSlots()
         bg = g.createChild("Rectangle")
         bg.width = m.cw
         bg.height = m.ch
-        bg.color = "0x1A2016FF"
+        bg.color = "0x262A1CFF"
         fb = g.createChild("Label")
-        fb.font = hFont("bold", 18)
+        ' no poster yet: the title in the book face, not shouting caps (UX review item 19)
+        fb.font = hFontCached("book", 30)
         fb.width = m.cw - 24
         fb.height = m.ch - 24
         fb.translation = [12, 12]
@@ -113,7 +115,9 @@ sub drawGrid()
                     g.pic.uri = ""
                     g.bar.visible = false
                 else
-                    g.fb.text = UCase(hTitle(it))
+                    yr = ""
+                    if it.ProductionYear <> invalid then yr = Chr(10) + it.ProductionYear.toStr()
+                    g.fb.text = hTitle(it) + yr
                     g.pic.uri = hImageAny(it, ["Primary"], 180)
                     hBraidSet(g.bar, hPercent(it))
                 end if
@@ -281,6 +285,11 @@ sub refresh(unused as dynamic)
         return
     end if
     m.section = libs[m.top.kind]
+    if m.view = "rows"
+        m.data = {}
+        loadRows()
+        return
+    end if
     ' coming back from details or after Options: keep the poster (and genre) you were on
     g = m.genre
     m.keepAt = invalid
@@ -426,7 +435,7 @@ sub setStripTitle(t as string)
 end sub
 
 sub showInfo()
-    if m.index < m.items.count() then m.item = m.items[m.index]
+    if m.view <> "rows" and m.index < m.items.count() then m.item = m.items[m.index]
     it = m.item
     if it = invalid or it.genreName <> invalid
         if it <> invalid
@@ -459,12 +468,22 @@ end sub
 ' ---------- focus ----------
 sub focusIn(unused as dynamic)
     m.focused = true
+    if m.view = "rows"
+        m.zone = "rows"
+        m.top.setFocus(true)
+        paintRows()
+        return
+    end if
     if m.items.count() > 0 or m.keepAt <> invalid then m.zone = "grid" else m.zone = "tabs"
     m.top.setFocus(true)
     paint()
 end sub
 
 sub paint()
+    if m.view = "rows"
+        paintRows()
+        return
+    end if
     row = Int(m.index / m.cols)
     if row < m.top0 then m.top0 = row
     if row > m.top0 + 1 then m.top0 = row - 1
@@ -488,11 +507,11 @@ sub paintHints()
     if it <> invalid then keys.push({ text: "OK", label: "Open" })
     if playable(it) then keys.push({ icon: "play", label: "Play" })
     if m.item <> invalid and m.item.genreName = invalid and m.item.Id <> invalid
-        ' the first choice of hOptions (dialogs.brs): Mark watched / Mark unwatched, then Open details
-        if m.item.UserData <> invalid and m.item.UserData.Played = true then opt = "Mark unwatched" else opt = "Mark watched"
+        ' * opens the options menu (dialogs.brs hOptions), so the hint says so (UX review item 8)
+        opt = "Options"
         keys.push({ icon: "asterisk", label: opt })
     end if
-    back = "Rooms"
+    back = "Rows"
     if m.genre <> invalid
         back = "Genres"
     else if m.zone <> "grid" and m.items.count() > 0
@@ -549,6 +568,7 @@ end sub
 
 function hKeyInner(key as string, press as boolean) as boolean
     if not press then return false
+    if m.view = "rows" then return rowsKey(key)
     if key = "play" and m.zone = "grid" and m.index < m.items.count()
         it = m.items[m.index]
         if playable(it)
@@ -571,7 +591,7 @@ function hKeyInner(key as string, press as boolean) as boolean
             paint()
             return true
         end if
-        leaveToPills()
+        leaveGrid()
         return true
     end if
     if key = "options"

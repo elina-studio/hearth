@@ -18,6 +18,8 @@
     <Group id="keys" translation="[0, 164]" />
   </children>
   <interface>
+    <!-- the "type or speak on your phone" line under the keys; off where the screen needs that space -->
+    <field id="phoneHint" type="boolean" value="true" onChange="onPhoneHint" />
     <field id="text" type="string" onChange="onText" alwaysNotify="true" />
     <field id="words" type="array" onChange="onWords" />
     <field id="mode" type="string" value="search" onChange="onMode" />

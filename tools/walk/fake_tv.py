@@ -22,7 +22,7 @@ class App:
         self.reset()
     def reset(self):
         self.stack = ["HubScreen"]; self.hubzone = "room"; self.pill = 0; self.room = 0; self.zi = 0; self.dialog = ""
-        self.top_zi = 0; self.term = ""; self.last = ""
+        self.top_zi = 0; self.term = ""; self.last = ""; self.view = "rows"; self.col = 0
     def log(self, line):
         for c in list(self.clients):
             try: c.sendall((line + "\n").encode())
@@ -61,14 +61,32 @@ class App:
             top = self.stack[-1]
             if top == "HubScreen" and self.hubzone == "pills":
                 if key in ("left", "right"): self.pill = (self.pill + (1 if key == "right" else -1)) % 8
-                elif key in ("down", "OK"): self.room = self.pill; self.hubzone = "room"; self.zi = 0
+                elif key in ("down", "OK"):
+                    if self.room != self.pill: self.view = "rows"; self.col = 0
+                    self.room = self.pill; self.hubzone = "room"; self.zi = 0
                 elif key == "back":
                     if self.pill != 0 or self.room != 0: self.pill = 0; self.room = 0
                     else: self.dialog = "StandardMessageDialog:Leave Hearth?"
                 elif key == "options": self.dialog = "StandardMessageDialog:Hearth"
                 self.keyline(key, True, "HubScreen", "zone:pills pillIndex:%d current:x " % self.pill); return
+            if top == "HubScreen" and ROOMS[self.room] == "LibraryRoom" and self.view == "rows":
+                # build 112: Shows/Movies open on rows; the last tile of each row (col 20+) opens the A to Z grid
+                if key == "back" or (key == "up" and self.zi == 0): self.hubzone = "pills"
+                elif key == "down": self.zi = min(self.zi + 1, 5)
+                elif key == "up": self.zi -= 1
+                elif key == "options": self.dialog = "StandardMessageDialog:Options"
+                elif key == "right": self.col = min(self.col + 1, 20)
+                elif key == "left": self.col = max(self.col - 1, 0)
+                elif key == "OK":
+                    if self.col >= 20: self.view = "grid"; self.zi = 3
+                    else: self.stack.append("DetailsScreen"); self.top_zi = 1
+                z = "rows" if self.view == "rows" else "grid"
+                self.keyline(key, True, "LibraryRoom", "zone:%s view:%s rowI:%d " % (z, self.view, self.zi)); return
             if top == "HubScreen":
                 r = ROOMS[self.room]; zs = ZONES[r]
+                if r == "LibraryRoom" and key == "back":
+                    self.view = "rows"; self.zi = 0; self.col = 0
+                    self.keyline(key, True, r, "zone:rows view:rows "); return
                 if key == "back" or (key == "up" and self.zi == 0): self.hubzone = "pills"
                 elif key == "down": self.zi = min(self.zi + 1, len(zs) - 1)
                 elif key == "up": self.zi -= 1
@@ -81,7 +99,8 @@ class App:
                     elif r == "AmbianceRoom": self.stack.append("MoodScreen")
                     elif r == "PhotosRoom": self.stack.append("SlideshowScreen")
                     elif r == "RequestsRoom" and z == "grid": pass
-                self.keyline(key, True, r, "zone:%s term:%s " % (zs[self.zi], self.term)); return
+                extra = "view:grid " if r == "LibraryRoom" else ""
+                self.keyline(key, True, r, "zone:%s term:%s %s" % (zs[self.zi], self.term, extra)); return
             # pushed screens: Back pops; Details has zones; OK on act starts the player
             if key == "back": self.stack.pop(); self.keyline(key, True, top, ""); return
             if top == "DetailsScreen":
