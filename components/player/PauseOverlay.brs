@@ -428,12 +428,15 @@ sub paintButtons()
 end sub
 
 sub pressButton(id as string)
-    if id = "back10"
-        jump(-10)
-    else if id = "fwd30"
-        jump(30)
+    if id = "back10" or id = "fwd30"
+        if id = "back10" then jump(-10) else jump(30)
+        ' paused, a skip leaves a scrub point: focus goes to the timeline, where Left/Right move it, OK jumps and Back cancels
+        if m.target <> invalid
+            m.zone = "bar"
+            paintButtons()
+        end if
     else if id = "toggle"
-        m.top.action = { cmd: "toggle" }
+        if m.target <> invalid then commit() else m.top.action = { cmd: "toggle" }
     else if id = "more"
         openMore()
     else
@@ -662,7 +665,7 @@ function hKeyInner(key as string, press as boolean) as boolean
         end if
         paintButtons()
     else if key = "down"
-        if m.zone = "big"
+        if m.zone = "big" and m.target = invalid
             m.zone = "chips"
             m.btn = 0
             paintButtons()
