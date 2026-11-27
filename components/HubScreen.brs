@@ -265,8 +265,8 @@ function makeRoom(name as string) as object
     else if name = "Ambiance"
         room = CreateObject("roSGNode", "AmbianceRoom")
     else
-        room = CreateObject("roSGNode", "PlaceholderRoom")
-        room.name = name
+        ' every pill has a real room; an unknown name falls back to Home rather than a "coming soon" page
+        room = CreateObject("roSGNode", "HomeRoom")
     end if
     room.observeField("request", "onRoomRequest")
     m.rooms[name] = room

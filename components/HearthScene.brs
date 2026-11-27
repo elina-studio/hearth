@@ -24,6 +24,7 @@ sub init()
     m.ribbon = m.top.findNode("ribbon")
     m.music.observeField("track", "onMusicTrack")
     initSfx()
+    initWalk()
 
     ' the lantern intro plays while the saved login is checked
     m.introDone = false
@@ -229,6 +230,10 @@ end sub
 sub onRemote()
     r = m.global.remote
     if r = invalid or r.n = invalid then return
+    if Left(r.go, 5) = "walk:"
+        walkOpen(Mid(r.go, 6))
+        return
+    end if
     d = m.top.dialog
     if r.go = "" and d <> invalid and d.subtype() = "StandardKeyboardDialog"
         d.text = r.text
@@ -432,4 +437,59 @@ sub onSfx()
     m.sfxLast = name
     m.sfxClock.Mark()
     node.control = "play"
+end sub
+
+' ---------- walk trace (tools/walk): only when launched with ?walk=1 ----------
+' Every 0.4 s, when something changed, one HWALK line: the screen stack, the focus chain, any dialog, the music state.
+sub initWalk()
+    m.walkLast = ""
+    if not m.global.hasField("walk") then return
+    if m.global.walk <> true then return
+    t = CreateObject("roSGNode", "Timer")
+    t.duration = 0.4
+    t.repeat = true
+    t.observeField("fire", "walkTick")
+    m.top.appendChild(t)
+    t.control = "start"
+    m.walkTimer = t
+    print "HWALK trace on"
+end sub
+
+sub walkTick()
+    stk = ""
+    for i = 0 to m.stack.getChildCount() - 1
+        stk = stk + m.stack.getChild(i).subtype() + ">"
+    end for
+    chain = ""
+    node = m.top
+    n = 0
+    while node <> invalid and n < 14
+        f = node.focusedChild
+        if f = invalid then exit while
+        nm = f.subtype()
+        if f.id <> "" then nm = nm + "#" + f.id
+        chain = chain + nm + ">"
+        node = f
+        n = n + 1
+    end while
+    dlg = ""
+    d = m.top.dialog
+    if d <> invalid
+        dlg = d.subtype()
+        if d.title <> invalid and d.title <> "" then dlg = dlg + ":" + d.title
+    end if
+    ms = ""
+    if m.music <> invalid and m.music.state <> invalid then ms = m.music.state
+    sig = "stack=" + stk + " focus=" + chain + " dialog=" + dlg + " music=" + ms
+    if sig <> m.walkLast
+        m.walkLast = sig
+        print "HWALK "; sig
+    end if
+end sub
+
+' walk only: open one music screen on top of whatever is showing (radio, lastfm, schedules, big, cover, milk, hearth, request)
+sub walkOpen(mode as string)
+    if not m.global.hasField("walk") or m.global.walk <> true then return
+    print "HWALK open "; mode
+    handle({ action: "musicView", mode: mode })
 end sub

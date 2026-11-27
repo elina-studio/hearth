@@ -496,6 +496,7 @@ end sub
 
 ' Called with the result of a screen's key handler: only a key the handler took makes a sound.
 function hKeySfx(key as string, down as boolean, handled as boolean) as boolean
+    if down then hWalkKey(key, handled)
     if down and handled
         if key = "OK" or key = "options"
             hSfx("select")
@@ -507,3 +508,27 @@ function hKeySfx(key as string, down as boolean, handled as boolean) as boolean
     end if
     return handled
 end function
+
+' ---------- walk trace (tools/walk): only when launched with ?walk=1, never in normal use ----------
+' Prints one HWALK line per key press with the screen and the position state of the component that took it,
+' so the walk script on the Mac can check where every press landed. Runs in the calling component, so m is its own.
+sub hWalkKey(key as string, handled as boolean)
+    g = m.global
+    if g = invalid or not g.hasField("walk") then return
+    if g.walk <> true then return
+    sub_ = "?"
+    if m.top <> invalid then sub_ = m.top.subtype()
+    st = ""
+    for each nm in ["zone", "index", "sel", "btn", "tab", "tabSel", "chip", "letter", "row", "epSel", "belowSel", "pillIndex", "current", "mode", "song", "alb", "f", "focus", "term", "railIndex", "gridIndex", "resIndex"]
+        v = m[nm]
+        t = type(v)
+        if t = "roString" or t = "String" then st = st + nm + ":" + v + " "
+        if t = "Integer" or t = "roInt" or t = "roInteger" then st = st + nm + ":" + v.toStr() + " "
+        if t = "Boolean" or t = "roBoolean" then
+            if v then st = st + nm + ":true " else st = st + nm + ":false "
+        end if
+    end for
+    h = "no"
+    if handled then h = "yes"
+    print "HWALK key="; key; " handled="; h; " screen="; sub_; " st="; st
+end sub

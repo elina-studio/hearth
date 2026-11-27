@@ -5,6 +5,8 @@ sub Main(args as dynamic)
     screen.setMessagePort(port)
     ' phone remote (tools/remote): POST /input?hearthText=...&hearthGo=search|request
     screen.getGlobalNode().addFields({ remote: {} })
+    ' tools/walk launches with ?walk=1 so every key press and screen change is printed to the debug log
+    if args <> invalid and args.walk = "1" then screen.getGlobalNode().addFields({ walk: true })
     restoreKeys()
     scene = screen.CreateScene("HearthScene")
     screen.show()
@@ -23,6 +25,16 @@ end sub
 ' Keys and addresses for other services stay on the TV (registry), never in the repo.
 sub saveInput(screen as object, info as object)
     if info = invalid then return
+    ' tools/walk only (app launched with ?walk=1): open a music screen directly, POST /input?walkOpen=radio
+    if info.walkOpen <> invalid
+        gw = screen.getGlobalNode()
+        if gw.hasField("walk") and gw.walk = true
+            wn = 1
+            if gw.remote <> invalid and gw.remote.n <> invalid then wn = gw.remote.n + 1
+            gw.remote = { text: "", go: "walk:" + info.walkOpen, n: wn }
+        end if
+        return
+    end if
     if info.hearthText <> invalid or info.hearthGo <> invalid
         g = screen.getGlobalNode()
         n = 1
