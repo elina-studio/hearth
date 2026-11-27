@@ -3,6 +3,10 @@ sub init()
     m.audio = m.top.findNode("audio")
     m.audio.observeField("state", "onAudioState")
     m.audio.observeField("position", "onPosition")
+    ' m.out is whatever plays the song right now: the Audio node, or a Video node while a music view
+    ' shows pictures with the song in one stream (mixplay.brs)
+    m.out = m.audio
+    mixInit()
     m.report = m.top.findNode("report")
     m.report.observeField("fire", "onReport")
     m.original = invalid
@@ -49,6 +53,7 @@ sub onCommand()
     if c.cmd = invalid then return
     cmd = c.cmd
     if castCommand(c) then return
+    if mixCommand(c) then return
     if queueCommand(c) then return
     ' the TV's screen is lent to a video and no speaker plays: play/pause only decides what happens on tvRejoin
     if m.tvYielded = true and not castActive() and (cmd = "toggle" or cmd = "play" or cmd = "resume" or cmd = "pause")
@@ -76,7 +81,7 @@ sub onCommand()
         if m.top.queue = invalid or m.top.queue.count() = 0
             shuffleAll()
         else if m.top.state = "playing" or m.top.state = "buffering"
-            m.audio.control = "pause"
+            m.out.control = "pause"
         else if m.top.state = "paused"
             resume()
         else
@@ -91,9 +96,9 @@ sub onCommand()
             playIndex(m.top.index)
         end if
     else if cmd = "pause"
-        if m.top.state = "playing" or m.top.state = "buffering" then m.audio.control = "pause"
+        if m.top.state = "playing" or m.top.state = "buffering" then m.out.control = "pause"
     else if cmd = "stop"
-        m.audio.control = "stop"
+        m.out.control = "stop"
     else if cmd = "next"
         skip(1)
     else if cmd = "prev"
@@ -469,6 +474,7 @@ sub playIndex(i as integer, startAt = 0 as float)
     m.top.track = tr
     m.top.position = startAt
     m.top.duration = tr.duration
+    mixStopVideo()
     c = CreateObject("roSGNode", "ContentNode")
     if startAt > 0 then c.playStart = startAt
     c.url = tr.url
@@ -501,13 +507,22 @@ sub playIndex(i as integer, startAt = 0 as float)
         m.tvYieldResume = true
         return
     end if
+    ' a music view wants pictures with the song: ask the NAS for the joined stream (mixplay.brs)
+    if mixWanted(tr)
+        mixPlay(i, startAt)
+        return
+    end if
+    m.out = m.audio
     m.audio.control = "play"
 end sub
 
 ' The TV plays one Audio node at a time; if another one took over while we were paused, start again where we were
 sub resume()
-    if m.audio.state = "paused"
-        m.audio.control = "resume"
+    if m.mix <> invalid and m.out = m.audio and mixWanted(m.top.track)
+        ' a music view wants the joined stream: start it here instead of the paused Audio
+        playIndex(m.top.index, m.top.position)
+    else if m.out.state = "paused"
+        m.out.control = "resume"
     else
         playIndex(m.top.index, m.top.position)
     end if
@@ -541,6 +556,9 @@ sub restart()
     if m.top.queue = invalid or m.top.queue.count() = 0 then return
     if castActive()
         playIndex(m.top.index)
+    else if m.out <> m.audio
+        ' the joined stream starts where the song started: ask for it again from the top
+        playIndex(m.top.index)
     else if m.top.state = "playing" or m.top.state = "paused"
         m.audio.seek = 0
         if m.top.state = "paused" then m.audio.control = "resume"
@@ -550,7 +568,12 @@ sub restart()
 end sub
 
 sub onAudioState()
-    s = m.audio.state
+    if m.out <> m.audio then return
+    outState(m.audio.state, m.audio.errorMsg)
+end sub
+
+' what the song's player (Audio, or the Video of a joined stream) is doing
+sub outState(s as string, errorMsg as string)
     ' the TV is quiet while speakers play: its audio events don't count
     if castActive() and not castTvOn() then return
     if s = "playing"
@@ -571,7 +594,7 @@ sub onAudioState()
         name = ""
         if tr <> invalid then name = tr.title
         if m.errors >= 3
-            say("The TV can't play these songs (" + m.audio.errorMsg + ").")
+            say("The TV can't play these songs (" + errorMsg + ").")
             m.top.state = "stopped"
             m.report.control = "stop"
         else
@@ -607,8 +630,13 @@ sub trackFinished()
 end sub
 
 sub onPosition()
+    if m.out <> m.audio then return
     m.top.position = m.audio.position
     if m.audio.duration > 0 then m.top.duration = m.audio.duration
+    afterPosition()
+end sub
+
+sub afterPosition()
     if not m.scrobbled and m.top.duration > 30 and m.top.position > m.top.duration * 0.9 then scrobble()
 end sub
 

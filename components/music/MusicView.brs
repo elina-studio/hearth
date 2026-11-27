@@ -22,6 +22,19 @@ sub init()
     m.sToast.font = hFont("bold", 24)
     m.presetName = m.top.findNode("presetName")
     m.presetName.font = hFont("caps", 30)
+    m.lookTag = m.top.findNode("lookTag")
+    m.lookTagBg = m.top.findNode("lookTagBg")
+    m.tagIn = m.top.findNode("tagIn")
+    m.tagOut = m.top.findNode("tagOut")
+    m.tagTimer = m.top.findNode("tagTimer")
+    m.tagTimer.observeField("fire", "hideLookTag")
+    m.vizVideo = m.top.findNode("vizVideo")
+    m.vizVideo.visible = false
+    m.vizBack = m.top.findNode("vizBack")
+    m.vizNote = m.top.findNode("vizNote")
+    m.vizNote.font = hFont("regular", 32)
+    m.picker = m.top.findNode("picker")
+    m.picker.observeField("chosen", "onLookChosen")
     m.noFire = m.top.findNode("noFire")
     m.noFire.font = hFont("regular", 32)
     m.stripIn = m.top.findNode("stripIn")
@@ -30,8 +43,8 @@ sub init()
     m.stripTimer.observeField("fire", "hideStrip")
     m.lyrics = m.top.findNode("lyrics")
     m.mix = "both"
-    m.preset = 0
     m.sound = invalid
+    m.vizOn = false
 
     ' scoped, so leaving this view drops only its own observers
     p = muPlayer()
@@ -41,6 +54,8 @@ sub init()
     p.observeFieldScoped("state", "onPlayerState")
     p.observeFieldScoped("position", "showTime")
     p.observeFieldScoped("message", "onMessage")
+    p.observeFieldScoped("mixState", "onMixState")
+    p.observeFieldScoped("vizLook", "onVizLook")
 end sub
 
 sub onShown(unused as dynamic)
@@ -53,10 +68,7 @@ sub onMode()
         m.groups[k].visible = (k = mode)
     end for
     if mode = "milk"
-        applyPreset()
-        for each id in ["vSpin", "vTint", "vBreath"]
-            m.top.findNode(id).control = "start"
-        end for
+        startViz()
     else if mode = "hearth"
         startHearth()
     end if
@@ -94,14 +106,26 @@ sub showNow()
         m.coverBlur.uri = ""
     end if
     mode = m.top.mode
-    keys = "Play pauses  ·  Rewind and Fast forward change song  ·  Back closes"
-    if m.top.mode <> "cover" then keys = keys + "  ·  Up shows or hides lyrics"
+    ' one idea per line, so the right-aligned hint never breaks mid-phrase
+    keys = "Play pauses  ·  Rewind and Fast forward change song" + Chr(10)
+    if m.top.mode <> "cover" then keys = keys + "Up shows or hides lyrics  ·  Back closes" else keys = keys + "Back closes"
     if mode = "hearth"
         names = { both: "FIRE + MUSIC", fire: "FIRE ONLY", music: "MUSIC ONLY" }
         m.sEyebrow.text = "HEARTH  ·  " + names[m.mix] + "  ·  " + n.eyebrow
         keys = keys + Chr(10) + "* mutes the fire or the music"
     else if mode = "milk"
-        keys = keys + Chr(10) + "Left and Right change the look  ·  * music options"
+        p = muPlayer()
+        how = ""
+        if m.vizLoop = true
+            how = "  ·  LOOP"
+        else if p.mixState = "on" and p.mixKind = "loop"
+            how = "  ·  LOOP (NUCBOX OFF)"
+        else if p.mixState = "on"
+            how = "  ·  LIVE"
+        end if
+        m.sEyebrow.text = "VISUALIZER" + how + "  ·  " + n.eyebrow
+        if n.track <> invalid then m.vizBack.uri = pxImage(n.track.thumb, 480, 270, 40)
+        keys = keys + Chr(10) + "Left and Right change the look  ·  * looks and options"
     else
         keys = keys + Chr(10) + "* music options"
     end if
@@ -140,28 +164,189 @@ sub hideStrip()
     m.stripOut.control = "start"
 end sub
 
-' ---------- visualizer (a stand-in for MilkDrop: no beat detection on the TV) ----------
-sub applyPreset()
-    ' name, spin seconds, four tints for each layer group
-    presets = [
-        { name: "Embers", spin: 60, c: [&hE0B34AFF, &hF0907CFF, &hD9A066FF, &hE0B34AFF] },
-        { name: "Moss", spin: 80, c: [&hA3A35AFF, &h6E8B4AFF, &hE0B34AFF, &hA3A35AFF] },
-        { name: "Night sky", spin: 110, c: [&h8FA7C9FF, &hE0B34AFF, &hB59ACFFF, &h8FA7C9FF] },
-        { name: "Bonfire", spin: 36, c: [&hF0907CFF, &hE0B34AFF, &hFF6A3DFF, &hF0907CFF] }
-    ]
-    p = presets[m.preset mod presets.count()]
-    spin = m.top.findNode("vSpin")
-    spin.control = "stop"
-    spin.duration = p.spin
-    c = p.c
-    ' each layer starts at a different point of the palette so they never match
-    m.top.findNode("c1").keyValue = [c[0], c[1], c[2], c[0]]
-    m.top.findNode("c2").keyValue = [c[1], c[2], c[0], c[1]]
-    m.top.findNode("c3").keyValue = [c[2], c[0], c[1], c[2]]
-    m.top.findNode("c4").keyValue = [c[3], c[1], c[0], c[3]]
-    m.top.findNode("cg").keyValue = [c[0], c[2], c[1], c[0]]
-    m.presetName.text = UCase(p.name)
-    if m.top.mode = "milk" then spin.control = "start"
+' ---------- visualizer: MilkDrop for each song (rendered on the NucBox, or a ready-made loop on the NAS) ----------
+' The song and the picture come as one stream (MusicPlayer mixplay.brs), so the Video here plays the music too.
+' While the song plays on speakers (cast), the TV shows the look's loop with no sound instead.
+sub startViz()
+    p = muPlayer()
+    m.vizOn = true
+    m.vizLoop = false
+    m.vizNote.text = "Starting the visualizer..."
+    m.vizNote.visible = true
+    if p.castCount > 0
+        startVizLoop()
+    else
+        p.command = { cmd: "mixOn", kind: "viz", video: m.vizVideo }
+        onMixState()
+    end if
+end sub
+
+' cast: the speakers carry the song, the TV loops the look's ready-made video without sound
+sub startVizLoop()
+    p = muPlayer()
+    look = p.vizLook
+    if look = invalid or look = "" or vizLabel(look) = "" then look = vizPick()
+    m.vizLoop = true
+    m.vizLoopLook = look
+    c = CreateObject("roSGNode", "ContentNode")
+    c.url = nasBase() + "/api/viz/loopfile?n=" + look
+    c.streamFormat = "mp4"
+    v = m.vizVideo
+    v.loop = true
+    v.mute = true
+    v.content = c
+    v.observeField("state", "onVizLoopState")
+    if m.vizYielded <> true
+        p.command = { cmd: "tvYield" }
+        m.vizYielded = true
+    end if
+    v.control = "play"
+    showLookTag(look)
+end sub
+
+sub onVizLoopState()
+    v = m.vizVideo
+    if v.state = "playing"
+        v.visible = true
+        m.vizNote.visible = false
+    else if v.state = "error"
+        print "[music] visualizer loop error: "; v.errorMsg
+        v.visible = false
+        m.vizNote.text = "No ready-made loop for this look on the NAS yet. The music carries on in the other rooms." + Chr(10) + "Run the visualizer setup on the NucBox to make the loops."
+        m.vizNote.visible = true
+    end if
+end sub
+
+sub stopViz()
+    if not m.vizOn then return
+    m.vizOn = false
+    v = m.vizVideo
+    if m.vizLoop = true
+        v.unobserveField("state")
+        v.control = "stop"
+        m.vizLoop = false
+    else
+        muPlayer().command = { cmd: "mixOff" }
+    end if
+    v.visible = false
+    if m.vizYielded = true
+        m.vizYielded = false
+        muPlayer().command = { cmd: "tvRejoin" }
+    end if
+end sub
+
+' the player's joined stream: show the video when it runs, the soft cover and a note when it can't
+sub onMixState()
+    p = muPlayer()
+    st = p.mixState
+    if m.top.mode = "milk" and m.vizOn and m.vizLoop <> true
+        m.vizVideo.visible = (st = "on")
+        if st = "on"
+            m.vizNote.visible = false
+        else if st = "failed"
+            m.vizNote.text = "No visualizer for this song: " + p.mixNote + "." + Chr(10) + "The music carries on, and the next song tries again."
+            m.vizNote.visible = true
+        else if st = "starting"
+            m.vizNote.text = "Starting the visualizer..."
+            m.vizNote.visible = true
+        end if
+    else if m.top.mode = "hearth" and m.fireMix <> invalid
+        m.fireMix.visible = (st = "on")
+        if st = "failed" and p.mixNote = "preparing"
+            m.noFire.text = "Getting your fire clip ready on the NAS. The moving fire joins the music in a moment."
+            m.noFire.visible = true
+            ' the NAS is copying the clip from Plex: try again shortly
+            if m.fireRetry = invalid
+                m.fireRetry = CreateObject("roSGNode", "Timer")
+                m.fireRetry.duration = 15
+                m.fireRetry.observeField("fire", "onFireRetry")
+            end if
+            m.fireRetry.control = "start"
+        else if st = "on"
+            m.noFire.visible = false
+        end if
+        if m.sound <> invalid then m.sound.active = (st <> "on" or m.mix <> "music")
+    end if
+    showNow()
+end sub
+
+sub onVizLook()
+    if m.top.mode = "milk" then showLookTag(muPlayer().vizLook)
+end sub
+
+sub showLookTag(look as dynamic)
+    if look = invalid or look = "" then return
+    name = vizLabel(look)
+    if name = "" then return
+    m.presetName.text = UCase(name)
+    w = m.presetName.boundingRect().width
+    if w < 100 then w = 100
+    m.lookTagBg.width = w + 48
+    m.tagOut.control = "stop"
+    m.tagIn.control = "start"
+    m.tagTimer.control = "stop"
+    m.tagTimer.control = "start"
+end sub
+
+sub hideLookTag()
+    m.tagOut.control = "start"
+end sub
+
+' Left/Right: the next or previous look (among the starred ones when there are any) for this song
+sub stepLook(d as integer)
+    pool = []
+    stars = vizStars()
+    for each l in vizLooks()
+        if stars.Count() = 0 or stars[l.n] = true then pool.push(l.n)
+    end for
+    if pool.Count() < 2
+        pool = []
+        for each l in vizLooks()
+            pool.push(l.n)
+        end for
+    end if
+    cur = muPlayer().vizLook
+    if m.vizLoop = true then cur = m.vizLoopLook
+    at = -1
+    for i = 0 to pool.Count() - 1
+        if pool[i] = cur then at = i
+    end for
+    at = (at + d + pool.Count()) mod pool.Count()
+    useLook(pool[at])
+end sub
+
+sub useLook(look as string)
+    ' a fixed pick follows the change; shuffle keeps shuffling from the next song
+    if vizChoice() <> "shuffle" then vizSetChoice(look)
+    if m.vizLoop = true
+        m.vizVideo.unobserveField("state")
+        m.vizVideo.control = "stop"
+        muPlayer().vizLook = look
+        startVizLoop()
+    else
+        muSend("mixLook", { look: look })
+    end if
+end sub
+
+sub openLooks()
+    cur = muPlayer().vizLook
+    if m.vizLoop = true then cur = m.vizLoopLook
+    m.picker.callFunc("open", { current: cur })
+    m.picker.visible = true
+end sub
+
+sub onLookChosen()
+    c = m.picker.chosen
+    m.picker.visible = false
+    m.top.setFocus(true)
+    if c = invalid or c = "" or c = "close" then return
+    if c = "shuffle"
+        vizSetChoice("shuffle")
+        useLook(vizPick())
+    else
+        vizSetChoice(c)
+        useLook(c)
+    end if
 end sub
 
 ' ---------- hearth: your own fire clip from the Ambiance library, with the music on top ----------
@@ -228,28 +413,62 @@ sub showFire(clip as object)
     if pic = invalid then pic = clip.thumb
     if pic <> invalid then st.uri = fullStill(pic)
     m.fireStill = st
+    m.fireClip = clip
+    fireStart()
+end sub
+
+' Which fire: while the song plays on the TV, the NAS joins the fire clip and the song into one stream
+' (m.fireMix, MusicPlayer mixplay.brs). With speakers (cast) or "Fire only", the clip loops on its own.
+sub fireStart()
     p = muPlayer()
-    if p.castCount > 0
-        ' speakers carry the song, so the screen is free for the real fire
-        v = holder.createChild("Video")
-        v.width = 1920
-        v.height = 1080
-        v.enableUI = false
-        v.loop = true
-        v.disableScreenSaver = true
-        v.mute = (m.mix = "music")
-        m.fireConverted = needsConvert(clip)
-        v.content = clipContent(clip, m.fireConverted)
-        v.observeField("state", "onFireVideo")
-        m.fireVideo = v
-        m.fireClip = clip
-        p.command = { cmd: "tvYield" }
-        m.fireYielded = true
-        v.control = "play"
-        m.top.setFocus(true)
+    if p.castCount > 0 or m.mix = "fire"
+        fireLoop(m.fireClip)
     else
+        holder = m.top.findNode("moodHolder")
+        if m.fireMix = invalid
+            v = holder.createChild("Video")
+            v.width = 1920
+            v.height = 1080
+            v.enableUI = false
+            v.disableScreenSaver = true
+            v.visible = false
+            m.fireMix = v
+        end if
         if m.sound <> invalid then m.sound.active = true
+        p.command = { cmd: "mixOn", kind: "fire", video: m.fireMix, clip: m.fireClip.key }
     end if
+end sub
+
+sub onFireRetry()
+    if m.top.mode = "hearth" and m.fireMix <> invalid and m.mix <> "fire" and muPlayer().castCount = 0 then fireStart()
+end sub
+
+sub fireMixStop()
+    if m.fireRetry <> invalid then m.fireRetry.control = "stop"
+    if m.fireMix = invalid then return
+    muPlayer().command = { cmd: "mixOff" }
+    m.fireMix.visible = false
+end sub
+
+sub fireLoop(clip as object)
+    ' speakers carry the song (or "Fire only" paused it), so the screen is free for the clip on its own
+    p = muPlayer()
+    v = m.top.findNode("moodHolder").createChild("Video")
+    v.width = 1920
+    v.height = 1080
+    v.enableUI = false
+    v.loop = true
+    v.disableScreenSaver = true
+    v.mute = (m.mix = "music")
+    m.fireConverted = needsConvert(clip)
+    v.content = clipContent(clip, m.fireConverted)
+    v.observeField("state", "onFireVideo")
+    m.fireVideo = v
+    m.fireClip = clip
+    p.command = { cmd: "tvYield" }
+    m.fireYielded = true
+    v.control = "play"
+    m.top.setFocus(true)
 end sub
 
 sub onFireVideo()
@@ -279,7 +498,7 @@ sub stopFire()
     if m.fireVideo <> invalid
         m.fireVideo.unobserveField("state")
         m.fireVideo.control = "stop"
-        m.fireVideo.visible = false
+        m.top.findNode("moodHolder").removeChild(m.fireVideo)
         m.fireVideo = invalid
     end if
     if m.fireStill <> invalid then m.fireStill.visible = true
@@ -290,15 +509,25 @@ sub stopFire()
 end sub
 
 sub setMix(mix as string)
+    old = m.mix
     m.mix = mix
     if m.sound <> invalid then m.sound.on = (mix <> "music")
     if m.fireVideo <> invalid then m.fireVideo.mute = (mix = "music")
     p = muPlayer()
+    ' "Fire only" swaps the joined stream for the clip on its own, and back again
+    if m.fireClip <> invalid and p.castCount = 0 and (old = "fire") <> (mix = "fire")
+        if mix = "fire"
+            fireMixStop()
+        else
+            stopFire()
+        end if
+    end if
     if mix = "fire"
         muSend("pause")
     else if p.state <> "playing" and p.state <> "buffering"
         muSend("play")
     end if
+    if m.fireClip <> invalid and p.castCount = 0 and (old = "fire") <> (mix = "fire") then fireStart()
     showNow()
 end sub
 
@@ -306,8 +535,7 @@ sub onPlayerState()
     showNow()
     ' pressing Play during "fire only" means they want music too
     if m.top.mode = "hearth" and m.mix = "fire" and muPlayer().state = "playing"
-        m.mix = "both"
-        showNow()
+        setMix("both")
     end if
 end sub
 
@@ -330,6 +558,31 @@ sub mixMenu()
     m.top.getScene().dialog = d
 end sub
 
+' * in the Visualizer: the look picker first, then the usual music options
+sub vizMenu()
+    d = CreateObject("roSGNode", "StandardMessageDialog")
+    d.title = "Visualizer"
+    c = vizChoice()
+    if c = "shuffle" then now = "Shuffling your starred looks" else now = "Always " + vizLabel(c)
+    if c = "shuffle" and vizStars().Count() = 0 then now = "Shuffling all looks (star some to narrow it)"
+    d.message = [now]
+    d.buttons = ["Choose a look...", "Music options", "Close"]
+    d.observeField("buttonSelected", "onVizMenu")
+    d.observeField("wasClosed", "onMuClosed")
+    m.vizDialog = d
+    m.top.getScene().dialog = d
+end sub
+
+sub onVizMenu()
+    b = m.vizDialog.buttonSelected
+    m.vizDialog.close = true
+    if b = 0
+        openLooks()
+    else if b = 1
+        muOptions(false)
+    end if
+end sub
+
 sub onMix()
     b = m.mixDialog.buttonSelected
     m.mixDialog.close = true
@@ -346,16 +599,15 @@ end sub
 
 sub leave()
     m.lyrics.callFunc("lyricsStop", invalid)
+    stopViz()
+    fireMixStop()
     stopFire()
     if m.sound <> invalid
         m.sound.on = false
         m.sound.active = false
     end if
-    for each id in ["vSpin", "vTint", "vBreath"]
-        m.top.findNode(id).control = "stop"
-    end for
     p = muPlayer()
-    for each f in ["track", "queue", "state", "position", "message"]
+    for each f in ["track", "queue", "state", "position", "message", "mixState", "vizLook"]
         p.unobserveFieldScoped(f)
     end for
     m.top.request = { action: "back" }
@@ -363,6 +615,11 @@ end sub
 
 function hKeyInner(key as string, press as boolean) as boolean
     if not press then return false
+    ' the look picker takes every key while it is open
+    if m.picker.visible
+        m.picker.callFunc("handleKey", key)
+        return true
+    end if
     if key = "back"
         leave()
         return true
@@ -372,7 +629,13 @@ function hKeyInner(key as string, press as boolean) as boolean
         return true
     end if
     if key = "options"
-        if m.top.mode = "hearth" then mixMenu() else muOptions(false)
+        if m.top.mode = "hearth"
+            mixMenu()
+        else if m.top.mode = "milk"
+            vizMenu()
+        else
+            muOptions(false)
+        end if
         return true
     end if
     if key = "up" and m.top.mode <> "cover"
@@ -386,8 +649,7 @@ function hKeyInner(key as string, press as boolean) as boolean
         return true
     end if
     if m.top.mode = "milk" and (key = "left" or key = "right")
-        if key = "left" then m.preset = m.preset + 3 else m.preset = m.preset + 1
-        applyPreset()
+        if key = "left" then stepLook(-1) else stepLook(1)
         showStrip()
         return true
     end if

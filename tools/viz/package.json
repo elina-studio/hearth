@@ -1,0 +1,11 @@
+{
+  "name": "hearth-viz",
+  "private": true,
+  "description": "Hearth visualizer renderer for the NucBox",
+  "main": "viz.js",
+  "dependencies": {
+    "butterchurn": "2.6.7",
+    "butterchurn-presets": "2.4.7",
+    "playwright-core": "1.49.1"
+  }
+}

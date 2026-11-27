@@ -41,6 +41,12 @@
     <!-- Radio (radio.brs): false | true, and its seed name -->
     <field id="radioOn" type="boolean" value="false" />
     <field id="radioName" type="string" />
+    <!-- pictures + song as one stream for the Visualizer and Hearth views (mixplay.brs):
+         mixState off | starting | on | failed, mixKind live | loop | fire, mixNote = why it failed, vizLook = look number -->
+    <field id="mixState" type="string" value="off" alwaysNotify="true" />
+    <field id="mixKind" type="string" />
+    <field id="mixNote" type="string" />
+    <field id="vizLook" type="string" alwaysNotify="true" />
   </interface>
   <script type="text/brightscript" uri="pkg:/source/util.brs" />
   <script type="text/brightscript" uri="pkg:/components/music/plex.brs" />
@@ -50,5 +56,7 @@
   <script type="text/brightscript" uri="pkg:/components/music/lastfm.brs" />
   <script type="text/brightscript" uri="pkg:/components/music/radio.brs" />
   <script type="text/brightscript" uri="pkg:/components/music/queue.brs" />
+  <script type="text/brightscript" uri="pkg:/components/music/vizlooks.brs" />
+  <script type="text/brightscript" uri="pkg:/components/music/mixplay.brs" />
   <script type="text/brightscript" uri="pkg:/components/music/MusicPlayer.brs" />
 </component>
