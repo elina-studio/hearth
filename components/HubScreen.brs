@@ -3,7 +3,7 @@ sub init()
     m.pillsGroup = m.top.findNode("pills")
     ' x and width of each pre-rendered label PNG (2px side padding), from the whimsy spec
     m.tabX = [100, 240, 398, 570, 719, 931, 1152, 1324]
-    ' Search is a magnifying glass only (owner, Nov 27); its name shows under it while it has focus
+    ' Search is a magnifying glass only, no word under it (owner, Nov 27)
     m.tabW = [101, 120, 133, 110, 174, 182, 134, 60]
     for i = 0 to m.names.count() - 1
         p = m.pillsGroup.createChild("Poster")
@@ -168,7 +168,8 @@ sub layoutChip()
     if not m.npChip.visible then return
     right = m.clock.translation[0] - 14
     if right > 1684 then right = 1684
-    left = 1474
+    ' starts 40 px right of the Search glass (which ends at 1384), so long titles get more room (owner, Nov 27)
+    left = m.tabX[7] + m.tabW[7] + 40
     fixed = 60 + 10 + 18 + 18
     m.npTitle.width = 0
     m.npArtist.width = 0
@@ -376,16 +377,6 @@ sub paintPills()
         m.pillLine.color = "0xE0B34AFF"
     end if
     m.pillLine.visible = (m.zone = "pills")
-    if m.searchCap = invalid
-        m.searchCap = m.top.createChild("Label")
-        m.searchCap.font = hFont("bold", 22)
-        m.searchCap.color = "0xFFE7A0FF"
-        m.searchCap.text = "Search"
-        m.searchCap.width = 120
-        m.searchCap.horizAlign = "center"
-        m.searchCap.translation = [m.tabX[7] + 30 - 60, 98]
-    end if
-    m.searchCap.visible = (m.zone = "pills" and fi = 7)
     m.pillLine.translation = [m.tabX[fi] + 2, 92]
     m.pillLine.width = m.tabW[fi] - 4
     target = [m.tabX[fi] + Int(m.tabW[fi] / 2) - 32, 64]
