@@ -28,6 +28,9 @@ sub init()
     m.tagOut = m.top.findNode("tagOut")
     m.tagTimer = m.top.findNode("tagTimer")
     m.tagTimer.observeField("fire", "hideLookTag")
+    m.lookTimer = m.top.findNode("lookTimer")
+    m.lookTimer.observeField("fire", "applyLook")
+    m.lookWant = ""
     m.vizVideo = m.top.findNode("vizVideo")
     m.vizVideo.visible = false
     m.vizBack = m.top.findNode("vizBack")
@@ -412,6 +415,8 @@ sub stepLook(d as integer)
     pool = vizPool()
     cur = muPlayer().vizLook
     if m.vizLoop = true then cur = m.vizLoopLook
+    ' presses made while an earlier one is still waiting step on from that one
+    if m.lookWant <> "" then cur = m.lookWant
     at = -1
     for i = 0 to pool.Count() - 1
         if pool[i] = cur then at = i
@@ -420,7 +425,22 @@ sub stepLook(d as integer)
     useLook(pool[at])
 end sub
 
+' A fast run of Left/Right only changes the look once, 0.45 s after the last press: every change asks the
+' NAS and the NucBox for a new stream and swaps the TV's video over.
 sub useLook(look as string)
+    m.lookWant = look
+    showLookTag(look)
+    m.lookTimer.control = "stop"
+    m.lookTimer.control = "start"
+end sub
+
+sub applyLook()
+    look = m.lookWant
+    m.lookWant = ""
+    if look <> "" then useLookNow(look)
+end sub
+
+sub useLookNow(look as string)
     ' a fixed pick follows the change; shuffle keeps shuffling from the next song
     if vizChoice() <> "shuffle" then vizSetChoice(look)
     if m.vizLoop = true
@@ -784,6 +804,8 @@ sub muRestoreFocus()
 end sub
 
 sub leave()
+    m.lookTimer.control = "stop"
+    m.lookWant = ""
     m.lyrics.callFunc("lyricsStop", invalid)
     stopViz()
     fireMixStop()
@@ -801,6 +823,7 @@ end sub
 
 function hKeyInner(key as string, press as boolean) as boolean
     if not press then return false
+    if hKeyTooFast(120, key) then return true
     ' the look picker takes every key while it is open
     if m.picker.visible
         m.picker.callFunc("handleKey", key)

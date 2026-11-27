@@ -9,6 +9,7 @@
     <Timer id="castClock" duration="1" repeat="true" />
     <Timer id="castPoll" repeat="false" />
     <Timer id="castAlign" duration="0.35" repeat="false" />
+    <Timer id="skipTimer" duration="0.4" repeat="false" />
   </children>
   <interface>
     <field id="command" type="assocarray" alwaysNotify="true" onChange="onCommand" />

@@ -76,6 +76,7 @@ end sub
 
 function hKeyInner(key as string, press as boolean) as boolean
     if not press then return false
+    if hKeyTooFast(120, key) then return true
     if muMediaKey(key) then return true
     if key = "back"
         leaveWith({ action: "back" })

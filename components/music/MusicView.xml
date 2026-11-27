@@ -72,6 +72,7 @@
       <FloatFieldInterpolator key="[0.0, 1.0]" keyValue="[1.0, 0.0]" fieldToInterp="lookTag.opacity" />
     </Animation>
     <Timer id="tagTimer" duration="3" repeat="false" />
+    <Timer id="lookTimer" duration="0.45" repeat="false" />
     <!-- the look picker (* > Visualizer look), drawn over everything -->
     <VizLookPicker id="picker" visible="false" />
   </children>

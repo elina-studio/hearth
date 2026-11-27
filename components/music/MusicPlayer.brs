@@ -8,6 +8,12 @@ sub init()
     m.out = m.audio
     mixInit()
     m.report = m.top.findNode("report")
+    ' rapid Next/Previous presses are folded into one change of song (see skip)
+    m.skipTimer = m.top.findNode("skipTimer")
+    m.skipTimer.observeField("fire", "onSkipSettled")
+    m.skipDelta = 0
+    m.skipClock = CreateObject("roTimespan")
+    m.skipLast = -10000
     m.report.observeField("fire", "onReport")
     m.original = invalid
     m.errors = 0
@@ -103,7 +109,7 @@ sub onCommand()
         skip(1)
     else if cmd = "prev"
         ' like a CD player: back to the top first, then the song before
-        if m.top.position > 4 then restart() else skip(-1)
+        if m.top.position > 4 and m.skipDelta = 0 and m.skipClock.TotalMilliseconds() - m.skipLast > 700 then restart() else skip(-1)
     else if cmd = "restart"
         restart()
     else if cmd = "queueTracks"
@@ -531,7 +537,31 @@ sub resume()
     end if
 end sub
 
+' Next / Previous. The first press acts at once; presses that follow quickly are added up and acted on
+' once, 0.4 s after the last one. Starting a song means stopping and reloading the Audio node, a Plex
+' report, a Last.fm report, a helper request and several redraws, and doing that on every press of a
+' fast run froze the TV until the watchdog switched it off.
 sub skip(d as integer)
+    now = m.skipClock.TotalMilliseconds()
+    if m.skipDelta = 0 and now - m.skipLast > 700
+        m.skipLast = now
+        skipNow(d)
+        return
+    end if
+    m.skipDelta = m.skipDelta + d
+    m.skipLast = now
+    m.skipTimer.control = "stop"
+    m.skipTimer.control = "start"
+end sub
+
+sub onSkipSettled()
+    d = m.skipDelta
+    m.skipDelta = 0
+    m.skipLast = m.skipClock.TotalMilliseconds()
+    if d <> 0 then skipNow(d)
+end sub
+
+sub skipNow(d as integer)
     q = m.top.queue
     if q = invalid or q.count() = 0
         if d > 0 then shuffleAll()
@@ -540,7 +570,10 @@ sub skip(d as integer)
     i = m.top.index + d
     if i >= q.count()
         if m.top.repeat = "all"
-            i = 0
+            i = i mod q.count()
+        else if d > 1 and m.top.index + 1 < q.count()
+            ' a run of presses past the end: stop on the last song; the next press asks for more
+            i = q.count() - 1
         else
             ' Next on the last song: play the first of the "more like this" songs as soon as they arrive
             m.wantNext = true

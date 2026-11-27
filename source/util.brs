@@ -675,6 +675,17 @@ sub hSfx(name as string)
 end sub
 
 ' Called with the result of a screen's key handler: only a key the handler took makes a sound.
+' True when this key press came less than ms after the previous one on this screen (Back is never held up).
+' Keeps a run of very fast presses from queueing up more work than the TV can do.
+function hKeyTooFast(ms as integer, key as string) as boolean
+    if key = "back" then return false
+    if m.gateClock = invalid then m.gateClock = CreateObject("roTimespan")
+    if m.gateSeen = true and m.gateClock.TotalMilliseconds() < ms then return true
+    m.gateSeen = true
+    m.gateClock.Mark()
+    return false
+end function
+
 function hKeySfx(key as string, down as boolean, handled as boolean) as boolean
     if down then hWalkKey(key, handled)
     if down and handled
