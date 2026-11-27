@@ -1,5 +1,7 @@
 sub init()
     m.bg = m.top.findNode("bg")
+    m.edge = m.top.findNode("edge")
+    m.player = m.top.findNode("player")
     m.rule = m.top.findNode("rule")
     m.artBg = m.top.findNode("artBg")
     m.art = m.top.findNode("art")
@@ -48,6 +50,7 @@ sub build()
     m.track.height = 8
     m.fill.height = 8
     m.castList.visible = false
+    m.edge.visible = false
     if m.top.layout = "bar"
         ' 1920 x 130 along the bottom of a screen
         m.bg.visible = true
@@ -100,6 +103,8 @@ sub build()
     else if m.top.castOpen
         ' the column with the room list: small art and titles side by side, then the rooms
         m.bg.visible = true
+        m.bg.width = 604
+        m.edge.visible = true
         m.artSize = 170
         place(m.artBg, [96, 36], 170, 170)
         place(m.art, [96, 36], 170, 170)
@@ -121,6 +126,8 @@ sub build()
         m.castList.visible = true
     else
         m.bg.visible = true
+        m.bg.width = 604
+        m.edge.visible = true
         m.artSize = 440
         place(m.artBg, [96, 40], 440, 440)
         place(m.art, [96, 40], 440, 440)
@@ -160,8 +167,8 @@ sub build()
     m.scrobText.width = 220
     m.track.visible = false
     m.fill.visible = false
-    if m.braid <> invalid then m.top.removeChild(m.braid)
-    m.braid = hBraid(m.top, m.barW, 0)
+    if m.braid <> invalid then m.player.removeChild(m.braid)
+    m.braid = hBraid(m.player, m.barW, 0)
     m.braid.translation = [m.track.translation[0], m.track.translation[1] + m.track.height / 2 - 6]
     if m.top.castOpen and m.top.layout = "column"
         drawCast()
@@ -291,14 +298,11 @@ end sub
 
 sub drawIdle()
     m.idle.visible = m.idleOn
+    ' nothing queued takes the player's place: the player is hidden, not painted over
+    m.player.visible = not m.idleOn
     m.idle.removeChildrenIndex(m.idle.getChildCount(), 0)
     m.idleItems = []
     if not m.idleOn then return
-    ' covers the empty player underneath; the same tone as the panel
-    cover = m.idle.createChild("Rectangle")
-    cover.width = 620
-    cover.height = 930
-    cover.color = "0x131611FF"
     k = m.idle.createChild("Label")
     k.font = hFont("caps", 24)
     k.color = "0xE0B34AFF"
