@@ -48,8 +48,17 @@ end function
 
 ' Merge Plex clips (PlexTask "clips") into the built-in moods. A clip that matches a mood replaces its
 ' picture and footage; the rest become new moods, placed before The Window. The first match wins.
-function ambMerge(clips as object) as object
+function ambMerge(clips as object, preparing = invalid as object) as object
     items = ambMoods()
+    ' clips the NAS is still getting ready for the TV: their mood waits for them instead of borrowing another's
+    if preparing <> invalid
+        for each fname in preparing
+            pm = ambClipMood(fname)
+            for each it in items
+                if it.mood = pm then it.preparing = true
+            end for
+        end for
+    end if
     extra = []
     print "[ambiance] merge input: "; clips.count(); " clips"
     for each c in clips
@@ -101,7 +110,7 @@ function ambMerge(clips as object) as object
     end for
     for each c in clips
         md = c._md
-        if md <> "" and best[md] <> invalid and best[md].Id = c.Id
+        if md <> "" and best[md] <> invalid and toStr0(best[md].Id) = toStr0(c.Id)
             for each it in items
                 if it.mood = md
                     it.clip = c
@@ -109,7 +118,7 @@ function ambMerge(clips as object) as object
                     nice = ambNice(c)
                     ' "fireflies.mp4" on Fireflies says nothing new: keep the mood's own line then
                     if nice <> "" and not ambSameWord(nice, it) then it.sub = nice
-                    if c.thumb <> invalid then it.plexStill = c.thumb
+                    if c.thumb <> invalid and c.thumb <> "" then it.plexStill = c.thumb
                 end if
             end for
         else
@@ -123,7 +132,7 @@ function ambMerge(clips as object) as object
     end for
     if fireClip <> invalid
         for each it in items
-            if it.mood = "lightsout" and it.clip = invalid
+            if it.mood = "lightsout" and it.clip = invalid and it.preparing <> true
                 it.clip = fireClip.clip
                 if fireClip.plexStill <> invalid then it.plexStill = fireClip.plexStill
             end if
@@ -273,6 +282,12 @@ function clipContent(clip as object, transcode as boolean) as object
     server = m.global.plexServer
     token = m.global.plexServerToken
     c = CreateObject("roSGNode", "ContentNode")
+    ' a clip the NAS helper serves from the hearth folder: already H.264 the TV plays, nothing to convert
+    if clip.url <> invalid and clip.url <> ""
+        c.url = clip.url
+        c.streamFormat = "mp4"
+        return c
+    end if
     if not transcode
         c.url = server + clip.key + "?X-Plex-Token=" + token
         if LCase(clip.container) = "mkv" then c.streamFormat = "mkv" else c.streamFormat = "mp4"
@@ -289,6 +304,7 @@ function clipContent(clip as object, transcode as boolean) as object
 end function
 
 function fullStill(path as string) as string
+    if Left(path, 4) = "http" then return path
     return m.global.plexServer + "/photo/:/transcode?width=1280&height=720&minSize=1&upscale=1&url=" + hEscape(path) + "&X-Plex-Token=" + m.global.plexServerToken
 end function
 

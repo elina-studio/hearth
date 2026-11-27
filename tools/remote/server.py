@@ -36,6 +36,7 @@ import shelf
 import lyrics
 import web
 import mix
+import clips
 
 TV_IP = os.environ.get("TV_IP", "192.168.254.9")
 HTTP_PORT = int(os.environ.get("HTTP_PORT", "8765"))
@@ -236,6 +237,8 @@ class Handler(BaseHTTPRequestHandler):
             return web.proxy(self, "HEAD", path)
         if path.startswith("/api/mix/s/"):
             return mix.serve_segment(self, path)
+        if path == "/api/clips" or path.startswith("/api/clips/"):
+            return clips.serve(self, path, urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query))
         if path == "/api/viz/loopfile":
             return mix.loop_play(self, urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query))
         self.send_json({"error": "not found"}, 404)
@@ -274,6 +277,8 @@ class Handler(BaseHTTPRequestHandler):
             self.status()
         elif path.startswith("/api/mix/s/"):
             mix.serve_segment(self, path)
+        elif path == "/api/clips" or path.startswith("/api/clips/"):
+            clips.serve(self, path, urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query))
         elif path == "/api/mix/start":
             mix.start(self, urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query))
         elif path == "/api/viz/audio":
@@ -529,6 +534,7 @@ def main():
         HTTP_PORT, (", https :%d" % HTTPS_PORT) if len(servers) > 1 else "", TV_IP, WHISPER_HOST, WHISPER_PORT), flush=True)
     print("House key in %s (the TV %s is let in without it; phones open /?t=<key> once)" % (os.path.join(DATA_DIR, "helper-token"), TV_IP), flush=True)
     mix.set_token(guard.TOKEN)
+    clips.start()
     threading.Thread(target=lastfm.worker, daemon=True).start()
     threading.Thread(target=discover.worker, daemon=True).start()
     servers[0].serve_forever()

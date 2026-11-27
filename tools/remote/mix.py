@@ -299,6 +299,11 @@ def _fetch_fire(part_key, dest):
 
 def fire_clip(part_key):
     """(path, None) when the clip is on the NAS; (None, 'preparing') while it is being fetched; (None, why) on failure."""
+    if part_key and part_key.startswith("nas:"):
+        # a clip the helper reads from the hearth folder itself (clips.py), already in a form the TV plays
+        import clips
+        p = clips.play_path(part_key[4:])
+        return (p, None) if p else (None, "preparing")
     if not part_key or not part_key.startswith("/library/parts/"):
         return None, "no fire clip given"
     os.makedirs(FIRES, exist_ok=True)

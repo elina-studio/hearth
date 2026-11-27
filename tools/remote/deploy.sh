@@ -4,6 +4,9 @@
 # It asks for the NAS ssh password and the sudo password once. The house key is shown only in this Terminal window.
 NAS="Elina@192.168.254.41"
 BRANCH=${HEARTH_BRANCH:-claude/project-thread-y2pdyc}
+# HEARTH_REF (a commit) installs exactly that commit's helper; without it, the newest of the branch
+REF=refs/heads/$BRANCH
+[ -n "$HEARTH_REF" ] && REF=$HEARTH_REF
 CTL="-o ControlMaster=auto -o ControlPath=/tmp/hearth-ssh-%r-%h -o ControlPersist=300"
 R() { ssh -t $CTL "$NAS" "$@"; }
 
@@ -11,7 +14,7 @@ echo "1/4 Signing in to the NAS (ssh password, then the sudo password)..."
 R "sudo -v" || exit 1
 
 echo "2/4 Updating the helper (about a minute)..."
-R "mkdir -p /volume1/docker/hearth-remote && rm -rf /tmp/hearth-dl && mkdir /tmp/hearth-dl && cd /tmp/hearth-dl && curl -sL https://github.com/elina-studio/hearth/archive/refs/heads/$BRANCH.tar.gz | tar xz && cp -r hearth-*/tools/remote/. /volume1/docker/hearth-remote/ && rm -rf /volume1/docker/hearth-remote/viz && mkdir -p /volume1/docker/hearth-remote/viz && cp hearth-*/tools/viz/viz.js hearth-*/tools/viz/page.html hearth-*/tools/viz/looks.json hearth-*/tools/viz/package.json hearth-*/tools/viz/package-lock.json /volume1/docker/hearth-remote/viz/ && cd /volume1/docker/hearth-remote && sudo /usr/local/bin/docker compose up -d --build >/tmp/hearth-build.log 2>&1; echo build exit code \$?; tail -3 /tmp/hearth-build.log" | tee /tmp/hearth-deploy.out
+R "mkdir -p /volume1/docker/hearth-remote && rm -rf /tmp/hearth-dl && mkdir /tmp/hearth-dl && cd /tmp/hearth-dl && curl -sL https://github.com/elina-studio/hearth/archive/$REF.tar.gz | tar xz && cp -r hearth-*/tools/remote/. /volume1/docker/hearth-remote/ && rm -rf /volume1/docker/hearth-remote/viz && mkdir -p /volume1/docker/hearth-remote/viz && cp hearth-*/tools/viz/viz.js hearth-*/tools/viz/page.html hearth-*/tools/viz/looks.json hearth-*/tools/viz/package.json hearth-*/tools/viz/package-lock.json /volume1/docker/hearth-remote/viz/ && cd /volume1/docker/hearth-remote && sudo /usr/local/bin/docker compose up -d --build >/tmp/hearth-build.log 2>&1; echo build exit code \$?; tail -3 /tmp/hearth-build.log" | tee /tmp/hearth-deploy.out
 # the old helper keeps answering when a rebuild fails, so check the rebuild itself, not only that something answers
 grep -q "build exit code 0" /tmp/hearth-deploy.out || { echo "The helper did NOT update (the rebuild failed, the lines above say why). The old helper is still running."; exit 3; }
 

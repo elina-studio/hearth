@@ -663,7 +663,7 @@ sub onMoodClips(event as object)
     t = hTaskFrom(event)
     if t.ok and t.response.Clips <> invalid and t.response.Clips.count() > 0
         if not m.global.hasField("ambItems") then m.global.addFields({ ambItems: [] })
-        m.global.ambItems = ambMerge(t.response.Clips)
+        m.global.ambItems = ambMerge(t.response.Clips, t.response.Preparing)
     end if
     onMood()
 end sub

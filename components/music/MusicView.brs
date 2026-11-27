@@ -498,7 +498,7 @@ sub onFireClips(event as object)
     if m.top.mode <> "hearth" then return
     if t.ok and t.response.Clips <> invalid and t.response.Clips.count() > 0
         if not m.global.hasField("ambItems") then m.global.addFields({ ambItems: [] })
-        m.global.ambItems = ambMerge(t.response.Clips)
+        m.global.ambItems = ambMerge(t.response.Clips, t.response.Preparing)
     end if
     clip = hearthClip()
     if clip <> invalid then showFire(clip) else noFireClip()

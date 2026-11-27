@@ -805,6 +805,7 @@ sub paintMoods()
                 uri = "pkg:/images/amb/tile-" + it.mood + ".jpg"
                 if it.plexStill <> invalid and it.plexStill <> "" and m.global.plexServer <> invalid and m.global.plexServer <> ""
                     uri = m.global.plexServer + "/photo/:/transcode?width=460&height=124&minSize=1&upscale=1&url=" + hEscape(it.plexStill) + "&X-Plex-Token=" + m.global.plexServerToken
+                    if Left(it.plexStill, 4) = "http" then uri = it.plexStill
                 end if
                 if t.pic.uri <> uri then t.pic.uri = uri
             end if
@@ -831,7 +832,7 @@ sub onMoodClips(event as object)
     end if
     if t.response.Clips.count() > 0 and not m.global.hasField("ambItems")
         m.global.addFields({ ambItems: [] })
-        m.global.ambItems = ambMerge(t.response.Clips)
+        m.global.ambItems = ambMerge(t.response.Clips, t.response.Preparing)
     end if
     paintMoods()
 end sub

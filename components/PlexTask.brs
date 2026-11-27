@@ -154,7 +154,37 @@ sub runTask()
                 clips.push({ Id: md.ratingKey, Name: toS(md.title, f), file: f, key: part.key, container: toS(med.container, ""), videoCodec: toS(med.videoCodec, ""), thumb: md.thumb, art: md.art, duration: md.duration, width: med.width, height: med.height, aspect: med.aspectRatio })
             end if
         end for
-        out = { Clips: clips }
+        ' Plex adds new files to its library when it pleases (fireflies.mp4 and embers.mp4 never arrived), so the
+        ' NAS helper also reads the hearth folder itself (tools/remote/clips.py). Whatever Plex doesn't have comes
+        ' from there: a copy the TV plays as it is, and a picture taken from the clip. Preparing = still being made.
+        preparing = []
+        nas = CreateObject("roRegistrySection", "hearth").Read("nasUrl")
+        if nas = "" then nas = "http://192.168.254.41:8765"
+        r3 = req("GET", nas + "/api/clips", {}, "", 6000)
+        folder = []
+        if r3.body <> invalid and type(r3.body) = "roAssociativeArray" and r3.body.clips <> invalid then folder = r3.body.clips
+        print "[ambiance] helper folder: status "; r3.status; " clips "; folder.count()
+        have = {}
+        for each c in clips
+            have[LCase(toS(c.file, ""))] = true
+        end for
+        for each fc in folder
+            fname = toS(fc.file, "")
+            if fname <> "" and have[LCase(fname)] = invalid
+                if fc.ready = true
+                    print "[ambiance] from the folder (not in Plex): "; fname
+                    nc = { Id: "nas" + toS(fc.id, ""), Name: toS(fc.name, fname), file: fname, key: "nas:" + toS(fc.id, ""), url: toS(fc.url, ""), container: "mp4", videoCodec: "h264", width: fc.width, height: fc.height }
+                    if toS(fc.thumb, "") <> "" then nc.thumb = fc.thumb
+                    clips.push(nc)
+                else if toS(fc.state, "") <> "failed"
+                    print "[ambiance] folder clip still being prepared: "; fname
+                    preparing.push(fname)
+                else
+                    print "[ambiance] folder clip FAILED on the helper: "; fname; " "; toS(fc.why, "")
+                end if
+            end if
+        end for
+        out = { Clips: clips, Preparing: preparing }
     else if op = "titles"
         ' just the names in a library, for the search keyboard's predictions
         res = req("GET", m.server + "/library/sections/" + a.section + "/all", { "X-Plex-Container-Start": "0", "X-Plex-Container-Size": toS(a.limit, "5000") }, m.token)

@@ -1,11 +1,14 @@
-' Geometry (1920 x 930 under the pills): PEEK px of the neighbours show at each edge, three panels of
+' Geometry (1920 x 930 under the pills): PEEK px of the neighbours show at each edge, VIS panels of
 ' W px fill the middle, RULE px dividers sit between. The focused panel is kept in the middle slot
-' (or the first/last slot at the ends) by sliding the whole strip.
+' (or nearer the first/last slot at the ends) by sliding the whole strip. With VIS or fewer moods the
+' strip sits centred and nothing slides.
 sub init()
     m.H = 930
     m.RULE = 24
-    m.PEEK = 120
-    m.W = Int((1920 - 2 * m.RULE - 2 * m.PEEK) / 3)
+    m.PEEK = 80
+    m.VIS = 5
+    m.PAD = 28
+    m.W = Int((1920 - (m.VIS + 1) * m.RULE - 2 * m.PEEK) / m.VIS)
     m.active = false
     m.strip = m.top.findNode("strip")
     m.dotsGroup = m.top.findNode("dots")
@@ -54,6 +57,8 @@ end sub
 
 ' A Plex picture cropped to the panel's shape (Plex scales it to cover, the Poster trims the rest).
 function plexStill(path as string) as string
+    ' a picture the NAS helper took from the clip itself
+    if Left(path, 4) = "http" then return path
     w = 760
     h = 930
     if CreateObject("roDeviceInfo").GetUIResolution().name = "HD"
@@ -89,12 +94,15 @@ sub onClips(event as object)
     end if
     print "[ambiance] plex clips: "; t.response.Clips.count()
     m.clipsKnown = true
-    if t.response.Clips.count() = 0
+    ' a clip the NAS is still getting ready: ask again the next time the room is looked at
+    prep = t.response.Preparing
+    if prep <> invalid and prep.count() > 0 then m.clipsAsked = false
+    if t.response.Clips.count() = 0 and (prep = invalid or prep.count() = 0)
         build(ambMoods(), m.items[m.index].mood)
         paint()
         return
     end if
-    items = ambMerge(t.response.Clips)
+    items = ambMerge(t.response.Clips, prep)
     if not m.global.hasField("ambItems") then m.global.addFields({ ambItems: [] })
     m.global.ambItems = items
     keep = m.items[m.index].mood
@@ -106,12 +114,13 @@ function panelX(i as integer) as integer
     return i * (m.W + m.RULE)
 end function
 
-' strip offset that puts the focused panel in its slot (slot 1 of 0..2 when possible)
+' strip offset that keeps the focused panel in the middle slot when it can be
 function stripX() as integer
-    slot = 1
-    if m.index = 0 then slot = 0
-    if m.index = m.n - 1 then slot = 2
-    return m.PEEK + slot * (m.W + m.RULE) - panelX(m.index)
+    if m.n <= m.VIS then return Int((1920 - (m.n * m.W + (m.n - 1) * m.RULE)) / 2)
+    first = m.index - Int(m.VIS / 2)
+    if first < 0 then first = 0
+    if first > m.n - m.VIS then first = m.n - m.VIS
+    return m.PEEK + m.RULE - panelX(first)
 end function
 
 function makePanel(i as integer) as object
@@ -131,7 +140,11 @@ function makePanel(i as integer) as object
     if it.plexStill <> invalid and it.plexStill <> "" then pic.uri = plexStill(it.plexStill)
     ' a built-in mood with no clip of the person's own: a dashed panel with the file name to add
     hint = clipHint(it.mood)
-    if m.clipsKnown and it.clip = invalid and hint <> "" then missingPanel(g, pic, hint)
+    if m.clipsKnown and it.clip = invalid and it.preparing = true
+        missingPanel(g, "Your clip is being made ready for the TV")
+    else if m.clipsKnown and it.clip = invalid and hint <> ""
+        missingPanel(g, "Drawn scene · your own clip replaces it")
+    end if
     top = g.createChild("Poster")
     top.uri = "pkg:/images/amb/shade-top.png"
     top.width = m.W
@@ -144,7 +157,7 @@ function makePanel(i as integer) as object
     p.bottomShade = bot
     num = g.createChild("Label")
     num.font = hFont("caps", 34)
-    num.translation = [40, 40]
+    num.translation = [m.PAD, 40]
     nn = (i + 1).toStr()
     if i + 1 < 10 then nn = "0" + nn
     num.text = nn
@@ -152,18 +165,22 @@ function makePanel(i as integer) as object
     t = g.createChild("Label")
     ' your own clips can have long names: step the size down so they stay on one line
     ' step the size down until the whole name fits (UX review item 5: "LIGHTS O..." was cut off)
-    t.translation = [40, 76]
-    hFitTitle(t, UCase(it.title), "caps", [92, 80, 70, 60, 52, 46], m.W - 70)
+    ' narrow panels: one line when it fits, two lines at the smallest size when it doesn't
+    t.translation = [m.PAD, 84]
+    fit = hFitTitle2(t, UCase(it.title), "caps", [60, 52, 46, 40], m.W - 2 * m.PAD)
     p.title = t
     s = g.createChild("Label")
-    s.font = hFont("fell", 34)
+    s.font = hFont("fell", 30)
     s.color = "0xB5AF8CFF"
-    s.translation = [44, 190]
-    s.width = m.W - 70
+    ' the line sits a fixed 10 px under the title, however tall the title came out
+    s.translation = [m.PAD, 84 + fit.height + 10]
+    s.width = m.W - 2 * m.PAD
+    s.wrap = true
+    s.maxLines = 2
     s.text = it.sub
     ' controls on the focused panel: OK Play, and the sound state
     c = g.createChild("Group")
-    c.translation = [40, m.H - 82]
+    c.translation = [m.PAD, m.H - 136]
     ok = c.createChild("Poster")
     ok.uri = "pkg:/images/amb/icon-ok.png"
     ok.width = 62
@@ -176,11 +193,11 @@ function makePanel(i as integer) as object
     snd = c.createChild("Poster")
     snd.width = 46
     snd.height = 34
-    snd.translation = [170, 5]
+    snd.translation = [8, 61]
     sl = c.createChild("Label")
     sl.font = hFont("regular", 26)
     sl.color = "0xB5AF8CFF"
-    sl.translation = [228, 6]
+    sl.translation = [76, 62]
     p.soundIcon = snd
     p.soundLabel = sl
     p.controls = c
@@ -203,13 +220,15 @@ end function
 
 ' A built-in mood with no clip of the person's own keeps its drawn scene (UX review item 5): no dashed setup box.
 ' One quiet line says the drawn scene is standing in; the file name to add lives in the mood's * options.
-sub missingPanel(g as object, pic as object, file as string)
+sub missingPanel(g as object, words as string)
     a = g.createChild("Label")
     a.font = hFont("regular", 24)
     a.color = "0xB5AF8CCC"
-    a.width = m.W - 80
-    a.translation = [40, m.H - 140]
-    a.text = "Drawn scene · your own clip replaces it"
+    a.width = m.W - 2 * m.PAD
+    a.wrap = true
+    a.maxLines = 2
+    a.translation = [m.PAD, m.H - 230]
+    a.text = words
 end sub
 
 sub paint()
@@ -301,7 +320,10 @@ sub clipInfo(it as object)
     d.title = it.title
     hint = clipHint(it.mood)
     if it.clip <> invalid
-        d.message = ["Playing your own clip from Plex: " + it.clip.Name]
+        d.message = ["Playing your own clip: " + it.clip.Name]
+        if it.mood = "lightsout" and ambClipMood(it.clip.file) <> "lightsout" then d.message = ["No embers clip found, so this plays your fire clip: " + it.clip.Name]
+    else if it.preparing = true
+        d.message = ["Your clip is in the hearth folder and the NAS is making a copy this TV can play. It shows here when it is ready."]
     else if hint <> ""
         d.message = ["This mood shows a drawn scene.", "To use your own clip, add a video to the Plex Ambiance library named " + hint]
     else

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Ambiance room (layout C): three tall panels at a time with a peek at each side, gold dividers between,
+<!-- Ambiance room (layout C): five tall panels at a time with a peek at each side, gold dividers between,
      number, title and line of text over the top of each picture. Left/Right slides; OK opens the mood
      full screen; Up or Back returns to the pills. -->
 <component name="AmbianceRoom" extends="Group">
