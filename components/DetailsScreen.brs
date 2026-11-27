@@ -455,7 +455,7 @@ sub drawTabs()
         prog = seasonProgress(s)
         if prog <> ""
             sub1 = g.createChild("Label")
-            sub1.font = hFont("regular", 20)
+            sub1.font = hFont("regular", 22)
             sub1.text = prog
             sub1.translation = [0, 40]
             if foc

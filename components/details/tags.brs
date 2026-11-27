@@ -33,10 +33,10 @@ function hTag(parent as object, text as string, icon as string, kind as string) 
     end if
     lab = g.createChild("Label")
     if kind = "green"
-        lab.font = hFont("regular", 21)
+        lab.font = hFont("regular", 22)
         lab.text = text
     else
-        lab.font = hFont("caps", 17)
+        lab.font = hFont("caps", 22)
         lab.text = UCase(text)
     end if
     lab.color = ink
@@ -55,7 +55,7 @@ end function
 function hRating(parent as object, label as string, value as string) as object
     g = parent.createChild("Group")
     a = g.createChild("Label")
-    a.font = hFont("caps", 17)
+    a.font = hFont("caps", 22)
     a.color = "0xB5AF8CFF"
     a.text = UCase(label)
     a.height = 32

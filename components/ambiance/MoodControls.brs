@@ -132,7 +132,7 @@ sub paint()
     for each b in [["sun", 1532, m.top.dimText], ["timer", 1618, m.top.timerText]]
         bx(b[1], 22, 68, 60, "pkg:/images/amb/mix-fill.9.png", "0xEDE6CAFF", 0.09)
         icon(b[0], b[1] + 18, 36, 32, m.CREAM)
-        l = text(b[2], b[1] - 10, 86, 88, hFont("regular", 18), m.MUTED)
+        l = text(b[2], b[1] - 10, 86, 88, hFont("regular", 22), m.MUTED)
         l.horizAlign = "center"
     end for
     ' focus ring

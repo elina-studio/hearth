@@ -5,11 +5,11 @@ sub init()
     m.heading.font = hFont("fell", 40)
     m.hIcon = m.top.findNode("hIcon")
     m.note = m.top.findNode("note")
-    m.note.font = hFont("regular", 19)
+    m.note.font = hFont("regular", 22)
     m.more = m.top.findNode("more")
-    m.more.font = hFont("regular", 19)
+    m.more.font = hFont("regular", 22)
     m.hint = m.top.findNode("hint")
-    m.hint.font = hFont("regular", 19)
+    m.hint.font = hFont("regular", 22)
     m.rowH = 56
     m.headH = 46
     m.viewH = 780
@@ -77,7 +77,7 @@ sub draw()
             g.translation = [0, y]
             if r.header <> invalid
                 l = g.createChild("Label")
-                l.font = hFont("caps", 19)
+                l.font = hFont("caps", 22)
                 l.color = "0xB5AF8CFF"
                 l.text = UCase(r.header)
                 l.translation = [14, 12]
@@ -145,7 +145,7 @@ sub drawRow(g as object, r as object, focused as boolean)
         lab.width = 520 - x
     else if r.sub <> invalid and r.sub <> ""
         sl = g.createChild("Label")
-        sl.font = hFont("regular", 19)
+        sl.font = hFont("regular", 22)
         sl.color = "0xB5AF8CFF"
         sl.text = r.sub
         sl.horizAlign = "right"

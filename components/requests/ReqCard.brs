@@ -1,16 +1,16 @@
 sub init()
     m.top.findNode("fallback").font = hFontCached("caps", 30)
     m.top.findNode("tileTitle").font = hFontCached("caps", 36)
-    m.top.findNode("tileSub").font = hFontCached("regular", 20)
+    m.top.findNode("tileSub").font = hFontCached("regular", 22)
     m.chipText = m.top.findNode("chipText")
-    m.chipText.font = hFontCached("caps", 21)
-    m.top.findNode("scoreText").font = hFontCached("bold", 20)
+    m.chipText.font = hFontCached("caps", 22)
+    m.top.findNode("scoreText").font = hFontCached("bold", 22)
     m.poster = m.top.findNode("poster")
     m.cap = m.top.findNode("cap")
-    m.cap.font = hFontCached("bold", 21)
+    m.cap.font = hFontCached("bold", 22)
     m.cap.color = "0xEDE6CAFF"
     m.capSub = m.top.findNode("capSub")
-    m.capSub.font = hFontCached("regular", 19)
+    m.capSub.font = hFontCached("regular", 22)
     m.capSub.color = "0xB5AF8CFF"
 end sub
 
@@ -45,7 +45,7 @@ sub draw()
         m.poster.translation = [0, 30]
         fb.translation = [12, 214]
         fb.height = 50
-        fb.font = hFontCached("regular", 20)
+        fb.font = hFontCached("regular", 22)
         fb.text = t
     else
         m.poster.height = 270

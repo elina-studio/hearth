@@ -314,10 +314,11 @@ sub fullReady(it as object, purpose as string)
             st = hPlayStreams(part)
             for each s in part.Stream
                 if s.streamType = 2
-                    lab = s.displayTitle
-                    if lab = invalid then lab = rawStr(s.language) + " " + channelsText(s.channels)
-                    sub2 = ""
-                    if s.title <> invalid and s.title <> lab then sub2 = s.title
+                    ' plain words (walk 2, item 27): the language, then the speakers; the codec is on File info
+                    lab = rawStr(s.language)
+                    if lab = "" then lab = "Language not set"
+                    sub2 = channelsText(s.channels)
+                    if s.title <> invalid and s.title <> "" and Instr(1, LCase(s.title), "comment") > 0 then sub2 = "Commentary · " + sub2
                     sel = (st.audio <> invalid and st.audio.id = s.id)
                     c = LCase(pStr(s.codec))
                     if c = "truehd" or c = "dca" or Left(c, 3) = "dts" or c = "flac"

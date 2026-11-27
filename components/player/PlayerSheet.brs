@@ -97,7 +97,7 @@ function drawItem(g as object, it as object) as integer
         pic(g, "pkg:/images/w/twig-1290-s5.png", 20, 0, 680, 61)
         return 50
     else if k = "note"
-        l = lbl(g, sval(it.text), hFont("regular", 20), "0xC9C3A2FF", 30, 4)
+        l = lbl(g, sval(it.text), hFont("regular", 22), "0xC9C3A2FF", 30, 4)
         l.width = 680
         l.wrap = true
         l.lineSpacing = 2
@@ -140,14 +140,14 @@ function drawItem(g as object, it as object) as integer
         ty = Int(h / 2) - 16
         if hasSub then ty = Int(h / 2) - 30
         t = lbl(g, sval(it.title), hFont("bold", 24), m.c.ink, tx, ty, tw)
-        if hasSub then lbl(g, sval(it.desc), hFont("regular", 19), m.c.muted, tx, ty + 32, tw)
+        if hasSub then lbl(g, sval(it.desc), hFont("regular", 22), m.c.muted, tx, ty + 32, tw)
         if it.progress <> invalid and it.progress > 0
             bar = hBraid(g, 300, h - 16)
             bar.translation = [tx, h - 16]
             hBraidSet(bar, it.progress * 100)
         end if
         if it.tag <> invalid
-            tl = lbl(g, UCase(sval(it.tag)), hFont("caps", 16), m.c.muted, 0, 0)
+            tl = lbl(g, UCase(sval(it.tag)), hFont("caps", 22), m.c.muted, 0, 0)
             tagW = Int(tl.boundingRect().width) + 20
             bx = g.createChild("Poster")
             bx.uri = "pkg:/images/w/button-outline.9.png"
@@ -192,7 +192,7 @@ function drawItem(g as object, it as object) as integer
             r.height = 70
             r.color = "0x23303AFF"
             sample = sampleLabel(tg, o)
-            n = lbl(tg, sval(o.name), hFont("bold", 18), m.c.muted, -10, 80)
+            n = lbl(tg, sval(o.name), hFont("bold", 22), m.c.muted, -10, 80)
             n.width = 144
             n.horizAlign = "center"
             if i = sel then n.color = "0xFFE7A0FF"
@@ -218,7 +218,7 @@ function drawItem(g as object, it as object) as integer
         sideTxt = "IN SYNC"
         if v < 0 then sideTxt = "EARLIER"
         if v > 0 then sideTxt = "LATER"
-        lbl(g, sideTxt, hFont("caps", 20), m.c.muted, 560, 32)
+        lbl(g, sideTxt, hFont("caps", 22), m.c.muted, 560, 32)
         for t = -20 to 20
             tk = g.createChild("Rectangle")
             th = 11
@@ -239,18 +239,18 @@ function drawItem(g as object, it as object) as integer
         mk.height = 30
         mk.color = m.c.gold
         mk.translation = [370 + Int(cv * 150) - 3, 89]
-        lbl(g, "−2 s", hFont("regular", 18), m.c.muted, 34, 92)
-        lbl(g, "+2 s", hFont("regular", 18), m.c.muted, 668, 92)
+        lbl(g, "−2 s", hFont("regular", 22), m.c.muted, 34, 92)
+        lbl(g, "+2 s", hFont("regular", 22), m.c.muted, 668, 92)
         g.addFields({ hi: hi, ringH: 150 })
         return 164
     else if k = "stats"
         pic(g, "pkg:/images/player/check.png", 30, 6, 24, 24, m.c.gold)
         kk = lbl(g, UCase(sval(it.kicker)), hFont("caps", 24), m.c.gold, 64, 2)
-        nt = lbl(g, sval(it.note), hFont("regular", 20), m.c.muted, 74 + Int(kk.boundingRect().width), 4)
+        nt = lbl(g, sval(it.note), hFont("regular", 22), m.c.muted, 74 + Int(kk.boundingRect().width), 4)
         x = 30
         for each nv in it.nums
             a = lbl(g, sval(nv[0]), hFont("bold", 56), m.c.ink, x, 44)
-            b = lbl(g, UCase(sval(nv[1])), hFont("regular", 16), m.c.muted, x, 112)
+            b = lbl(g, UCase(sval(nv[1])), hFont("regular", 22), m.c.muted, x, 112)
             w = a.boundingRect().width
             if b.boundingRect().width > w then w = b.boundingRect().width
             x = x + Int(w) + 42
@@ -275,12 +275,12 @@ function drawItem(g as object, it as object) as integer
             fill.translation = [25, y + 5]
             pic(g, "pkg:/images/player/" + sval(s.icon) + ".png", 40, y + 21, 30, 30, stepTint)
             lbl(g, sval(s.title), hFont("bold", 22), m.c.ink, 84, y + 8, 610)
-            lbl(g, sval(s.desc), hFont("regular", 18), m.c.muted, 84, y + 38, 610)
+            lbl(g, sval(s.desc), hFont("regular", 22), m.c.muted, 84, y + 38, 610)
             if i < it.steps.count() - 1 then pic(g, "pkg:/images/icons/home-down.png", 358, y + 74, 22, 22, "0x6E4526FF")
             y = y + 98
         end for
         if it.note <> invalid and it.note <> ""
-            l = lbl(g, sval(it.note), hFont("regular", 19), "0xC9C3A2FF", 30, y - 4)
+            l = lbl(g, sval(it.note), hFont("regular", 22), "0xC9C3A2FF", 30, y - 4)
             l.width = 680
             l.wrap = true
             l.lineSpacing = 2

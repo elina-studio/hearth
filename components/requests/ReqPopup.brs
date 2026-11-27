@@ -7,7 +7,7 @@ sub init()
     m.items = m.top.findNode("items")
     m.btnFont = hFont("bold", 28)
     m.subFont = hFont("regular", 22)
-    m.tagFont = hFont("caps", 21)
+    m.tagFont = hFont("caps", 22)
     m.sel = 0
     m.list = []
 end sub

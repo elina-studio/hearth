@@ -36,6 +36,11 @@
 
     <Group id="hearth" visible="false">
       <Group id="moodHolder" />
+      <!-- why the fire is not moving, when the joined stream fails (walk 2, item 28) -->
+      <Group id="fireNote" visible="false">
+        <Rectangle id="fireNoteBg" translation="[80, 50]" width="900" height="64" color="0x0B0E09CC" />
+        <Label id="fireNoteText" translation="[104, 50]" height="64" vertAlign="center" width="1500" maxLines="1" color="0xEDE6CAFF" />
+      </Group>
       <Label id="noFire" translation="[160, 480]" width="1600" horizAlign="center" wrap="true" lineSpacing="2" color="0xB5AF8CFF" visible="false" />
     </Group>
 

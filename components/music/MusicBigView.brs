@@ -67,7 +67,7 @@ sub showNext()
         b.translation = [106, 50]
         b.width = 300
         b.maxLines = 1
-        b.font = hFont("regular", 20)
+        b.font = hFont("regular", 22)
         b.color = "0xB5AF8CFF"
         b.text = t.artist + "  ·  " + pxClock(t.duration)
         k = k + 1

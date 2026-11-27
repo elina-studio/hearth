@@ -37,6 +37,8 @@ sub init()
     m.picker.observeField("chosen", "onLookChosen")
     m.noFire = m.top.findNode("noFire")
     m.noFire.font = hFont("regular", 32)
+    m.fireNote = m.top.findNode("fireNote")
+    m.top.findNode("fireNoteText").font = hFont("regular", 24)
     m.stripIn = m.top.findNode("stripIn")
     m.stripOut = m.top.findNode("stripOut")
     m.stripTimer = m.top.findNode("stripTimer")
@@ -262,9 +264,18 @@ sub onMixState()
                 m.fireRetry.observeField("fire", "onFireRetry")
             end if
             m.fireRetry.control = "start"
+        else if st = "failed"
+            ' the still stays up; say so, once, in plain words
+            why = p.mixNote
+            if why = invalid or why = "" then why = "the NAS could not join it to the song"
+            t = m.top.findNode("fireNoteText")
+            t.text = "A still fire for this song: " + why + ". The next song tries the moving fire again."
+            m.top.findNode("fireNoteBg").width = Int(t.boundingRect().width) + 48
+            m.fireNote.visible = true
         else if st = "on"
             m.noFire.visible = false
         end if
+        if st <> "failed" then m.fireNote.visible = false
         if m.sound <> invalid then m.sound.active = (st <> "on" or m.mix <> "music")
     end if
     showNow()

@@ -61,14 +61,14 @@ sub build()
         done = g.createChild("Group")
         done.translation = [0, 166]
         t = g.createChild("Label")
-        t.font = hFont("bold", 21)
+        t.font = hFont("bold", 22)
         t.color = m.c.ink
         t.text = c.title
         t.width = 200
         t.maxLines = 1
         t.translation = [0, 186]
         tm = g.createChild("Label")
-        tm.font = hFont("regular", 19)
+        tm.font = hFont("regular", 22)
         tm.color = m.c.muted
         tm.text = mmss(c.start)
         tm.width = 272

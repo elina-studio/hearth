@@ -71,7 +71,7 @@ sub buildTiles()
         b.width = 232
         b.horizAlign = "center"
         b.maxLines = 1
-        b.font = hFont("regular", 21)
+        b.font = hFont("regular", 22)
         b.color = "0xB5AF8CFF"
         b.text = d.sub
         m.tileNodes.push({ g: t, ic: ic, ring: ring, a: a })

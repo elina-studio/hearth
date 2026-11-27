@@ -52,7 +52,7 @@ sub makeSlot()
     fb.lineSpacing = 2
     fb.vertAlign = "center"
     fb.horizAlign = "center"
-    fb.font = hFont("bold", 18)
+    fb.font = hFont("bold", 22)
     fb.color = "0xEDE6CAFF"
     cap = g.createChild("Label")
     cap.translation = [0, s + 14]
@@ -64,7 +64,7 @@ sub makeSlot()
     sub2.translation = [0, s + 44]
     sub2.width = cw - 20
     sub2.maxLines = 1
-    sub2.font = hFont("regular", 20)
+    sub2.font = hFont("regular", 22)
     sub2.color = "0xB5AF8CFF"
     if m.top.round
         cap.width = cw
@@ -81,7 +81,7 @@ sub makeSlot()
     tagL.translation = [x0 + 18, 10]
     tagL.height = 28
     tagL.vertAlign = "center"
-    tagL.font = hFont("bold", 17)
+    tagL.font = hFont("bold", 22)
     tagL.color = "0x1F1606FF"
     ring = g.createChild("Poster")
     if m.top.round

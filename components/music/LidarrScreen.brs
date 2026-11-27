@@ -589,7 +589,7 @@ sub drawAlbum(x as integer, item as object)
     y = g.createChild("Label")
     y.translation = [0, 208]
     y.width = 166
-    y.font = hFont("regular", 20)
+    y.font = hFont("regular", 22)
     y.color = "0xB5AF8CFF"
     if al.releaseDate <> invalid then y.text = Left(al.releaseDate, 4)
 end sub
@@ -622,7 +622,7 @@ sub badge(g as object, state as string)
     l.translation = [40, 8]
     l.height = 32
     l.vertAlign = "center"
-    l.font = hFont("bold", 18)
+    l.font = hFont("bold", 22)
     l.color = c
     l.text = text
 end sub

@@ -518,7 +518,7 @@ sub drawCast()
             ' one muted line under TV timing with the lag measured this song, so a nudge has a starting point
             tl = g.createChild("Label")
             tl.text = "Speakers trail the TV by " + trail + " s · nudge until they meet"
-            tl.font = hFont("regular", 20)
+            tl.font = hFont("regular", 22)
             tl.color = "0xB5AF8CFF"
             tl.translation = [112, y + 64]
             tl.width = 440
@@ -604,7 +604,7 @@ sub drawCast()
     end if
     ht = g.createChild("Label")
     ht.text = hint
-    ht.font = hFont("regular", 20)
+    ht.font = hFont("regular", 22)
     ht.color = "0xB5AF8CFF"
     ht.translation = [96, 782]
     ht.width = 460

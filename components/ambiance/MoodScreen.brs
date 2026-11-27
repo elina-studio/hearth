@@ -4,7 +4,7 @@ sub init()
     m.video = m.top.findNode("video")
     m.video.observeField("state", "onVideoState")
     m.credit = m.top.findNode("credit")
-    m.credit.font = hFont("regular", 20)
+    m.credit.font = hFont("regular", 22)
     m.useVideo = false
     m.note = m.top.findNode("note")
     m.note.font = hFont("regular", 24)

@@ -1,5 +1,5 @@
-' Pause screen A. Two focus zones: the timeline (Left/Right skip 10 s back / 30 s ahead, Rewind/Fast-forward
-' scrub faster each press, holding Left/Right seeks faster the longer it is held, OK plays or jumps to the scrub point) and the button row (Down from the timeline).
+' Pause screen. Three focus zones, top to bottom: the timeline (Left/Right skip 10 s back / 30 s ahead, Rewind/Fast-forward
+' scrub faster each press, holding Left/Right seeks faster the longer it is held, OK plays or jumps to the scrub point) then the big transport buttons, then the settings chips (Down moves through them).
 ' While playing it hides itself after 5 s; while paused it stays.
 
 sub init()
@@ -7,14 +7,14 @@ sub init()
     m.c = hColors()
     m.barX = 300
     m.barW = 1320
-    m.barY = 832
+    m.barY = 662
     m.top.findNode("kicker").font = hFont("caps", 24)
     m.top.findNode("title").font = hFont("bold", 44)
     m.top.findNode("clock").font = hFont("bold", 44)
-    m.top.findNode("ampm").font = hFont("regular", 21)
+    m.top.findNode("ampm").font = hFont("regular", 22)
     m.top.findNode("elapsed").font = hFont("bold", 64)
     m.top.findNode("remaining").font = hFont("bold", 64)
-    m.top.findNode("ends").font = hFont("regular", 21)
+    m.top.findNode("ends").font = hFont("regular", 22)
     m.top.findNode("thumbTime").font = hFont("bold", 26)
     m.bar = hBraid(m.top.findNode("barHolder"), m.barW, 0)
     m.head = m.top.findNode("head")
@@ -76,6 +76,7 @@ sub armHide()
 end sub
 
 sub onHideTimer()
+    if hDialogUp() then return
     if m.top.playing and m.target = invalid then close()
 end sub
 
@@ -108,10 +109,7 @@ end sub
 
 sub onPlaying()
     buildButtons()
-    if m.top.visible
-        armHide()
-        paintHints()
-    end if
+    if m.top.visible then armHide()
 end sub
 
 sub onPosition()
@@ -169,8 +167,8 @@ sub paint()
         m.timeSize = size
         m.top.findNode("elapsed").font = hFont("bold", size)
         m.top.findNode("remaining").font = hFont("bold", size)
-        m.top.findNode("elapsed").translation = [100, 800 + (64 - size) / 2]
-        m.top.findNode("remaining").translation = [1600, 800 + (64 - size) / 2]
+        m.top.findNode("elapsed").translation = [100, 630 + (64 - size) / 2]
+        m.top.findNode("remaining").translation = [1600, 630 + (64 - size) / 2]
     end if
     m.top.findNode("elapsed").text = clockText(cur)
     left = dur - cur
@@ -181,8 +179,8 @@ sub paint()
     ends.text = "Ends at " + w[0] + " " + w[1]
     ends.width = 0
     tw = ends.boundingRect().width
-    ends.translation = [1820 - tw, 882]
-    m.top.findNode("moon").translation = [1820 - tw - 34, 884]
+    ends.translation = [1820 - tw, 712]
+    m.top.findNode("moon").translation = [1820 - tw - 34, 715]
     pct = 0.0
     if dur > 0 then pct = 100.0 * cur / dur
     if pct < 0.6 then pct = 0.6
@@ -195,7 +193,7 @@ sub paint()
         px = hx - 160
         if px < 100 then px = 100
         if px > 1500 then px = 1500
-        m.preview.translation = [px, 560]
+        m.preview.translation = [px, 388]
         m.top.findNode("thumbTime").text = clockText(m.target)
         hasBif = (m.bif <> invalid and m.bif.ready = true)
         m.top.findNode("thumbBg").visible = hasBif
@@ -237,116 +235,196 @@ sub paintSeekDist()
     m.top.findNode("seekDistFill").width = w
     m.top.findNode("seekDistRing").width = w
     tagW = Int(m.seekTag.boundingRect().width)
-    m.seekDist.translation = [300 + tagW + 18, 878]
+    m.seekDist.translation = [300 + tagW + 18, 708]
     m.seekDist.visible = true
 end sub
 
 sub paintHints()
-    if m.target <> invalid
-        keys = [{ icon: "lr", label: "Move" }, { text: "OK", label: "Jump here" }, { icon: "back", label: "Cancel" }]
-    else if m.zone = "bar"
-        okLabel = "Pause"
-        if not m.top.playing then okLabel = "Play"
-        keys = [{ icon: "lr", label: "10 s back · 30 s ahead" }, { icon: "down", label: "Buttons" }, { text: "OK", label: okLabel }, { icon: "back", label: "Hide" }]
-    else
-        keys = [{ icon: "lr", label: "Choose" }, { icon: "up", label: "Timeline" }, { icon: "back", label: "Hide" }]
-    end if
-    m.hints.keys = keys
+    ' the hint strip is gone (item 13); only a scrub point still says what OK and Back do, where the chips were
+    scrubbing = (m.target <> invalid)
+    m.hints.visible = scrubbing
+    if scrubbing then m.hints.keys = [{ icon: "lr", label: "Move" }, { text: "OK", label: "Jump here" }, { icon: "back", label: "Cancel" }]
+    ch = m.top.findNode("chips")
+    if ch <> invalid then ch.visible = not scrubbing
 end sub
 
 ' ---------- buttons ----------
-function buttonDefs() as object
+' Two rows (walk 2, item 13; mockups/walk2/13-pause-screen.png): the big transport buttons, then one row of
+' settings chips that show their current value. Watched and Info sit under More.
+function bigDefs() as object
     playIcon = "pause"
     playLabel = "Pause"
     if not m.top.playing
         playIcon = "play"
         playLabel = "Play"
     end if
+    d = [{ id: "back10", icon: "back10", label: "Back 10 s" }, { id: "toggle", icon: playIcon, label: playLabel }, { id: "fwd30", icon: "fwd30", label: "Ahead 30 s" }]
+    if m.top.canNext then d.push({ id: "next", icon: "next", label: "Next episode" })
+    return d
+end function
+
+function chipDefs() as object
     i = m.top.info
     if i = invalid then i = {}
-    d = [{ id: "back10", icon: "back10", label: "Back 10" }, { id: "toggle", icon: playIcon, label: playLabel }, { id: "fwd30", icon: "fwd30", label: "Ahead 30" }, { id: "sep" }]
-    d.push({ id: "cc", icon: "cc", label: "Subtitles" })
-    d.push({ id: "audio", icon: "audio", label: "Audio" })
-    if i.hasChapters = true then d.push({ id: "chapters", icon: "chap", label: "Chapters" })
-    if i.isEpisode = true then d.push({ id: "episodes", icon: "eps", label: "Episodes" })
-    if m.top.canNext then d.push({ id: "next", icon: "next", label: "Next ep" })
-    d.push({ id: "quality", icon: "qual", label: "Quality" })
-    d.push({ id: "info", icon: "info", label: "Info" })
-    d.push({ id: "sleep", icon: "moon", label: "Sleep" })
-    d.push({ id: "watched", icon: "check", label: "Watched" })
+    v = m.top.values
+    if v = invalid then v = {}
+    d = [{ id: "cc", label: "Subtitles", value: v.cc }, { id: "audio", label: "Audio", value: v.audio }]
+    if i.hasChapters = true then d.push({ id: "chapters", label: "Chapters" })
+    if i.isEpisode = true then d.push({ id: "episodes", label: "Episodes" })
+    d.push({ id: "quality", label: "Quality", value: v.quality })
+    d.push({ id: "sleep", label: "Sleep", value: v.sleep })
+    d.push({ id: "more", label: "More" })
     return d
 end function
 
 sub buildButtons()
     row = m.top.findNode("buttons")
-    if row = invalid then return
+    chips = m.top.findNode("chips")
+    if row = invalid or chips = invalid then return
     keepId = invalid
-    if m.defs <> invalid and m.btn < m.defs.count() then keepId = m.defs[m.btn].id
+    if m.zone = "big" and m.bigs <> invalid and m.btn < m.bigs.count() then keepId = m.bigs[m.btn].id
+    if m.zone = "chips" and m.chipsD <> invalid and m.btn < m.chipsD.count() then keepId = m.chipsD[m.btn].id
     row.removeChildrenIndex(row.getChildCount(), 0)
-    m.defs = []
-    for each d in buttonDefs()
-        if d.id <> "sep" then m.defs.push(d)
-    end for
-    seps = 1
-    total = m.defs.count() * 96 + (m.defs.count() - 1) * 6 + seps * 38
+    chips.removeChildrenIndex(chips.getChildCount(), 0)
+    ' big transport buttons: 150 px slots, Play larger, a rule before Next episode
+    m.bigs = bigDefs()
+    total = m.bigs.count() * 150
+    if m.top.canNext then total = total + 46
     x = Int(960 - total / 2)
-    m.btnNodes = []
-    for each d in buttonDefs()
-        if d.id = "sep"
+    m.bigNodes = []
+    for each d in m.bigs
+        if d.id = "next"
             r = row.createChild("Rectangle")
             r.width = 2
-            r.height = 64
+            r.height = 92
             r.color = "0x404B2DFF"
-            r.translation = [x + 12, 0]
-            x = x + 38
-        else
-            g = row.createChild("Group")
-            g.translation = [x, 0]
-            bg = g.createChild("Poster")
-            bg.translation = [0, -12]
-            bg.width = 96
-            bg.height = 88
-            icon = g.createChild("Poster")
-            icon.uri = "pkg:/images/player/" + d.icon + ".png"
-            icon.width = 36
-            icon.height = 36
-            icon.translation = [30, 14]
-            lab = g.createChild("Label")
-            lab.font = hFont("bold", 19)
-            lab.text = d.label
-            lab.width = 110
-            lab.horizAlign = "center"
-            lab.translation = [-7, 74]
-            m.btnNodes.push({ bg: bg, icon: icon, label: lab, id: d.id })
-            x = x + 102
+            r.translation = [x + 22, 24]
+            x = x + 46
         end if
+        size = 92
+        if d.id = "toggle" then size = 116
+        g = row.createChild("Group")
+        g.translation = [x, 0]
+        fill = g.createChild("Poster")
+        fill.uri = "pkg:/images/player/circle-fill.png"
+        fill.width = size
+        fill.height = size
+        fill.translation = [75 - size / 2, 116 - size]
+        ring = g.createChild("Poster")
+        ring.uri = "pkg:/images/player/circle-ring.png"
+        ring.width = size
+        ring.height = size
+        ring.translation = [75 - size / 2, 116 - size]
+        isz = 40
+        if d.id = "toggle" then isz = 48
+        icon = g.createChild("Poster")
+        icon.uri = "pkg:/images/player/" + d.icon + ".png"
+        icon.width = isz
+        icon.height = isz
+        icon.translation = [75 - isz / 2, 116 - size / 2 - isz / 2]
+        lab = g.createChild("Label")
+        lab.font = hFont("regular", 24)
+        lab.text = d.label
+        lab.width = 170
+        lab.horizAlign = "center"
+        lab.translation = [-10, 126]
+        m.bigNodes.push({ fill: fill, ring: ring, icon: icon, label: lab, id: d.id })
+        x = x + 150
     end for
-    m.btn = 1
+    ' settings chips: name, then the value in bold
+    m.chipsD = chipDefs()
+    m.chipNodes = []
+    widths = []
+    total = 0
+    for each d in m.chipsD
+        g = chips.createChild("Group")
+        fill = g.createChild("Poster")
+        fill.uri = "pkg:/images/pill.9.png"
+        fill.height = 52
+        ring = g.createChild("Poster")
+        ring.uri = "pkg:/images/pill-ring.9.png"
+        ring.height = 52
+        nm = g.createChild("Label")
+        nm.font = hFont("regular", 24)
+        nm.text = d.label
+        nm.height = 52
+        nm.vertAlign = "center"
+        nm.translation = [24, 0]
+        w = 24 + Int(nm.boundingRect().width)
+        vlab = invalid
+        if d.value <> invalid and d.value <> ""
+            vlab = g.createChild("Label")
+            vlab.font = hFont("bold", 24)
+            vlab.text = d.value
+            vlab.height = 52
+            vlab.vertAlign = "center"
+            vlab.maxLines = 1
+            vlab.translation = [w + 10, 0]
+            vw = Int(vlab.boundingRect().width)
+            if vw > 220
+                vw = 220
+                vlab.width = 220
+            end if
+            w = w + 10 + vw
+        end if
+        w = w + 24
+        fill.width = w
+        ring.width = w
+        widths.push(w)
+        total = total + w
+        m.chipNodes.push({ g: g, fill: fill, ring: ring, name: nm, value: vlab, id: d.id })
+    end for
+    total = total + (widths.count() - 1) * 16
+    x = Int(960 - total / 2)
+    for k = 0 to widths.count() - 1
+        m.chipNodes[k].g.translation = [x, 0]
+        x = x + widths[k] + 16
+    end for
     if keepId <> invalid
-        for k = 0 to m.defs.count() - 1
-            if m.defs[k].id = keepId then m.btn = k
+        list = m.bigs
+        if m.zone = "chips" then list = m.chipsD
+        m.btn = 0
+        for k = 0 to list.count() - 1
+            if list[k].id = keepId then m.btn = k
         end for
     end if
     paintButtons()
 end sub
 
 sub paintButtons()
-    if m.btnNodes = invalid then return
-    for k = 0 to m.btnNodes.count() - 1
-        b = m.btnNodes[k]
-        focused = (m.zone = "buttons" and k = m.btn)
-        filled = focused or b.id = "toggle"
-        if filled
-            b.bg.uri = "pkg:/images/w/button-fill" + hVar(k) + ".9.png"
-            b.bg.blendColor = m.c.gold
+    if m.bigNodes = invalid or m.chipNodes = invalid then return
+    for k = 0 to m.bigNodes.count() - 1
+        b = m.bigNodes[k]
+        focused = (m.zone = "big" and k = m.btn)
+        ' on the timeline OK plays or pauses, so Play is the lit button there; once focus moves, only the focused one is lit
+        lit = focused or (b.id = "toggle" and m.zone = "bar")
+        if lit
+            b.fill.blendColor = m.c.gold
+            b.ring.blendColor = m.c.gold
             b.icon.blendColor = m.c.goldInk
         else
-            b.bg.uri = "pkg:/images/w/button-outline" + hVar(k) + ".9.png"
-            b.bg.blendColor = "0x404B2DFF"
+            b.fill.blendColor = "0x10150CD9"
+            if b.id = "toggle" then b.ring.blendColor = m.c.gold else b.ring.blendColor = "0x5F6E45FF"
             b.icon.blendColor = m.c.ink
         end if
         if focused then b.label.color = "0xFFE7A0FF" else b.label.color = m.c.muted
     end for
+    for k = 0 to m.chipNodes.count() - 1
+        c = m.chipNodes[k]
+        focused = (m.zone = "chips" and k = m.btn)
+        if focused
+            c.fill.blendColor = m.c.gold
+            c.ring.blendColor = m.c.gold
+            c.name.color = m.c.goldInk
+            if c.value <> invalid then c.value.color = m.c.goldInk
+        else
+            c.fill.blendColor = "0x10150CD9"
+            c.ring.blendColor = "0x5F6E45FF"
+            c.name.color = m.c.ink
+            if c.value <> invalid then c.value.color = m.c.gold
+        end if
+    end for
+    m.top.findNode("chips").visible = (m.target = invalid)
 end sub
 
 sub pressButton(id as string)
@@ -356,9 +434,35 @@ sub pressButton(id as string)
         jump(30)
     else if id = "toggle"
         m.top.action = { cmd: "toggle" }
+    else if id = "more"
+        openMore()
     else
         m.top.action = { cmd: "button", id: id }
     end if
+end sub
+
+' More: the two things that are not settings
+sub openMore()
+    m.hideTimer.control = "stop"
+    d = CreateObject("roSGNode", "HearthDialog")
+    d.title = "More"
+    d.message = [m.top.findNode("title").text]
+    d.buttons = ["What is playing, and how", "Mark watched or unwatched"]
+    d.observeField("buttonSelected", "onMore")
+    d.observeField("wasClosed", "onMoreClosed")
+    m.moreDialog = d
+    hShowDialog(d)
+end sub
+
+sub onMore()
+    i = m.moreDialog.buttonSelected
+    m.moreDialog.close = true
+    if i = 0 then m.top.action = { cmd: "button", id: "info" } else m.top.action = { cmd: "button", id: "watched" }
+end sub
+
+sub onMoreClosed()
+    if m.top.visible and not m.top.isInFocusChain() then m.top.setFocus(true)
+    armHide()
 end sub
 
 ' ---------- seeking ----------
@@ -530,29 +634,41 @@ function hKeyInner(key as string, press as boolean) as boolean
             if m.target <> invalid then commit() else m.top.action = { cmd: "toggle" }
         else if key = "down"
             if m.target <> invalid then return true
-            m.zone = "buttons"
+            m.zone = "big"
+            m.btn = 1
             m.hideTimer.control = "stop"
             paintButtons()
-            paintHints()
         else
             return key <> "options"
         end if
         return true
     end if
-    ' button row
+    ' the two button rows
+    n = m.bigs.count()
+    if m.zone = "chips" then n = m.chipsD.count()
     if key = "left"
         if m.btn > 0 then m.btn = m.btn - 1
         paintButtons()
     else if key = "right"
-        if m.btn < m.defs.count() - 1 then m.btn = m.btn + 1
+        if m.btn < n - 1 then m.btn = m.btn + 1
         paintButtons()
     else if key = "up"
-        m.zone = "bar"
+        if m.zone = "chips"
+            m.zone = "big"
+            m.btn = 1
+        else
+            m.zone = "bar"
+            armHide()
+        end if
         paintButtons()
-        paintHints()
-        armHide()
+    else if key = "down"
+        if m.zone = "big"
+            m.zone = "chips"
+            m.btn = 0
+            paintButtons()
+        end if
     else if key = "OK"
-        pressButton(m.defs[m.btn].id)
+        if m.zone = "big" then pressButton(m.bigs[m.btn].id) else pressButton(m.chipsD[m.btn].id)
     else
         return key <> "options"
     end if

@@ -90,7 +90,7 @@ sub init()
         detail.translation = [22, 60]
         detail.width = 170
         detail.maxLines = 1
-        detail.font = hFont("regular", 21)
+        detail.font = hFont("regular", 22)
         detail.color = m.c.muted
         bar = hBraid(g, 120, 66)
         bar.translation = [194, 66]
@@ -98,7 +98,7 @@ sub init()
         tags.translation = [334, 60]
         tags.width = 360
         tags.maxLines = 1
-        tags.font = hFont("caps", 18)
+        tags.font = hFont("caps", 22)
         tags.color = m.c.muted
         m.rowNodes.push({ g: g, ring: ring, bg: bg, tick: tick, title: title, score: score, detail: detail, bar: bar, tags: tags })
     end for
@@ -837,7 +837,7 @@ sub hints(list as object)
             lb.height = 30
             lb.horizAlign = "center"
             lb.vertAlign = "center"
-            lb.font = hFont("bold", 18)
+            lb.font = hFont("bold", 22)
             lb.color = m.c.goldInk
             lb.text = "OK"
         else
@@ -848,7 +848,7 @@ sub hints(list as object)
             ic.blendColor = m.c.gold
         end if
         t = m.hint.createChild("Label")
-        t.font = hFont("regular", 20)
+        t.font = hFont("regular", 22)
         t.color = m.c.muted
         t.height = 30
         t.vertAlign = "center"

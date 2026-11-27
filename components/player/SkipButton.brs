@@ -1,7 +1,7 @@
 sub init()
     m.top.visible = false
     m.top.findNode("lab").font = hFont("bold", 28)
-    m.top.findNode("hint").font = hFont("regular", 20)
+    m.top.findNode("hint").font = hFont("regular", 22)
 end sub
 
 sub paint()

@@ -25,7 +25,7 @@ sub uiInit()
     m.earHint = m.top.findNode("earHint")
     m.earKick.font = hFont("caps", 22)
     m.earInfo.font = hFont("bold", 30)
-    m.earHint.font = hFont("regular", 21)
+    m.earHint.font = hFont("regular", 22)
     m.earMode = false
     m.earHits = []
 end sub
@@ -135,9 +135,43 @@ function uiKey(key as string) as boolean
     return false
 end function
 
+' What the pause screen's settings chips show right now
+function ovValues() as object
+    v = { cc: "Off", audio: "", quality: "Original", sleep: "Off" }
+    if m.subStream <> invalid
+        n = toStr(m.subStream.language)
+        if n = "" then n = "On"
+        v.cc = n
+    end if
+    if m.streams <> invalid and m.streams.audio <> invalid then v.audio = audPlain(m.streams.audio, true)
+    if m.forceQuality <> invalid then v.quality = m.forceQuality + "p"
+    if m.sleepMode = "ep"
+        v.sleep = "After this"
+    else if m.sleepMode <> "off" and m.sleepMode <> invalid
+        v.sleep = m.sleepMode + " min"
+    end if
+    return v
+end function
+
+' A sound track in plain words (walk 2, item 27): the language, or how many speakers when the file names none.
+' The codec stays on the "What is playing" sheet.
+function audPlain(s as object, short as boolean) as string
+    lang = toStr(s.language)
+    ch = chName(s.channels)
+    if ch <> "" then ch = UCase(Left(ch, 1)) + Mid(ch, 2)
+    if short
+        if lang <> "" then return lang
+        if ch <> "" then return ch
+        return "On"
+    end if
+    if lang = "" then lang = "Language not set"
+    return lang
+end function
+
 sub openOverlay(mode as string)
     m.ov.position = position()
     m.ov.playing = (m.video.state = "playing")
+    m.ov.values = ovValues()
     m.ov.callFunc("open", mode)
     m.subs.lifted = true
     updateSkip()
@@ -183,7 +217,9 @@ sub onOverlayAction()
             playNext()
         else if id = "quality" or id = "info"
             openSheet("info", "")
-        else if id = "sleep" or id = "watched"
+        else if id = "watched"
+            openSheet("sleep", "w:leave")
+        else if id = "sleep"
             openSheet("sleep", "")
         end if
     end if
@@ -458,11 +494,11 @@ sub fillSheet(focusId as string)
         di = CreateObject("roDeviceInfo")
         for i = 0 to au.count() - 1
             s = au[i]
-            title = toStr(s.displayTitle)
-            if title = "" then title = toStr(s.language)
+            title = audPlain(s, false)
             codec = LCase(toStr(s.codec))
             ch = chName(s.channels)
-            desc = ch + " · " + UCase(codec)
+            desc = ch
+            if desc <> "" then desc = UCase(Left(desc, 1)) + Mid(desc, 2)
             row = { kind: "row", id: "aud:" + i.toStr(), title: title, desc: desc, on: (m.streams.audio <> invalid and toStr(m.streams.audio.id) = toStr(s.id)) }
             if s.title <> invalid and Instr(1, LCase(s.title), "comment") > 0 then row.desc = "Commentary · " + desc
             if di.CanDecodeAudio({ Codec: rokuAudioCodec(codec) }).result <> true then row.tag = "converts"

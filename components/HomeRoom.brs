@@ -34,7 +34,7 @@ sub init()
     m.spkOpen = false
     m.spkIdx = 0
     m.spkRows = []
-    m.top.findNode("spkTitle").font = hFont("caps", 20)
+    m.top.findNode("spkTitle").font = hFont("caps", 22)
     holder = m.top.findNode("spkRows")
     for i = 0 to 4
         bg = holder.createChild("Rectangle")
@@ -47,14 +47,14 @@ sub init()
         nm.width = 230
         nm.height = 28
         nm.vertAlign = "center"
-        nm.font = hFont("regular", 20)
+        nm.font = hFont("regular", 22)
         st = holder.createChild("Label")
         st.translation = [244, i * 30]
         st.width = 110
         st.height = 28
         st.vertAlign = "center"
         st.horizAlign = "right"
-        st.font = hFont("regular", 18)
+        st.font = hFont("regular", 22)
         m.spkRows.push({ bg: bg, nm: nm, st: st })
     end for
     m.top.findNode("mSpk").font = hFont("regular", 22)
@@ -107,7 +107,7 @@ end sub
 sub buildTonight()
     m.tCards = []
     m.top.findNode("tnTitle").font = hFont("fell", 34)
-    m.top.findNode("tnNote").font = hFont("regular", 20)
+    m.top.findNode("tnNote").font = hFont("regular", 22)
     holder = m.top.findNode("tnCards")
     icons = ["episode", "film", "home-note"]
     for i = 0 to 2
@@ -128,7 +128,7 @@ sub buildTonight()
         ic.translation = [0, 102]
         ic.blendColor = "0xE0B34AFF"
         kick = g.createChild("Label")
-        kick.font = hFont("caps", 17)
+        kick.font = hFont("caps", 22)
         kick.translation = [30, 100]
         kick.height = 26
         kick.vertAlign = "center"
@@ -651,7 +651,7 @@ sub buildReqLines()
         pic.height = 126
         pic.loadDisplayMode = "scaleToZoom"
         nm = g.createChild("Label")
-        nm.font = hFont("regular", 18)
+        nm.font = hFont("regular", 22)
         nm.width = 90
         nm.height = 24
         nm.translation = [0, 130]

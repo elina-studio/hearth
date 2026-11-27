@@ -31,7 +31,7 @@ sub init()
     m.weather.font = hFont("book", 26)
     m.wxIcon = m.top.findNode("wxIcon")
     m.buildTag = m.top.findNode("buildTag")
-    m.buildTag.font = hFont("regular", 16)
+    m.buildTag.font = hFont("regular", 22)
     ' the build number lives in the Hearth menu (*), not under the clock
     m.buildTag.text = ""
     m.buildTag.visible = false
@@ -97,9 +97,9 @@ sub initChip()
     m.npArt = m.top.findNode("npArt")
     m.npArtBack = m.top.findNode("npArtBack")
     m.npTitle = m.top.findNode("npTitle")
-    m.npTitle.font = hFont("bold", 20)
+    m.npTitle.font = hFont("bold", 22)
     m.npArtist = m.top.findNode("npArtist")
-    m.npArtist.font = hFont("regular", 16)
+    m.npArtist.font = hFont("regular", 22)
     m.npBars = m.top.findNode("npBars")
     m.npPulse = m.top.findNode("npPulse")
     m.npThumb = ""
