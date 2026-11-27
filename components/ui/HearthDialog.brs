@@ -25,6 +25,11 @@ sub open(prev = invalid as dynamic)
     if m.btns = invalid then m.btns = []
     m.heads = m.top.heads
     if m.heads = invalid then m.heads = {}
+    m.pop = (m.top.popup = true and m.btns.count() <= 3)
+    if m.pop
+        openPopup()
+        return
+    end if
     m.titleL.text = m.top.title
     y = 68 + m.titleL.boundingRect().height + 10
     lines = m.top.message
@@ -72,6 +77,116 @@ sub open(prev = invalid as dynamic)
     draw()
 end sub
 
+function bodyText() as string
+    lines = m.top.message
+    body = ""
+    if lines <> invalid
+        for each ln in lines
+            if ln <> invalid and ln <> ""
+                if body <> "" then body = body + Chr(10)
+                body = body + ln
+            end if
+        end for
+    end if
+    return body
+end function
+
+' The centred card: title, words, then the buttons in one row. 760 wide, as tall as its words need.
+sub openPopup()
+    m.top.findNode("shade").color = "0x0B0E09D9"
+    m.rule.visible = false
+    m.more.visible = false
+    w = 760
+    x = Int((1920 - w) / 2)
+    m.titleL.horizAlign = "center"
+    m.titleL.font = hFont("bold", 48)
+    m.titleL.width = w - 120
+    m.titleL.text = m.top.title
+    th = m.titleL.boundingRect().height
+    body = bodyText()
+    m.msg.horizAlign = "center"
+    m.msg.font = hFont("regular", 26)
+    m.msg.width = w - 120
+    m.msg.maxLines = 6
+    m.msg.text = body
+    bh = 0
+    if body <> "" then bh = m.msg.boundingRect().height + 12
+    n = m.btns.count()
+    btnH = 0
+    if n > 0 then btnH = 72 + 36
+    ' 56 above the title, 36 between the words and the buttons, then the hint line and 40 below it
+    h = Int(56 + th + bh + 36 + btnH + 28 + 40)
+    y = Int((1080 - h) / 2)
+    panel = m.top.findNode("panel")
+    ring = m.top.findNode("panelRing")
+    ' panel.9 carries 13 px of clear edge on every side
+    ring.translation = [x - 15, y - 15]
+    ring.width = w + 30
+    ring.height = h + 30
+    ring.visible = true
+    panel.translation = [x - 13, y - 13]
+    panel.width = w + 26
+    panel.height = h + 26
+    m.titleL.translation = [x + 60, y + 56]
+    m.msg.translation = [x + 60, y + 56 + th + 12]
+    m.popY = y + 56 + th + bh + 36
+    m.popX = x
+    m.popW = w
+    m.hint.horizAlign = "center"
+    m.hint.width = w
+    m.hint.translation = [x, y + h - 40 - 28]
+    if n > 1
+        m.hint.text = "OK  Choose      BACK  Close"
+    else
+        m.hint.text = "OK  Close"
+    end if
+    m.list.translation = [0, 0]
+    m.sel = m.top.buttonFocused
+    if m.sel < 0 or m.sel >= n then m.sel = 0
+    m.isOpen = true
+    m.top.setFocus(true)
+    m.hold.control = "start"
+    draw()
+end sub
+
+sub drawPopup()
+    m.list.removeChildrenIndex(m.list.getChildCount(), 0)
+    n = m.btns.count()
+    if n = 0 then return
+    gap = 24
+    bw = 300
+    if n = 3 then bw = 208
+    total = n * bw + (n - 1) * gap
+    x = m.popX + Int((m.popW - total) / 2)
+    for i = 0 to n - 1
+        focused = (i = m.sel)
+        bg = m.list.createChild("Poster")
+        ' the button images carry 13 px of clear edge on every side
+        bg.translation = [x - 13, m.popY - 13]
+        bg.width = bw + 26
+        bg.height = 72 + 26
+        lab = m.list.createChild("Label")
+        lab.font = hFont("bold", 30)
+        lab.text = m.btns[i]
+        lab.width = bw - 24
+        lab.height = 72
+        lab.horizAlign = "center"
+        lab.vertAlign = "center"
+        lab.maxLines = 1
+        lab.translation = [x + 12, m.popY]
+        if focused
+            bg.uri = "pkg:/images/w/button-fill-v2.9.png"
+            bg.blendColor = "0xE0B34AFF"
+            lab.color = "0x1F1606FF"
+        else
+            bg.uri = "pkg:/images/w/button-outline-v2.9.png"
+            bg.blendColor = "0x5F6E45FF"
+            lab.color = "0xEDE6CAFF"
+        end if
+        x = x + bw + gap
+    end for
+end sub
+
 ' a room that grabs focus when its data lands must not leave the sheet open and deaf
 sub onHold()
     if m.isOpen and not m.top.isInFocusChain() then m.top.setFocus(true)
@@ -100,6 +215,10 @@ sub onClose()
 end sub
 
 sub draw()
+    if m.pop = true
+        drawPopup()
+        return
+    end if
     m.list.removeChildrenIndex(m.list.getChildCount(), 0)
     n = m.btns.count()
     if n = 0 then return
@@ -184,9 +303,9 @@ function hKeyInner(key as string, press as boolean) as boolean
     n = m.btns.count()
     if key = "back"
         m.top.close = true
-    else if key = "up" or key = "down"
+    else if key = "up" or key = "down" or (m.pop = true and (key = "left" or key = "right"))
         if n = 0 then return true
-        if key = "up" then m.sel = m.sel - 1 else m.sel = m.sel + 1
+        if key = "up" or key = "left" then m.sel = m.sel - 1 else m.sel = m.sel + 1
         if m.sel < 0 then m.sel = 0
         if m.sel > n - 1 then m.sel = n - 1
         m.top.buttonFocused = m.sel

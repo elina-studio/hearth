@@ -48,6 +48,7 @@ sub hMessage(title as string, text as string)
     d.title = title
     d.message = [text]
     d.buttons = ["OK"]
+    d.popup = true
     d.observeField("buttonSelected", "onMessageClosed")
     m.msgDialog = d
     hShowDialog(d)

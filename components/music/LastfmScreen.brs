@@ -197,6 +197,7 @@ sub act(a as string)
         ' re-pairing needs the phone, so ask first
         dlg = CreateObject("roSGNode", "HearthDialog")
         dlg.title = "Disconnect Last.fm?"
+        dlg.popup = true
         dlg.message = ["Hearth stops sending what you play. To connect again you'll need your phone."]
         dlg.buttons = ["Disconnect", "Cancel"]
         dlg.observeField("buttonSelected", "onDisconnectPick")

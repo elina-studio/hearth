@@ -4,11 +4,13 @@
      hShowDialog(d) (source/util.brs) instead of scene.dialog = d.
      buttons: "Label" or "Label: value" (the value is drawn on the right). heads: { "<button index>": "GROUP" }
      puts a group title above that button. Like the Roku dialog, choosing a button does not close it; the caller
-     sets close = true. wasClosed fires once, however it closed. -->
+     sets close = true. wasClosed fires once, however it closed.
+     popup = true (set before showing) is for questions and notices: a centred card, buttons in one row. -->
 <component name="HearthDialog" extends="Group">
   <children>
     <Rectangle id="shade" width="1920" height="1080" color="0x0B0E09B8" />
-    <Poster uri="pkg:/images/w/panel.9.png" translation="[1168, 28]" width="684" height="1024" blendColor="0x141A11FF" />
+    <Poster id="panelRing" uri="pkg:/images/w/panel.9.png" visible="false" blendColor="0xE0B34A66" />
+    <Poster id="panel" uri="pkg:/images/w/panel.9.png" translation="[1168, 28]" width="684" height="1024" blendColor="0x141A11FF" />
     <Label id="title" translation="[1220, 68]" width="580" maxLines="2" wrap="true" lineSpacing="0" color="0xEDE6CAFF" />
     <Label id="msg" translation="[1220, 130]" width="580" maxLines="12" wrap="true" lineSpacing="2" color="0xB5AF8CFF" />
     <Rectangle id="rule" translation="[1220, 180]" width="580" height="2" color="0xE0B34A66" />
@@ -22,6 +24,9 @@
     <field id="message" type="stringarray" />
     <field id="buttons" type="stringarray" />
     <field id="heads" type="assocarray" />
+    <!-- a question or a notice ("Leave Hearth?"): a small card in the middle with its buttons side by side,
+         instead of the side sheet that menus use (mockups/leave-popup/leave-popup.png) -->
+    <field id="popup" type="boolean" value="false" />
     <field id="buttonFocused" type="integer" value="0" />
     <field id="buttonSelected" type="integer" value="0" alwaysNotify="true" />
     <field id="close" type="boolean" value="false" onChange="onClose" />

@@ -453,7 +453,8 @@ end sub
 sub leavePrompt()
     d = CreateObject("roSGNode", "HearthDialog")
     d.title = "Leave Hearth?"
-    d.message = [""]
+    d.message = ["You'll go back to the Roku home screen."]
+    d.popup = true
     d.buttons = ["Stay", "Leave"]
     d.observeField("buttonSelected", "onLeave")
     d.observeField("wasClosed", "onLeaveClosed")
