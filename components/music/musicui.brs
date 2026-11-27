@@ -160,10 +160,7 @@ sub muDo(a as string)
         muSend("lyricsNudge", { delta: -0.5 })
     else if a = "lyricsLater"
         muSend("lyricsNudge", { delta: 0.5 })
-    else if a = "hearth"
-        ' the Ambiance hearth (their own fire clip); the music keeps playing over it
-        m.top.request = { action: "mood", mood: "hearth" }
-    else if a = "cover" or a = "milk" or a = "request" or a = "radio" or a = "lastfm" or a = "schedules"
+    else if a = "cover" or a = "milk" or a = "hearth" or a = "request" or a = "radio" or a = "lastfm" or a = "schedules"
         m.top.request = { action: "musicView", mode: a }
     end if
 end sub
