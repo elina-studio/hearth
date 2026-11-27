@@ -8,237 +8,941 @@
 <script src="node_modules/butterchurn-presets/lib/butterchurnPresetsMD1.min.js"></script>
 <script>
 // Hearth's own visualizer looks, written for this house (not from the MilkDrop packs).
-// Each is a butterchurn preset: the warp shader draws into the feedback buffer (so things leave soft trails),
-// the comp shader grades it for the screen. page.html merges these over the packs; looks.json names them.
-(function () {
+// Each is a butterchurn preset. The warp shader paints the scene into the feedback buffer (so light can leave
+// trails and the blur passes give a soft bloom), the comp shader grades it for the screen, and a little plain
+// JS per frame (frame_eqs_str) turns the song into smooth motion: q1 music clock, q2 bass, q3 beat pulse,
+// q4 treble, q5 beat count, q6 loudness, q8 mids, q27 beat count eased (so a beat can turn or push things one notch). page.html merges these over the packs; looks.json names them.
+window.hearthLooks = {};
+window.HL = (function () {
   const off = { enabled: 0 };
-  const quiet = () => [0, 1, 2, 3].map(() => ({ baseVals: off }));
+  const quiet = () => [0, 1, 2, 3].map(() => ({ baseVals: off, init_eqs_str: '', frame_eqs_str: '', point_eqs_str: '' }));
   const base = {
     decay: 1, gammaadj: 1, echo_zoom: 1, echo_alpha: 0, wave_a: 0, wave_mode: 0, additivewave: 0,
     zoom: 1, rot: 0, warp: 0, warpscale: 1, zoomexp: 1, cx: 0.5, cy: 0.5, dx: 0, dy: 0, sx: 1, sy: 1,
     ob_size: 0, ob_a: 0, ib_size: 0, ib_a: 0, mv_a: 0, brighten: 0, darken: 0, solarize: 0, invert: 0,
-    darken_center: 0, wrap: 0,
+    darken_center: 0, wrap: 0, b1n: 0, b1x: 1, b2n: 0, b2x: 1, b3n: 0, b3x: 1, b1ed: 0,
   };
-  // shared helpers, put before shader_body in each shader
+  // GLSL shared by every shader
   const lib = `
-float hh(float n) { return fract(sin(n * 127.1) * 43758.5453); }
+#define PI 3.14159265
+#define TAU 6.2831853
+float h1(float n) { return fract(sin(n * 127.1 + 31.7) * 43758.5453); }
+float h2(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+vec2 h22(vec2 p) { return fract(sin(vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)))) * 43758.5453); }
 vec2 rot2(vec2 p, float a) { float c = cos(a), s = sin(a); return vec2(c * p.x - s * p.y, s * p.x + c * p.y); }
 float nz(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
-  float a = fract(sin(dot(i, vec2(127.1, 311.7))) * 43758.5453);
-  float b = fract(sin(dot(i + vec2(1.0, 0.0), vec2(127.1, 311.7))) * 43758.5453);
-  float c = fract(sin(dot(i + vec2(0.0, 1.0), vec2(127.1, 311.7))) * 43758.5453);
-  float d = fract(sin(dot(i + vec2(1.0, 1.0), vec2(127.1, 311.7))) * 43758.5453);
-  return mix(mix(a, b, f.x), mix(c, d, f.x), f.y); }
-float fbm(vec2 p) { float v = 0.0, a = 0.5; for (int i = 0; i < 4; i++) { v += a * nz(p); p *= 2.03; a *= 0.5; } return v; }
-// a leaf along +x from 0 to len, half width w: >0 inside (soft edge), plus its midrib
-float leaf(vec2 q, float len, float w) {
-  float t = clamp(q.x / len, 0.0, 1.0);
-  float half_ = w * pow(sin(3.14159 * t), 0.75) * (1.0 - 0.25 * t);
-  float inside = smoothstep(0.004, -0.002, abs(q.y) - half_) * step(0.0, q.x) * step(q.x, len);
-  return inside;
-}
-float rib(vec2 q, float len) { return smoothstep(0.003, 0.0, abs(q.y)) * step(0.02 * len, q.x) * step(q.x, len * 0.9); }
+  return mix(mix(h2(i), h2(i + vec2(1.0, 0.0)), f.x), mix(h2(i + vec2(0.0, 1.0)), h2(i + vec2(1.0, 1.0)), f.x), f.y); }
+float fbm(vec2 p) { float v = 0.0, a = 0.5; for (int i = 0; i < 4; i++) { v += a * nz(p); p = p * 2.03 + 17.1; a *= 0.5; } return v; }
+float fbm2(vec2 p) { return 0.65 * nz(p) + 0.35 * nz(p * 2.1 + 9.3); }
+// screen position: x across (about -0.89..0.89), y up (-0.5..0.5)
 vec2 P(vec2 uv) { return vec2((uv.x - 0.5) * texsize.x / texsize.y, 0.5 - uv.y); }
+vec2 UV(vec2 p) { return vec2(p.x * texsize.y / texsize.x + 0.5, 0.5 - p.y); }
+float sat(float x) { return clamp(x, 0.0, 1.0); }
+
+// Real-looking leaves of six kinds: 0 elm (toothed), 1 willow, 2 oak (lobed), 3 ginkgo (fan), 4 heart-shaped, 5 fern.
+// lprof = the outline: half width (as a share of w) at t along the midrib.
+float lprof(float t, float kind) {
+  if (kind < 0.5) return pow(t, 0.55) * pow(1.0 - t, 0.72) * 1.86;
+  if (kind < 1.5) return pow(sin(PI * pow(t, 0.75)), 0.85);
+  if (kind < 2.5) return pow(t, 0.6) * pow(1.0 - t, 0.42) * 1.55 * (0.48 + 0.52 * pow(0.5 + 0.5 * cos(TAU * (t * 4.2 - 0.62)), 0.55));
+  if (kind < 3.5) return 1.0;
+  if (kind < 4.5) return pow(t, 0.33) * pow(1.0 - t, 0.62) * 1.52;
+  return pow(t, 0.4) * pow(1.0 - t, 0.75) * 1.7 * (0.10 + 0.90 * pow(abs(sin(PI * t * 11.0)), 0.45));
+}
+// q is leaf space: x runs 0..1 from stem to tip, y across. w = half width (for the ginkgo, the half angle of
+// its fan), sd = seed, e = size of one pixel in leaf space. ca = body colour, cb = the colour it mottles and
+// edges toward. Returns rgb and alpha; rim comes back 1 at the edge. The stalk pokes out below x = 0.
+vec4 leafK(vec2 q, float w, float sd, float e, vec3 ca, vec3 cb, float serr, float kind, out float rim) {
+  rim = 0.0;
+  if (q.x < -0.22 || q.x > 1.03 || abs(q.y) > w * 1.25 + 0.05) return vec4(0.0);
+  bool fan = kind > 2.5 && kind < 3.5;
+  // the midrib bows a little, a different way for each leaf
+  float bow = fan ? 0.0 : (h1(sd + 1.0) - 0.5) * 0.45;
+  float stalkY = q.y - bow * q.x + 0.9 * bow * q.x * q.x * step(q.x, 0.0);
+  q.y -= bow * q.x * (1.0 - q.x);
+  float t = sat(q.x);
+  float ay = abs(q.y), sgn = q.y > 0.0 ? 1.0 : 0.0;
+  float a, vf, side, mid, hw;
+  if (fan) {
+    // ginkgo: a fan with a wavy rim, a notch in the middle and fine veins spreading from the stalk
+    float rr = length(q), an = atan(q.y, q.x);
+    float lim = 0.97 - 0.03 * cos(an * 24.0 + sd) - 0.17 * exp(-an * an / 0.003);
+    float d = max((abs(an) - w) * rr, rr - lim);
+    a = smoothstep(e, -e, d) * step(0.0, q.x);
+    rim = sat(1.0 + d / 0.10);
+    float nvf = 30.0;
+    vf = fract(an * nvf / (2.0 * w) + 0.5);
+    float dv = min(vf, 1.0 - vf) * (2.0 * w) / nvf * rr;
+    side = smoothstep(0.003 + e, 0.003 - e * 0.3, dv) * smoothstep(0.08, 0.3, rr) * 0.7;
+    mid = 0.0; hw = w * rr + 0.001; t = rr;
+  } else {
+    // side veins sweep forward as they leave the midrib; teeth or lobes sit where they end
+    float nv = kind < 0.5 ? 9.0 : (kind < 1.5 ? 15.0 : (kind < 2.5 ? 4.2 : (kind < 4.5 ? 6.0 : 11.0)));
+    float sweep = kind < 1.5 ? 0.7 : (kind < 2.5 ? 0.35 : (kind < 4.5 ? 0.9 : 0.12));
+    float ph = kind < 0.5 ? sgn * 0.5 + h1(sd + 2.0) : (kind < 2.5 && kind > 1.5 ? -0.62 + 0.5 : (kind > 4.5 ? 0.5 : sgn * 0.5));
+    float prof = lprof(t, kind);
+    float vc = (t - ay * (sweep + 1.1 * ay / w * step(kind, 0.5))) * nv + ph;
+    vf = fract(vc);
+    float tz = fract((t - w * prof * 1.8) * nv * 2.0 + ph * 2.0);
+    float tooth = serr * tz * tz * smoothstep(0.05, 0.3, t) * step(kind, 0.5);
+    hw = w * prof * (1.0 - tooth) + (nz(vec2(t * 6.0, sd)) - 0.5) * 0.08 * w * prof;
+    float d = ay - hw;
+    a = smoothstep(e, -e, d) * step(0.0, q.x) * step(q.x, 1.0);
+    rim = sat(1.0 + d / (0.4 * w + 0.001));
+    float dv = min(vf, 1.0 - vf) / nv;
+    float vw = 0.0042 * (1.0 - 0.75 * rim);
+    side = smoothstep(vw + e, vw - e * 0.3, dv) * (1.0 - rim * rim * rim) * smoothstep(0.02, 0.08, t);
+    float mw = 0.0085 * (1.0 - 0.8 * t) + 0.002;
+    mid = smoothstep(mw + e, mw - e * 0.3, ay) * step(q.x, 0.98);
+  }
+  // fine net of veinlets (only when the leaf is big enough on screen to show it)
+  float net = nz(q * 85.0 + sd * 9.0);
+  net = smoothstep(0.44, 0.5, net) * smoothstep(0.56, 0.5, net) * 0.3 * smoothstep(0.012, 0.003, e);
+  // the blade puffs up between veins, and folds along the midrib so one half catches more light
+  float puff = sin(PI * vf);
+  float lightv = cos(TAU * vf + 0.6);
+  float fold = fan ? 1.0 - 0.25 * abs(q.y) / (hw + 0.01) + 0.12 : mix(0.80, 1.16, smoothstep(-0.03, 0.03, q.y));
+  // colour: mottled, browner toward tip and edge, darker along the midrib
+  float mot = fbm2(q * vec2(4.0, 6.0) + sd * 31.0);
+  float spots = smoothstep(0.74, 0.8, nz(q * 26.0 + sd * 5.0));
+  vec3 c = mix(ca, cb, sat(mot * 1.5 - 0.45 + 0.6 * rim * rim + 0.3 * t * t));
+  c *= (0.74 + (fan ? 0.12 : 0.30) * puff + (fan ? 0.05 : 0.13) * lightv + (fan ? 0.16 : 0.0)) * fold;
+  c *= 1.0 - 0.28 * smoothstep(0.3 * w, 0.0, ay) * (1.0 - t) * (fan ? 0.0 : 1.0);
+  c = mix(c, cb * 0.4, spots * (0.15 + 0.6 * rim));
+  c *= 1.0 - 0.35 * rim * rim * rim;
+  c += vec3(1.0, 0.92, 0.7) * 0.09 * smoothstep(0.0, 1.0, 1.0 - abs(q.y / (hw + 0.001) - 0.5) * 2.4) * (0.4 + 0.6 * mot);
+  vec3 vcol = mix(c * 1.5 + vec3(0.06, 0.05, 0.02), mix(ca, cb, 0.5) * 1.5, 0.3);
+  c = mix(c, vcol, sat(side * 0.7 + net));
+  c = mix(c, vcol * 1.05, mid * 0.9);
+  // stalk
+  float sw = 0.0095;
+  float st = smoothstep(sw + e, sw - e, abs(stalkY)) * step(-0.2, q.x) * step(q.x, 0.03);
+  vec3 outc = mix(mix(ca, cb, 0.6) * 0.9, c, a);
+  return vec4(outc, max(a, st));
+}
+vec4 leaf(vec2 q, float w, float sd, float e, vec3 ca, vec3 cb, float serr) { float rim; return leafK(q, w, sd, e, ca, cb, serr, 0.0, rim); }
+// just the outline of a leaf (no stalk), for shadows: cheap
+float leafAK(vec2 q, float w, float sd, float e, float kind) {
+  if (q.x < 0.0 || q.x > 1.0) return 0.0;
+  if (kind > 2.5 && kind < 3.5) { float rr = length(q); return smoothstep(e, -e, max((abs(atan(q.y, q.x)) - w) * rr, rr - 0.95)); }
+  q.y -= (h1(sd + 1.0) - 0.5) * 0.45 * q.x * (1.0 - q.x);
+  return smoothstep(e, -e, abs(q.y) - w * lprof(q.x, kind));
+}
+float leafA(vec2 q, float w, float sd, float e) { return leafAK(q, w, sd, e, 0.0); }
+// autumn palette by seed: moss green, olive, gold, amber, russet
+void leafPal(float s, out vec3 ca, out vec3 cb) {
+  s = fract(s) * 5.0;
+  if (s < 1.0) { ca = vec3(0.16, 0.30, 0.09); cb = vec3(0.34, 0.36, 0.10); }
+  else if (s < 2.0) { ca = vec3(0.33, 0.36, 0.10); cb = vec3(0.56, 0.40, 0.10); }
+  else if (s < 3.0) { ca = vec3(0.74, 0.52, 0.12); cb = vec3(0.58, 0.28, 0.07); }
+  else if (s < 4.0) { ca = vec3(0.72, 0.36, 0.08); cb = vec3(0.42, 0.14, 0.05); }
+  else { ca = vec3(0.50, 0.17, 0.06); cb = vec3(0.26, 0.10, 0.05); }
+}
+// rounded tree tops side by side, for a far bank against the sky
+float trees(float x, float sc, float sd) {
+  float v = x * sc + sd, id = floor(v), f = fract(v);
+  float a = (0.45 + 0.55 * h1(id + sd)) * sqrt(max(0.0, 1.0 - pow(2.0 * f - 1.0, 2.0)));
+  float v2 = v + 0.5, id2 = floor(v2), f2 = fract(v2);
+  float b = (0.45 + 0.55 * h1(id2 + sd + 50.0)) * sqrt(max(0.0, 1.0 - pow(2.0 * f2 - 1.0, 2.0)));
+  return max(a, b);
+}
+// the finish every look gets: soft shoulder, dark corners, a breath of grain so dark gradients do not band
+vec3 finish(vec3 c, vec2 p, float vig) {
+  c = c / (1.0 + 0.35 * c) * 1.3;
+  c *= 1.0 - vig * smoothstep(0.3, 1.0, length(p * vec2(0.82, 1.0)));
+  c += (h2(p * 913.0 + fract(time) * 7.0) - 0.5) * 0.012;
+  return max(c, 0.0);
+}
 `;
-  const comp = (grade) => `${lib}
-shader_body {
-  vec3 c = texture(sampler_main, uv).rgb;
+  // JS run every frame: turns the song into smooth numbers (kept in a closure-free global so it survives frames)
+  const music = (key) => `
+var G = globalThis.__hl || (globalThis.__hl = {});
+var s = G['${key}'];
+if (!s || a.time < s.last) { s = G['${key}'] = { last: a.time, mt: 0, bs: 0, md: 0, tr: 0, vol: 0, pt: 0, pulse: 0, nb: 0, step: 0, cool: 0, av: 1, age: 9 }; }
+var dt = Math.min(0.1, Math.max(0, a.time - s.last)); s.last = a.time; s.dt = dt;
+var k = function (rate) { return 1 - Math.exp(-dt * rate); };
+var b = Math.max(0, a.bass - 0.75), m = Math.max(0, a.mid - 0.75), t = Math.max(0, a.treb - 0.75), v = (a.bass + a.mid + a.treb) / 3;
+s.bs += (b - s.bs) * k(b > s.bs ? 18 : 3);
+s.md += (m - s.md) * k(m > s.md ? 14 : 3);
+s.tr += (t - s.tr) * k(t > s.tr ? 20 : 4);
+s.vol += (v - s.vol) * k(1.5);
+s.av += (a.bass - s.av) * k(0.8);
+s.cool -= dt; s.hit = 0; s.age += dt;
+if (a.bass > 1.3 * s.av && a.bass > 1.15 && s.cool <= 0) { s.pt = 1; s.nb += 1; s.cool = 0.3; s.hit = 1; s.age = 0; }
+s.pt *= Math.exp(-dt * 4.5);
+s.pulse += (s.pt - s.pulse) * k(28);
+s.step += (s.nb - s.step) * k(6);
+s.mt += dt * (0.4 + 0.6 * Math.min(1.5, s.vol) + 1.5 * s.pulse);
+a.q1 = s.mt; a.q2 = Math.min(1.6, s.bs); a.q3 = s.pulse; a.q4 = Math.min(1.6, s.tr); a.q5 = s.nb; a.q6 = s.vol;
+a.q8 = Math.min(1.6, s.md); a.q27 = s.step; a.q28 = s.age;
+s.raw = [a.bass, a.mid, a.treb];
+`;
+  const mk = (name, o) => {
+    const key = name.replace(/[^a-z]/gi, '');
+    window.hearthLooks[name] = {
+      baseVals: Object.assign({}, base, o.base || {}), shapes: quiet(), waves: quiet().map((w, i) => (o.waves && o.waves[i]) || w),
+      init_eqs_str: `if (globalThis.__hl) globalThis.__hl['${key}'] = null;`,
+      frame_eqs_str: music(key) + (o.frame || ''), pixel_eqs_str: '', pixel_eqs: '',
+      warp: `${lib}\n${o.fn || ''}\nshader_body {\n${o.warp}\n}`,
+      comp: `${lib}\n${o.cfn || ''}\nshader_body {\n${o.comp || 'vec2 p = P(uv); vec3 c = texture(sampler_main, uv).rgb; ret = finish(c, p, 0.5);'}\n}`,
+    };
+  };
+  return { mk, lib };
+})();
+// Leaf mandala: a rosette that never stops opening. Rings of real leaves are born at the gold heart, grow
+// outward and pass the edge of the screen. It is built to dance: every beat opens the rosette a notch and turns
+// the rings against each other, the inner rings swell with the bass, the middle with the mids, the outer with the
+// treble, and a gold ring round the heart is the song's own wave.
+HL.mk('Hearth - Leaf mandala', {
+  fn: `
+const float G = 0.30;                     // ring spacing, in log radius
+const float R0 = 0.05;
+// where a pixel sits in one ring's leaf: xy = leaf space, z = leaf length, w = half width. Each ring has its own
+// kind of leaf: elm, willow, oak, ginkgo, heart, fern, round and round
+vec4 ringQ(float j, float r, float th, float z, out float sd, out float kind) {
+  kind = mod(j, 6.0);
+  float n = mod(j, 2.0) < 0.5 ? 8.0 : 16.0;
+  float w = kind < 0.5 ? 0.36 : (kind < 1.5 ? 0.15 : (kind < 2.5 ? 0.36 : (kind < 3.5 ? 0.40 : (kind < 4.5 ? 0.44 : 0.23))));
+  float lenr = kind < 0.5 ? 2.9 : (kind < 1.5 ? 2.5 : (kind < 2.5 ? 2.7 : (kind < 3.5 ? 2.0 : (kind < 4.5 ? 2.4 : 2.5))));
+  float R = R0 * exp((j + z) * G);
+  float wb = smoothstep(0.30, 0.09, R), wt = smoothstep(0.22, 0.55, R);
+  float swell = 1.0 + 0.03 * sin(q1 * 0.9 - j * 1.1) + 0.20 * (wb * q2 + (1.0 - wb - wt) * q8 + wt * q4 * 0.8);
+  float L = R * (exp(G * lenr) - 1.0) * swell;
+  float cell = TAU / n;
+  float dir = mod(j, 2.0) < 0.5 ? 1.0 : -1.0;
+  // every third ring is a fast one that keeps spinning; the rest sway and turn a notch on each beat
+  float fast = mod(j, 3.0) < 0.5 ? 1.0 : 0.0;
+  float off = (dir > 0.0 ? 0.0 : cell * 0.5) + dir * (0.2 * sin(q1 * 0.17 + j * 1.7) + q1 * (0.015 + 0.16 * fast) + q27 * 0.09);
+  float da = mod(th - off + cell * 0.5, cell) - cell * 0.5;
+  sd = kind * 7.0 + 1.0;
+  return vec4(vec2(r * cos(da) - R * 0.85, r * sin(da)) / L, L, w);
+}
+`,
+  warp: `
   vec2 p = P(uv);
-  ${grade || ''}
-  c *= 1.0 - 0.55 * smoothstep(0.35, 0.95, length(p * vec2(0.85, 1.0)));
+  float px = 1.0 / texsize.y;
+  float r = length(p) + 1e-5, th = atan(p.y, p.x) + q1 * 0.02;
+  float z = q1 * 0.045 + q27 * 0.085;
+  float u = log(r / R0) / G - z;
+  float j0 = floor(u);
+  vec3 c = vec3(0.0); float A = 0.0;
+  // innermost ring is on top: walk outward until the pixel is covered
+  for (int k = 3; k >= -1; k--) {
+    float j = j0 - float(k), sd, kind, rim;
+    vec4 g = ringQ(j, r, th, z, sd, kind);
+    if (g.x < 0.0 || g.x > 1.0 || abs(g.y) > g.w * 1.3) continue;
+    vec3 ca, cb; leafPal(fract(j * 0.19 + 0.05), ca, cb);
+    vec4 l = leafK(g.xy, g.w, sd, px / g.z, ca, cb, 0.07, kind, rim);
+    l.a *= step(0.0, g.x);
+    if (l.a < 0.01) continue;
+    // gold along the edge
+    l.rgb += vec3(0.95, 0.70, 0.28) * smoothstep(0.80, 1.0, rim) * 0.22;
+    // shade from the rings lying over this one, thrown a little outward, and darker toward its own base
+    float sh = 0.0, sd2, k2;
+    for (int m = 1; m <= 2; m++) {
+      vec4 gs = ringQ(j - float(m), r * (1.0 - 0.035 * float(m)), th + 0.01, z, sd2, k2);
+      sh = max(sh, leafAK(gs.xy, gs.w * 1.06, sd2, 0.06, k2));
+    }
+    l.rgb *= (1.0 - 0.6 * sh) * (0.55 + 0.45 * smoothstep(0.0, 0.5, g.x));
+    c += (1.0 - A) * l.a * l.rgb; A += (1.0 - A) * l.a;
+    if (A > 0.99) break;
+  }
+  c += (1.0 - A) * vec3(0.012, 0.02, 0.014);
+  // a pulse of warm light that leaves the heart on each beat
+  float wave = exp(-pow((r - (1.0 - q3) * 0.75) / 0.12, 2.0)) * q3;
+  c *= 0.80 + 0.45 * wave + 0.12 * q2;
+  // the gold heart: a seed head with its own slow spiral
+  float hr = 0.058 * (1.0 + 0.22 * q2);
+  float heart = smoothstep(hr, hr - 0.006, r);
+  vec2 sp = vec2(log(r / hr) * 5.0 - q1 * 0.35, (th - q1 * 0.02) * 13.0 / TAU);
+  float seeds = 0.5 + 0.5 * cos(TAU * (sp.x + sp.y)) * cos(TAU * (sp.x * 0.618 - sp.y));
+  vec3 hc = mix(vec3(0.30, 0.16, 0.04), vec3(1.0, 0.72, 0.26), seeds * smoothstep(0.0, hr, r) + 0.25);
+  hc *= 0.8 + 0.5 * q3;
+  c = mix(c, hc, heart);
+  c += vec3(1.0, 0.7, 0.3) * 0.25 * exp(-r * r / (hr * hr * 5.0)) * (0.5 + 0.6 * q2);
   ret = c;
-}`;
-  const mk = (warp, grade, extra) => ({
-    baseVals: Object.assign({}, base, extra || {}), shapes: quiet(), waves: quiet(),
-    init_eqs_str: '', frame_eqs_str: '', pixel_eqs_str: '', pixel_eqs: '',
-    warp: `${lib}\nshader_body {\n${warp}\n}`, comp: comp(grade),
-  });
-
-  const looks = {};
-
-  // 1. Leaf mandala: three rings of leaves turning against each other, breathing with the bass
-  looks['Hearth - Leaf mandala'] = mk(`
+`,
+  // gold rays round the heart: the song's own wave, mirrored left and right
+  waves: [{
+    baseVals: { enabled: 1, samples: 144, sep: 0, scaling: 1, smoothing: 0.5, spectrum: 0, usedots: 0, thick: 1, additive: 0, r: 1, g: 0.78, b: 0.35, a: 1 },
+    init_eqs_str: '', frame_eqs_str: '',
+    point_eqs_str: `
+var i = Math.round(a.sample * 143), ray = Math.floor(i / 3), tip = (i % 3) == 1 ? 1 : 0;
+var th = 1.5707963 + (ray + 0.5) / 48 * 3.14159265;
+var len = Math.min(0.075, Math.abs(a.value1) * 0.22);
+var r = 0.066 * (1 + 0.22 * a.q2) + tip * (0.006 + len);
+a.x = 0.5 + r * 0.5625 * Math.cos(th); a.y = 0.5 + r * 0.5625 * Math.sin(th);
+a.r = 1; a.g = 0.74; a.b = 0.30; a.a = 0.9;
+`,
+  }, {
+    baseVals: { enabled: 1, samples: 144, sep: 0, scaling: 1, smoothing: 0.5, spectrum: 0, usedots: 0, thick: 1, additive: 0, r: 1, g: 0.78, b: 0.35, a: 1 },
+    init_eqs_str: '', frame_eqs_str: '',
+    point_eqs_str: `
+var i = Math.round(a.sample * 143), ray = Math.floor(i / 3), tip = (i % 3) == 1 ? 1 : 0;
+var th = 1.5707963 - (ray + 0.5) / 48 * 3.14159265;
+var len = Math.min(0.075, Math.abs(a.value1) * 0.22);
+var r = 0.066 * (1 + 0.22 * a.q2) + tip * (0.006 + len);
+a.x = 0.5 + r * 0.5625 * Math.cos(th); a.y = 0.5 + r * 0.5625 * Math.sin(th);
+a.r = 1; a.g = 0.74; a.b = 0.30; a.a = 0.9;
+`,
+  }],
+  comp: `
   vec2 p = P(uv);
-  // the old picture turns a touch and sinks inward, so the leaves leave soft spiral trails
-  vec2 q = rot2(p, 0.0035) * 0.994;
-  vec3 c = texture(sampler_main, vec2(q.x * texsize.y / texsize.x + 0.5, 0.5 - q.y)).rgb * 0.955;
-  float r = length(p), a = atan(p.y, p.x);
-  float br = 0.85 + 0.25 * bass_att;
-  vec3 add = vec3(0.0);
+  vec3 c = texture(sampler_main, uv).rgb;
+  c += texture(sampler_blur1, uv).rgb * vec3(0.26, 0.20, 0.12);
+  ret = finish(c * 1.05, p, 0.75);
+`,
+});
+// Ladybug swarm: ladybirds on the wing, wing cases open and hind wings a blur, wheeling in one slow swirl round
+// a drifting centre through soft-focus night foliage. Near ones are big and sharp, far ones small and dim.
+// Nothing jumps: the song's energy smoothly speeds the swirl up and opens it wider, and the lights behind
+// breathe with the bass, mids and treble.
+HL.mk('Hearth - Ladybug swarm', {
+  frame: `
+if (s.T === undefined) { s.T = 0; s.spd = 0.6; s.wide = 0; }
+s.spd += (0.45 + 0.6 * Math.min(1.5, s.vol) + 0.5 * Math.min(1.2, s.bs) - s.spd) * k(1.0);
+s.T += dt * s.spd;
+s.wide += (Math.min(1.2, s.bs) - s.wide) * k(0.9);
+a.q7 = s.T; a.q29 = s.wide;
+`,
+  fn: `
+// where ladybird fi is at swirl-time T: an oval orbit round the drifting centre, inner ones going round faster
+vec2 bpos(float fi, float T) {
+  vec2 C = vec2(0.40 * sin(0.21 * T) + 0.14 * sin(0.47 * T + 1.0), 0.15 * sin(0.29 * T + 0.5));
+  float rad = (0.14 + 0.34 * fract(fi * 0.618 + 0.3)) * (1.0 + 0.45 * q29) * (1.0 + 0.18 * sin(T * 0.6 + fi * 2.0));
+  float th = T * (0.75 + 0.5 * h1(fi + 3.0)) / (0.6 + rad * 2.0) + fi * 2.399;
+  return C + rad * vec2(1.4 * cos(th), 0.85 * sin(th)) + 0.03 * vec2(sin(T * 1.3 + fi * 5.0), cos(T * 1.1 + fi * 3.0));
+}
+float ell(vec2 q, vec2 c, vec2 r, float e) { vec2 d = (q - c) / r; float l = length(d); return smoothstep(e, -e, (l - 1.0) * min(r.x, r.y)); }
+// one ladybird in body space: x forward, body one unit long. open 0 = walking, 1 = flying. Returns rgb + alpha
+vec4 bug(vec2 q, float open, float flap, float e) {
+  if (dot(q, q) > 1.7) return vec4(0.0);
+  vec3 col = vec3(0.0); float A = 0.0;
+  float th = open * 1.08;
+  // hind wings: long, smoky and see-through, beating fast
+  if (open > 0.05) {
+    for (int sI = 0; sI < 2; sI++) {
+      float sg = sI == 0 ? 1.0 : -1.0;
+      vec2 l = rot2(vec2(q.x, q.y * sg) - vec2(0.12, 0.06), th * 0.72 + 0.22 * flap);
+      float wv = ell(l, vec2(-0.56, 0.02), vec2(0.58, 0.19), e + 0.03) * open;
+      float vein = smoothstep(0.02, 0.0, abs(l.y - 0.08 - 0.12 * l.x * l.x)) * 0.5;
+      vec3 wc = vec3(0.85, 0.72, 0.5) * (0.6 + vein);
+      float wa = wv * 0.5;
+      col = mix(col, wc, wa / max(A + wa * (1.0 - A), 0.001) * (1.0 - A) + 0.0); A = A + wa * (1.0 - A);
+    }
+  }
+  // abdomen under the wing cases
+  float ab = ell(q, vec2(-0.12, 0.0), vec2(0.33, 0.23), e);
+  vec3 abc = vec3(0.07, 0.05, 0.04) * (0.7 + 0.5 * smoothstep(0.1, 0.0, abs(fract(q.x * 9.0) - 0.5) - 0.3));
+  col = mix(col, abc, ab); A = max(A, ab);
+  // the two red wing cases, each half of the dome, swung out about its shoulder
+  for (int sI = 0; sI < 2; sI++) {
+    float sg = sI == 0 ? 1.0 : -1.0;
+    vec2 l = rot2(vec2(q.x, q.y * sg) - vec2(0.24, 0.03), th) + vec2(0.24, 0.03);
+    float el = ell(l, vec2(-0.08, 0.0), vec2(0.43, 0.37), e) * smoothstep(-e, e, l.y);
+    if (el > 0.001) {
+      vec2 d = (l - vec2(-0.08, 0.0)) / vec2(0.43, 0.37);
+      float rr = dot(d, d);
+      vec3 red = mix(vec3(0.86, 0.15, 0.06), vec3(0.42, 0.03, 0.02), rr * rr);
+      red *= 0.75 + 0.45 * sat(0.6 - d.y * 0.6 + d.x * 0.3);
+      float sp = ell(l, vec2(-0.02, 0.17), vec2(0.075, 0.07), e) + ell(l, vec2(-0.28, 0.11), vec2(0.07, 0.065), e)
+        + ell(l, vec2(-0.25, 0.27), vec2(0.055, 0.05), e) + ell(l, vec2(0.21, 0.02), vec2(0.06, 0.055), e);
+      red = mix(red, vec3(0.03, 0.02, 0.02), sat(sp));
+      // wet shine
+      red += vec3(1.0, 0.9, 0.8) * 0.4 * ell(l, vec2(0.08, 0.21), vec2(0.08, 0.025), 0.025);
+      red *= 1.0 - 0.5 * smoothstep(0.03, 0.0, l.y) * (1.0 - open);
+      col = mix(col, red, el); A = max(A, el);
+    }
+  }
+  // pronotum with its two pale patches, and the head
+  float pr = ell(q, vec2(0.33, 0.0), vec2(0.14, 0.26), e);
+  vec3 pc = vec3(0.035, 0.03, 0.03) + vec3(0.2) * ell(q, vec2(0.36, 0.0), vec2(0.03, 0.12), 0.05);
+  pc = mix(pc, vec3(0.92, 0.88, 0.78), ell(vec2(q.x, abs(q.y)), vec2(0.37, 0.17), vec2(0.05, 0.065), e));
+  col = mix(col, pc, pr); A = max(A, pr);
+  float hd = ell(q, vec2(0.47, 0.0), vec2(0.07, 0.11), e);
+  col = mix(col, vec3(0.03), hd); A = max(A, hd);
+  // feelers
+  vec2 fq = vec2(q.x - 0.5, abs(q.y) - 0.06);
+  float fe = smoothstep(0.012 + e, 0.012 - e, abs(fq.y - fq.x * 0.9)) * step(0.0, fq.x) * step(fq.x, 0.11);
+  col = mix(col, vec3(0.03), fe); A = max(A, fe);
+  return vec4(col, A);
+}
+// soft discs of light, the way lamps and gaps in leaves blur behind a close subject
+vec3 bokeh(vec2 p) {
+  vec3 c = vec3(0.0);
+  for (int i = 0; i < 9; i++) {
+    float fi = float(i);
+    vec2 pos = vec2((h1(fi + 0.5) - 0.5) * 1.9, (h1(fi + 9.5) - 0.5) * 1.0) + 0.05 * vec2(sin(q1 * 0.11 + fi * 2.0), cos(q1 * 0.09 + fi * 3.0));
+    float rad = 0.06 + 0.11 * h1(fi + 4.0);
+    float d = length(p - pos) / rad;
+    float disc = smoothstep(1.0, 0.86, d) * (0.65 + 0.35 * smoothstep(0.6, 1.0, d));
+    vec3 tint = mix(vec3(0.10, 0.17, 0.07), vec3(0.34, 0.22, 0.07), step(0.62, h1(fi + 7.0)));
+    c += tint * disc * (0.30 + 0.15 * sin(q1 * 0.3 + fi * 1.9)) * (0.55 + 1.3 * (mod(fi, 3.0) < 0.5 ? q2 : (mod(fi, 3.0) < 1.5 ? q8 : q4)));
+    rad *= 1.0;
+  }
+  return c;
+}
+`,
+  warp: `
+  vec2 p = P(uv);
+  float px = 1.0 / texsize.y;
+  // background: deep foliage out of focus
+  float bg = fbm(p * 1.6 + vec2(q1 * 0.02, 0.0));
+  vec3 c = mix(vec3(0.012, 0.022, 0.014), vec3(0.05, 0.085, 0.04), bg * bg * 1.6);
+  c += vec3(0.07, 0.05, 0.02) * smoothstep(0.9, 0.0, length(p - vec2(0.45, 0.3)));
+  // big leaves hanging in the dark behind, far out of focus and swaying a little
+  for (int i = 0; i < 5; i++) {
+    float fi = float(i);
+    vec2 lp = vec2(-0.75 + 0.42 * fi + 0.1 * sin(fi * 5.0), (mod(fi, 2.0) < 0.5 ? 0.38 : -0.42) + 0.08 * sin(fi * 3.0));
+    float la = (mod(fi, 2.0) < 0.5 ? -1.5708 : 1.5708) + 0.5 * sin(fi * 2.3) + 0.06 * sin(q1 * 0.4 + fi * 2.0);
+    float ll = 0.5 + 0.2 * h1(fi + 60.0);
+    vec2 lq = rot2(p - lp, -la) / ll;
+    float m = leafA(lq, 0.3, fi + 40.0, 0.07);
+    float ribb = smoothstep(0.03, 0.0, abs(lq.y - (h1(fi + 41.0) - 0.5) * 0.45 * lq.x * (1.0 - lq.x)));
+    c = mix(c, vec3(0.035, 0.07, 0.03) * (0.8 + 0.5 * bg) + vec3(0.03, 0.035, 0.012) * ribb, m * 0.75);
+  }
+  c += bokeh(p) * 0.85;
+  // the swarm
+  const int N = 20;
+  for (int i = 0; i < N; i++) {
+    float fi = float(i);
+    float z = (fi + 0.5) / float(N);
+    float size = mix(0.045, 0.14, z * z);
+    vec2 pos = bpos(fi, q7);
+    vec2 d = p - pos;
+    if (dot(d, d) > size * size * 1.7) continue;
+    vec2 vel = bpos(fi, q7 + 0.03) - pos;
+    float ang = atan(vel.y, vel.x);
+    float flap = sin(time * 43.0 + fi * 2.1);
+    vec4 b = bug(rot2(d, -ang) / size, 0.84 + 0.10 * q2, flap, px / size * (1.0 + 2.0 * (1.0 - z)));
+    b.rgb *= mix(0.5, 1.05, z);
+    c = mix(c, b.rgb, b.a * mix(0.8, 1.0, z));
+  }
+  ret = c;
+`,
+  comp: `
+  vec2 p = P(uv);
+  vec3 c = texture(sampler_main, uv).rgb;
+  c += texture(sampler_blur1, uv).rgb * vec3(0.22, 0.2, 0.14);
+  ret = finish(c * 1.1, p, 0.6);
+`,
+});
+// Leaf down a creek: looking straight down into a shallow stream. Sunlit ripples net over a pebble bed,
+// autumn leaves ride the current with their shadows on the stones below. The current lunges on every beat and
+// each leaf sends out a ring, the net of light flares with the bass, and the treble scatters sparkles.
+HL.mk('Hearth - Leaf down a creek', {
+  fn: `
+float caust(vec2 p, float t) {
+  vec2 i = p; float c = 1.0;
+  for (int n = 0; n < 4; n++) {
+    float tt = t * (1.0 - 3.5 / float(n + 1));
+    i = p + vec2(cos(tt - i.x) + sin(tt + i.y), sin(tt - i.y) + cos(tt + i.x));
+    c += 1.0 / length(vec2(p.x / (sin(i.x + tt) * 200.0), p.y / (cos(i.y + tt) * 200.0)));
+  }
+  c = 1.17 - pow(c / 4.0, 1.4);
+  return pow(abs(c), 8.0);
+}
+// the stream bed: rounded pebbles in earth colours, dark in the gaps
+vec3 bed(vec2 p) {
+  vec2 g = floor(p), f = fract(p); float d1 = 9.0, d2 = 9.0; vec2 id = g;
+  for (int j = -1; j <= 1; j++) for (int i = -1; i <= 1; i++) {
+    vec2 o = vec2(float(i), float(j)); vec2 r = o + h22(g + o) - f; float d = dot(r, r);
+    if (d < d1) { d2 = d1; d1 = d; id = g + o; } else if (d < d2) d2 = d;
+  }
+  float edge = sqrt(d2) - sqrt(d1);
+  float k = h2(id + 3.3), k2 = h2(id + 7.1);
+  vec3 c = mix(vec3(0.17, 0.14, 0.11), vec3(0.34, 0.30, 0.25), k);
+  c = mix(c, vec3(0.17, 0.19, 0.13), step(0.78, k2));
+  c = mix(c, vec3(0.36, 0.25, 0.15), step(k2, 0.14));
+  c *= 0.75 + 0.5 * nz(p * 7.0);
+  c *= (0.38 + 0.62 * smoothstep(0.0, 0.3, edge)) * (1.25 - 1.0 * sqrt(d1));
+  c += vec3(0.10, 0.09, 0.07) * smoothstep(0.25, 0.0, length(sqrt(d1) - 0.12)) * k;
+  return c;
+}
+float meander(float x) { return 0.05 * sin(x * 2.1 + 0.7) + 0.025 * sin(x * 4.3 - 1.0); }
+float surf(vec2 f) { return fbm2(f * vec2(2.2, 5.5)) + 0.5 * nz(f * vec2(5.0, 11.0) + 4.0); }
+`,
+  warp: `
+  vec2 p = P(uv);
+  float px = 1.0 / texsize.y;
+  float flow = q1 * 0.16;
+  // water runs left to right along a lazy bend, quicker in the middle than at the sides
+  vec2 s = vec2(p.x, p.y - meander(p.x));
+  float lane = 1.0 - 0.5 * s.y * s.y * 4.0;
+  vec2 f = vec2(s.x - flow * lane, s.y);
+  float h0 = surf(f), hx = surf(f + vec2(0.012, 0.0)), hy = surf(f + vec2(0.0, 0.012));
+  vec2 n = vec2(hx - h0, hy - h0) / 0.012;
+  // what lies under the water, bent by the ripples
+  vec2 bp = p + n * 0.005;
+  float deep = fbm2(bp * 1.3 + 5.0);
+  vec3 c = bed(bp * 13.0 + vec2(3.0, 1.0));
+  c = mix(c, vec3(0.2, 0.19, 0.14) * (0.6 + 0.8 * nz(bp * 5.0)), 0.25);
+  c = mix(c, c * vec3(0.45, 0.62, 0.50), 0.4 + 0.6 * deep) * (1.15 - 0.7 * deep);
+  // the bright net the sun throws through the ripples
+  float ca = caust((f + n * 0.008) * vec2(11.0, 19.0) - 250.0, q1 * 0.8);
+  float cb = caust((f + n * 0.012) * vec2(6.3, 10.3) - 251.7, q1 * 0.55 + 2.0);
+  float light = ca * 1.0 + cb * 0.9;
+  c *= 0.5 + 0.3 * h0;
+  c += c * vec3(1.8, 1.3, 0.6) * light * (1.6 + 1.8 * q2) + vec3(0.9, 0.62, 0.25) * light * 0.09;
+
+  // leaves on the current, with their shadows on the bed
+  float span = 2.9;
+  for (int i = 0; i < 6; i++) {
+    float fi = float(i);
+    float sp = 0.75 + 0.5 * h1(fi + 0.3);
+    float x = mod(flow * sp + h1(fi + 1.0) * span + fi * 0.47, span) - span * 0.5;
+    float y0 = (h1(fi + 4.0) - 0.5) * 0.62;
+    float y = y0 + meander(x) + 0.018 * sin(q1 * 0.8 + fi * 2.0);
+    float len = 0.20 + 0.20 * h1(fi + 6.0) * h1(fi + 6.0);
+    float ang = fi * 2.4 + (mod(fi, 2.0) < 0.5 ? 0.35 : -0.35) * q27 + 0.9 * sin(q1 * 0.21 + fi * 3.0) + q1 * 0.07 * (h1(fi + 8.0) - 0.5) + 0.12 * sin(q1 * 1.1 + fi);
+    vec2 d = p - vec2(x, y);
+    if (dot(d, d) > len * len * 1.0) continue;
+    vec3 la, lb; leafPal(h1(fi + 9.0) * 0.8 + 0.2, la, lb);
+    float w = 0.25 + 0.06 * h1(fi + 11.0);
+    // shadow: lower and to the right, soft, wobbling with the water
+    vec2 qs = rot2(d - vec2(0.03, -0.04) + n * 0.006, -ang) / len + vec2(0.5, 0.0);
+    float sh = leaf(qs, w, fi * 3.7, 0.05, la, lb, 0.0).a;
+    c *= 1.0 - 0.7 * sh;
+    vec2 q = rot2(d, -ang) / len + vec2(0.5, 0.0);
+    // a thin bright line where the water clings to the edge
+    float halo = leaf(q, w + 0.02, fi * 3.7, 0.035, la, lb, 0.0).a;
+    c += vec3(0.5, 0.45, 0.3) * halo * 0.10;
+    // a ring spreads from the leaf on each beat
+    float rr = length(d) - (len * 0.30 + q28 * 0.16);
+    c += vec3(1.0, 0.85, 0.55) * exp(-rr * rr / 0.00012) * exp(-q28 * 3.5) * 0.16 * smoothstep(len, len * 0.7, length(d));
+    float rim; vec4 l = leafK(q, w, fi * 3.7, px / len, la, lb, 0.09, mod(fi, 3.0) < 0.5 ? 0.0 : (mod(fi, 3.0) < 1.5 ? 2.0 : 4.0), rim);
+    l.rgb *= 0.85 + 0.5 * light + 0.12 * h0;
+    c = mix(c, l.rgb, l.a);
+  }
+  // sparkles riding the surface, more of them when the treble is busy
+  float gl = smoothstep(0.55 - 0.3 * q4, 1.3, ca * cb * 3.0 + ca * ca * 0.6);
+  c += vec3(1.0, 0.88, 0.62) * gl * 0.5;
+  ret = c;
+`,
+  comp: `
+  vec2 p = P(uv);
+  vec3 c = texture(sampler_main, uv).rgb;
+  c += texture(sampler_blur1, uv).rgb * vec3(0.30, 0.24, 0.14);
+  ret = finish(c * 0.85, p, 0.7);
+`,
+});
+// Dandelion drift: a dandelion clock at dusk, backlit, letting its seeds go. Each seed is a real one - a
+// parachute of fine hairs over a thin stalk and a brown seed - tumbling off on the wind and leaving a faint
+// wisp of light. The wind gusts with the bass, and each beat makes the clock shimmer.
+HL.mk('Hearth - Dandelion drift', {
+  frame: `
+s.gust = (s.gust || 0) + dt * (0.25 + 0.4 * Math.min(1.2, s.bs) + 1.6 * s.pulse);
+a.q7 = s.gust;
+`,
+  fn: `
+// hairs radiating from a point: v = offset from the hub, n hairs, lw = line width. Constant-width lines.
+float hairs(vec2 v, float n, float turn, float lw) {
+  float d = length(v), ang = atan(v.y, v.x) + turn, st = TAU / n;
+  float a0 = floor(ang / st + 0.5) * st;
+  return smoothstep(lw, lw * 0.25, d * abs(sin(ang - a0)));
+}
+// one flying seed, in its own space: hub of the parachute at the origin, stalk hanging down -y. Unit = hair length
+float seed(vec2 q, float sd, float e, out float body) {
+  body = 0.0;
+  if (dot(q, q) > 9.0) return 0.0;
+  float d = length(q), ang = atan(q.y, q.x);
+  // the parachute: a shallow cup of hairs seen from the side, so the fan covers a bit more than the top half
+  float fan = smoothstep(-0.55, -0.2, sin(ang)) ;
+  float st = TAU / 22.0;
+  float id = floor(ang / st + 0.5);
+  float len = 0.78 + 0.22 * h1(id + sd);
+  float a0 = id * st;
+  float hair = smoothstep(0.02 + e, 0.006, d * abs(sin(ang - a0))) * smoothstep(len, len * 0.85, d) * fan;
+  // each hair ends in a bright speck, and the whole cup has a soft glow
+  float tip = smoothstep(0.07, 0.0, length(q - len * 0.97 * vec2(cos(a0), sin(a0)))) * fan;
+  float glow = exp(-d * d * 1.6) * 0.20 * smoothstep(-0.9, 0.3, sin(ang));
+  float hub = smoothstep(0.07, 0.02, d);
+  // stalk and seed
+  float bend = 0.10 * q.y * q.y * (h1(sd + 3.0) - 0.5);
+  float stalk = smoothstep(0.016 + e, 0.008, abs(q.x - bend)) * step(q.y, 0.0) * step(-1.9, q.y);
+  vec2 sq = (q - vec2(bend, -2.08)) / vec2(0.055, 0.22);
+  body = smoothstep(1.0 + e * 8.0, 0.8, length(sq));
+  return hair * 0.75 + tip * 0.8 + glow + hub * 0.6 + stalk * 0.55;
+}
+// the clock itself: a ball of seeds still holding on
+float clock(vec2 d, float R, float px) {
+  float r = length(d) / R, a = atan(d.y, d.x);
+  if (r > 1.3) return 0.0;
+  float I = 0.0;
   for (int k = 0; k < 3; k++) {
     float fk = float(k);
-    float n = 6.0 + 3.0 * fk;
-    float spin = (fk == 1.0 ? -1.0 : 1.0) * time * (0.09 + 0.04 * fk);
-    float aa = mod(a + spin + 3.14159 / n, 6.28318 / n) - 3.14159 / n;
-    vec2 lq = vec2(cos(aa), sin(aa)) * r;
-    float r0 = (0.05 + 0.105 * fk) * br;
-    float L = 0.085 + 0.03 * fk;
-    float f = leaf(lq - vec2(r0, 0.0), L, 0.026 + 0.006 * fk);
-    float v = rib(lq - vec2(r0, 0.0), L);
-    vec3 col = mix(vec3(0.28, 0.42, 0.16), vec3(0.88, 0.70, 0.29), 0.5 + 0.5 * sin(time * 0.3 + fk * 1.7));
-    add += f * (col * (0.9 - 0.5 * v)) * (0.32 + 0.12 * mid_att);
+    float K = 15.0 + 8.0 * fk, shell = 0.60 + 0.16 * fk;
+    float aa = a + (fk - 1.0) * 0.035 * sin(q1 * 0.25 + fk) + fk * 0.7;
+    float cell = TAU / K;
+    float id = floor(aa / cell);
+    float jit = h1(id + fk * 37.0);
+    float ca = (id + 0.5 + 0.3 * (jit - 0.5)) * cell;
+    float rt = shell * (0.96 + 0.08 * h1(id + fk * 11.0 + 5.0));
+    // its stalk back to the centre
+    float da = aa - ca;
+    I += smoothstep(1.6 * px, 0.4 * px, r * R * abs(sin(da))) * smoothstep(0.05, 0.12, r) * step(r, rt) * 0.30;
+    // its parachute, seen from all sorts of angles
+    vec2 v = vec2(r * cos(da) - rt, r * sin(da));
+    float dd = length(v);
+    float tr = 0.20 - 0.03 * fk;
+    I += hairs(v, 11.0, jit * 6.0 + q1 * 0.05, 1.3 * px / R) * smoothstep(tr, tr * 0.5, dd) * (0.42 + 0.3 * jit) * (1.0 + 0.9 * q3 * jit);
+    I += exp(-dd * dd / (tr * tr * 0.3)) * 0.09;
   }
-  // a small gold seed in the middle
-  add += vec3(0.9, 0.7, 0.3) * smoothstep(0.03 * br, 0.0, r) * 0.35;
-  ret = max(c, add);
-`, 'c = pow(c, vec3(0.95));');
-
-  // 2. Ladybug swarm: a little flock wandering over dark moss, scattering a bit on the beat
-  looks['Hearth - Ladybug swarm'] = mk(`
+  // more seeds overlap toward the edge of the ball, so it glows there
+  I += 0.16 * smoothstep(1.02, 0.86, r) * smoothstep(0.2, 0.95, r);
+  I *= smoothstep(1.12, 0.98, r);
+  return I;
+}
+`,
+  warp: `
   vec2 p = P(uv);
-  vec3 c = texture(sampler_main, uv).rgb * 0.55;
-  vec3 moss = mix(vec3(0.03, 0.05, 0.025), vec3(0.08, 0.12, 0.05), fbm(p * 3.0 + vec2(0.0, time * 0.02)));
-  c = max(c, moss * 0.9);
-  vec2 home = vec2(0.3 * sin(time * 0.11), 0.15 * sin(time * 0.15 + 1.0));
-  for (int i = 0; i < 22; i++) {
+  float px = 1.0 / texsize.y;
+  // dusk: dark green above, a low amber glow behind the clock
+  vec3 bg = mix(vec3(0.012, 0.022, 0.016), vec3(0.035, 0.055, 0.035), sat(0.5 - p.y));
+  bg += vec3(0.42, 0.22, 0.06) * exp(-length((p - vec2(-0.62, -0.42)) * vec2(0.9, 1.5)) * 2.6) * (0.5 + 0.6 * q2);
+  bg += vec3(0.10, 0.09, 0.04) * fbm(p * 2.0 + vec2(q7 * 0.02, 0.0)) * 0.25;
+  // wisps: last frame carried along by the wind, fading
+  vec3 prev = texture(sampler_main, uv - vec2(0.0016, -0.0007) * (1.0 + q2)).rgb;
+  vec3 c = bg;
+  // the clock on its stem
+  vec2 cc = vec2(-0.52, -0.10 + 0.006 * sin(q7 * 0.9));
+  float R = 0.19 * (1.0 + 0.05 * q3);
+  float sx = cc.x + 0.10 * pow(sat((cc.y - p.y) / 0.5), 1.8);
+  float stem = smoothstep(0.007 + px, 0.007 - px, abs(p.x - sx)) * step(p.y, cc.y);
+  c = mix(c, vec3(0.10, 0.12, 0.05) + vec3(0.2, 0.14, 0.05) * smoothstep(0.0, 0.007, p.x - sx), stem);
+  c = mix(c, vec3(0.16, 0.13, 0.06), smoothstep(0.024, 0.018, length(p - cc)));
+  float ck = clock(p - cc, R, px);
+  c += vec3(1.0, 0.93, 0.76) * ck * (0.42 + 0.3 * q8 + 0.25 * q3);
+  // seeds on the wind
+  for (int i = 0; i < 20; i++) {
     float fi = float(i);
-    float sp = 0.18 + 0.25 * hh(fi);
-    float t = time * sp + fi * 7.3;
-    float rad = (0.12 + 0.3 * hh(fi + 3.0)) * (0.9 + 0.3 * bass_att);
-    vec2 pos = home + rad * vec2(1.5 * sin(t * 1.1 + fi), sin(t * 0.83 + fi * 2.1));
-    vec2 vel = vec2(1.5 * cos(t * 1.1 + fi) * 1.1, cos(t * 0.83 + fi * 2.1) * 0.83);
-    float ang = atan(vel.y, vel.x);
-    vec2 q = rot2(p - pos, -ang);
-    float s = 0.02 + 0.01 * hh(fi + 9.0);
-    float body = smoothstep(1.0, 0.85, length(q / vec2(s * 1.15, s)));
-    float head = smoothstep(1.0, 0.7, length((q - vec2(s * 1.05, 0.0)) / vec2(s * 0.45, s * 0.6)));
-    float seam = smoothstep(s * 0.12, 0.0, abs(q.y)) * step(q.x, s * 0.9);
-    float dots = 0.0;
-    for (int d = 0; d < 3; d++) {
-      float fd = float(d);
-      vec2 dp = vec2(s * (0.45 - 0.45 * fd), s * 0.45);
-      dots += smoothstep(s * 0.22, s * 0.12, length(vec2(q.x, abs(q.y)) - dp));
-    }
-    vec3 red = vec3(0.78, 0.16, 0.08) * (0.85 + 0.3 * treb_att);
-    vec3 bug = mix(red, vec3(0.03), clamp(seam + dots, 0.0, 1.0));
-    bug += vec3(0.25) * smoothstep(s * 0.5, 0.0, length(q - vec2(s * 0.2, -s * 0.35)));
-    c = mix(c, bug, body);
-    c = mix(c, vec3(0.02), head * (1.0 - body));
+    float z = h1(fi + 2.0);
+    float u = fract(q7 * (0.035 + 0.03 * h1(fi + 4.0)) + h1(fi + 6.0));
+    float fromClock = step(h1(fi + 8.0), 0.7);
+    vec2 start = mix(vec2(-1.05, (h1(fi + 10.0) - 0.5) * 0.9), cc + R * 0.8 * vec2(cos(fi * 2.4), sin(fi * 2.4)), fromClock);
+    float rise = (h1(fi + 12.0) - 0.35) * 0.75;
+    vec2 pos = start + vec2(u * 2.3, rise * u * (0.4 + 0.6 * u) + 0.05 * sin(u * 9.0 + fi * 3.0) * smoothstep(0.0, 0.2, u));
+    float sc = mix(0.022, 0.058, z * z) * (0.75 + 0.5 * u);
+    vec2 d = p - pos;
+    if (dot(d, d) > sc * sc * 9.0) continue;
+    float tilt = -0.35 + 0.45 * sin(q7 * (0.5 + 0.4 * h1(fi + 14.0)) + fi * 2.0) - 0.2 * q2;
+    float body;
+    float sI = seed(rot2(d, -tilt) / sc, fi, px / sc, body);
+    float fade = smoothstep(0.0, 0.05, u) * smoothstep(1.0, 0.92, u) * mix(0.55, 1.0, z);
+    c = mix(c, vec3(0.20, 0.13, 0.06), body * fade);
+    c += vec3(1.0, 0.92, 0.74) * sI * fade * (0.5 + 0.5 * q4);
   }
+  // wisps: what the seeds drew a moment ago, fading
+  c = max(c, prev * 0.86 - 0.006);
+  // the near bank: dark grass against the glow
+  float gy = -0.43 + 0.04 * sin(p.x * 2.0 + 1.0) + 0.012 * sin(p.x * 9.0);
+  float gx = p.x * 64.0 + 3.0 * nz(vec2(p.x * 9.0, 2.0)), gid = floor(gx);
+  float gh = 0.02 + 0.13 * h1(gid) * h1(gid + 3.0);
+  float tt = sat((p.y - gy) / gh);
+  float blade = step(p.y, gy + gh) * smoothstep(0.34 * pow(1.0 - tt, 0.7), 0.22 * pow(1.0 - tt, 0.7), abs(fract(gx) - 0.5 - ((h1(gid + 5.0) - 0.5) * 0.7 + 0.25 * sin(q7 * 0.7 + gid * 0.3)) * tt * tt));
+  c = mix(c, vec3(0.008, 0.014, 0.009), max(blade, smoothstep(gy + 0.004, gy - 0.004, p.y)));
   ret = c;
-`, '', {});
-
-  // 3. Leaf down a creek: water flowing left to right with gold glints, a few leaves riding it
-  looks['Hearth - Leaf down a creek'] = mk(`
+`,
+  comp: `
   vec2 p = P(uv);
-  float fl = time * 0.12;
-  vec2 w = p * vec2(2.2, 5.0);
-  float ripple = fbm(w + vec2(-fl * 3.0, 0.0) + 0.6 * fbm(w * 1.7 + vec2(-fl * 4.0, time * 0.05)));
-  vec3 water = mix(vec3(0.02, 0.06, 0.05), vec3(0.08, 0.17, 0.13), ripple);
-  float glint = pow(max(0.0, fbm(w * 2.6 + vec2(-fl * 6.0, 0.0)) - 0.55) * 2.4, 3.0);
-  water += vec3(0.95, 0.75, 0.35) * glint * (0.35 + 0.5 * treb_att);
-  // soft feedback so the glints stream into long streaks
-  vec3 prev = texture(sampler_main, uv - vec2(0.0025, 0.0)).rgb;
-  vec3 c = mix(water, max(water, prev * 0.93), 0.6);
-  for (int i = 0; i < 4; i++) {
-    float fi = float(i);
-    float sp = 0.045 + 0.02 * hh(fi);
-    float span = texsize.x / texsize.y + 0.4;
-    float x = mod(time * sp + hh(fi + 1.0) * span, span) - span * 0.5;
-    float y = -0.3 + 0.2 * fi + 0.035 * sin(time * 0.7 + fi * 2.0) + 0.02 * sin(x * 9.0);
-    float ang = 0.5 * sin(time * 0.35 + fi * 3.0) + 0.15 * sin(time * 1.3 + fi);
-    vec2 q = rot2(p - vec2(x, y), -ang) + vec2(0.06, 0.0);
-    float f = leaf(q, 0.12, 0.032);
-    vec3 col = mix(vec3(0.55, 0.36, 0.10), vec3(0.88, 0.64, 0.22), hh(fi + 5.0));
-    col *= 0.85 - 0.45 * rib(q, 0.12);
-    // a darker shadow on the water just below the leaf
-    vec2 qs = rot2(p - vec2(x + 0.01, y - 0.012), -ang) + vec2(0.06, 0.0);
-    c *= 1.0 - 0.45 * leaf(qs, 0.12, 0.034);
-    c = mix(c, col, f);
-  }
-  ret = c;
-`, '');
-
-  // 4. Dandelion drift: seed heads float up and sideways on a slow wind, trailing faint light
-  looks['Hearth - Dandelion drift'] = mk(`
+  vec3 c = texture(sampler_main, uv).rgb;
+  c += texture(sampler_blur1, uv).rgb * vec3(0.30, 0.26, 0.18);
+  ret = finish(c * 1.05, p, 0.6);
+`,
+});
+// Firefly meadow: a summer night. Stars over a far line of trees, mist lying in the grass, and fireflies
+// drawing short strokes of light as they rise. Their glow lights the grass and mist around them. Some flash
+// on the beat, the rest keep their own slow time, and the grass leans when the bass blows through.
+HL.mk('Hearth - Firefly meadow', {
+  // the feedback buffer holds only the light: fresh sparks over the fading strokes of the last moments
+  warp: `
   vec2 p = P(uv);
-  vec3 c = texture(sampler_main, uv + vec2(-0.0006, 0.0012)).rgb * 0.93;
-  vec3 sky = mix(vec3(0.02, 0.035, 0.02), vec3(0.07, 0.09, 0.05), 1.0 - uv.y);
-  c = max(c, sky);
-  for (int i = 0; i < 26; i++) {
-    float fi = float(i);
-    float sp = 0.03 + 0.04 * hh(fi);
-    float hgt = 1.3;
-    float y = mod(time * sp + hh(fi + 2.0) * hgt, hgt) - hgt * 0.5;
-    float x = (hh(fi + 4.0) - 0.5) * 1.9 + 0.12 * sin(time * 0.4 + fi * 1.7) + y * 0.25;
-    vec2 q = p - vec2(x, y);
-    float s = 0.018 + 0.016 * hh(fi + 6.0);
-    float a = atan(q.y, q.x), r = length(q);
-    float rays = pow(abs(cos(a * 9.0 + fi + time * 0.3)), 30.0) * smoothstep(s, s * 0.2, r);
-    float puff = smoothstep(s, s * 0.6, r) * 0.25;
-    float stem = smoothstep(0.0022, 0.0, abs(q.x + q.y * 0.15)) * step(-s * 2.2, q.y) * step(q.y, 0.0);
-    float core = smoothstep(s * 0.18, 0.0, length(q + vec2(0.0, s * 0.05)));
-    vec3 col = vec3(0.92, 0.88, 0.72) * (0.55 + 0.35 * mid_att);
-    c = max(c, col * (rays * 0.8 + puff + stem * 0.6 + core * 0.6));
-  }
-  ret = c;
-`, '');
-
-  // 5. Firefly meadow: grass silhouettes swaying, fireflies drifting and glowing in slow pulses
-  looks['Hearth - Firefly meadow'] = mk(`
-  vec2 p = P(uv);
-  vec3 c = texture(sampler_main, uv).rgb * 0.9;
-  vec3 night = mix(vec3(0.015, 0.025, 0.02), vec3(0.04, 0.06, 0.05), 1.0 - uv.y);
-  c = max(c * 0.95, night);
+  vec3 c = texture(sampler_main, uv).rgb * 0.90 - 0.004;
   for (int i = 0; i < 30; i++) {
     float fi = float(i);
-    vec2 pos = vec2((hh(fi) - 0.5) * 1.8, (hh(fi + 1.0) - 0.6) * 0.9);
-    pos += 0.12 * vec2(sin(time * (0.2 + 0.2 * hh(fi + 2.0)) + fi), sin(time * (0.15 + 0.2 * hh(fi + 3.0)) + fi * 1.3));
-    float blink = pow(0.5 + 0.5 * sin(time * (0.7 + 0.6 * hh(fi + 4.0)) + fi * 4.0), 6.0);
-    blink *= 0.7 + 0.5 * bass_att;
-    float g = exp(-pow(length(p - pos) / 0.012, 2.0)) + 0.35 * exp(-length(p - pos) / 0.03);
-    c += vec3(0.95, 0.85, 0.35) * g * blink * 0.55;
+    float z = h1(fi + 1.0);
+    vec2 base = vec2((h1(fi + 2.0) - 0.5) * 1.9, -0.36 + 0.5 * h1(fi + 3.0) * (0.4 + 0.6 * z));
+    float w1 = 0.13 + 0.15 * h1(fi + 4.0), w2 = 0.11 + 0.14 * h1(fi + 5.0);
+    vec2 pos = base + vec2(0.13 * sin(q1 * w1 + fi * 2.0), 0.07 * sin(q1 * w2 + fi * 3.0))
+      + 0.018 * vec2(cos(q1 * (0.6 + w1 * 2.0) + fi), sin(q1 * (0.75 + w2 * 2.0) + fi * 1.7));
+    // flash: every other one answers the beat, the rest keep their own rhythm
+    float per = 3.2 + 3.0 * h1(fi + 6.0);
+    float ph = fract(time / per + h1(fi + 7.0));
+    float own = smoothstep(0.0, 0.03, ph) * smoothstep(0.34, 0.06, ph);
+    float turn = step(mod(q5 + fi, 3.0), 0.5);
+    float onbeat = turn * sqrt(q3);
+    float lit = mod(fi, 3.0) < 1.5 ? max(onbeat, own * 0.4) : own;
+    if (lit < 0.01) continue;
+    float rad = mix(0.004, 0.0095, z);
+    float d = length(p - pos);
+    float g = min(1.0, 1.6 * exp(-d * d / (rad * rad)));
+    vec3 col = mix(vec3(1.0, 0.80, 0.25), vec3(0.78, 1.0, 0.30), h1(fi + 8.0) * 0.7);
+    c = max(c, col * g * lit * mix(0.6, 1.0, z));
   }
-  // grass: tapered blades along the bottom, leaning with the wind
-  float blade = 0.0;
-  for (int k = 0; k < 2; k++) {
-    float fk = float(k);
-    float gx = p.x * (34.0 + 20.0 * fk) + fk * 0.5;
-    float id = floor(gx);
-    float hgt = 0.1 + 0.16 * hh(id + fk * 50.0);
-    float yy = p.y + 0.5;
-    float tt = clamp(yy / hgt, 0.0, 1.0);
-    float lean = (0.25 + 0.15 * sin(time * 0.5 + id * 0.37)) * tt * tt;
-    float cx = fract(gx) - 0.5 - lean;
-    float wdt = 0.28 * (1.0 - tt);
-    blade = max(blade, step(yy, hgt) * smoothstep(wdt, wdt * 0.6, abs(cx)));
+  ret = c;
+`,
+  base: { b1n: 0, b1x: 0.4, b2n: 0, b2x: 0.22, b3n: 0, b3x: 0.14 },
+  cfn: `
+// one layer of grass. Returns coverage (x) and how far up the blade we are (y). head > 0 adds seed heads
+vec2 grass(vec2 p, float dens, float ground, float hmin, float hmax, float sd, float wind, float e, float head) {
+  float gx = p.x * dens;
+  float cov = 0.0, up = 0.0;
+  for (int o = -2; o <= 2; o++) {
+    float id = floor(gx) + float(o);
+    float x0 = (id + h1(id + sd)) / dens;
+    float hgt = hmin + (hmax - hmin) * pow(h1(id + sd + 7.0), 1.6);
+    float gy = ground + 0.03 * sin(x0 * 1.7 + sd) + 0.012 * sin(x0 * 5.3 + sd * 2.0);
+    float t = (p.y - gy) / hgt;
+    if (t > 1.12) continue;
+    float tc = clamp(t, 0.0, 1.0);
+    float lean = ((h1(id + sd + 11.0) - 0.5) * 1.3 + wind * (0.5 + 0.7 * h1(id + sd + 13.0))) * hgt;
+    float xc = x0 + lean * tc * tc;
+    float hw = (0.20 + 0.22 * h1(id + sd + 15.0)) / dens * pow(1.0 - tc, 0.75) * step(t, 1.0);
+    float b = smoothstep(hw + e, hw - e, abs(p.x - xc)) * step(t, 1.0);
+    // a seed head nodding at the top of some stems
+    if (head > 0.0 && h1(id + sd + 17.0) > 0.6) {
+      vec2 hq = vec2(p.x - (x0 + lean * 0.92), p.y - (gy + hgt * 0.97));
+      hq = rot2(hq, -lean / hgt * 1.4);
+      b = max(b, smoothstep(1.0 + e * 60.0, 0.75, length(hq / vec2(0.0045 + 0.07 / dens, 0.028 + 0.5 / dens))));
+    }
+    if (b > cov) { cov = b; up = tc; }
   }
-  vec3 c2 = mix(c, vec3(0.012, 0.022, 0.014), blade);
-  ret = c2;
-`, '');
-
-  // 6. Rain on the pond: rings spread on still dark water, a new drop on each beat and now and then
-  looks['Hearth - Rain on the pond'] = mk(`
+  return vec2(cov, up);
+}
+`,
+  comp: `
   vec2 p = P(uv);
-  vec3 c = vec3(0.02, 0.045, 0.04) + vec3(0.03, 0.05, 0.03) * fbm(p * 2.5 + time * 0.02);
-  float h = 0.0;
-  for (int i = 0; i < 14; i++) {
-    float fi = float(i);
-    float per = 3.0 + 3.0 * hh(fi);
-    float t = mod(time + hh(fi + 1.0) * per, per);
-    float cyc = floor((time + hh(fi + 1.0) * per) / per);
-    vec2 pos = vec2((hh(fi + cyc * 3.1) - 0.5) * 1.6, (hh(fi + cyc * 5.7 + 2.0) - 0.5) * 0.85);
-    float r = length(p - pos);
-    float front = t * 0.11;
-    float env = exp(-t * 0.6) * smoothstep(0.0, 0.03, front - r + 0.03);
-    h += sin((r - front) * 90.0) * exp(-pow((r - front) / 0.03, 2.0)) * env;
+  float px = 1.0 / texsize.y;
+  vec3 spark = texture(sampler_main, uv).rgb;
+  vec3 near = texture(sampler_blur1, uv).rgb, wide = texture(sampler_blur2, uv).rgb, far = texture(sampler_blur3, uv).rgb;
+  // sky, deepest at the top, a little light left low down
+  vec3 c = mix(vec3(0.045, 0.075, 0.075), vec3(0.012, 0.024, 0.034), sat(p.y * 1.7 + 0.2));
+  c += vec3(0.07, 0.085, 0.06) * exp(-pow((p.y - 0.06) / 0.14, 2.0)) * (0.8 + 0.7 * q2);
+  c += vec3(0.05, 0.06, 0.055) * exp(-length(p - vec2(0.55, 0.42)) * 3.0);
+  // stars
+  vec2 sg = rot2(p, 0.4) * 31.0; vec2 si = floor(sg);
+  vec2 so = h22(si) * 0.7 + 0.15;
+  float tw = 0.55 + 0.45 * sin(time * (1.0 + 3.0 * h2(si + 5.0)) + h2(si) * 40.0) + 0.5 * q4 * h2(si + 9.0);
+  float star = smoothstep(0.09, 0.0, length(sg - si - so)) * step(0.86, h2(si + 3.0)) * tw * (0.3 + 0.7 * h2(si + 11.0));
+  c += vec3(0.75, 0.80, 0.70) * star * smoothstep(0.03, 0.22, p.y) * 0.55;
+  // far trees
+  float tl = 0.0 + 0.05 * nz(vec2(p.x * 1.6, 1.0)) + 0.085 * trees(p.x, 5.5, 1.0) + 0.05 * trees(p.x, 13.0, 9.0) + 0.012 * nz(vec2(p.x * 60.0, 2.0)) * 1.0;
+  c = mix(c, vec3(0.010, 0.019, 0.016), smoothstep(tl + 0.004, tl - 0.004, p.y));
+  // mist over the meadow, lit by the fireflies inside it
+  float mist = smoothstep(0.10, -0.25, p.y) * (0.55 + 0.45 * fbm(vec2(p.x * 2.0 + q1 * 0.03, p.y * 6.0)));
+  c += vec3(0.045, 0.065, 0.050) * mist;
+  float wind = 0.22 * sin(q1 * 0.6 + p.x * 2.2) + 0.12 * sin(q1 * 1.3 + p.x * 5.0) + 0.35 * q2;
+  vec3 glow = near * 0.5 + wide * 0.8 + far * 0.8;
+  // back grass, soft and hazy
+  vec2 g1 = grass(p, 70.0, -0.20, 0.04, 0.15, 1.0, wind * 0.6, px * 1.5, 0.0);
+  c = mix(c, vec3(0.020, 0.038, 0.024) * (0.6 + 1.2 * g1.y) + glow * 0.40, g1.x * 0.9);
+  // middle grass
+  vec2 g2 = grass(p, 38.0, -0.33, 0.08, 0.30, 2.0, wind * 0.8, px, 1.0);
+  c = mix(c, vec3(0.012, 0.025, 0.014) * (0.6 + 1.3 * g2.y) + glow * 0.34, g2.x);
+  // the fireflies and their strokes, with haloes
+  c += spark * 1.6 + near * 0.8 + wide * 0.5 * (0.5 + 0.5 * mist) + far * 0.3 * (0.4 + 0.6 * mist);
+  // near grass in front of everything: dark blades with light catching their edges
+  float g3 = grass(p, 17.0, -0.50, 0.12, 0.52, 3.0, wind, px, 1.0).x;
+  float g3in = grass(p, 17.0, -0.50, 0.12, 0.52, 3.0, wind, px * 6.0, 1.0).x;
+  vec3 blade = vec3(0.006, 0.012, 0.008) + (wide * 0.8 + near * 0.6 + far * 0.4) * (0.15 + 1.5 * (1.0 - g3in));
+  c = mix(c, blade, g3);
+  ret = finish(c * 1.15, p, 0.55);
+`,
+});
+// Rain on the pond: looking out across still water at night toward a lit round window on the far bank.
+// Its gold reflection lies down the water and every ripple breaks it up. A soft drizzle keeps the surface
+// alive, and each beat lands one big drop whose rings roll out toward you.
+HL.mk('Hearth - Rain on the pond', {
+  frame: `
+if (!s.drops) { s.drops = []; for (var i = 0; i < 6; i++) s.drops.push({ x: 0, z: 1, t: -99 }); }
+if (s.hit) { var d = s.drops[s.nb % 6]; d.z = 0.7 + 2.2 * Math.random() * Math.random(); d.x = (Math.random() - 0.5) * 1.3; d.t = a.time; }
+for (var i = 0; i < 6; i++) { a['q' + (9 + 3 * i)] = s.drops[i].x; a['q' + (10 + 3 * i)] = s.drops[i].z; a['q' + (11 + 3 * i)] = Math.min(99, a.time - s.drops[i].t); }
+`,
+  fn: `
+const float HZ = 0.17;                    // where the far bank meets the water
+const vec2 LAMP = vec2(0.26, 0.215);      // the lit window
+float bank(float x) { return 0.02 + 0.05 * nz(vec2(x * 1.3, 3.0)) + 0.05 * trees(x, 4.3, 2.0) + 0.03 * trees(x, 11.0, 5.0) + 0.01 * nz(vec2(x * 55.0, 5.0)); }
+// everything above the waterline: sky, far trees, the window and its glow
+vec3 env(vec2 s) {
+  vec3 c = mix(vec3(0.050, 0.075, 0.075), vec3(0.012, 0.022, 0.032), sat((s.y - HZ) * 2.6));
+  c += vec3(0.06, 0.07, 0.05) * exp(-(s.y - HZ) * 9.0);
+  float tl = HZ + bank(s.x);
+  // the hill the window sits in
+  float hill = HZ + 0.115 * exp(-pow((s.x - LAMP.x) / 0.16, 2.0));
+  float land = smoothstep(max(tl, hill) + 0.003, max(tl, hill) - 0.003, s.y);
+  c = mix(c, vec3(0.008, 0.015, 0.012), land);
+  vec2 d = s - LAMP;
+  float r = length(d);
+  float win = smoothstep(0.021, 0.018, r);
+  float bars = max(smoothstep(0.0035, 0.0015, abs(d.x)), smoothstep(0.0035, 0.0015, abs(d.y)));
+  float fl = 0.8 + 0.5 * q8;
+  c += vec3(1.0, 0.62, 0.20) * win * (1.0 - 0.75 * bars) * 1.25 * fl;
+  c += vec3(1.0, 0.55, 0.16) * (0.22 * exp(-r * r / 0.0035) + 0.07 * exp(-r * 7.0)) * fl;
+  // a second, smaller light further along the bank
+  float r2 = length(s - vec2(-0.52, HZ + 0.02));
+  c += vec3(1.0, 0.6, 0.2) * (smoothstep(0.006, 0.004, r2) * 0.9 + 0.08 * exp(-r2 * r2 / 0.0012));
+  return c;
+}
+// slope of one ring of ripples at world point w, from a drop at d0 that fell 'age' seconds ago
+vec2 ring(vec2 w, vec2 d0, float age, float amp, float kk) {
+  if (age > 8.0 || age < 0.0) return vec2(0.0);
+  vec2 dv = w - d0; float r = length(dv) + 1e-4;
+  float u = r - 0.30 * age;
+  float sg = 0.03 + 0.04 * age;
+  if (abs(u) > sg * 2.6) return vec2(0.0);
+  float en = amp * exp(-age * 0.5) * smoothstep(0.0, 0.12, age) / (0.5 + r * 2.0);
+  float ga = exp(-u * u / (sg * sg));
+  float dh = en * ga * (kk * cos(kk * u) - 2.0 * u / (sg * sg) * sin(kk * u));
+  return dv / r * dh;
+}
+`,
+  warp: `
+  vec2 p = P(uv);
+  float px = 1.0 / texsize.y;
+  vec3 c;
+  if (p.y >= HZ) {
+    c = env(p);
+  } else {
+    // where this pixel lands on the water
+    float zc = 0.22 / (HZ - p.y);
+    vec2 w = vec2(p.x * zc, zc);
+    // ripples too fine to draw far away are faded out
+    float fine = zc * zc * px / 0.22;       // size of one pixel in world z
+    vec2 g = vec2(0.0);
+    for (int i = 0; i < 6; i++) {
+      vec3 d = i == 0 ? vec3(q9, q10, q11) : i == 1 ? vec3(q12, q13, q14) : i == 2 ? vec3(q15, q16, q17) : i == 3 ? vec3(q18, q19, q20) : i == 4 ? vec3(q21, q22, q23) : vec3(q24, q25, q26);
+      float kk = 210.0 / (0.45 + 0.55 * d.y);
+      g += ring(w, vec2(d.x * d.y, d.y), d.z, 0.0055, kk) * smoothstep(1.2, 0.35, kk * fine);
+    }
+    for (int i = 0; i < 12; i++) {
+      float fi = float(i);
+      float per = 3.5 + 4.0 * h1(fi);
+      float tt = time + h1(fi + 1.0) * per;
+      float age = mod(tt, per), cyc = floor(tt / per);
+      float dz = 0.45 + 3.2 * h1(fi + cyc * 3.1) * h1(fi + cyc * 1.3 + 4.0);
+      float kk = 260.0 / (0.45 + 0.55 * dz);
+      g += ring(w, vec2((h1(fi + cyc * 5.7 + 2.0) - 0.5) * 1.6 * dz, dz), age, 0.0019, kk) * smoothstep(1.2, 0.35, kk * fine);
+    }
+    // a light breeze on the surface
+    vec2 wv = w * vec2(11.0, 26.0) + vec2(q1 * 0.3, q1 * 0.6);
+    float n0 = fbm2(wv);
+    vec2 gw = vec2(fbm2(wv + vec2(0.15, 0.0)) - n0, fbm2(wv + vec2(0.0, 0.15)) - n0) * 0.16 * smoothstep(3.0, 0.5, fine * 150.0);
+    vec2 gr = g;
+    g += gw;
+    // mirror the far bank in the water, bent by the slope of the surface
+    vec2 rp = vec2(p.x + g.x * 0.25 + gw.x * 0.6, HZ + (HZ - p.y) * 0.96 + gr.y * 0.3 + gw.y * 1.2 + 0.006 * sin(p.y * 520.0 + time * 2.5) * smoothstep(0.0, 0.05, HZ - p.y));
+    rp.y = max(rp.y, HZ + 0.001);
+    vec3 refl = env(rp);
+    float fres = mix(0.45, 0.96, pow(sat(1.0 - (HZ - p.y) * 1.5), 2.0));
+    c = refl * fres + vec3(0.006, 0.014, 0.014) * (1.0 - fres);
+    // crests facing the window pick up its gold, the others a little sky
+    vec2 toL = normalize(vec2(LAMP.x * 3.0 - w.x, 3.2 - w.y));
+    float sl = dot(gr + gw * 0.25, toL);
+    c += vec3(1.0, 0.60, 0.20) * max(sl, 0.0) * 0.9 * exp(-abs(p.x - LAMP.x) * 1.0) + vec3(0.10, 0.16, 0.15) * (max(-sl, 0.0) * 0.8 + abs(g.x) * 0.25);
+    // the window's light lies down the water as a broken gold path
+    float bandw = 0.016 + 0.11 * (HZ - p.y);
+    float band = exp(-pow((p.x - LAMP.x + g.x * 0.5 + gw.x * 2.0) / bandw, 2.0));
+    float glit = smoothstep(0.5, 0.95, nz(w * vec2(26.0, 70.0) + vec2(0.0, q1 * 1.3)) + gw.y * 9.0 + g.y * 1.5);
+    c += vec3(1.0, 0.62, 0.22) * band * (0.05 + 0.75 * glit) * smoothstep(0.75, 0.05, HZ - p.y) * (0.8 + 0.4 * q4);
+    // lily pads riding the ripples
+    for (int i = 0; i < 6; i++) {
+      float fi = float(i);
+      vec2 pc = vec2((h1(fi + 31.0) - 0.5) * 1.5, 0.0) ; pc.y = 0.42 + 0.9 * h1(fi + 33.0); pc.x *= pc.y;
+      pc += 0.02 * vec2(sin(q1 * 0.13 + fi), cos(q1 * 0.11 + fi * 2.0));
+      float pr = 0.045 + 0.035 * h1(fi + 35.0);
+      vec2 dv = w - pc + g * 0.02; float dr = length(dv);
+      if (dr > pr) continue;
+      float an = atan(dv.y, dv.x) + fi * 2.0;
+      float pad = smoothstep(pr, pr - fine * 1.5, dr) * smoothstep(0.10, 0.16, abs(an - 6.2832 * floor(an / 6.2832 + 0.5)) + 0.25 * (1.0 - dr / pr));
+      vec3 pcx = vec3(0.020, 0.045, 0.022) * (0.8 + 0.4 * sin(an * 9.0) * 0.3) + vec3(0.5, 0.3, 0.1) * smoothstep(0.6, 1.0, dr / pr) * 0.12 * exp(-abs(p.x - LAMP.x) * 2.0);
+      c = mix(c, pcx, pad);
+    }
+    c *= 1.0 - 0.25 * sat(length(g) * 2.0) * (1.0 - fres);
   }
-  h *= 0.75 + 0.4 * bass_att;
-  c += vec3(0.85, 0.72, 0.40) * max(h, 0.0) * 0.35 + vec3(0.10, 0.20, 0.14) * max(-h, 0.0) * 0.25;
-  // floating leaves drift slowly round the pond
-  for (int i = 0; i < 3; i++) {
+  // rain in the air, barely there
+  float rn = nz(vec2(p.x * 120.0 + p.y * 9.0, p.y * 2.5 + time * 9.0));
+  c += vec3(0.25, 0.3, 0.28) * smoothstep(0.86, 1.0, rn) * 0.06;
+  ret = c;
+`,
+  comp: `
+  vec2 p = P(uv);
+  vec3 c = texture(sampler_main, uv).rgb;
+  c += texture(sampler_blur1, uv).rgb * vec3(0.35, 0.26, 0.14) + texture(sampler_blur2, uv).rgb * vec3(0.22, 0.14, 0.06);
+  ret = finish(c * 1.15, p, 0.55);
+`,
+});
+// Three looks bred from "martin - angel flight" (the house favourite): the same bones - faint shapes, a current
+// that smears them into ribbons, and an endless fly-through of layers - with Hearth's colours and new currents.
+(function () {
+  const packs = window.butterchurnPresets && (window.butterchurnPresets.default || window.butterchurnPresets);
+  const src = packs && packs.getPresets()['martin - angel flight'];
+  if (!src) return;
+  const flight = (name, o) => {
+    const p = JSON.parse(JSON.stringify(src));
+    // the drifting shapes that become the ribbons
+    Object.assign(p.shapes[2].baseVals, o.shape);
+    p.shapes[2].frame_eqs_str += o.shapeEq || '';
+    // the cloud of specks and the thin line
+    p.waves[0].point_eqs_str = p.waves[0].point_eqs_str.replace('a.r=1;a.g=.5;a.b=1;', o.dots);
+    p.waves[1].point_eqs_str = p.waves[1].point_eqs_str.replace('a.r=.4;a.g=.2;a.b=.7;', o.line);
+    p.frame_eqs_str += 'a.mv_a=0;' + (o.frame || '');
+    p.warp = ` shader_body {
+  vec2 c0 = (uv - 0.5) * vec2(1280.0, 720.0);
+  ${o.current}
+  ret = 0.99 * texture(sampler_main, uv + flow * vec2(1.0 / 1280.0, 1.0 / 720.0) * 12.0).xyz - 0.01;
+ }`;
+    p.comp = ` shader_body {
+  vec2 u = (uv - 0.5) * aspect.xy;
+  vec3 r = vec3(0.0);
+  for (int i = 0; i < ${o.layers}; i++) {
     float fi = float(i);
-    vec2 pos = vec2(0.55 * sin(time * 0.03 + fi * 2.1), 0.3 * sin(time * 0.04 + fi * 1.3));
-    vec2 q = rot2(p - pos, -(time * 0.05 + fi * 2.0)) + vec2(0.05, 0.0);
-    float f = leaf(q, 0.1, 0.03);
-    vec3 col = mix(vec3(0.25, 0.36, 0.12), vec3(0.62, 0.50, 0.20), hh(fi + 7.0)) * (0.85 - 0.4 * rib(q, 0.1));
-    c = mix(c, col, f);
+    float dist = 1.0 - fract(fi / ${o.layers}.0 + q29 * ${o.speed});
+    float inten = sqrt(dist) * (1.0 - dist * dist);
+    float a = fi * ${o.turn};
+    vec2 v = vec2(u.x * cos(a) - u.y * sin(a), u.x * sin(a) + u.y * cos(a));
+    r = max(r, texture(sampler_main, fract(2.0 * v * dist + 0.5)).xyz * inten);
   }
-  vec3 prev = texture(sampler_main, uv).rgb;
-  ret = mix(c, prev, 0.35);
-`, '');
+  r *= 3.0;
+  ${o.grade}
+  r *= 1.0 - 0.5 * smoothstep(0.35, 0.95, length(u));
+  ret = r;
+ }`;
+    window.hearthLooks[name] = p;
+  };
 
-  window.hearthLooks = looks;
+  // Lantern flight: gold ribbons with moss-green shadows, on a grid of round eddies
+  flight('Hearth - Lantern flight', {
+    shape: { r: 1, g: 0.62, b: 0.12, r2: 0.10, g2: 0.30, b2: 0.06, a2: 0.3, sides: 24 },
+    dots: 'a.r=1;a.g=.8;a.b=.4;', line: 'a.r=.5;a.g=.6;a.b=.2;',
+    current: `vec2 t = c0 * 0.022;
+  vec2 flow = vec2(sin(t.y) * cos(t.x * 0.5), -sin(t.x) * cos(t.y * 0.5)) * 1.6 + clamp(tan(t * 0.5), -6.0, 6.0) * 0.15;`,
+    layers: 4, speed: '1.0', turn: '1.5708',
+    grade: 'r = vec3(r.r * 1.0 + r.b * 0.2, r.g * 0.95 + r.b * 0.25, r.b * 0.35);',
+  });
+
+  // Moss flight: green and gold vines that wind round the middle, three layers a third of a turn apart
+  flight('Hearth - Moss flight', {
+    shape: { r: 0.55, g: 0.85, b: 0.20, r2: 0.9, g2: 0.55, b2: 0.05, a2: 0.3, sides: 6 },
+    dots: 'a.r=.8;a.g=1;a.b=.4;', line: 'a.r=.9;a.g=.7;a.b=.2;',
+    current: `float rr = length(c0) + 1.0, an = atan(c0.y, c0.x);
+  vec2 pol = vec2(log(rr) * 5.0, an * 5.0);
+  vec2 f = clamp(tan(pol), -8.0, 8.0) * cos(pol.yx * pol.yx * 0.15);
+  vec2 er = c0 / rr, et = vec2(-er.y, er.x);
+  vec2 flow = (er * f.x + et * f.y) * 0.8;`,
+    layers: 3, speed: '0.8', turn: '2.0944',
+    grade: 'r = vec3(r.r * 0.95, r.g * 0.9 + r.b * 0.2, r.b * 0.3) ;',
+  });
+
+  // Ember flight: slow amber and russet ribbons on a slanted weave, like sparks rising up a chimney
+  flight('Hearth - Ember flight', {
+    shape: { r: 1, g: 0.42, b: 0.08, r2: 0.55, g2: 0.10, b2: 0.04, a2: 0.35, sides: 4 },
+    dots: 'a.r=1;a.g=.6;a.b=.25;', line: 'a.r=1;a.g=.4;a.b=.1;',
+    current: `vec2 t = vec2(c0.x + c0.y, c0.x - c0.y) * 0.016;
+  vec2 f = clamp(tan(t), -12.0, 12.0) * cos(t.yx * t.yx);
+  vec2 flow = vec2(f.x + f.y, f.x - f.y) * 0.7 + vec2(0.0, -0.25);`,
+    layers: 4, speed: '0.7', turn: '0.7854',
+    grade: 'r = vec3(r.r * 1.05 + r.b * 0.2, r.g * 0.85 + r.b * 0.1, r.b * 0.25);',
+  });
 })();
 </script>
 <script>
