@@ -4,12 +4,13 @@ sub init()
     ' x and width of each pre-rendered label PNG (2px side padding), from the whimsy spec
     m.tabX = [100, 240, 398, 570, 719, 931, 1152, 1324]
     ' Search is a magnifying glass only, no word under it (owner, Nov 27)
-    m.tabW = [101, 120, 133, 110, 174, 182, 134, 60]
+    ' exactly the pictures' own sizes (52 tall): any other size squashes the lettering
+    m.tabW = [101, 121, 133, 111, 174, 182, 134, 60]
     for i = 0 to m.names.count() - 1
         p = m.pillsGroup.createChild("Poster")
-        p.translation = [m.tabX[i], 42]
+        p.translation = [m.tabX[i], 38]
         p.width = m.tabW[i]
-        p.height = 44
+        p.height = 52
         p.loadDisplayMode = "noScale"
     end for
     m.flyGlow = m.top.findNode("flyGlow")
@@ -166,14 +167,14 @@ sub onChipArt()
     end if
 end sub
 
-' Sizes the chip to its words and right-aligns it just left of the clock (the steady firefly steps aside for it).
+' Sizes the chip to its words and centres it between the Search glass and the twig's leaf (the steady firefly steps aside for it).
 ' It must stay clear of the Search label on the left and the twig's leaf under the clock.
 sub layoutChip()
     if not m.npChip.visible then return
-    right = m.clock.translation[0] - 14
-    if right > 1684 then right = 1684
-    ' starts 40 px right of the Search glass (which ends at 1384), so long titles get more room (owner, Nov 27)
-    left = m.tabX[7] + m.tabW[7] + 40
+    ' the gap it lives in: from the Search glass (its picture ends at 1370) to the twig's first leaf (1663);
+    ' 20 px clear of the glass, and short of the twig's left tip at 1634
+    left = 1390
+    right = 1622
     fixed = 60 + 10 + 18 + 18
     m.npTitle.width = 0
     m.npArtist.width = 0
@@ -189,7 +190,9 @@ sub layoutChip()
     w = fixed + tw
     m.npBack.width = w
     m.npBars.translation = [60 + tw + 10, 18]
-    m.npChip.translation = [right - w, 26]
+    ' centred in the gap between the Search glass and the twig's leaf, and on the same line as the room names
+    x = Int((left + right - w) / 2)
+    m.npChip.translation = [x, 35]
 end sub
 
 ' Lays out the weather line: icon, then text, right-aligned to 1824

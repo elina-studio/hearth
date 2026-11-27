@@ -10,7 +10,7 @@
     <Poster uri="pkg:/images/clock/twig.png" translation="[1629, 56]" width="200" height="56" />
     <Poster id="wxIcon" translation="[1500, 100]" width="28" height="28" blendColor="0xE0B34AFF" visible="false" />
     <Label id="weather" translation="[1540, 96]" height="36" vertAlign="center" color="0xB5AF8CFF" />
-    <Group id="npChip" translation="[1474, 26]" visible="false">
+    <Group id="npChip" translation="[1474, 35]" visible="false">
       <Poster id="npBack" uri="pkg:/images/pill-v2.9.png" height="56" blendColor="0xFFFFFF14" />
       <Rectangle id="npArtBack" translation="[6, 6]" width="44" height="44" color="0x2A2620FF" visible="false" />
       <Poster id="npArt" translation="[6, 6]" width="44" height="44" loadDisplayMode="scaleToZoom" />

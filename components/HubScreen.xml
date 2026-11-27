@@ -31,7 +31,7 @@
     <Label id="weather" translation="[1540, 96]" height="36" vertAlign="center" color="0xB5AF8CFF" />
     <!-- now playing chip (audit idea 2A): left of the clock while music plays and Music is not the room.
          Display only, never focused. HubScreen.layoutChip sizes it and right-aligns it to the clock. -->
-    <Group id="npChip" translation="[1474, 26]" visible="false">
+    <Group id="npChip" translation="[1474, 35]" visible="false">
       <Poster id="npBack" uri="pkg:/images/pill-v2.9.png" height="56" blendColor="0xFFFFFF14" />
       <Rectangle translation="[6, 6]" width="44" height="44" color="0x2A2620FF" visible="false" id="npArtBack" />
       <Poster id="npArt" translation="[6, 6]" width="44" height="44" loadDisplayMode="scaleToZoom" />
