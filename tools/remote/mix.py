@@ -358,7 +358,7 @@ def hello(ip, body):
     with _lock:
         _nucbox.clear()
         _nucbox.update({"host": ip, "port": int(body.get("port") or 8790), "seen": time.time(),
-                        "width": body.get("width"), "fps": body.get("measuredFps")})
+                        "width": body.get("width"), "fps": body.get("measuredFps"), "renderer": body.get("renderer") or ""})
 
 
 def nucbox():
@@ -525,4 +525,5 @@ def status(h):
         have = [f for f in os.listdir(LOOPS) if f.endswith(".mp4")]
     ff = shutil.which(FFMPEG) is not None
     h.send_json({"ffmpeg": ff, "nucbox": ({"host": nb["host"], "port": nb["port"], "secondsAgo": int(time.time() - nb["seen"]),
-                                           "fps": nb.get("fps")} if nb else None), "loops": len(have)})
+                                           "fps": nb.get("fps"), "renderer": nb.get("renderer", "")} if nb else None),
+                 "loops": len(have), "renderer": renderer_version() or ""})

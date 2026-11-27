@@ -26,20 +26,28 @@ echo "   Helper says: $ST"
 echo "$ST" | grep -q '"ffmpeg": true' || { echo "The helper is running but without ffmpeg, so the update didn't take. Send me the lines above."; exit 1; }
 echo "   OK: the helper can join pictures and songs."
 echo
-echo "=== Last step, on the NucBox ==="
-echo "On the NucBox: click Start, type PowerShell, right-click it, pick 'Run as administrator', then paste this one line:"
-echo
-LOOPS=$(echo "$ST" | grep -o '"loops": *[0-9]*' | grep -o '[0-9]*$')
-if [ "${LOOPS:-0}" -ge 31 ]; then
-  # already set up: update the renderer only (it keeps its key and the loops are all there)
-  printf '%s\n' "\$c='$SHA'; & ([scriptblock]::Create((irm https://raw.githubusercontent.com/elina-studio/hearth/\$c/tools/viz/install.ps1))) -Commit \$c -SkipLoops"
-  echo
-  echo "It takes about 2 minutes and ends with ALL DONE."
+echo "=== The NucBox ==="
+# the NucBox says hello every minute; the helper just restarted, so give it a moment
+for i in 1 2 3 4 5 6 7 8; do
+  echo "$ST" | grep -q '"nucbox": {' && break
+  sleep 10
+  ST=$(curl -s --max-time 10 -H "X-Hearth-Token: $K" http://192.168.254.41:8765/api/viz/status)
+done
+if echo "$ST" | grep -q '"nucbox": {.*"renderer": "[0-9a-f]'; then
+  echo "   The NucBox updates itself from the helper: nothing to do there. It takes the new version within a minute"
+  echo "   and makes any missing loops on its own, between songs."
+  NUC=ok
 else
-  printf '%s\n' "\$c='$SHA'; & ([scriptblock]::Create((irm https://raw.githubusercontent.com/elina-studio/hearth/\$c/tools/viz/install.ps1))) -Commit \$c -Token $K"
+  if echo "$ST" | grep -q '"nucbox": {'; then
+    echo "   The NucBox is on but runs an older renderer that can't update itself yet."
+  else
+    echo "   The NucBox didn't say hello (off, asleep, or the renderer isn't running)."
+  fi
+  echo "   ONE TIME ONLY: on the NucBox, open PowerShell as administrator and paste this line (no key in it)."
+  echo "   After this the NucBox updates itself and never needs a step again."
   echo
-  echo "It takes about 15 to 25 minutes (most of it is making the loops) and ends with ALL DONE."
-  echo "That line holds your house key: paste it only on the NucBox."
+  printf '%s\n' "\$c='$SHA'; & ([scriptblock]::Create((irm https://raw.githubusercontent.com/elina-studio/hearth/\$c/tools/viz/install.ps1))) -Commit \$c -SkipLoops"
+  NUC=todo
 fi
 echo
 echo "The Hearth fire view needs nothing more: it works as soon as the helper is updated."
