@@ -78,6 +78,47 @@ end function
 
 ' One shared Font per kind and size. Making a Font node for every label is slow, and a Discover grid of 100 posters
 ' or a sheet of 50 chips would make hundreds of them.
+' ---------- names the app fonts cannot draw (walk 2, item 23) ----------
+' Japanese, Korean, Chinese, Thai, Hebrew, Arabic and the like came out as boxes: the Hearth fonts only hold
+' Latin, Greek and Cyrillic. Such a name is drawn in the TV's own font, which has them.
+function hOutsideFont(t as dynamic) as boolean
+    if t = invalid then return false
+    if type(t) <> "String" and type(t) <> "roString" then return false
+    n = Len(t)
+    if n > 80 then n = 80
+    for i = 1 to n
+        c = Asc(Mid(t, i, 1))
+        if c > 591
+            inGreekCyr = (c >= 880 and c <= 1327)
+            inSigns = (c >= 8192 and c <= 9727)
+            if not inGreekCyr and not inSigns then return true
+        end if
+    end for
+    return false
+end function
+
+function hSysFont(kind as string, size as integer) as object
+    f = CreateObject("roSGNode", "Font")
+    if kind = "bold" or kind = "caps" or kind = "pica" then f.uri = "font:BoldSystemFontFile" else f.uri = "font:SystemFontFile"
+    if size < 22 then size = 22
+    f.size = size
+    return f
+end function
+
+' Call before setting a label's text to a name from the library: swaps to the TV's font only when the name
+' needs it, and back again when the same label is reused for a name that does not.
+sub hFontText(node as object, t as dynamic, kind as string)
+    fnow = node.font
+    if fnow = invalid then return
+    isSys = (Left(fnow.uri, 5) = "font:")
+    want = hOutsideFont(t)
+    if want and not isSys
+        node.font = hSysFont(kind, fnow.size)
+    else if isSys and not want
+        node.font = hFontCached(kind, fnow.size)
+    end if
+end sub
+
 function hFontCached(kind as string, size as integer) as object
     if not m.global.hasField("fontCache") then m.global.addFields({ fontCache: {} })
     key = kind + "|" + size.toStr()
@@ -482,6 +523,8 @@ sub hFbStatus(event as object)
     ' appears if the picture fails or there is none (UX review item 22: titles flashing up looked like errors)
     st = p.loadStatus
     if g <> invalid and g.hasField("fb") then g.fb.visible = not (st = "ready" or st = "loading")
+    ' the waiting initial (MusicGrid) gives way to the full name when the picture fails
+    if g <> invalid and g.hasField("ini") and g.hasField("fb") then g.ini.visible = not g.fb.visible
     if g <> invalid and g.hasField("bg")
         if st = "loading" then g.bg.opacity = 0.6 else g.bg.opacity = 1.0
     end if
@@ -578,6 +621,7 @@ function hFitTitle(node as object, ttl as string, kind as string, sizes as objec
     fitSz = hFitSize(ttl, kind, sizes, width)
     if fitSz = 0 then fitSz = sizes[sizes.count() - 1]
     node.font = hFontCached(kind, fitSz)
+    if hOutsideFont(ttl) then node.font = hSysFont(kind, fitSz)
     if node.subtype() = "ScrollingLabel"
         node.maxWidth = width
     else
@@ -596,6 +640,7 @@ function hFitTitle2(node as object, ttl as string, kind as string, sizes as obje
         node.wrap = false
         node.maxLines = 1
         node.font = hFontCached(kind, fitSz)
+        if hOutsideFont(ttl) then node.font = hSysFont(kind, fitSz)
         node.text = ttl
         return { lines: 1, height: Int(fitSz * 1.35), drop: Int((sizes[0] - fitSz) * 0.8) }
     end if
@@ -603,6 +648,7 @@ function hFitTitle2(node as object, ttl as string, kind as string, sizes as obje
     node.wrap = true
     node.maxLines = 2
     node.font = hFontCached(kind, fitSz)
+    if hOutsideFont(ttl) then node.font = hSysFont(kind, fitSz)
     node.text = ttl
     h = Int(node.boundingRect().height)
     ' the measured height can be missing on the first frame; two lines of this font are about 2.7 x the size

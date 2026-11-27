@@ -7,7 +7,7 @@ sub init()
     m.note = m.top.findNode("note")
     m.note.font = hFont("regular", 22)
     m.more = m.top.findNode("more")
-    m.more.font = hFont("regular", 22)
+    m.more.font = hFont("bold", 22)
     m.hint = m.top.findNode("hint")
     m.hint.font = hFont("regular", 22)
     m.rowH = 56

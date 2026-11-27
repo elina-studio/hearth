@@ -221,6 +221,8 @@ sub showNow()
     m.eyebrow.text = n.eyebrow
     ' set the scrolling title only when it changes: setting it again restarts the scroll, which showed the
     ' title twice on top of itself (live walk Nov 27)
+    hFontText(m.title, n.title, "bold")
+    hFontText(m.sub, n.sub, "regular")
     if m.title.text <> n.title then m.title.text = n.title
     m.sub.text = n.sub
     if n.track <> invalid
@@ -395,6 +397,7 @@ sub drawIdle()
             if it.md.thumb <> invalid then art.uri = pxImage(it.md.thumb, 128, 128)
             l = g.createChild("Label")
             l.font = hFont("bold", 28)
+            if hOutsideFont(it.md.title) then l.font = hSysFont("bold", 28)
             l.text = pxStr(it.md.title)
             if focused then l.color = "0xFFE7A0FF" else l.color = "0xEDE6CAFF"
             l.width = 372

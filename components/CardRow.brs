@@ -171,6 +171,7 @@ sub fillSlot(g as object, c as object, w as integer)
         g.fb.text = hInitials(title)
     else
         g.fb.font = hFontCached("book", 28)
+        if hOutsideFont(title) then g.fb.font = hSysFont("book", 28)
         g.fb.color = "0xEDE6CAFF"
         g.fb.text = hClean(title)
     end if
@@ -203,7 +204,9 @@ sub fillSlot(g as object, c as object, w as integer)
     end if
     g.cap.visible = m.top.showCaption
     g.sub2.visible = m.top.showCaption
+    hFontText(g.cap, title, "bold")
     g.cap.text = title
+    hFontText(g.sub2, c.sub, "regular")
     if c.sub <> invalid then g.sub2.text = c.sub else g.sub2.text = ""
     key = ""
     if c.item <> invalid and c.item.Id <> invalid then key = c.item.Id.toStr()

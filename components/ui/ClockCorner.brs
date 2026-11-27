@@ -79,6 +79,8 @@ sub updateChip()
         end if
         return
     end if
+    hFontText(m.npTitle, tr.title, "bold")
+    hFontText(m.npArtist, tr.artist, "regular")
     m.npTitle.text = pxStr(tr.title)
     m.npArtist.text = pxStr(tr.artist)
     th = pxStr(tr.thumb)

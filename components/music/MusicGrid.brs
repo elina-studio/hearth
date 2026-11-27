@@ -36,6 +36,16 @@ sub makeSlot()
     bg.height = s
     bg.color = "0x1D2418FF"
     if m.top.round then bg.visible = false
+    ' under the cover: the first letter of the name, so a cover that is still on its way is not a blank square
+    ' (walk 2, item 22). The cover draws over it when it arrives.
+    ini = g.createChild("Label")
+    ini.translation = [x0, 0]
+    ini.width = s
+    ini.height = s
+    ini.horizAlign = "center"
+    ini.vertAlign = "center"
+    ini.font = hFont("bold", 96)
+    ini.color = "0x5F6E45FF"
     p = g.createChild("Poster")
     p.translation = [x0, 0]
     p.width = s
@@ -98,7 +108,7 @@ sub makeSlot()
         ring.height = s + 54
     end if
     ring.visible = false
-    g.addFields({ poster: p, fb: fb, cap: cap, sub2: sub2, ring: ring, tagBg: tagBg, tagL: tagL })
+    g.addFields({ poster: p, ini: ini, fb: fb, cap: cap, sub2: sub2, ring: ring, tagBg: tagBg, tagL: tagL })
 end sub
 
 sub fill(g as object, c as object)
@@ -108,7 +118,15 @@ sub fill(g as object, c as object)
     g.fb.visible = (img = "")
     t = c.title
     if t = invalid then t = ""
+    hFontText(g.fb, t, "bold")
+    hFontText(g.cap, t, "bold")
+    hFontText(g.sub2, c.sub, "regular")
     g.fb.text = UCase(t)
+    first = ""
+    if img <> "" and Len(t) > 0 then first = UCase(Left(t, 1))
+    ' only letters and digits the app font has; anything else stays a plain square
+    if first <> "" and Asc(first) > 126 then first = ""
+    g.ini.text = first
     g.cap.text = t
     if c.sub <> invalid then g.sub2.text = c.sub else g.sub2.text = ""
     tg = ""
