@@ -521,6 +521,9 @@ sub resume()
     if m.mix <> invalid and m.out.isSameNode(m.audio) and mixWanted(m.top.track)
         ' a music view wants the joined stream: start it here instead of the paused Audio
         playIndex(m.top.index, m.top.position)
+    else if m.mix <> invalid and m.mix.kind = "viz" and not m.out.isSameNode(m.audio) and m.top.track <> invalid and m.vizFor[m.top.track.id] <> invalid and m.vizFor[m.top.track.id] <> m.mixShownLook
+        ' a new look was picked while paused: start the stream with it where the song is
+        playIndex(m.top.index, m.top.position)
     else if m.out.state = "paused"
         m.out.control = "resume"
     else

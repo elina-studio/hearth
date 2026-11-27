@@ -146,6 +146,28 @@ def _prune():
         _sessions.pop(sid, None)
 
 
+def _fps(path):
+    try:
+        out = subprocess.run([FFPROBE, "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=r_frame_rate",
+                              "-of", "default=nw=1:nk=1", path], capture_output=True, timeout=20).stdout.decode().strip()
+        a, b = out.split("/")
+        return float(a) / float(b)
+    except Exception:
+        return 0.0
+
+
+def _vod_playlist(total, seg):
+    """The whole stream's playlist up front: every piece is exactly `seg` seconds (keyframe every 2 s), the last the rest."""
+    n = max(1, int(-(-(total - 1e-6) // seg)))
+    lines = ["#EXTM3U", "#EXT-X-VERSION:3", "#EXT-X-TARGETDURATION:%d" % seg, "#EXT-X-MEDIA-SEQUENCE:0",
+             "#EXT-X-PLAYLIST-TYPE:VOD", "#EXT-X-INDEPENDENT-SEGMENTS"]
+    for i in range(n):
+        d = seg if i < n - 1 else total - seg * (n - 1)
+        lines += ["#EXTINF:%.6f," % d, "s%04d.ts" % i]
+    lines += ["#EXT-X-ENDLIST", ""]
+    return "\n".join(lines)
+
+
 def loop_session(video, song, ss, wait=20):
     """Starts (or reuses) ffmpeg joining a looping video with the song from ss. Returns (id, error)."""
     sid = _sid(video, os.path.getmtime(video), song, round(ss))
@@ -169,12 +191,18 @@ def loop_session(video, song, ss, wait=20):
                     "-hls_segment_filename", os.path.join(d, "s%04d.ts"), os.path.join(d, "index.m3u8")]
             err = open(os.path.join(d, "ffmpeg.log"), "wb")
             s = {"dir": d, "proc": subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=err), "used": time.time()}
+            # a visualizer loop has a keyframe every 2 s, so its pieces are exactly 4 s: the TV can get the whole
+            # playlist at once and start right away, while the rest is still being made
+            if os.path.dirname(os.path.abspath(video)) == os.path.abspath(LOOPS):
+                fps = _fps(video)
+                if fps > 0:
+                    s["vod"] = int(left * fps) / fps
             _sessions[sid] = s
             _prune()
     # Copying the picture is quick, so wait for the whole song (the playlist's ENDLIST): a growing playlist makes
     # the TV treat the song as live, jump in near its newest piece and skip the start. If it takes too long,
     # hand over the growing one anyway after `wait` seconds.
-    until = time.time() + wait
+    until = time.time() + (0 if s.get("vod") else wait)
     while time.time() < until + 15:
         done = s["proc"].poll() == 0
         if done and _segments(s["dir"]) >= 1:
@@ -201,6 +229,28 @@ def serve_segment(h, path):
         if s:
             s["used"] = time.time()
     full = os.path.join(WORK, m.group(1), m.group(2))
+    if s and s.get("vod"):
+        if m.group(2) == "index.m3u8":
+            body = _vod_playlist(s["vod"], 4).encode()
+            h.send_response(200)
+            h.send_header("Content-Type", "application/vnd.apple.mpegurl")
+            h.send_header("Content-Length", str(len(body)))
+            h.send_header("Cache-Control", "no-store")
+            h.end_headers()
+            h.wfile.write(body)
+            return
+        # a piece asked for before it is made: wait for ffmpeg to finish it (it lists a piece once it is closed)
+        until = time.time() + 20
+        while time.time() < until:
+            try:
+                with open(os.path.join(s["dir"], "index.m3u8")) as fh:
+                    if m.group(2) in fh.read().split("\n"):
+                        break
+            except OSError:
+                pass
+            if s["proc"].poll() is not None:
+                break
+            time.sleep(0.15)
     if not s or not os.path.isfile(full):
         return h.send_json({"error": "gone"}, 404)
     ctype = "application/vnd.apple.mpegurl" if full.endswith(".m3u8") else "video/mp2t"
@@ -391,7 +441,8 @@ def start(h, q):
                 threading.Thread(target=loop_session, args=(lf, song, ss), daemon=True).start()
             return h.send_json({"ok": True, "kind": "prefetch" if lf else "none"})
         if not lf:
-            return h.send_json({"ok": False, "why": why + " and there's no ready-made loop for this look yet"}, 404)
+            # short: the TV shows it in one line
+            return h.send_json({"ok": False, "why": "NucBox off, no backup loop yet" if not nb else "NucBox busy, no backup loop yet"}, 404)
         sid, why2 = loop_session(lf, song, ss)
         if not sid:
             return h.send_json({"ok": False, "why": why2}, 500)

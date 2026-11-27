@@ -17,6 +17,8 @@ sub mixInit()
     m.mixSkip = ""
     m.mixPrefetched = ""
     m.mixPending = invalid
+    m.mixShownLook = ""
+    m.mixAskLook = ""
     m.vizFor = {}
 end sub
 
@@ -139,7 +141,10 @@ sub mixPlay(i as integer, startAt as float)
     m.mixReq = { seq: m.mixSeq, index: i, ss: ss, id: tr.id, at: startAt, live: false }
     m.top.state = "buffering"
     m.top.mixState = "starting"
-    nasCall("GET", "/api/mix/start?" + mixQuery(tr, ss), "", "onMixStart", m.mixSeq.toStr())
+    m.mixAskLook = ""
+    q = mixQuery(tr, ss)
+    m.mixReq.look = m.mixAskLook
+    nasCall("GET", "/api/mix/start?" + q, "", "onMixStart", m.mixSeq.toStr())
 end sub
 
 function mixQuery(tr as object, ss as integer, ahead = false as boolean) as string
@@ -147,7 +152,10 @@ function mixQuery(tr as object, ss as integer, ahead = false as boolean) as stri
     if ahead then q = q + "&prefetch=1"
     if m.mix.kind = "viz"
         look = vizLookFor(tr)
-        if not ahead then m.top.vizLook = look
+        if not ahead
+            m.top.vizLook = look
+            m.mixAskLook = look
+        end if
         q = q + "&look=" + look
     else
         q = q + "&clip=" + pxEscape(m.mix.clip)
@@ -169,7 +177,11 @@ sub mixSwitch()
     m.mixReq = { seq: m.mixSeq, index: m.top.index, ss: ss, id: tr.id, at: ss, live: true }
     ' a new look: the old one stays on screen until the change-over
     if m.out.isSameNode(m.audio) then m.top.mixState = "starting"
-    nasCall("GET", "/api/mix/start?" + mixQuery(tr, ss), "", "onMixStart", m.mixSeq.toStr())
+    m.mixAskLook = ""
+    q = mixQuery(tr, ss)
+    m.mixReq.look = m.mixAskLook
+    print "[music] new look "; m.mixAskLook; " from "; ss; " s (song at "; m.top.position; ")"
+    nasCall("GET", "/api/mix/start?" + q, "", "onMixStart", m.mixSeq.toStr())
 end sub
 
 ' the joined stream is ready ahead of the song: wait for the song to get there, watching closely
@@ -197,11 +209,12 @@ sub mixCheckPending()
     end if
     if m.top.position < p.ss - 0.12 then return
     mixClearPending()
-    mixJoin(p.url, p.kind, p.ss, m.top.position)
+    mixJoin(p.url, p.kind, p.ss, m.top.position, p.look)
 end sub
 
 ' start the joined stream (which begins at song second ss) at song second at
-sub mixJoin(url as string, kind as string, ss as integer, at as float)
+sub mixJoin(url as string, kind as string, ss as integer, at as float, look = "" as dynamic)
+    m.mixShownLook = pxStr(look)
     c = CreateObject("roSGNode", "ContentNode")
     c.url = url
     c.streamFormat = "hls"
@@ -239,13 +252,13 @@ sub onMixStart(event as object)
                 return
             end if
             if m.top.position < r.ss - 0.12
-                mixWait({ url: resp.url, kind: pxStr(resp.kind), ss: r.ss, id: r.id, index: r.index })
+                mixWait({ url: resp.url, kind: pxStr(resp.kind), ss: r.ss, id: r.id, index: r.index, look: r.look })
             else
-                mixJoin(resp.url, pxStr(resp.kind), r.ss, m.top.position)
+                mixJoin(resp.url, pxStr(resp.kind), r.ss, m.top.position, r.look)
             end if
             return
         end if
-        mixJoin(resp.url, pxStr(resp.kind), r.ss, r.at)
+        mixJoin(resp.url, pxStr(resp.kind), r.ss, r.at, r.look)
         return
     end if
     why = ""
@@ -255,7 +268,16 @@ sub onMixStart(event as object)
     print "[music] no joined stream: "; why
     if r.live = true
         ' the song never stopped: it just carries on as it is (with the old look, if one is on)
-        if not m.out.isSameNode(m.audio) then return
+        if not m.out.isSameNode(m.audio)
+            ' say so, and put the name back to the look that is really on screen
+            tr = m.top.track
+            if tr <> invalid and m.mixShownLook <> invalid and m.mixShownLook <> ""
+                m.vizFor[tr.id] = m.mixShownLook
+                m.top.vizLook = m.mixShownLook
+            end if
+            say("Look not ready: " + why)
+            return
+        end if
         m.top.mixNote = why
         m.top.mixState = "failed"
         return
