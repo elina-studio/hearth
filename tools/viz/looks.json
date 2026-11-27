@@ -124,5 +124,75 @@
   "n": 213,
   "preset": "Hearth - Dusk flight",
   "label": "Dusk flight"
+ },
+ {
+  "n": 221,
+  "preset": "Hearth - Moth lantern",
+  "label": "Moth lantern"
+ },
+ {
+  "n": 222,
+  "preset": "Hearth - Murmuration",
+  "label": "Murmuration"
+ },
+ {
+  "n": 223,
+  "preset": "Hearth - Mushrooms",
+  "label": "Mushrooms"
+ },
+ {
+  "n": 224,
+  "preset": "Hearth - Smoke rings",
+  "label": "Smoke rings"
+ },
+ {
+  "n": 225,
+  "preset": "Hearth - Tree rings",
+  "label": "Tree rings"
+ },
+ {
+  "n": 226,
+  "preset": "Hearth - Fern crown",
+  "label": "Fern crown"
+ },
+ {
+  "n": 227,
+  "preset": "Hearth - Fiddleheads",
+  "label": "Fiddleheads"
+ },
+ {
+  "n": 228,
+  "preset": "Hearth - Moonlit fronds",
+  "label": "Moonlit fronds"
+ },
+ {
+  "n": 229,
+  "preset": "Hearth - Constellation weave",
+  "label": "Constellation weave"
+ },
+ {
+  "n": 230,
+  "preset": "Hearth - Honeycomb glow",
+  "label": "Honeycomb glow"
+ },
+ {
+  "n": 231,
+  "preset": "Hearth - Jellyfish",
+  "label": "Jellyfish"
+ },
+ {
+  "n": 232,
+  "preset": "Hearth - Aurora over the hills",
+  "label": "Aurora over the hills"
+ },
+ {
+  "n": 233,
+  "preset": "Hearth - Dew on the web",
+  "label": "Dew on the web"
+ },
+ {
+  "n": 234,
+  "preset": "Hearth - Mycelium",
+  "label": "Mycelium"
  }
 ]

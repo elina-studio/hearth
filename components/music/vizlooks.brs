@@ -26,7 +26,21 @@ function vizLooks() as object
         { n: "204", label: "Dandelion drift" },
         { n: "205", label: "Firefly meadow" },
         { n: "206", label: "Rain on the pond" },
-        { n: "213", label: "Dusk flight" }
+        { n: "213", label: "Dusk flight" },
+        { n: "221", label: "Moth lantern" },
+        { n: "222", label: "Murmuration" },
+        { n: "223", label: "Mushrooms" },
+        { n: "224", label: "Smoke rings" },
+        { n: "225", label: "Tree rings" },
+        { n: "226", label: "Fern crown" },
+        { n: "227", label: "Fiddleheads" },
+        { n: "228", label: "Moonlit fronds" },
+        { n: "229", label: "Constellation weave" },
+        { n: "230", label: "Honeycomb glow" },
+        { n: "231", label: "Jellyfish" },
+        { n: "232", label: "Aurora over the hills" },
+        { n: "233", label: "Dew on the web" },
+        { n: "234", label: "Mycelium" }
     ]
 end function
 
