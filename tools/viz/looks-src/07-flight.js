@@ -1,5 +1,5 @@
-// Three looks bred from "martin - angel flight" (the house favourite): the same bones - faint shapes, a current
-// that smears them into ribbons, and an endless fly-through of layers - with Hearth's colours and new currents.
+// Dusk flight, bred from "martin - angel flight" (the house favourite): the same bones - faint shapes, a current
+// that smears them into ribbons, and an endless fly-through of layers - in pale gold with teal shadows.
 (function () {
   const packs = window.butterchurnPresets && (window.butterchurnPresets.default || window.butterchurnPresets);
   const src = packs && packs.getPresets()['martin - angel flight'];
@@ -36,28 +36,6 @@
  }`;
     window.hearthLooks[name] = p;
   };
-
-  // Lantern flight: gold ribbons with moss-green shadows, on a grid of round eddies
-  flight('Hearth - Lantern flight', {
-    shape: { r: 1, g: 0.62, b: 0.12, r2: 0.10, g2: 0.30, b2: 0.06, a2: 0.3, sides: 24 },
-    shapeEq: 'a.rad*=0.6;',
-    dots: 'a.r=1;a.g=.8;a.b=.4;', line: 'a.r=.5;a.g=.6;a.b=.2;',
-    current: `vec2 t = c0 * 0.022;
-  vec2 flow = vec2(sin(t.y) * cos(t.x * 0.5), -sin(t.x) * cos(t.y * 0.5)) * 1.6 + clamp(tan(t * 0.5), -6.0, 6.0) * 0.15;`,
-    layers: 4, speed: '1.0', turn: '1.5708',
-    grade: 'r = vec3(r.r * 1.0 + r.b * 0.2, r.g * 0.88 + r.b * 0.2, r.b * 0.35) * 0.85;',
-  });
-
-  // Willow flight: the original current with wider eddies, in olive and old gold, three layers a third of a turn apart
-  flight('Hearth - Willow flight', {
-    shape: { r: 0.50, g: 0.60, b: 0.16, r2: 0.95, g2: 0.62, b2: 0.10, a2: 0.3, sides: 5 },
-    shapeEq: 'a.rad*=0.7;',
-    dots: 'a.r=.8;a.g=1;a.b=.4;', line: 'a.r=.9;a.g=.7;a.b=.2;',
-    current: `vec2 t = c0 * 0.019;
-  vec2 flow = clamp(tan(t), -12.0, 12.0) * cos(t.yx * t.yx);`,
-    layers: 3, speed: '0.9', turn: '2.0944',
-    grade: 'r = vec3(r.r * 0.95 + r.g * 0.1, r.g * 0.80 + r.b * 0.2, r.b * 0.3) * 0.85;',
-  });
 
   // Dusk flight: closest to the original - pale gold ribbons with deep teal shadows, eight ways round
   flight('Hearth - Dusk flight', {

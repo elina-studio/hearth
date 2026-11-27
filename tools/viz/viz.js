@@ -108,6 +108,60 @@ async function drawFrames(pcm, preset, w, h, enc, job) {
   }
 }
 
+// ---------------------------------------------------------------- picture size per look
+// Some looks are much heavier to draw than others. Each look is timed once (a short silent try at each size,
+// biggest first) and drawn at the biggest size this machine keeps up with; the stream is always sent at
+// 1280x720. A look too heavy even at the smallest size is not drawn live: its ready-made loop plays instead.
+// The answers are kept in config.json and measured again whenever the renderer's files change.
+const SIZES = [[1280, 720], [960, 540], [640, 360]];
+const sizeKey = look => String(look);
+function knownSize(look) {
+  const ls = cfg.lookSize;
+  if (!ls || ls.ver !== myVersion() || ls.base !== cfg.width + 'x' + cfg.height) return undefined;
+  return ls.sizes[sizeKey(look)];
+}
+async function timeLook(preset, w, h) {
+  const page = await openPage(w, h);
+  try {
+    await page.evaluate(n => window.load(n, 0), preset);
+    const quiet = windows(Buffer.alloc(0), 0);
+    const one = () => page.evaluate(([a, b, c, dt]) => window.frame(a, b, c, dt, 0.9).length, [...quiet, 1 / cfg.fps]);
+    for (let i = 0; i < 6; i++) await one();   // the first frames build the shaders
+    const t0 = Date.now(), n = 20;
+    for (let i = 0; i < n; i++) await one();
+    return n / Math.max(0.001, (Date.now() - t0) / 1000);
+  } finally {
+    await page.close().catch(() => {});
+  }
+}
+// [w, h] to draw this look at, or null when it cannot keep up with a song at any size
+async function sizeFor(look, preset) {
+  const known = knownSize(look);
+  if (known !== undefined) return known;
+  const need = cfg.fps * (+process.env.HEARTH_VIZ_HEADROOM || 1.25);
+  let pick = null; const seen = [];
+  for (const [w, h] of SIZES) {
+    if (w > cfg.width) continue;
+    const fps = await timeLook(preset, w, h);
+    seen.push(`${w}x${h} ${fps.toFixed(0)}`);
+    if (fps >= need) { pick = [w, h]; break; }
+  }
+  if (!cfg.lookSize || cfg.lookSize.ver !== myVersion() || cfg.lookSize.base !== cfg.width + 'x' + cfg.height) cfg.lookSize = { ver: myVersion(), base: cfg.width + 'x' + cfg.height, sizes: {} };
+  cfg.lookSize.sizes[sizeKey(look)] = pick;
+  saveCfg();
+  log(`look ${look}: ${seen.join(', ')} frames a second -> ${pick ? 'drawn at ' + pick.join('x') : 'too heavy to draw live, its loop plays instead'}`);
+  return pick;
+}
+// times every look not timed yet, between songs, so a song never waits for it
+async function timeLooks() {
+  for (const l of LOOKS) {
+    if (knownSize(l.n) !== undefined) continue;
+    while (active || queue.length) await new Promise(r => setTimeout(r, 5000));
+    try { timing = true; await sizeFor(l.n, l.preset); } catch (e) { log('timing look', l.n, 'failed:', e.message); } finally { timing = false; }
+  }
+}
+let timing = false;
+
 // ---------------------------------------------------------------- song jobs
 const jobs = new Map();   // id -> job
 let active = null;
@@ -124,6 +178,10 @@ async function runJob(job) {
   try {
     fs.rmSync(job.dir, { recursive: true, force: true });
     fs.mkdirSync(job.dir, { recursive: true });
+    const known = LOOKS.some(l => String(l.n) === String(job.look));
+    while (timing) await new Promise(r => setTimeout(r, 100));   // one timing at a time, or the numbers come out low
+    const size = known ? await sizeFor(job.look, job.preset) : [cfg.width, cfg.height];
+    if (!size) throw new Error('this look is too heavy to draw live here');
     const pcm = await decode(job.audioUrl, job.ss);
     if (job.cancelled) throw new Error('cancelled');
     const raw = path.join(job.dir, 'audio.raw');
@@ -131,17 +189,24 @@ async function runJob(job) {
     job.seconds = pcm.length / 4 / SR;
     const enc = encoder(['-f', 'image2pipe', '-framerate', String(cfg.fps), '-c:v', 'mjpeg', '-i', '-',
       '-f', 's16le', '-ar', String(SR), '-ac', '2', '-i', raw, '-map', '0:v', '-map', '1:a',
-      ...videoArgs(cfg.width, cfg.height), '-c:a', 'aac', '-b:a', '192k', '-shortest',
+      ...videoArgs(size[0], size[1]), '-c:a', 'aac', '-b:a', '192k', '-shortest',
       '-f', 'hls', '-hls_time', '2', '-hls_list_size', '0', '-hls_playlist_type', 'event', '-hls_flags', 'independent_segments',
       '-hls_segment_filename', path.join(job.dir, 's%04d.ts'), path.join(job.dir, 'index.m3u8')]);
-    const fps = await drawFrames(pcm, job.preset, cfg.width, cfg.height, enc, job);
+    const fps = await drawFrames(pcm, job.preset, size[0], size[1], enc, job);
     enc.stdin.end();
     const r = await enc.done;
     fs.rmSync(raw, { force: true });
     if (job.cancelled) throw new Error('cancelled');
     if (r.code !== 0) throw new Error('encoder: ' + r.err.slice(-300));
     job.state = 'done';
-    log(`done ${job.id} (${job.seconds.toFixed(0)} s of song at ${fps.toFixed(0)} frames a second)`);
+    log(`done ${job.id} (look ${job.look} at ${size.join('x')}, ${job.seconds.toFixed(0)} s of song at ${fps.toFixed(0)} frames a second)`);
+    // a look that fell behind the music on a whole song is timed again with more room to spare
+    if (known && job.seconds > 20 && fps < cfg.fps * 1.02 && cfg.lookSize && cfg.lookSize.sizes[sizeKey(job.look)]) {
+      const at = SIZES.findIndex(s => s[0] === size[0]);
+      cfg.lookSize.sizes[sizeKey(job.look)] = at >= 0 && at < SIZES.length - 1 ? SIZES[at + 1] : null;
+      saveCfg();
+      log(`look ${job.look} fell behind the music: next time ${cfg.lookSize.sizes[sizeKey(job.look)] ? 'it is drawn at ' + cfg.lookSize.sizes[sizeKey(job.look)].join('x') : 'its loop plays instead'}`);
+    }
   } catch (e) {
     job.state = job.cancelled ? 'cancelled' : 'failed';
     job.error = String(e.message || e);
@@ -357,7 +422,7 @@ async function serve() {
   await hello();
   setInterval(hello, 60000);
   // looks added since the loops were made get theirs now, between songs
-  setTimeout(() => loops(true).catch(e => log('loops:', e.message)), 30000);
+  setTimeout(() => timeLooks().catch(e => log('timing:', e.message)).then(() => loops(true)).catch(e => log('loops:', e.message)), 30000);
 }
 
 // ---------------------------------------------------------------- bench and loops
@@ -400,7 +465,10 @@ async function loops(keep) {
   let have = await fetch(cfg.helper + '/api/viz/loops', { headers: { 'X-Hearth-Token': cfg.token } }).then(r => r.ok ? r.json() : null).catch(() => null);
   if (keep && !have) return;
   if (!have) have = { looks: [] };
-  if (keep && LOOKS.every(l => (have.looks || []).includes(l.n))) return;
+  // a look redrawn since its loop was made (looks.json gives it a new "v") gets a new loop, which replaces the old one
+  const made0 = cfg.loopV || {};
+  const fresh = l => (have.looks || []).includes(l.n) && (!l.v || made0[l.n] === l.v);
+  if (keep && LOOKS.every(fresh)) return;
   let pcm;
   try {
     const r = await fetch(cfg.helper + '/api/viz/sample', { headers: { 'X-Hearth-Token': cfg.token } });
@@ -419,7 +487,7 @@ async function loops(keep) {
   if (pcm.length < need) pcm = Buffer.concat([pcm, testTone(34).subarray(0, need - pcm.length)]);
   let made = 0;
   for (const look of LOOKS) {
-    if ((have.looks || []).includes(look.n)) { if (!keep) log(`loop ${look.n} ${look.label}: already on the NAS`); continue; }
+    if (fresh(look)) { if (!keep) log(`loop ${look.n} ${look.label}: already on the NAS`); continue; }
     // a song on the TV comes first
     while (keep && (active || queue.length)) await new Promise(r => setTimeout(r, 5000));
     const raw = path.join(WORK, `loop-${look.n}-raw.mp4`), out = path.join(WORK, `loop-${look.n}.mp4`);
@@ -444,7 +512,7 @@ async function loops(keep) {
       '-map', '[v]', '-c:v', 'libx264', '-preset', 'slow', '-profile:v', 'high', '-level', '4.0', '-r', String(cfg.fps), '-g', String(cfg.fps * 2), '-b:v', '2500k', '-maxrate', '3500k', '-bufsize', '6M', '-movflags', '+faststart', '-an', out]);
     const up = await fetch(cfg.helper + `/api/viz/loop?n=${look.n}`, { method: 'POST', headers: { 'X-Hearth-Token': cfg.token, 'Content-Type': 'video/mp4' }, body: fs.readFileSync(out) });
     log(`loop ${look.n} ${look.label}: ${up.ok ? 'uploaded' : 'upload FAILED (' + up.status + ')'}`);
-    if (up.ok) made++;
+    if (up.ok) { made++; if (look.v) { cfg.loopV = Object.assign({}, cfg.loopV, { [look.n]: look.v }); saveCfg(); } }
     fs.rmSync(raw, { force: true }); fs.rmSync(out, { force: true });
   }
   console.log(`RESULT loops made ${made}`);

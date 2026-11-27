@@ -173,7 +173,12 @@ function handleKey(key as string) as boolean
     else if key = "up"
         if f >= m.cols then f = f - m.cols
     else if key = "down"
-        if f + m.cols <= last then f = f + m.cols
+        if f + m.cols <= last
+            f = f + m.cols
+        else if Int(f / m.cols) < Int(last / m.cols)
+            ' a short last row: Down from a column with nothing under it lands on the row's last look
+            f = last
+        end if
     end if
     if f <> m.focus
         m.focus = f

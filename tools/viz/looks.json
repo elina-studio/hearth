@@ -87,31 +87,42 @@
  {
   "n": 201,
   "preset": "Hearth - Leaf mandala",
-  "label": "Leaf mandala"
+  "label": "Leaf mandala",
+  "v": 2
  },
  {
   "n": 202,
   "preset": "Hearth - Ladybug swarm",
-  "label": "Ladybug swarm"
+  "label": "Ladybug swarm",
+  "v": 2
  },
  {
   "n": 203,
   "preset": "Hearth - Leaf down a creek",
-  "label": "Leaf down a creek"
+  "label": "Leaf down a creek",
+  "v": 2
  },
  {
   "n": 204,
   "preset": "Hearth - Dandelion drift",
-  "label": "Dandelion drift"
+  "label": "Dandelion drift",
+  "v": 2
  },
  {
   "n": 205,
   "preset": "Hearth - Firefly meadow",
-  "label": "Firefly meadow"
+  "label": "Firefly meadow",
+  "v": 2
  },
  {
   "n": 206,
   "preset": "Hearth - Rain on the pond",
-  "label": "Rain on the pond"
+  "label": "Rain on the pond",
+  "v": 2
+ },
+ {
+  "n": 213,
+  "preset": "Hearth - Dusk flight",
+  "label": "Dusk flight"
  }
 ]
