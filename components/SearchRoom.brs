@@ -164,6 +164,10 @@ sub onFound(event as object)
         return
     end if
 
+    ' Plex answers nonsense with loose guesses ("zzq" gave Parasite and Stargate SG-1 on walk 2). When not one result
+    ' has the typed letters anywhere in its names, they are guesses: treat it as nothing found.
+    if found.count() > 0 and not anyHasText(found, LCase(m.tried)) then found = []
+
     ' nothing? quietly try again without the last letter (a typo is usually the last key pressed)
     if found.count() = 0 and Len(m.tried) >= 3 and m.tried = m.term
         m.tried = Left(m.tried, Len(m.tried) - 1).Trim()
@@ -271,6 +275,17 @@ sub onSeasonCheck(event as object)
 end sub
 
 ' Titles that start with what you typed first (ignoring a leading "The"), otherwise Plex's order.
+function anyHasText(items as object, q as string) as boolean
+    for each it in items
+        ' matched through an actor or director: a real match with the name elsewhere
+        if it.Reason <> invalid then return true
+        for each f in [it.Name, it.SeriesName, it.ArtistName]
+            if f <> invalid and Instr(1, LCase(f.toStr()), q) > 0 then return true
+        end for
+    end for
+    return false
+end function
+
 function ranked(items as object, q as string) as object
     keyed = []
     i = 0
@@ -335,7 +350,10 @@ sub setRows(rows as object)
             r.y = y
             if r.kind = "recent" then r.h = 64 else r.h = 92
             if r.kind = "item" and (r.item.Type = "Series" or r.item.Type = "artist" or r.item.Type = "album")
-                r.more = "Request"
+                ' says what you'd get: plain "Request" on something already in the library read as a mistake (walk 2)
+                r.more = "More seasons"
+                if r.item.Type = "artist" then r.more = "More albums"
+                if r.item.Type = "album" then r.more = "Missing songs"
             end if
             r.node = makeRow(r)
             m.focusable.push(i)

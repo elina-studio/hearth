@@ -1785,7 +1785,10 @@ function filterSummary(key as string) as string
     names = { popular: "most popular", rating: "top rated", newest: "newest", az: "A to Z" }
     if key <> "trending" or f.kind <> "all" then parts.push(names[f.sort])
     text = parts.join(" · ")
-    if m.busy[key] = true then return "Asking Overseerr… · " + text
+    if m.busy[key] = true
+        if text = "" then return "Asking Overseerr…"
+        return "Asking Overseerr… · " + text
+    end if
     if filtersActive(key)
         ' keep room for "Filtered · 43 of 100" and the hint on the same line
         if Len(text) > 48 then text = Left(text, 46) + "…"
@@ -1793,6 +1796,8 @@ function filterSummary(key as string) as string
     end if
     n = filterCountShown(key)
     if m.totals[key] <> invalid and m.totals[key] > n then n = m.totals[key]
+    ' no dangling dot when there is nothing after the count (Trending, walk 2)
+    if text = "" then return reqThousands(n) + " titles"
     return reqThousands(n) + " titles · " + text
 end function
 
