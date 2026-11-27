@@ -57,7 +57,8 @@ function vizLooks() as object
         { n: "121", label: "Ghost city" },
         { n: "122", label: "Amulet" },
         { n: "123", label: "Big guns" },
-        { n: "124", label: "Neon blobs" }
+        { n: "124", label: "Neon blobs" },
+        { n: "125", label: "Let it grow" }
     ]
 end function
 

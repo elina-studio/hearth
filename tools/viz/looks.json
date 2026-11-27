@@ -273,5 +273,10 @@
   "n": 124,
   "preset": "flexi - bouncing balls [double mindblob neon mix]",
   "label": "Neon blobs"
+ },
+ {
+  "n": 125,
+  "preset": "cope - strange attractor [flexis let it grow mix] (Jelly 5.56 [volume noise zoom-in])",
+  "label": "Let it grow"
  }
 ]
