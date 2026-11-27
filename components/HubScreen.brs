@@ -511,9 +511,13 @@ sub openMenu()
     ' a friendly name only: never the raw address
     if srv = invalid or srv = "" then srv = "Plex" else srv = "Plex on " + srv
     ai = CreateObject("roAppInfo")
-    d.message = ["Signed in to " + srv, "Hearth build " + ai.GetValue("build_version")]
+    d.hero = { art: "pkg:/images/lantern.png", shape: "logo", kicker: "Build " + ai.GetValue("build_version") }
+    d.message = ["Signed in to " + srv]
     if m.global.sfxOn then snd = "Menu sounds: On" else snd = "Menu sounds: Off"
     d.buttons = ["Close", snd, "Sign out"]
+    d.heads = { "1": "Settings" }
+    d.subs = ["", "The soft taps as you move around", "Leave this Plex account on this TV"]
+    d.icons = ["", "pkg:/images/music/icons/wave.png", "pkg:/images/music/icons/close.png"]
     d.observeField("buttonSelected", "onMenu")
     m.dialog = d
     hShowDialog(d)

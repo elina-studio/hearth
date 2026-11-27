@@ -468,7 +468,14 @@ sub albumOptions(i as integer)
     d = CreateObject("roSGNode", "HearthDialog")
     d.title = pxStr(m.albums[i].md.title)
     d.message = [pxStr(m.albums[i].md.parentTitle)]
-    d.buttons = ["Play album", "Shuffle album", "Play next", "Add to queue", "Close"]
+    kick = "Album"
+    if m.albums[i].md.year <> invalid then kick = "Album  ·  " + m.albums[i].md.year.toStr()
+    ic = "pkg:/images/music/icons/"
+    d.hero = { art: pxImage(m.albums[i].md.thumb, 320, 320), shape: "square", kicker: kick }
+    d.buttons = ["Play", "Shuffle", "Play next", "Add to queue", "Close"]
+    d.kinds = ["tile", "tile", "tile", "tile", ""]
+    d.subs = ["From the top", "Mixed up", "After this song", "At the end", ""]
+    d.icons = [ic + "play.png", ic + "shuffle.png", ic + "next.png", ic + "queue.png", ""]
     d.observeField("buttonSelected", "onAlbumOption")
     d.observeField("wasClosed", "onShown")
     m.dialog = d
@@ -483,7 +490,12 @@ sub trackOptions(i as integer, k as integer)
     d = CreateObject("roSGNode", "HearthDialog")
     d.title = pxStr(md.title)
     d.message = [pxStr(m.albums[i].md.title)]
+    ic = "pkg:/images/music/icons/"
+    d.hero = { art: pxImage(m.albums[i].md.thumb, 320, 320), shape: "square", kicker: "Song" }
     d.buttons = ["Play from here", "Play next", "Add to queue", "More like this", "Close"]
+    d.kinds = ["tile", "tile", "tile", "", ""]
+    d.subs = ["Then the rest of the album", "After this song", "At the end", "A mix that starts from this song", ""]
+    d.icons = [ic + "play.png", ic + "next.png", ic + "queue.png", ic + "wave.png", ""]
     d.observeField("buttonSelected", "onAlbumOption")
     d.observeField("wasClosed", "onShown")
     m.dialog = d

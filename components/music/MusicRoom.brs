@@ -687,7 +687,14 @@ sub cardOptions()
     d = CreateObject("roSGNode", "HearthDialog")
     d.title = pxStr(card.item.title)
     d.message = [card.sub]
+    ic = "pkg:/images/music/icons/"
+    kick = pxStr(card.item.type)
+    if kick <> "" then kick = UCase(Left(kick, 1)) + Mid(kick, 2)
+    d.hero = { art: pxImage(card.item.thumb, 320, 320), shape: "square", kicker: kick }
     d.buttons = ["Play", "Shuffle", "Close"]
+    d.kinds = ["tile", "tile", ""]
+    d.subs = ["From the top", "Mixed up", ""]
+    d.icons = [ic + "play.png", ic + "shuffle.png", ""]
     d.observeField("buttonSelected", "onCardOption")
     d.observeField("wasClosed", "onMuClosed")
     m.cardDialog = d

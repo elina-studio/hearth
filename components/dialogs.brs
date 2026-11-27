@@ -13,14 +13,32 @@ sub hOptions(item as object)
     labels.push("Open details") : m.optActions.push("details")
     if played
         labels.push("Mark unwatched") : m.optActions.push("unplayed")
+        seen = "It shows as not watched again"
     else
         labels.push("Mark watched") : m.optActions.push("played")
+        seen = "It leaves Continue watching"
     end if
     labels.push("Close") : m.optActions.push("close")
     d = CreateObject("roSGNode", "HearthDialog")
     d.title = hTitle(item)
     d.message = [hSubtitle(item)]
+    ' the poster leads for a film or a show; an episode's picture is wide, so it gets the square
+    kind = "Film"
+    shape = "poster"
+    pw = 300
+    if item.Type = "Series" then kind = "Show"
+    if item.Type = "Episode"
+        kind = "Episode"
+        shape = "square"
+        pw = 320
+    end if
+    chips = []
+    if played then chips.push("Watched")
+    d.hero = { art: hImage(item, "Primary", pw), shape: shape, kicker: kind, chips: chips }
     d.buttons = labels
+    d.kinds = ["main", "", ""]
+    d.icons = ["pkg:/images/icons/d-info.png", "pkg:/images/icons/d-check.png", ""]
+    d.subs = ["", seen, ""]
     d.observeField("buttonSelected", "onOptions")
     m.optDialog = d
     hShowDialog(d)

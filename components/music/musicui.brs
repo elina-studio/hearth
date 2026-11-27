@@ -58,50 +58,91 @@ end function
 sub muOptions(views as boolean)
     p = muPlayer()
     m.muActions = []
-    labels = []
-    heads = {}
-    heads["0"] = "Playback"
-    if p.shuffle then labels.push("Shuffle: On") else labels.push("Shuffle: Off")
-    m.muActions.push("shuffle")
+    m.muB = { labels: [], subs: [], icons: [], kinds: [], pics: [], heads: {} }
+    ic = "pkg:/images/music/icons/"
+    muHead("Playback")
+    if p.shuffle then muAdd("Shuffle: On", "shuffle", "Mix up what is queued", ic + "shuffle.png") else muAdd("Shuffle: Off", "shuffle", "Mix up what is queued", ic + "shuffle.png")
     r = "Off"
     if p.repeat = "all" then r = "All"
     if p.repeat = "one" then r = "One song"
-    labels.push("Repeat: " + r) : m.muActions.push("repeat")
-    heads[labels.count().toStr()] = "More like this"
-    labels.push("More like this song") : m.muActions.push("more")
+    muAdd("Repeat: " + r, "repeat", "Off, all, or one song", ic + "repeat.png")
+    muHead("More like this")
+    muAdd("More like this song", "more", "A mix that starts from this song", ic + "wave.png")
     if p.radioOn
-        labels.push("Radio options") : m.muActions.push("radioMenu")
+        muAdd("Radio options...", "radioMenu", "Steer the radio that is playing", ic + "radio.png")
     else
-        labels.push("Start a radio") : m.muActions.push("radio")
+        muAdd("Start a radio...", "radio", "Pick a mood and let it run", ic + "radio.png")
     end if
     if p.lyricsActive
-        labels.push("Lyrics") : m.muActions.push("lyricsMenu")
+        muAdd("Lyrics...", "lyricsMenu", "Show, hide or nudge the words", ic + "lyrics.png")
     end if
-    heads[labels.count().toStr()] = "Last.fm"
-    labels.push("Love this song") : m.muActions.push("love")
-    labels.push("Last.fm settings") : m.muActions.push("lastfm")
-    heads[labels.count().toStr()] = "Library"
-    labels.push("Music schedules") : m.muActions.push("schedules")
+    ' the right-hand column
+    split = m.muB.labels.count()
+    if views
+        muHead("On screen")
+        n = muNow()
+        coverPic = ""
+        if n.track <> invalid then coverPic = pxImage(n.track.thumb, 360, 240)
+        muPic("Cover", "cover", coverPic)
+        muPic("Visualizer", "milk", "pkg:/images/music/viz/10.jpg")
+        muPic("Hearth fire", "hearth", "pkg:/images/amb/tile-hearth.jpg")
+    end if
+    muHead("Last.fm")
+    muAdd("Love this song", "love", "Saved to your Last.fm loves", ic + "heart.png")
+    muAdd("Last.fm...", "lastfm", "Connect it, or see what it sends", ic + "scrobble.png")
+    muHead("Library")
+    muAdd("Music schedules...", "schedules", "Music that starts by itself", ic + "clock.png")
     libs = p.libraries
     if libs <> invalid and libs.Count() > 1
-        labels.push("Library: " + p.sectionName) : m.muActions.push("library")
-    end if
-    if views
-        heads[labels.count().toStr()] = "On screen"
-        labels.push("Cover") : m.muActions.push("cover")
-        labels.push("Visualizer") : m.muActions.push("milk")
-        labels.push("Hearth fire") : m.muActions.push("hearth")
+        muAdd("Library: " + p.sectionName, "library", "Switch between your music libraries", ic + "disc.png")
     end if
     d = CreateObject("roSGNode", "HearthDialog")
     d.title = "Music"
+    d.icon = ic + "disc.png"
     n = muNow()
-    d.message = [n.title + "  ·  " + n.sub]
-    d.buttons = labels
-    d.heads = heads
+    if n.track <> invalid
+        k = "Playing now"
+        if p.state <> "playing" and p.state <> "buffering" then k = "Paused"
+        d.now = { art: pxImage(n.track.thumb, 208, 208), kicker: k, title: n.title, sub: n.sub }
+    else
+        d.message = ["Nothing is playing"]
+    end if
+    b = m.muB
+    d.buttons = b.labels
+    d.subs = b.subs
+    d.icons = b.icons
+    d.kinds = b.kinds
+    d.pics = b.pics
+    d.heads = b.heads
+    d.split = split
     d.observeField("buttonSelected", "onMuOption")
     d.observeField("wasClosed", "onMuClosed")
     m.muDialog = d
     hShowDialog(d)
+end sub
+
+sub muHead(words as string)
+    m.muB.heads[m.muB.labels.count().toStr()] = words
+end sub
+
+sub muAdd(caption as string, action as string, line as string, iconUri as string)
+    b = m.muB
+    b.labels.push(caption)
+    b.subs.push(line)
+    b.icons.push(iconUri)
+    b.kinds.push("")
+    b.pics.push("")
+    m.muActions.push(action)
+end sub
+
+sub muPic(caption as string, action as string, picUri as string)
+    b = m.muB
+    b.labels.push(caption)
+    b.subs.push("")
+    b.icons.push("")
+    b.kinds.push("pic")
+    b.pics.push(picUri)
+    m.muActions.push(action)
 end sub
 
 sub onMuOption()

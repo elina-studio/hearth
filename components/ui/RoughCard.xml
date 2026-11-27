@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A card with a hand-cut, uneven edge, any size (popups; mockups/popups-rich/). Put together from the white
+     pieces in images/w/rough/ (made by tools/art/rough_card.py, which lays its mockup cards out the same way):
+     four corners, edge strips end to end, a plain middle. Set width and height, then the colours if needed. -->
+<component name="RoughCard" extends="Group">
+  <interface>
+    <field id="width" type="integer" value="0" />
+    <field id="height" type="integer" value="0" onChange="build" />
+    <field id="fillColor" type="string" value="0x141A11FF" />
+    <field id="lineColor" type="string" value="0xE0B34A78" />
+  </interface>
+  <script type="text/brightscript" uri="pkg:/components/ui/RoughCard.brs" />
+</component>

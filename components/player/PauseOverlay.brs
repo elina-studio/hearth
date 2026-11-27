@@ -451,6 +451,9 @@ sub openMore()
     d.title = "More"
     d.message = [m.top.findNode("title").text]
     d.buttons = ["What is playing, and how", "Mark watched or unwatched"]
+    d.icon = "pkg:/images/player/dots.png"
+    d.icons = ["pkg:/images/player/info.png", "pkg:/images/player/check.png"]
+    d.subs = ["Picture, sound and how it is reaching the TV", "Change where this sits in Continue watching"]
     d.observeField("buttonSelected", "onMore")
     d.observeField("wasClosed", "onMoreClosed")
     m.moreDialog = d

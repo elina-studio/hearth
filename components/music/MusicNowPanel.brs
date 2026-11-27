@@ -817,25 +817,58 @@ end sub
 sub panelMore()
     p = muPlayer()
     m.moreActs = []
+    ic = "pkg:/images/music/icons/"
     labels = []
-    if p.castCount > 0 then labels.push("Play in other rooms (" + p.castCount.toStr() + " on)") else labels.push("Play in other rooms")
-    m.moreActs.push("cast")
-    labels.push("Queue") : m.moreActs.push("queue")
-    labels.push(muRepeatLabel()) : m.moreActs.push("repeat")
-    if p.liked = "like" then labels.push("Liked (undo)") else labels.push("Like this song")
-    m.moreActs.push("like")
-    labels.push("Dislike this song") : m.moreActs.push("dislike")
-    labels.push("Big view") : m.moreActs.push("big")
-    labels.push("Hearth fire") : m.moreActs.push("hearth")
-    labels.push("Cover") : m.moreActs.push("cover")
-    labels.push("Visualizer") : m.moreActs.push("milk")
-    labels.push("More music options...") : m.moreActs.push("options")
-    labels.push("Close") : m.moreActs.push("close")
+    subs = []
+    icons = []
+    kinds = []
+    pics = []
+    if p.castCount > 0 then labels.push("Play in other rooms: " + p.castCount.toStr() + " on") else labels.push("Play in other rooms...")
+    m.moreActs.push("cast") : subs.push("Send this music to your speakers") : icons.push(ic + "speaker.png")
+    labels.push("Queue...") : m.moreActs.push("queue") : subs.push("What plays next") : icons.push(ic + "queue.png")
+    r = "Off"
+    if p.repeat = "all" then r = "All"
+    if p.repeat = "one" then r = "One song"
+    labels.push("Repeat: " + r) : m.moreActs.push("repeat") : subs.push("Off, all, or one song") : icons.push(ic + "repeat.png")
+    if p.liked = "like" then labels.push("Like this song: On") else labels.push("Like this song: Off")
+    m.moreActs.push("like") : subs.push("Plays more like it in mixes") : icons.push(ic + "thumbup.png")
+    labels.push("Dislike this song") : m.moreActs.push("dislike") : subs.push("Keeps it out of mixes") : icons.push(ic + "thumbdown.png")
+    labels.push("Big view") : m.moreActs.push("big") : subs.push("The player, full screen") : icons.push(ic + "expand.png")
+    for each x in labels
+        kinds.push("")
+        pics.push("")
+    end for
+    n = muNow()
+    coverPic = ""
+    if n.track <> invalid then coverPic = pxImage(n.track.thumb, 360, 240)
+    viewsAt = labels.count()
+    labels.push("Hearth fire") : m.moreActs.push("hearth") : pics.push("pkg:/images/amb/tile-hearth.jpg")
+    labels.push("Cover") : m.moreActs.push("cover") : pics.push(coverPic)
+    labels.push("Visualizer") : m.moreActs.push("milk") : pics.push("pkg:/images/music/viz/10.jpg")
+    for k = 0 to 2
+        kinds.push("pic")
+        subs.push("")
+        icons.push("")
+    end for
+    labels.push("More music options...") : m.moreActs.push("options") : subs.push("Shuffle, radio, Last.fm, schedules") : icons.push(ic + "more.png") : kinds.push("") : pics.push("")
+    labels.push("Close") : m.moreActs.push("close") : subs.push("") : icons.push("") : kinds.push("") : pics.push("")
     d = CreateObject("roSGNode", "HearthDialog")
     d.title = "Music"
-    n = muNow()
-    d.message = [n.title]
+    d.icon = ic + "disc.png"
+    if n.track <> invalid
+        d.now = { art: pxImage(n.track.thumb, 208, 208), kicker: "Playing now", title: n.title, sub: n.sub }
+    else
+        d.message = [n.title]
+    end if
     d.buttons = labels
+    d.subs = subs
+    d.icons = icons
+    d.kinds = kinds
+    d.pics = pics
+    hd = {}
+    hd[viewsAt.toStr()] = "On screen"
+    d.heads = hd
+    d.split = viewsAt
     d.observeField("buttonSelected", "onPanelMore")
     d.observeField("wasClosed", "onMuClosed")
     m.moreDialog = d

@@ -1,22 +1,35 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Hearth's own menu and message popup (walk 2, item 14; a centred card since build 122, mockups/popups/). It takes the place of
-     Roku's StandardMessageDialog everywhere, with the same fields, so a caller only changes how it is shown:
-     hShowDialog(d) (source/util.brs) instead of scene.dialog = d.
-     buttons: "Label" or "Label: value" (the value is drawn on the right). heads: { "<button index>": "GROUP" }
-     puts a group title above that button. Like the Roku dialog, choosing a button does not close it; the caller
-     sets close = true. wasClosed fires once, however it closed.
-     popup = true (set before showing) is for questions and notices: a centred card, buttons in one row. -->
+<!-- Hearth's popup for every menu, question and notice (mockups/popups-rich/). A hand-cut card in the middle of
+     the screen with a picture or icon on top, rows with an icon and a line of what they do, switches and values
+     on the right, big buttons and picture tiles.
+     It keeps the fields of Roku's StandardMessageDialog, so a plain caller only sets title, message and buttons
+     and shows it with hShowDialog(d) (source/util.brs). Choosing a button does not close it; the caller sets
+     close = true. wasClosed fires once, however it closed.
+
+     buttons   "Label", or "Label: value". The value is drawn on the right: On / Off as a switch, anything else
+               as a chip. A label ending in "..." gets a chevron instead of the dots.
+               A button called "Close" is not drawn when there are others (Back closes); indexes do not shift.
+     heads     { "<button index>": "GROUP" } puts a group title above that button.
+     subs      second line for each button, by index ("" for none).
+     icons     picture uri for each button's icon, by index ("" for none). White art; it is tinted.
+     kinds     how each button is drawn, by index: "" a row, "tile" a big button (neighbours share one line),
+               "pic" a picture tile (uses pics), "main" one wide gold button.
+     pics      picture uri for each "pic" button, by index.
+     split     index of the first button of the right-hand column; 0 = one column.
+     icon      header icon uri (white art), drawn beside the title.
+     hero      { art, shape: "square" | "poster" | "logo", kicker, chips: [..] } leads with a big picture; title is
+               the name beside it and message the line under it.
+     now       { art, kicker, title, sub } a "playing now" box under the title.
+     popup     true = a question or a notice: title and words centred, the buttons in one row. -->
 <component name="HearthDialog" extends="Group">
   <children>
-    <Rectangle id="shade" width="1920" height="1080" color="0x0B0E09B8" />
-    <Poster id="panelRing" uri="pkg:/images/w/panel.9.png" visible="false" blendColor="0xE0B34A66" />
-    <Poster id="panel" uri="pkg:/images/w/panel.9.png" translation="[1168, 28]" width="684" height="1024" blendColor="0x141A11FF" />
-    <Label id="title" translation="[1220, 68]" width="580" maxLines="2" wrap="true" lineSpacing="0" color="0xEDE6CAFF" />
-    <Label id="msg" translation="[1220, 130]" width="580" maxLines="12" wrap="true" lineSpacing="2" color="0xB5AF8CFF" />
-    <Rectangle id="rule" translation="[1220, 180]" width="580" height="2" color="0xE0B34A66" />
-    <Group id="list" translation="[1206, 200]" />
-    <Label id="more" translation="[1220, 952]" width="580" color="0xB5AF8CFF" />
-    <Label id="hint" translation="[1220, 990]" width="580" color="0xB5AF8CFF" />
+    <Rectangle id="shade" width="1920" height="1080" color="0x0B0E09D9" />
+    <RoughCard id="card" />
+    <Poster id="twig" uri="pkg:/images/w/twig-300-s5.png" width="340" height="120" visible="false" />
+    <Poster id="fly" uri="pkg:/images/w/firefly-main.png" width="64" height="64" visible="false" />
+    <Group id="headG" />
+    <Group id="body" />
+    <Group id="foot" />
     <Timer id="hold" duration="0.4" repeat="true" />
   </children>
   <interface>
@@ -24,10 +37,15 @@
     <field id="message" type="stringarray" />
     <field id="buttons" type="stringarray" />
     <field id="heads" type="assocarray" />
-    <!-- a question or a notice ("Leave Hearth?"): a small card in the middle with its buttons side by side,
-         instead of the side sheet that menus use (mockups/leave-popup/leave-popup.png) -->
+    <field id="subs" type="stringarray" />
+    <field id="icons" type="stringarray" />
+    <field id="kinds" type="stringarray" />
+    <field id="pics" type="stringarray" />
+    <field id="split" type="integer" value="0" />
+    <field id="icon" type="string" />
+    <field id="hero" type="assocarray" />
+    <field id="now" type="assocarray" />
     <field id="popup" type="boolean" value="false" />
-    <!-- menus are a centred card too; side = true puts one back on the right edge as a side sheet -->
     <field id="side" type="boolean" value="false" />
     <field id="buttonFocused" type="integer" value="0" />
     <field id="buttonSelected" type="integer" value="0" alwaysNotify="true" />
