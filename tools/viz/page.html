@@ -1,0 +1,24 @@
+<!doctype html><html><head><meta charset="utf-8"></head>
+<body style="margin:0;background:#000;overflow:hidden">
+<canvas id="c"></canvas>
+<script src="node_modules/butterchurn/lib/butterchurn.min.js"></script>
+<script src="node_modules/butterchurn-presets/lib/butterchurnPresets.min.js"></script>
+<script>
+// Hearth visualizer page: the renderer (viz.js) drives it one frame at a time with the song's own samples,
+// so the picture follows the music exactly, however fast or slow the machine renders.
+const q = new URLSearchParams(location.search);
+const W = +q.get('w') || 1280, H = +q.get('h') || 720;
+const cv = document.getElementById('c');
+cv.width = W; cv.height = H;
+const bc = butterchurn.default || butterchurn;
+const presets = (butterchurnPresets.default || butterchurnPresets).getPresets();
+const viz = bc.createVisualizer(new AudioContext(), cv, { width: W, height: H, pixelRatio: 1, textureRatio: 1 });
+const dec = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+window.hasPreset = name => !!presets[name];
+window.load = (name, blend) => { viz.loadPreset(presets[name], blend || 0); return true; };
+window.frame = (m, l, r, dt, quality) => {
+  viz.render({ audioLevels: { timeByteArray: dec(m), timeByteArrayL: dec(l), timeByteArrayR: dec(r) }, elapsedTime: dt });
+  return cv.toDataURL('image/jpeg', quality || 0.9).split(',')[1];
+};
+window.ready = true;
+</script></body></html>

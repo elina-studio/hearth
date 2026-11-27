@@ -35,6 +35,7 @@ import discover
 import shelf
 import lyrics
 import web
+import mix
 
 TV_IP = os.environ.get("TV_IP", "192.168.254.9")
 HTTP_PORT = int(os.environ.get("HTTP_PORT", "8765"))
@@ -233,6 +234,10 @@ class Handler(BaseHTTPRequestHandler):
             return
         if path.startswith("/px/"):
             return web.proxy(self, "HEAD", path)
+        if path.startswith("/api/mix/s/"):
+            return mix.serve_segment(self, path)
+        if path == "/api/viz/loopfile":
+            return mix.loop_play(self, urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query))
         self.send_json({"error": "not found"}, 404)
 
     def do_GET(self):
@@ -267,6 +272,20 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json(web.pj_poll(since))
         elif path == "/api/status":
             self.status()
+        elif path.startswith("/api/mix/s/"):
+            mix.serve_segment(self, path)
+        elif path == "/api/mix/start":
+            mix.start(self, urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query))
+        elif path == "/api/viz/audio":
+            mix.audio(self, urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query))
+        elif path == "/api/viz/sample":
+            mix.sample(self)
+        elif path == "/api/viz/loops":
+            mix.loops_list(self)
+        elif path == "/api/viz/loopfile":
+            mix.loop_play(self, urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query))
+        elif path == "/api/viz/status":
+            mix.status(self)
         elif path == "/api/round":
             self.round_image()
         elif path == "/api/keys":
@@ -406,7 +425,12 @@ class Handler(BaseHTTPRequestHandler):
                 if len(pcm) < 3200:
                     return self.send_json({"text": ""})
                 return self.send_json({"text": transcribe(pcm)})
+            if path == "/api/viz/loop":
+                return mix.loop_upload(self, urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query))
             req = json.loads(self.body() or b"{}")
+            if path == "/api/viz/hello":
+                mix.hello(self.client_address[0], req)
+                return self.send_json({"ok": True})
             if path == "/api/lastfm/begin":
                 return self.send_json(lastfm.begin())
             if path == "/api/lastfm/event":
@@ -501,6 +525,7 @@ def main():
     print("Hearth remote: http :%d%s, TV %s, whisper %s:%d" % (
         HTTP_PORT, (", https :%d" % HTTPS_PORT) if len(servers) > 1 else "", TV_IP, WHISPER_HOST, WHISPER_PORT), flush=True)
     print("House key in %s (the TV %s is let in without it; phones open /?t=<key> once)" % (os.path.join(DATA_DIR, "helper-token"), TV_IP), flush=True)
+    mix.set_token(guard.TOKEN)
     threading.Thread(target=lastfm.worker, daemon=True).start()
     threading.Thread(target=discover.worker, daemon=True).start()
     servers[0].serve_forever()

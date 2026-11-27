@@ -55,3 +55,17 @@ The helper now refuses anyone without the house key. It is made on first start a
 - Scripts send it as the header `X-Hearth-Token`.
 - Ten wrong tries from one address lock that address out for a minute.
 - Responses carry security headers and a Content-Security-Policy; the old `Access-Control-Allow-Origin: *` is gone; request bodies are capped; `/api/round` only fetches pictures from the Plex server.
+
+## Music with pictures (Visualizer and the Hearth fire)
+
+The TV plays one stream at a time, so the helper joins pictures and the song into one HLS stream (`mix.py`, needs
+the ffmpeg in the image):
+
+- `GET /api/mix/start?kind=fire&file=<song>&clip=<Plex part key>&ss=<s>` your fire clip (fetched from Plex once,
+  kept in `data/fire-clips`), looped under the song.
+- `GET /api/mix/start?kind=viz&file=<song>&look=<n>&ss=<s>` MilkDrop: rendered live on the NucBox (`tools/viz`)
+  when it is on and fast enough, otherwise the look's ready-made loop from `data/viz-loops` under the song.
+- The NucBox says hello every minute (`POST /api/viz/hello`) and uploads the loops (`POST /api/viz/loop?n=`).
+  `GET /api/viz/status` shows whether it is seen and how many loops there are.
+
+Setup: `tools/viz/setup-viz.sh` on the Mac, then the PowerShell line it prints on the NucBox.

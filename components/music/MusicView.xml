@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Full-screen music: mode "cover" (big album art), "milk" (visualizer stand-in) or "hearth" (the fire, with
+<!-- Full-screen music: mode "cover" (big album art), "milk" (MilkDrop, rendered for each song) or "hearth" (the fire, with
      fire + music / fire only / music only). The now-playing strip shows on any key and fades after a few seconds. -->
 <component name="MusicView" extends="Group">
   <children>
@@ -22,12 +22,16 @@
     </Group>
 
     <Group id="milk" visible="false">
-      <Poster id="vGlow" uri="pkg:/images/intro-glow.png" translation="[510, 90]" width="900" height="900" opacity="0.5" />
-      <Poster id="v1" uri="pkg:/images/music/viz-dots.png" translation="[360, -60]" width="1200" height="1200" scaleRotateCenter="[600, 600]" opacity="0.35" />
-      <Poster id="v2" uri="pkg:/images/music/viz-spiral.png" translation="[410, -10]" width="1100" height="1100" scaleRotateCenter="[550, 550]" opacity="0.55" />
-      <Poster id="v3" uri="pkg:/images/music/viz-rosette.png" translation="[510, 90]" width="900" height="900" scaleRotateCenter="[450, 450]" opacity="0.8" />
-      <Poster id="v4" uri="pkg:/images/music/viz-rosette.png" translation="[660, 240]" width="600" height="600" scaleRotateCenter="[300, 300]" opacity="0.5" />
-      <Label id="presetName" translation="[96, 60]" width="900" color="0xB5AF8C99" />
+      <!-- the song's cover, softly, until the MilkDrop stream starts (and if it can't) -->
+      <Poster id="vizBack" width="1920" height="1080" loadDisplayMode="scaleToZoom" opacity="0.35" />
+      <Rectangle width="1920" height="1080" color="0x0B0E0999" />
+      <Label id="vizNote" translation="[260, 420]" width="1400" horizAlign="center" wrap="true" lineSpacing="2" color="0xB5AF8CFF" />
+      <!-- MilkDrop for this song, with the song in the same stream (MusicPlayer mixplay.brs) -->
+      <Video id="vizVideo" width="1920" height="1080" enableUI="false" disableScreenSaver="true" />
+      <Group id="lookTag" opacity="0">
+        <Rectangle id="lookTagBg" translation="[80, 50]" width="560" height="64" color="0x0B0E09B3" />
+        <Label id="presetName" translation="[104, 62]" width="900" color="0xEDE6CAFF" />
+      </Group>
     </Group>
 
     <Group id="hearth" visible="false">
@@ -56,24 +60,15 @@
     </Animation>
     <Timer id="stripTimer" duration="4" repeat="false" />
 
-    <Animation id="vSpin" duration="60" repeat="true" easeFunction="linear">
-      <FloatFieldInterpolator id="r1" key="[0.0, 1.0]" keyValue="[0.0, 6.2832]" fieldToInterp="v1.rotation" />
-      <FloatFieldInterpolator id="r2" key="[0.0, 1.0]" keyValue="[0.0, -12.5664]" fieldToInterp="v2.rotation" />
-      <FloatFieldInterpolator id="r3" key="[0.0, 1.0]" keyValue="[0.0, 18.8496]" fieldToInterp="v3.rotation" />
-      <FloatFieldInterpolator id="r4" key="[0.0, 1.0]" keyValue="[0.0, -25.1327]" fieldToInterp="v4.rotation" />
+    <Animation id="tagIn" duration="0.25" easeFunction="outQuad">
+      <FloatFieldInterpolator key="[0.0, 1.0]" keyValue="[0.0, 1.0]" fieldToInterp="lookTag.opacity" />
     </Animation>
-    <Animation id="vTint" duration="24" repeat="true" easeFunction="linear">
-      <ColorFieldInterpolator id="c1" key="[0.0, 0.33, 0.66, 1.0]" fieldToInterp="v1.blendColor" />
-      <ColorFieldInterpolator id="c2" key="[0.0, 0.33, 0.66, 1.0]" fieldToInterp="v2.blendColor" />
-      <ColorFieldInterpolator id="c3" key="[0.0, 0.33, 0.66, 1.0]" fieldToInterp="v3.blendColor" />
-      <ColorFieldInterpolator id="c4" key="[0.0, 0.33, 0.66, 1.0]" fieldToInterp="v4.blendColor" />
-      <ColorFieldInterpolator id="cg" key="[0.0, 0.33, 0.66, 1.0]" fieldToInterp="vGlow.blendColor" />
+    <Animation id="tagOut" duration="0.8" easeFunction="inOutQuad">
+      <FloatFieldInterpolator key="[0.0, 1.0]" keyValue="[1.0, 0.0]" fieldToInterp="lookTag.opacity" />
     </Animation>
-    <Animation id="vBreath" duration="4" repeat="true" easeFunction="inOutQuad">
-      <Vector2DFieldInterpolator id="b3" key="[0.0, 0.5, 1.0]" keyValue="[[1.0, 1.0], [1.08, 1.08], [1.0, 1.0]]" fieldToInterp="v3.scale" />
-      <Vector2DFieldInterpolator id="b4" key="[0.0, 0.5, 1.0]" keyValue="[[1.1, 1.1], [0.94, 0.94], [1.1, 1.1]]" fieldToInterp="v4.scale" />
-      <FloatFieldInterpolator key="[0.0, 0.5, 1.0]" keyValue="[0.4, 0.65, 0.4]" fieldToInterp="vGlow.opacity" />
-    </Animation>
+    <Timer id="tagTimer" duration="3" repeat="false" />
+    <!-- the look picker (* > Visualizer look), drawn over everything -->
+    <VizLookPicker id="picker" visible="false" />
   </children>
   <interface>
     <field id="mode" type="string" onChange="onMode" />
@@ -84,5 +79,7 @@
   <script type="text/brightscript" uri="pkg:/components/music/plex.brs" />
   <script type="text/brightscript" uri="pkg:/components/music/musicui.brs" />
   <script type="text/brightscript" uri="pkg:/components/ambiance/ambianceData.brs" />
+  <script type="text/brightscript" uri="pkg:/components/music/nas.brs" />
+  <script type="text/brightscript" uri="pkg:/components/music/vizlooks.brs" />
   <script type="text/brightscript" uri="pkg:/components/music/MusicView.brs" />
 </component>
