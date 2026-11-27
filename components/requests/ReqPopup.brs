@@ -1,7 +1,6 @@
 sub init()
     m.top.findNode("eyebrow").font = hFont("caps", 26)
     m.top.findNode("rating").font = hFont("caps", 26)
-    m.top.findNode("rt").font = hFont("caps", 26)
     m.top.findNode("title").font = hFont("caps", 64)
     m.top.findNode("overview").font = hFont("regular", 24)
     m.items = m.top.findNode("items")
@@ -68,8 +67,17 @@ sub build()
             x = x + 30 + lab.boundingRect().width + 36
         end for
     end if
-    h = 50 + y + 40 + 50
+    m.listH = 50 + y + 40 + 50
+    m.top.findNode("scoreCard").visible = false
+    m.cardH = 0
+    layoutPanel()
+end sub
+
+' The panel is as tall as the list, or as the poster plus the score card under it
+sub layoutPanel()
+    h = m.listH
     if h < 550 then h = 550
+    if m.cardH > 0 and 520 + m.cardH + 40 > h then h = 520 + m.cardH + 40
     m.top.findNode("panelBg").height = h
     m.top.findNode("panel").translation = [400, Int((930 - h) / 2) - 20]
 end sub
@@ -192,12 +200,78 @@ sub setLabel(args as object)
     drawItems()
 end sub
 
-' Rotten Tomatoes critics score, shown after the TMDB rating once Overseerr has fetched it
-sub setRt(text as string)
-    rt = m.top.findNode("rt")
-    rt.text = text
-    x = m.top.findNode("eyebrow").boundingRect().width + 14
-    rating = m.top.findNode("rating")
-    if rating.visible then x = rating.translation[0] + rating.boundingRect().width + 28
-    rt.translation = [x, 0]
+' Scores from the NAS helper ({ imdb, rt, aud, cert }): one row each under the poster, the number big,
+' what it is small on the right. The TMDB star in the eyebrow goes once there is a real score.
+sub setScores(v as object)
+    g = m.top.findNode("scoreCard")
+    g.removeChildrenIndex(g.getChildCount(), 0)
+    rows = []
+    if v.imdb <> invalid then rows.push({ icon: "pkg:/images/requests/star.png", gold: true, big: rqScore1(v.imdb), small: " / 10", label: "IMDb" })
+    if v.rt <> invalid
+        lab = "Critics"
+        if v.cert = true then lab = "Certified"
+        rows.push({ icon: rqTomato(v), big: Int(v.rt).toStr() + "%", small: "", label: lab })
+    end if
+    if v.aud <> invalid then rows.push({ icon: "pkg:/images/requests/popcorn.png", big: Int(v.aud).toStr() + "%", small: "", label: "Audience" })
+    if rows.count() = 0
+        g.visible = false
+        m.cardH = 0
+        layoutPanel()
+        return
+    end if
+    m.top.findNode("star").visible = false
+    m.top.findNode("rating").visible = false
+    h = 20 + rows.count() * 46
+    bg = g.createChild("Poster")
+    bg.uri = "pkg:/images/tile.9.png"
+    bg.blendColor = "0xFFFFFF10"
+    bg.width = 300
+    bg.height = h
+    y = 10
+    for each r in rows
+        col = "0xEDE6CAFF"
+        ic = g.createChild("Poster")
+        ic.uri = r.icon
+        ic.width = 28
+        ic.height = 28
+        ic.translation = [20, y + 9]
+        if r.gold = true
+            ' IMDb: a gold star and the number in yellow, like on the posters
+            col = "0xE0B34AFF"
+            ic.blendColor = col
+            ic.width = 24
+            ic.height = 24
+            ic.translation = [22, y + 11]
+        end if
+        big = g.createChild("Label")
+        big.font = m.btnFont
+        big.color = col
+        big.text = r.big
+        big.height = 46
+        big.vertAlign = "center"
+        x = 62
+        big.translation = [x, y]
+        if r.small <> ""
+            sm = g.createChild("Label")
+            sm.font = m.subFont
+            sm.color = "0xB5AF8CFF"
+            sm.text = r.small
+            sm.height = 46
+            sm.vertAlign = "center"
+            sm.translation = [x + big.boundingRect().width + 4, y + 2]
+        end if
+        lab = g.createChild("Label")
+        lab.font = m.subFont
+        lab.color = "0xB5AF8CFF"
+        lab.text = r.label
+        lab.width = 260
+        lab.height = 46
+        lab.horizAlign = "right"
+        lab.vertAlign = "center"
+        lab.translation = [20, y]
+        y = y + 46
+    end for
+    g.visible = true
+    m.cardH = h
+    layoutPanel()
 end sub

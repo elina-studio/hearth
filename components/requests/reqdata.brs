@@ -337,3 +337,25 @@ function rqArrivedEyebrow(d as object) as string
     if d.when.text <> "" then e = e + " · ARRIVED " + UCase(d.when.text)
     return e
 end function
+
+' An IMDb score as "7.6" (always one decimal)
+function rqScore1(v as dynamic) as string
+    if v = invalid then return ""
+    x = Int(v * 10 + 0.5)
+    return Int(x / 10).toStr() + "." + (x mod 10).toStr()
+end function
+
+' "movie:603": the key the NAS helper's scores use (invalid for anything that isn't an Overseerr title)
+function rqScoreKey(c as dynamic) as dynamic
+    if c = invalid or c.kind <> "media" or c.data = invalid or c.data.id = invalid then return invalid
+    mt = c.data.mediaType
+    if mt <> "movie" and mt <> "tv" then return invalid
+    return mt + ":" + c.data.id.toStr()
+end function
+
+' Which tomato: green splat under 60%, gold-ringed tomato when certified fresh
+function rqTomato(v as object) as string
+    if v.rt < 60 then return "pkg:/images/requests/splat.png"
+    if v.cert = true then return "pkg:/images/requests/tomato-cert.png"
+    return "pkg:/images/requests/tomato.png"
+end function

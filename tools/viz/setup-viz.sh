@@ -26,6 +26,16 @@ echo "   Helper says: $ST"
 echo "$ST" | grep -q '"ffmpeg": true' || { echo "The helper is running but without ffmpeg, so the update didn't take. Send me the lines above."; exit 1; }
 echo "   OK: the helper can join pictures and songs."
 echo
+echo "=== Requests scores (IMDb and Rotten Tomatoes) ==="
+# the helper fetches IMDb's ratings file about 20 s after it starts; give it up to 2 minutes
+for i in 1 2 3 4 5 6 7 8 9 10 11 12; do
+  RS=$(curl -s --max-time 30 -H "X-Hearth-Token: $K" http://192.168.254.41:8765/api/ratings/selftest)
+  echo "$RS" | grep -q "^IMDb: ok" && break
+  echo "$RS" | grep -q "^IMDb: file failed" && break
+  sleep 10
+done
+echo "$RS" | sed 's/^/   /'
+echo
 echo "=== The NucBox ==="
 # the NucBox says hello every minute; the helper just restarted, so give it a moment
 for i in 1 2 3 4 5 6 7 8; do

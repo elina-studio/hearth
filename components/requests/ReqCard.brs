@@ -4,7 +4,8 @@ sub init()
     m.top.findNode("tileSub").font = hFontCached("regular", 22)
     m.chipText = m.top.findNode("chipText")
     m.chipText.font = hFontCached("caps", 22)
-    m.top.findNode("scoreText").font = hFontCached("bold", 22)
+    m.top.findNode("imdbText").font = hFontCached("bold", 17)
+    m.top.findNode("rtText").font = hFontCached("bold", 17)
     m.poster = m.top.findNode("poster")
     m.cap = m.top.findNode("cap")
     m.cap.font = hFontCached("bold", 22)
@@ -55,9 +56,7 @@ sub draw()
         fb.font = hFontCached("caps", 30)
     end if
     m.poster.uri = ""
-    sc = m.top.findNode("score")
-    sc.visible = (c.score <> invalid and c.score <> "" and c.kind = "media")
-    if sc.visible then m.top.findNode("scoreText").text = c.score
+    drawScores()
     onLoad()
     drawChip(c.chip)
     p = c.progress
@@ -121,4 +120,44 @@ end sub
 
 sub onFocused()
     m.top.findNode("ring").visible = m.top.focused
+end sub
+
+' One small badge, top right of the poster: IMDb number in yellow, then the tomato (fresh, gold-ringed when
+' certified) or green splat (rotten) and the critics %. Either half is left out when there's no score.
+sub drawScores()
+    g = m.top.findNode("score")
+    c = m.top.card
+    v = m.top.scores
+    if c = invalid or c.kind <> "media" or c.square = true or v = invalid
+        g.visible = false
+        return
+    end if
+    im =m.top.findNode("imdbText")
+    ic = m.top.findNode("rtIcon")
+    rt = m.top.findNode("rtText")
+    x = 7
+    im.visible = (v.imdb <> invalid)
+    if im.visible
+        im.text = rqScore1(v.imdb)
+        im.translation = [x, 0]
+        x = x + im.boundingRect().width + 6
+    end if
+    has = (v.rt <> invalid)
+    ic.visible = has
+    rt.visible = has
+    if has
+        ic.uri = rqTomato(v)
+        ic.translation = [x, 5]
+        rt.text = Int(v.rt).toStr() + "%"
+        rt.translation = [x + 18, 0]
+        x = x + 18 + rt.boundingRect().width + 1
+    end if
+    if x <= 7
+        g.visible = false
+        return
+    end if
+    w = x + 6
+    m.top.findNode("scoreBg").width = w
+    g.translation = [180 - 6 - w, 6]
+    g.visible = true
 end sub

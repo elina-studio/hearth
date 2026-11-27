@@ -9,11 +9,12 @@
       <Poster id="panelBg" uri="pkg:/images/tile.9.png" blendColor="0x141A11FF" width="1120" height="550" />
       <Rectangle id="posterBg" translation="[50, 50]" width="300" height="450" color="0x1D2418FF" />
       <Poster id="poster" translation="[50, 50]" width="300" height="450" loadDisplayMode="scaleToZoom" />
+      <!-- IMDb, Rotten Tomatoes critics and audience, under the poster (setScores) -->
+      <Group id="scoreCard" translation="[50, 520]" visible="false" />
       <Group translation="[400, 50]">
         <Label id="eyebrow" color="0xD9A066FF" />
         <Poster id="star" uri="pkg:/images/requests/star.png" width="22" height="22" blendColor="0xD9A066FF" visible="false" />
         <Label id="rating" color="0xD9A066FF" />
-        <Label id="rt" color="0xF0907CFF" />
         <Label id="title" translation="[0, 34]" width="660" wrap="true" lineSpacing="2" maxLines="2" color="0xEDE6CAFF" />
         <Label id="overview" translation="[0, 124]" width="660" wrap="true" lineSpacing="2" maxLines="3" color="0xB5AF8CFF" />
         <Group id="items" translation="[0, 250]" />
@@ -27,8 +28,9 @@
     <function name="handleKey" />
     <function name="checked" />
     <function name="setLabel" />
-    <function name="setRt" />
+    <function name="setScores" />
   </interface>
   <script type="text/brightscript" uri="pkg:/source/util.brs" />
+  <script type="text/brightscript" uri="pkg:/components/requests/reqdata.brs" />
   <script type="text/brightscript" uri="pkg:/components/requests/ReqPopup.brs" />
 </component>

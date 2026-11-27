@@ -95,7 +95,14 @@ sub init()
     m.listError = {}
     m.genres = { movie: [], tv: [] }
     m.provs = { movie: [], tv: [] }
-    m.rt = {}
+    ' IMDb / Rotten Tomatoes scores from the NAS helper (tools/remote/ratings.py), by "movie:603"
+    m.scores = {}
+    m.scoreAsk = {}
+    m.scoreRounds = 0
+    m.scoreFailAt = -1000
+    m.top.findNode("scoreTimer").observeField("fire", "onScoreTimer")
+    m.top.findNode("hdrImdb").font = hFont("caps", 26)
+    m.top.findNode("hdrRt").font = hFont("caps", 26)
     m.filterBar = m.top.findNode("filterBar")
     m.top.findNode("barLabel").font = hFont("bold", 26)
     m.top.findNode("barSum").font = hFont("regular", 24)
@@ -365,15 +372,18 @@ sub onList(event as object)
 end sub
 
 sub publishList(key as string)
+    wantScores(m.acc[key])
     m.cards[key] = clientFilter(key, m.acc[key])
     print "[hearth-filter] publish "; key; " "; m.cards[key].count(); " cards of "; m.acc[key].count()
     m.problem = ""
     paintRail()
     if currentList().key = key then showList()
+    ' a score filter can leave few titles from the pages so far: fetch more (up to 6 pages) to fill the grid
+    if scoreFiltered(key) and m.cards[key].count() < 18 and m.pageNo[key] <> invalid and m.pageNo[key] >= 1 and m.pageNo[key] < 6 then maybeMore(key)
 end sub
 
 function newFilters(kind as string) as object
-    return { kind: kind, genres: [], provider: "", minRating: 0, sort: "popular" }
+    return { kind: kind, genres: [], provider: "", minRating: 0, minRt: 0, minImdb: 0, sort: "popular" }
 end function
 
 ' "movie" / "tv" for the list being narrowed; "all" for the plain Trending feed
@@ -491,6 +501,7 @@ sub addFilterQuery(q as object, key as string)
         qp(q, "watchRegion", watchRegion())
     end if
     votes = 0
+    if fnum(f.minRt) > 0 or fnum(f.minImdb) > 0 then votes = 50
     if f.minRating > 0
         qp(q, "voteAverageGte", f.minRating.toStr())
         votes = 50
@@ -544,8 +555,173 @@ function genreId(kind as string, name as string) as string
     return ""
 end function
 
+' Rotten Tomatoes / IMDb minimums and sorts are done here (Overseerr can't): a title shows once its scores are in
 function clientFilter(key as string, cards as object) as object
-    return cards
+    f = m.filters[key]
+    if f = invalid or not scoreFiltered(key) then return cards
+    minRt = fnum(f.minRt)
+    minImdb = fnum(f.minImdb)
+    out = []
+    for each c in cards
+        v = scoreOf(c)
+        pass = true
+        if minRt > 0 then pass = (v <> invalid and v.rt <> invalid and v.rt >= minRt)
+        if pass and minImdb > 0 then pass = (v <> invalid and v.imdb <> invalid and v.imdb >= minImdb)
+        if pass
+            c.rtScore = 0
+            c.imdbScore = 0
+            if v <> invalid and v.rt <> invalid then c.rtScore = v.rt
+            if v <> invalid and v.imdb <> invalid then c.imdbScore = v.imdb
+            out.push(c)
+        end if
+    end for
+    if f.sort = "rt" then out = sortCards(out, "rtScore", true)
+    if f.sort = "imdb" then out = sortCards(out, "imdbScore", true)
+    return out
+end function
+
+function fnum(v as dynamic) as float
+    if v = invalid then return 0
+    return v
+end function
+
+function scoreFiltered(key as string) as boolean
+    f = m.filters[key]
+    if f = invalid then return false
+    return fnum(f.minRt) > 0 or fnum(f.minImdb) > 0 or f.sort = "rt" or f.sort = "imdb"
+end function
+
+function scoreOf(c as object) as dynamic
+    k = rqScoreKey(c)
+    if k = invalid then return invalid
+    return m.scores[k]
+end function
+
+' ================================================================ scores (NAS helper)
+
+' Asks the helper for every title it hasn't answered yet, in one call
+sub wantScores(cards as dynamic)
+    if cards = invalid then return
+    if m.up.TotalSeconds() - m.scoreFailAt < 60 then return
+    ids = []
+    for each c in cards
+        k = rqScoreKey(c)
+        if k <> invalid and m.scores[k] = invalid and m.scoreAsk[k] = invalid and ids.count() < 200
+            ids.push(k)
+            m.scoreAsk[k] = true
+        end if
+    end for
+    if ids.count() = 0 then return
+    t = CreateObject("roSGNode", "NasTask")
+    t.method = "POST"
+    t.path = "/api/ratings"
+    t.bodyText = FormatJson({ ids: ids })
+    t.addFields({ ids: ids })
+    keep(t, "onScores")
+end sub
+
+sub onScores(event as object)
+    t = taskFrom(event)
+    if not t.ok or t.response.ratings = invalid
+        ' helper off or old: forget these asks, try again in a minute; the TMDB star stays in the header meanwhile
+        print "[hearth-scores] helper said "; t.status
+        m.scoreFailAt = m.up.TotalSeconds()
+        for each k in t.ids
+            m.scoreAsk.delete(k)
+        end for
+        if isFilterable(currentList().key) and scoreFiltered(currentList().key) then showList()
+        return
+    end if
+    r = t.response.ratings
+    pend = t.response.pending
+    waiting = {}
+    if pend <> invalid
+        for each k in pend
+            waiting[k] = true
+        end for
+    end if
+    for each k in t.ids
+        if r[k] <> invalid
+            m.scores[k] = r[k]
+            m.scoreAsk.delete(k)
+        else if waiting[k] = invalid
+            ' the helper couldn't look it up (Overseerr busy): no badge, and nothing left "checking"
+            m.scores[k] = {}
+            m.scoreAsk.delete(k)
+        end if
+    end for
+    if pend <> invalid and pend.count() > 0
+        for each k in pend
+            m.scoreAsk.delete(k)
+            ' still being looked up on the NAS: ask again shortly (about 40 s at most, then give up on these)
+            if m.scoreRounds >= 10 then m.scores[k] = {}
+        end for
+        if m.scoreRounds < 10
+            m.scoreRounds = m.scoreRounds + 1
+            m.top.findNode("scoreTimer").control = "start"
+        end if
+    else
+        m.scoreRounds = 0
+    end if
+    applyScores()
+end sub
+
+sub onScoreTimer()
+    l = currentList()
+    if m.acc[l.key] <> invalid then wantScores(m.acc[l.key]) else wantScores(m.cards[l.key])
+end sub
+
+' New scores: badges on the cards on screen, the header, an open popup, and lists filtered by score
+sub applyScores()
+    for each k in m.nodes
+        n = m.nodes[k]
+        v = scoreOf(n.card)
+        if v <> invalid and FormatJson(v) <> FormatJson(n.scores) then n.scores = v
+    end for
+    for each key in ["trending", "movies", "tv"]
+        if scoreFiltered(key) and m.acc[key] <> invalid
+            old = sigOf(m.cards[key])
+            fresh = clientFilter(key, m.acc[key])
+            if sigOf(fresh) <> old
+                m.cards[key] = fresh
+                if m.fresh[key] = invalid then m.fresh[key] = 0
+                m.fresh[key] = m.fresh[key] + 1
+                if m.gridIndex >= fresh.count() then m.gridIndex = 0
+                if currentList().key = key
+                    showList()
+                    if m.zone = "grid" and fresh.count() = 0 then m.zone = "bar"
+                    refreshFocus()
+                end if
+                if fresh.count() < 18 and m.pageNo[key] <> invalid and m.pageNo[key] >= 1 and m.pageNo[key] < 6 then maybeMore(key)
+            end if
+        end if
+    end for
+    if isFilterable(currentList().key) then paintBar()
+    if m.zone = "grid" then showCardInfo()
+    if m.popup <> invalid and m.popCard <> invalid
+        v = scoreOf(m.popCard)
+        if v <> invalid then m.popup.callFunc("setScores", v)
+    end if
+end sub
+
+function sigOf(cards as dynamic) as string
+    if cards = invalid then return "-"
+    s = ""
+    for each c in cards
+        k = rqScoreKey(c)
+        if k <> invalid then s = s + k + ","
+    end for
+    return s
+end function
+
+' Titles loaded for this list that the helper is still scoring (for "Checking scores…")
+function scoresPending(key as string) as boolean
+    if m.acc[key] = invalid then return false
+    for each c in m.acc[key]
+        k = rqScoreKey(c)
+        if k <> invalid and m.scores[k] = invalid and m.scoreAsk[k] = true then return true
+    end for
+    return false
 end function
 
 function cardHasGenre(c as object, name as string) as boolean
@@ -567,13 +743,13 @@ function sortCards(cards as object, field as string, desc as boolean) as object
     for each c in cards
         v = c[field]
         if v = invalid
-            if field = "vote" then v = 0 else v = ""
+            if field = "vote" or field = "rtScore" or field = "imdbScore" then v = 0 else v = ""
         end if
         i = out.count()
         while i > 0
             w = out[i - 1][field]
             if w = invalid
-                if field = "vote" then w = 0 else w = ""
+                if field = "vote" or field = "rtScore" or field = "imdbScore" then w = 0 else w = ""
             end if
             before = false
             if desc then before = (v > w) else before = (LCase(v.toStr()) < LCase(w.toStr()))
@@ -658,6 +834,7 @@ sub onMine(event as object)
         if c.active = true then m.mineActive = true
     end for
     m.cards["mine"] = cards
+    wantScores(cards)
     m.ver = m.ver + 1
     paintRail()
     if currentList().key = "mine" then showList()
@@ -784,6 +961,10 @@ sub showList()
             m.empty.text = "Nothing new here yet. Things you request show up here once they've downloaded."
         else if isFilterable(l.key) and m.listError[l.key] <> invalid and m.listError[l.key] <> ""
             m.empty.text = m.listError[l.key] + " Press * to change the filters."
+        else if isFilterable(l.key) and scoreFiltered(l.key) and scoresPending(l.key)
+            m.empty.text = "Checking IMDb and Rotten Tomatoes scores…"
+        else if isFilterable(l.key) and scoreFiltered(l.key) and m.up.TotalSeconds() - m.scoreFailAt < 120
+            m.empty.text = "The NAS helper didn't answer, so there are no scores to filter by yet. Press * to change the filters."
         else if isFilterable(l.key) and filtersActive(l.key)
             m.empty.text = "Nothing matches those filters. Press * to change them."
         else
@@ -798,7 +979,40 @@ sub setHeadTitle(t as string)
     m.title.translation = [0, 34 + drop]
 end sub
 
+' After the eyebrow: the IMDb number in yellow and the tomato with the critics %, in place of the TMDB star.
+' Without scores (none found, or the helper is off) the TMDB star stays.
+sub headerScores(v as dynamic)
+    g = m.top.findNode("hdrScores")
+    if v = invalid or (v.imdb = invalid and v.rt = invalid)
+        g.visible = false
+        return
+    end if
+    m.star.visible = false
+    m.rating.visible = false
+    x = 0
+    im = m.top.findNode("hdrImdb")
+    ic = m.top.findNode("hdrRtIcon")
+    rt = m.top.findNode("hdrRt")
+    im.visible = (v.imdb <> invalid)
+    if im.visible
+        im.text = rqScore1(v.imdb)
+        im.translation = [x, 0]
+        x = x + im.boundingRect().width + 22
+    end if
+    ic.visible = (v.rt <> invalid)
+    rt.visible = ic.visible
+    if ic.visible
+        ic.uri = rqTomato(v)
+        ic.translation = [x, 5]
+        rt.text = Int(v.rt).toStr() + "%"
+        rt.translation = [x + 30, 0]
+    end if
+    g.translation = [m.eyebrow.boundingRect().width + 18, 0]
+    g.visible = true
+end sub
+
 sub setHeader(eyebrow as string, rating as string, title as string)
+    m.top.findNode("hdrScores").visible = false
     m.eyebrow.text = eyebrow
     setHeadTitle(UCase(title))
     has = (rating <> "")
@@ -873,6 +1087,8 @@ sub paintGrid()
             c = m.grid.createChild("ReqCard")
             c.translation = [(i mod m.cols) * m.pitchX, Int(i / m.cols) * gridPitchY()]
             c.card = cards[i]
+            v = scoreOf(cards[i])
+            if v <> invalid then c.scores = v
             m.nodes[k] = c
         end if
         r = Int(i / m.cols)
@@ -900,6 +1116,7 @@ sub showCardInfo()
     end if
     d = withDetails(c.data)
     setHeader(rqEyebrow(d), rqRating(d.rating), d.title)
+    headerScores(scoreOf(c))
     m.top.findNode("detailTimer").control = "stop"
     m.top.findNode("detailTimer").control = "start"
 end sub
@@ -985,6 +1202,7 @@ sub onSearch(event as object)
     if t.tag <> m.query then return
     if checkProblem(t) then return
     m.cards["search"] = discoverCards(t)
+    wantScores(m.cards["search"])
     m.resIndex = 0
     paintResults()
 end sub
@@ -1150,31 +1368,16 @@ sub showPopup(model as object)
     m.popup = p
     m.zoneBeforePopup = m.zone
     m.zone = "popup"
-    ' Rotten Tomatoes critics score (Overseerr looks it up per title)
+    ' IMDb / Rotten Tomatoes from the NAS helper (asked with the grid; asked now if this title came another way)
     c = m.popCard
-    if c <> invalid and c.kind = "media" and c.data.id <> invalid
-        rk = c.data.mediaType + c.data.id.toStr()
-        if m.rt[rk] <> invalid
-            if m.rt[rk] <> "" then p.callFunc("setRt", m.rt[rk])
+    if c <> invalid
+        v = scoreOf(c)
+        if v <> invalid
+            p.callFunc("setScores", v)
         else
-            path = "/api/v1/movie/" + c.data.id.toStr() + "/ratingscombined"
-            if c.data.mediaType = "tv" then path = "/api/v1/tv/" + c.data.id.toStr() + "/ratings"
-            oApi("GET", path, invalid, invalid, "onRt", rk)
+            wantScores([c])
         end if
     end if
-end sub
-
-sub onRt(event as object)
-    t = taskFrom(event)
-    text = ""
-    if t.ok and t.response <> invalid
-        r = t.response
-        if r.rt <> invalid then r = r.rt
-        if r.criticsScore <> invalid then text = "ROTTEN TOMATOES " + Int(r.criticsScore).toStr() + "%"
-    end if
-    m.rt[t.tag] = text
-    c = m.popCard
-    if m.popup <> invalid and text <> "" and c <> invalid and c.data.mediaType + c.data.id.toStr() = t.tag then m.popup.callFunc("setRt", text)
 end sub
 
 sub closePopup()
@@ -1399,6 +1602,7 @@ sub onLike(event as object)
     entry = { key: "like", icon: "spark", name: "Like " + t.tag, about: "MORE LIKE " + UCase(t.tag) }
     if m.lists[1].key = "like" then m.lists[1] = entry else m.lists = insertAt(m.lists, 1, entry)
     m.cards["like"] = cards
+    wantScores(cards)
     m.ver = m.ver + 1
     buildRail()
     m.railIndex = 1
@@ -1765,7 +1969,7 @@ end function
 function filtersActive(key as string) as boolean
     f = m.filters[key]
     if key = "trending" and f.kind <> "all" then return true
-    return f.genres.count() > 0 or f.provider <> "" or f.minRating > 0 or f.sort <> "popular"
+    return f.genres.count() > 0 or f.provider <> "" or f.minRating > 0 or fnum(f.minRt) > 0 or fnum(f.minImdb) > 0 or f.sort <> "popular"
 end function
 
 function filterSummary(key as string) as string
@@ -1782,12 +1986,18 @@ function filterSummary(key as string) as string
         end for
     end if
     if f.minRating > 0 then parts.push("rated " + f.minRating.toStr() + ".0+")
-    names = { popular: "most popular", rating: "top rated", newest: "newest", az: "A to Z" }
-    if key <> "trending" or f.kind <> "all" then parts.push(names[f.sort])
+    if fnum(f.minRt) > 0 then parts.push("Rotten Tomatoes " + Int(f.minRt).toStr() + "%+")
+    if fnum(f.minImdb) > 0 then parts.push("IMDb " + rqScore1(f.minImdb) + "+")
+    names = { popular: "most popular", rating: "top rated", newest: "newest", az: "A to Z", rt: "top on Rotten Tomatoes", imdb: "top on IMDb" }
+    if names[f.sort] <> invalid and (key <> "trending" or f.kind <> "all" or f.sort = "rt" or f.sort = "imdb") then parts.push(names[f.sort])
     text = parts.join(" · ")
     if m.busy[key] = true
         if text = "" then return "Asking Overseerr…"
         return "Asking Overseerr… · " + text
+    end if
+    if scoreFiltered(key) and scoresPending(key)
+        if Len(text) > 34 then text = Left(text, 32) + "…"
+        return "Checking scores… · " + text
     end if
     if filtersActive(key)
         ' keep room for "Filtered · 43 of 100" and the hint on the same line

@@ -1,12 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Filter and sort side sheet for the Discover lists (layout B).
-     Set "config" = { title, genres: [{ name }], providers: [{ id, name, logo }] (may be empty), filters: { genres: [names], provider: "", minRating: 0, sort: "popular" } }.
+     Set "config" = { title, genres: [{ name }], providers: [{ id, name, logo }] (may be empty), filters: { genres: [names], provider: "", minRating: 0, minRt: 0, minImdb: 0, sort: "popular" } }.
+     minRt / minImdb (Rotten Tomatoes %, IMDb score) and the "rt" / "imdb" sorts are applied by the room on the NAS helper's scores.
      The room forwards keys with callFunc("handleKey", key). OK on the last button or Back sets "result" (the chosen filters). -->
 <component name="FilterSheet" extends="Group">
   <children>
     <Rectangle width="1920" height="1080" translation="[0, -150]" color="0x05060499" />
     <Poster id="panelBg" uri="pkg:/images/tile.9.png" blendColor="0x141A11FF" translation="[1000, -100]" width="870" height="980" />
-    <Group id="content" translation="[1034, -76]" />
+    <!-- the chips scroll inside the panel when they don't all fit (refresh keeps the focused one in view) -->
+    <Group id="clip" translation="[1034, -76]" clippingRect="[-12, -12, 824, 946]">
+      <Group id="content" />
+    </Group>
   </children>
   <interface>
     <field id="config" type="assocarray" onChange="build" />

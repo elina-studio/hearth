@@ -37,6 +37,7 @@ import lyrics
 import web
 import mix
 import clips
+import ratings
 
 TV_IP = os.environ.get("TV_IP", "192.168.254.9")
 HTTP_PORT = int(os.environ.get("HTTP_PORT", "8765"))
@@ -328,8 +329,8 @@ class Handler(BaseHTTPRequestHandler):
         elif path == "/api/discover/albums":
             q = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
             self.send_json(shelf.albums((q.get("artist") or [""])[0]))
-        elif path == "/api/discover/selftest":
-            body = shelf.selftest_text().encode()
+        elif path in ("/api/discover/selftest", "/api/ratings/selftest"):
+            body = (ratings.selftest() if path == "/api/ratings/selftest" else shelf.selftest_text()).encode()
             self.send_response(200)
             self.send_header("Content-Type", "text/plain; charset=utf-8")
             self.send_header("Content-Length", str(len(body)))
@@ -443,6 +444,9 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_json(lastfm.begin())
             if path == "/api/lastfm/event":
                 return self.send_json(lastfm.event(req))
+            if path == "/api/ratings":
+                # the Requests room's IMDb and Rotten Tomatoes scores (ratings.py)
+                return self.send_json(ratings.get(req.get("ids") or []))
             if path == "/api/discover/hide":
                 return self.send_json(discover.hide(str(req.get("name", ""))))
             if path == "/api/discover/unhide":
@@ -537,6 +541,7 @@ def main():
     clips.start()
     threading.Thread(target=lastfm.worker, daemon=True).start()
     threading.Thread(target=discover.worker, daemon=True).start()
+    threading.Thread(target=ratings.worker, daemon=True).start()
     servers[0].serve_forever()
 
 

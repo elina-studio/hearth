@@ -1,14 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- One poster in the Requests grid: poster (or title when there's none), a status band across its foot with an icon, and a download bar. -->
+<!-- One poster in the Requests grid: poster (or title when there's none), a status band across its foot with an icon, a download bar,
+     and a small IMDb / Rotten Tomatoes badge once the room sets "scores" ({ imdb, rt, cert }, {} = none). -->
 <component name="ReqCard" extends="Group">
   <children>
     <Rectangle id="bg" width="180" height="270" color="0x1D2418FF" />
     <Label id="fallback" translation="[12, 10]" width="156" height="250" wrap="true" lineSpacing="2" horizAlign="center" vertAlign="center" color="0xEDE6CAFF" />
     <Poster id="poster" width="180" height="270" loadWidth="180" loadHeight="270" loadDisplayMode="scaleToZoom" />
-    <Group id="score" translation="[104, 8]" visible="false">
-      <Rectangle width="68" height="30" color="0x0B0E09D0" />
-      <Poster uri="pkg:/images/requests/star.png" width="16" height="16" translation="[7, 7]" blendColor="0xE0B34AFF" />
-      <Label id="scoreText" translation="[28, 0]" width="38" height="30" vertAlign="center" color="0xE0B34AFF" />
+    <!-- IMDb (yellow number) and Rotten Tomatoes (tomato or splat + %), one small see-through badge; scores from the NAS helper -->
+    <Group id="score" visible="false">
+      <Rectangle id="scoreBg" height="24" color="0x0B0E0980" />
+      <Label id="imdbText" height="24" vertAlign="center" color="0xE0B34AFF" />
+      <Poster id="rtIcon" width="15" height="15" />
+      <Label id="rtText" height="24" vertAlign="center" color="0xEDE6CAFF" />
     </Group>
     <Group id="tile" visible="false">
       <Poster uri="pkg:/images/tile.9.png" blendColor="0xFFFFFF0F" width="180" height="270" />
@@ -38,7 +41,9 @@
     <field id="card" type="assocarray" onChange="draw" />
     <field id="focused" type="boolean" value="false" onChange="onFocused" />
     <field id="load" type="boolean" value="false" onChange="onLoad" />
+    <field id="scores" type="assocarray" onChange="drawScores" />
   </interface>
   <script type="text/brightscript" uri="pkg:/source/util.brs" />
+  <script type="text/brightscript" uri="pkg:/components/requests/reqdata.brs" />
   <script type="text/brightscript" uri="pkg:/components/requests/ReqCard.brs" />
 </component>

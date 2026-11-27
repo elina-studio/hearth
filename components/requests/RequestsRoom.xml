@@ -9,6 +9,12 @@
         <Label id="eyebrow" color="0xD9A066FF" />
         <Poster id="star" uri="pkg:/images/requests/star.png" width="22" height="22" blendColor="0xD9A066FF" visible="false" />
         <Label id="rating" color="0xD9A066FF" />
+        <!-- the focused title's IMDb (yellow) and Rotten Tomatoes scores, after the eyebrow -->
+        <Group id="hdrScores" visible="false">
+          <Label id="hdrImdb" color="0xE0B34AFF" />
+          <Poster id="hdrRtIcon" width="22" height="22" />
+          <Label id="hdrRt" color="0xD9A066FF" />
+        </Group>
         <ScrollingLabel id="title" translation="[0, 34]" maxWidth="1280" height="82" repeatCount="-1" scrollSpeed="70" color="0xEDE6CAFF" />
       </Group>
       <Group id="tabs" translation="[540, 128]" visible="false" />
@@ -59,6 +65,7 @@
     </Group>
     <Group id="popupHolder" />
     <Group id="sheetHolder" />
+    <Timer id="scoreTimer" duration="4" repeat="false" />
     <Timer id="toastTimer" duration="4" />
     <Timer id="undoTimer" duration="1" repeat="true" />
     <Timer id="detailTimer" duration="0.4" />
