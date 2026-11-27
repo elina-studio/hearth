@@ -44,7 +44,7 @@
       <Label id="noFire" translation="[160, 480]" width="1600" horizAlign="center" wrap="true" lineSpacing="2" color="0xB5AF8CFF" visible="false" />
     </Group>
 
-    <LyricsPanel id="lyrics" translation="[1060, 150]" />
+    <LyricsPanel id="lyrics" translation="[500, 270]" />
 
     <Group id="strip" opacity="0">
       <Rectangle translation="[0, 860]" width="1920" height="220" color="0x0B0E09D9" />

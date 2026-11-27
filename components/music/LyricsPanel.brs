@@ -1,29 +1,26 @@
 sub init()
     m.rows = m.top.findNode("rows")
     m.timing = m.top.findNode("timing")
-    m.timing.font = hFont("regular", 22)
+    m.timing.font = hFont("regular", 24)
     m.timingTimer = m.top.findNode("timingTimer")
     m.timingTimer.observeField("fire", "hideTiming")
-    ys = [26, 84, 142, 262, 320]
+    m.twigA = m.top.findNode("twigA")
+    m.twigB = m.top.findNode("twigB")
+    ' where each row sits when the current line is one line long
+    m.ys = [52, 102, 212, 348, 402]
     m.rowNodes = []
     for i = 0 to 4
         l = m.rows.createChild("Label")
-        l.translation = [36, ys[i]]
-        l.width = 688
+        l.translation = [30, m.ys[i]]
+        l.width = 860
+        l.horizAlign = "center"
         if i = 2
-            l.height = 112
-            l.vertAlign = "center"
-            l.wrap = true
-            l.maxLines = 2
-            l.font = hFont("bold", 40)
+            l.lineSpacing = 2
             l.color = "0xFFE7A0FF"
         else
-            l.height = 50
-            l.vertAlign = "center"
             l.maxLines = 1
-            l.font = hFont("bold", 28)
-            l.color = "0xB5AF8CFF"
-            if i = 1 or i = 3 then l.opacity = 0.7 else l.opacity = 0.4
+            l.color = "0xEDE6CAFF"
+            if i = 1 or i = 3 then l.opacity = 0.85 else l.opacity = 0.5
         end if
         m.rowNodes.push(l)
     end for
@@ -96,6 +93,8 @@ sub nudge(delta as dynamic)
     t = Str(m.offset).Trim()
     if m.offset > 0 then t = "+" + t
     m.timing.text = "Lyrics timing " + t + " s"
+    ' the note takes the last line's place for two seconds
+    m.rowNodes[4].visible = false
     m.timingTimer.control = "stop"
     m.timingTimer.control = "start"
     m.idx = -1
@@ -107,6 +106,7 @@ end sub
 
 sub hideTiming()
     m.timing.text = ""
+    m.rowNodes[4].visible = true
 end sub
 
 sub onTrack()
@@ -192,7 +192,19 @@ sub redraw()
     if show then paintRows()
 end sub
 
+' The old-style faces only have Western letters. A line with anything else (Greek, Cyrillic and so on) is drawn
+' in the app's plain face, which has them, so it never shows as boxes. (Scripts no app font has go to the TV's
+' own font through hOutsideFont.)
+function lyPlain(txt as string) as boolean
+    for i = 1 to Len(txt)
+        c = Asc(Mid(txt, i, 1))
+        if c > 255 and (c < 8208 or c > 8230) then return true
+    end for
+    return false
+end function
+
 sub paintRows()
+    cur = ""
     for k = 0 to 4
         i = m.idx + k - 2
         txt = ""
@@ -200,6 +212,40 @@ sub paintRows()
             txt = m.lines[i]
             if txt = "" then txt = "..."
         end if
-        m.rowNodes[k].text = txt
+        if k = 2
+            cur = txt
+        else
+            size = 32
+            if k = 1 or k = 3 then size = 36
+            if hOutsideFont(txt)
+                m.rowNodes[k].font = hSysFont("regular", size - 4)
+            else if lyPlain(txt)
+                m.rowNodes[k].font = hFontCached("bold", size - 6)
+            else
+                m.rowNodes[k].font = hFontCached("fell", size)
+            end if
+            m.rowNodes[k].text = txt
+        end if
     end for
+    ' current line: 52, then 44 on one line; longer becomes two gold lines and the lines and twigs around it move
+    ' apart to make room
+    kind = "pica"
+    if lyPlain(cur) then kind = "bold"
+    fit = hFitTitle2(m.rowNodes[2], cur, kind, [52, 44], 860)
+    up = 0
+    down = 0
+    y = m.ys[2] + fit.drop
+    if fit.lines = 2
+        ' less room above than below: the top line must stay clear of the border
+        up = 16
+        down = 24
+        y = m.ys[2] + 39 - Int(fit.height / 2)
+    end if
+    m.rowNodes[2].translation = [30, y]
+    m.rowNodes[0].translation = [30, m.ys[0] - up]
+    m.rowNodes[1].translation = [30, m.ys[1] - up]
+    m.rowNodes[3].translation = [30, m.ys[3] + down]
+    m.rowNodes[4].translation = [30, m.ys[4] + down]
+    m.twigA.translation = [230, 116 - up]
+    m.twigB.translation = [230, 250 + down]
 end sub

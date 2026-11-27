@@ -1,14 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Small lyrics panel that sits beside the player, over a visualizer, the Ambiance fire, the cover or the Big view.
-     Five lines: the current one in gold, two before and two after, dimmer. Time-coded lyrics follow the song (plus a timing
-     nudge, which also helps when speakers play along); plain lyrics scroll in step with the song's progress.
-     Found by the NAS helper (.lrc next to the song, then LRCLIB) via GET /api/lyrics. Hidden when a song has none.
-     The parent calls lyricsStop() when it leaves, toggle() to show/hide, nudge(seconds). -->
+<!-- Lyrics plaque (build 144, look C): centred on the screen, see-through, with an ornate gold border. Five lines, all
+     centred: the current one in gold small caps between two twigs, two before and two after in Fell italic, dimmer.
+     A current line too long for the width becomes two gold lines and the rest makes room. Time-coded lyrics follow
+     the song (plus a timing nudge, which also helps when speakers play along); plain lyrics scroll in step with the
+     song's progress. Found by the NAS helper (.lrc next to the song, then LRCLIB) via GET /api/lyrics. Hidden when a
+     song has none. The parent calls lyricsStop() when it leaves, toggle() to show/hide, nudge(seconds).
+     The plaque is 920 x 500; the border art is 12 px bigger all round. -->
 <component name="LyricsPanel" extends="Group">
   <children>
-    <Poster id="bg" uri="pkg:/images/w/panel-v4.9.png" translation="[-12, -12]" width="784" height="434" blendColor="0x0B0E09C8" />
+    <Poster id="bg" uri="pkg:/images/w/panel-v2.9.png" width="920" height="500" blendColor="0x0B0E098C" />
+    <Poster uri="pkg:/images/music/lyrics-border.png" translation="[-12, -12]" width="944" height="524" />
+    <Poster id="twigA" uri="pkg:/images/w/twig-420-s4.png" translation="[230, 116]" width="460" height="120" opacity="0.9" />
+    <Poster id="twigB" uri="pkg:/images/w/twig-420-s5.png" translation="[230, 250]" width="460" height="120" opacity="0.9" />
     <Group id="rows" />
-    <Label id="timing" translation="[36, 372]" width="688" color="0xB5AF8CFF" />
+    <Label id="timing" translation="[30, 404]" width="860" height="46" vertAlign="center" horizAlign="center" color="0xE0B34AFF" />
     <Timer id="timingTimer" duration="2" repeat="false" />
   </children>
   <interface>
