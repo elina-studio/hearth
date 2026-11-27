@@ -284,7 +284,7 @@ sub paintRows()
         if i < m.rowI then r.opacity = 0 else r.opacity = 1
     end for
     c = rowsCurrent()
-    if c <> invalid and c.az <> true and c.item <> invalid
+    if c <> invalid and not rowsIsAz(c) and c.item <> invalid
         m.item = c.item
     else if c <> invalid
         m.item = invalid
@@ -338,7 +338,7 @@ function rowsKey(key as string) as boolean
         return true
     end if
     if key = "play"
-        if c <> invalid and c.az <> true and playable(c.item)
+        if c <> invalid and not rowsIsAz(c) and playable(c.item)
             m.top.request = { action: "play", item: c.item, resume: hPercent(c.item) > 0 }
             return true
         end if
@@ -346,7 +346,7 @@ function rowsKey(key as string) as boolean
     end if
     if hMediaKey(key) then return false
     if key = "options"
-        if c <> invalid and c.az <> true and c.item <> invalid then hOptions(c.item)
+        if c <> invalid and not rowsIsAz(c) and c.item <> invalid then hOptions(c.item)
         return true
     end if
     if key = "up"
@@ -363,7 +363,7 @@ function rowsKey(key as string) as boolean
     else if key = "right" and n > 0
         m.rowNodes[m.rowI].callFunc("move", 1)
     else if key = "OK" and c <> invalid
-        if c.az = true
+        if rowsIsAz(c)
             enterGrid()
         else
             m.top.request = { action: "details", item: c.item }
@@ -372,4 +372,10 @@ function rowsKey(key as string) as boolean
     end if
     paintRows()
     return true
+end function
+
+' the "All A to Z" tile (plain cards have no az field; comparing a missing field to true is not safe)
+function rowsIsAz(c as dynamic) as boolean
+    if c = invalid then return false
+    return c.DoesExist("az")
 end function

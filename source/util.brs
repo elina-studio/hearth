@@ -581,7 +581,7 @@ function hInitials(n as string) as string
     for each w in words
         if Len(w) > 0 and Len(out) < 2 then out = out + UCase(Left(w, 1))
     end for
-    if Len(words) > 2 and Len(out) = 2
+    if words.count() > 2 and Len(out) = 2
         lw = words[words.count() - 1]
         if Len(lw) > 0 then out = Left(out, 1) + UCase(Left(lw, 1))
     end if
