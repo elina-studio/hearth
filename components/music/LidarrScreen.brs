@@ -204,7 +204,7 @@ end sub
 
 sub lookup()
     m.term = m.kb.text
-    if m.results.Count() = 0 then m.empty.text = "Asking Lidarr" + Chr(8230)
+    if m.results.Count() = 0 then hWaitOn(m.empty, "Lidarr")
     lApi("GET", "/artist/lookup", { term: m.term }, invalid, "onLookup", m.term)
 end sub
 

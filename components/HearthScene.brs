@@ -249,6 +249,7 @@ sub onRemote()
     end if
     if r.go <> "search" and r.go <> "request" then return
     if d <> invalid then d.close = true
+    if m.top.sheet <> invalid then m.top.sheet.close = true
     while m.stack.getChildCount() > 1 and topScreen().subtype() <> "HubScreen"
         popScreen()
     end while
@@ -483,6 +484,7 @@ sub walkTick()
     end while
     dlg = ""
     d = m.top.dialog
+    if d = invalid then d = m.top.sheet
     if d <> invalid
         dlg = d.subtype()
         if d.title <> invalid and d.title <> "" then dlg = dlg + ":" + d.title

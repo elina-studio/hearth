@@ -185,7 +185,7 @@ sub refresh(unused = invalid as dynamic)
     end if
     s = muPlayer().section
     if s = ""
-        if m.rows.count() = 0 then m.empty.text = "Looking for your music library in Plex" + Chr(8230)
+        if m.rows.count() = 0 then hWaitOn(m.empty, "Plex")
         muSend("findLibrary")
         return
     end if
@@ -197,7 +197,7 @@ sub refresh(unused = invalid as dynamic)
     end if
     m.loadedFor = s
     m.failed = invalid
-    if m.rows.count() = 0 and m.tab = 0 then m.empty.text = "Loading your music" + Chr(8230)
+    if m.rows.count() = 0 and m.tab = 0 then hWaitOn(m.empty, "Plex")
     m.results = {}
     m.hubOrder = []
     if m.rows.count() = 0
@@ -382,7 +382,7 @@ sub showTab(i as integer)
         return
     end if
     if forYou
-        if m.rows.count() = 0 and not bannerOn() then m.empty.text = "Loading your music" + Chr(8230)
+        if m.rows.count() = 0 and not bannerOn() then hWaitOn(m.empty, "Plex")
         paint()
         return
     end if
@@ -398,7 +398,7 @@ sub showTab(i as integer)
             m.askedFor = m.loadedFor
             loadLib(kind)
         else
-            m.empty.text = "Loading" + Chr(8230)
+            hWaitOn(m.empty, "Plex")
         end if
     else
         m.grid.index = lib.index
@@ -429,7 +429,7 @@ sub loadLib(kind as string, useCache = true as boolean)
         if here then showTab(m.tab)
         if kind = "artists" and m.tabDefs[m.tab][1] = "discover" then sendKnown()
     else if here
-        m.empty.text = "Loading" + Chr(8230)
+        hWaitOn(m.empty, "Plex")
     end if
     if kind = "playlists"
         pxApi("/playlists", { playlistType: "audio" }, "onLib", kind)
@@ -674,14 +674,14 @@ sub cardOptions()
     card = focusedCard()
     if card = invalid then return
     m.optCard = card.item
-    d = CreateObject("roSGNode", "StandardMessageDialog")
+    d = CreateObject("roSGNode", "HearthDialog")
     d.title = pxStr(card.item.title)
     d.message = [card.sub]
     d.buttons = ["Play", "Shuffle", "Close"]
     d.observeField("buttonSelected", "onCardOption")
     d.observeField("wasClosed", "onMuClosed")
     m.cardDialog = d
-    m.top.getScene().dialog = d
+    hShowDialog(d)
 end sub
 
 sub onCardOption()
@@ -924,7 +924,7 @@ sub showNew()
             m.askedFor = m.loadedFor
             loadLib("new")
         else
-            m.empty.text = "Loading" + Chr(8230)
+            hWaitOn(m.empty, "Plex")
         end if
         return
     end if

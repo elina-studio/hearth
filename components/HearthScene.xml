@@ -12,6 +12,7 @@
     <SoundEffect id="sfxDead" uri="pkg:/sounds/ui-deadend.wav" volume="50" />
   </children>
   <interface>
+    <field id="sheet" type="node" />
     <field id="exitApp" type="boolean" value="false" />
     <field id="request" type="assocarray" alwaysNotify="true" onChange="onRequest" />
   </interface>

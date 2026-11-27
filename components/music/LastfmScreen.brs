@@ -195,14 +195,14 @@ sub act(a as string)
         checkAgain()
     else if a = "disconnect"
         ' re-pairing needs the phone, so ask first
-        dlg = CreateObject("roSGNode", "StandardMessageDialog")
+        dlg = CreateObject("roSGNode", "HearthDialog")
         dlg.title = "Disconnect Last.fm?"
         dlg.message = ["Hearth stops sending what you play. To connect again you'll need your phone."]
         dlg.buttons = ["Disconnect", "Cancel"]
         dlg.observeField("buttonSelected", "onDisconnectPick")
         dlg.observeField("wasClosed", "onMuClosed")
         m.confirm = dlg
-        m.top.getScene().dialog = dlg
+        hShowDialog(dlg)
     else if a = "cast" or a = "now" or a = "love"
         key = { cast: "lastfmCast", now: "lastfmNow", love: "lastfmLove" }[a]
         if reg.Read(key) = "0" then reg.Write(key, "1") else reg.Write(key, "0")

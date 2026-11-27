@@ -636,7 +636,7 @@ sub buildReqLines()
     m.reqNote.font = hFont("regular", 22)
     m.reqEmpty = m.top.findNode("reqEmpty")
     m.reqEmpty.font = hFont("regular", 26)
-    m.reqEmpty.text = "Looking for new arrivals..."
+    hWaitOn(m.reqEmpty, "Plex")
     m.reqCells = []
     holder = m.top.findNode("reqLines")
     for i = 0 to 4

@@ -297,7 +297,7 @@ end function
 
 ' * on a mood: where its picture comes from, and how to use your own clip instead
 sub clipInfo(it as object)
-    d = CreateObject("roSGNode", "StandardMessageDialog")
+    d = CreateObject("roSGNode", "HearthDialog")
     d.title = it.title
     hint = clipHint(it.mood)
     if it.clip <> invalid
@@ -311,7 +311,7 @@ sub clipInfo(it as object)
     d.observeField("buttonSelected", "onClipInfoClosed")
     d.observeField("wasClosed", "onClipInfoClosed")
     m.clipDialog = d
-    m.top.getScene().dialog = d
+    hShowDialog(d)
 end sub
 
 sub onClipInfoClosed()

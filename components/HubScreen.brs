@@ -447,14 +447,14 @@ sub onRoomRequest(event as object)
 end sub
 
 sub leavePrompt()
-    d = CreateObject("roSGNode", "StandardMessageDialog")
+    d = CreateObject("roSGNode", "HearthDialog")
     d.title = "Leave Hearth?"
     d.message = [""]
     d.buttons = ["Stay", "Leave"]
     d.observeField("buttonSelected", "onLeave")
     d.observeField("wasClosed", "onLeaveClosed")
     m.dialog = d
-    m.top.getScene().dialog = d
+    hShowDialog(d)
 end sub
 
 sub onLeave()
@@ -509,7 +509,7 @@ end function
 
 ' The * menu on the room bar: Plex sign-in, the menu sounds switch, sign out.
 sub openMenu()
-    d = CreateObject("roSGNode", "StandardMessageDialog")
+    d = CreateObject("roSGNode", "HearthDialog")
     d.title = "Hearth"
     srv = m.global.plexServerName
     ' a friendly name only: never the raw address
@@ -520,7 +520,7 @@ sub openMenu()
     d.buttons = ["Close", snd, "Sign out"]
     d.observeField("buttonSelected", "onMenu")
     m.dialog = d
-    m.top.getScene().dialog = d
+    hShowDialog(d)
 end sub
 
 sub onMenu()

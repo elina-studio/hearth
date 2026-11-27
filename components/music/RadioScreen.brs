@@ -243,14 +243,14 @@ sub onMoods(event as object)
         end if
     end for
     labels.push("Cancel")
-    dlg = CreateObject("roSGNode", "StandardMessageDialog")
+    dlg = CreateObject("roSGNode", "HearthDialog")
     dlg.title = "A mood"
     dlg.message = ["Pick a mood. The radio plays songs Plex has tagged with it."]
     dlg.buttons = labels
     dlg.observeField("buttonSelected", "onMoodPick")
     dlg.observeField("wasClosed", "onMuClosed")
     m.moodDialog = dlg
-    m.top.getScene().dialog = dlg
+    hShowDialog(dlg)
 end sub
 
 sub onMoodPick()

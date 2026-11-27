@@ -59,40 +59,49 @@ sub muOptions(views as boolean)
     p = muPlayer()
     m.muActions = []
     labels = []
-    if p.shuffle then labels.push("Shuffle: on") else labels.push("Shuffle: off")
+    heads = {}
+    heads["0"] = "Playback"
+    if p.shuffle then labels.push("Shuffle: On") else labels.push("Shuffle: Off")
     m.muActions.push("shuffle")
-    labels.push(muRepeatLabel()) : m.muActions.push("repeat")
+    r = "Off"
+    if p.repeat = "all" then r = "All"
+    if p.repeat = "one" then r = "One song"
+    labels.push("Repeat: " + r) : m.muActions.push("repeat")
+    heads[labels.count().toStr()] = "More like this"
     labels.push("More like this song") : m.muActions.push("more")
     if p.radioOn
-        labels.push("Radio...") : m.muActions.push("radioMenu")
+        labels.push("Radio options") : m.muActions.push("radioMenu")
     else
-        labels.push("Start a radio...") : m.muActions.push("radio")
+        labels.push("Start a radio") : m.muActions.push("radio")
     end if
     if p.lyricsActive
-        labels.push("Lyrics...") : m.muActions.push("lyricsMenu")
+        labels.push("Lyrics") : m.muActions.push("lyricsMenu")
     end if
-    labels.push("Love on Last.fm") : m.muActions.push("love")
-    labels.push("Last.fm...") : m.muActions.push("lastfm")
-    labels.push("Music schedules...") : m.muActions.push("schedules")
+    heads[labels.count().toStr()] = "Last.fm"
+    labels.push("Love this song") : m.muActions.push("love")
+    labels.push("Last.fm settings") : m.muActions.push("lastfm")
+    heads[labels.count().toStr()] = "Library"
+    labels.push("Music schedules") : m.muActions.push("schedules")
     libs = p.libraries
     if libs <> invalid and libs.Count() > 1
-        labels.push("Library: " + p.sectionName + " (switch)") : m.muActions.push("library")
+        labels.push("Library: " + p.sectionName) : m.muActions.push("library")
     end if
     if views
+        heads[labels.count().toStr()] = "On screen"
         labels.push("Cover") : m.muActions.push("cover")
         labels.push("Visualizer") : m.muActions.push("milk")
         labels.push("Hearth fire") : m.muActions.push("hearth")
     end if
-    labels.push("Close") : m.muActions.push("close")
-    d = CreateObject("roSGNode", "StandardMessageDialog")
+    d = CreateObject("roSGNode", "HearthDialog")
     d.title = "Music"
     n = muNow()
     d.message = [n.title + "  ·  " + n.sub]
     d.buttons = labels
+    d.heads = heads
     d.observeField("buttonSelected", "onMuOption")
     d.observeField("wasClosed", "onMuClosed")
     m.muDialog = d
-    m.top.getScene().dialog = d
+    hShowDialog(d)
 end sub
 
 sub onMuOption()
@@ -113,14 +122,14 @@ end sub
 
 sub muSubMenu(title as string, labels as object, actions as object)
     m.muActions = actions
-    d = CreateObject("roSGNode", "StandardMessageDialog")
+    d = CreateObject("roSGNode", "HearthDialog")
     d.title = title
     d.message = [""]
     d.buttons = labels
     d.observeField("buttonSelected", "onMuOption")
     d.observeField("wasClosed", "onMuClosed")
     m.muDialog = d
-    m.top.getScene().dialog = d
+    hShowDialog(d)
 end sub
 
 sub onMuClosed()

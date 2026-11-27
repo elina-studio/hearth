@@ -774,9 +774,9 @@ sub showList()
     if m.problem <> "" and m.cards[l.key] = invalid
         m.empty.text = m.problem
     else if m.cards[l.key] = invalid and l.key = "new"
-        if m.global.plexServer = invalid or m.global.plexServer = "" then m.empty.text = "Sign in to Plex to see what's new." else m.empty.text = "Asking Plex…"
+        if m.global.plexServer = invalid or m.global.plexServer = "" then m.empty.text = "Sign in to Plex to see what's new." else hWaitOn(m.empty, "Plex")
     else if m.cards[l.key] = invalid
-        m.empty.text = "Asking Overseerr…"
+        hWaitOn(m.empty, "Overseerr")
     else if m.cards[l.key].count() = 0
         if l.key = "mine"
             m.empty.text = "No requests yet. Pick something in Trending or Search and press OK."

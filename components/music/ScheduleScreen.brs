@@ -447,14 +447,14 @@ sub openRooms()
         labels.push(mark + r.name)
     end for
     labels.push("Done")
-    d = CreateObject("roSGNode", "StandardMessageDialog")
+    d = CreateObject("roSGNode", "HearthDialog")
     d.title = "Rooms"
     d.message = ["OK ticks or unticks a speaker."]
     d.buttons = labels
     d.observeField("buttonSelected", "onRoomPick")
     d.observeField("wasClosed", "onMuClosed")
     m.dlg = d
-    m.top.getScene().dialog = d
+    hShowDialog(d)
 end sub
 
 sub onRoomPick()
@@ -494,14 +494,14 @@ sub pickPlaylist()
         labels.push(p.title)
     end for
     labels.push("Cancel")
-    d = CreateObject("roSGNode", "StandardMessageDialog")
+    d = CreateObject("roSGNode", "HearthDialog")
     d.title = "Plays"
     d.message = ["Music Assistant plays this Plex playlist on the speakers."]
     d.buttons = labels
     d.observeField("buttonSelected", "onPlaylistPick")
     d.observeField("wasClosed", "onMuClosed")
     m.dlg = d
-    m.top.getScene().dialog = d
+    hShowDialog(d)
 end sub
 
 sub onPlaylistPick()
@@ -517,8 +517,7 @@ end sub
 
 sub muRestoreFocus()
     ' the Rooms dialog reopens itself after each tick; its predecessor's wasClosed must not pull focus off it
-    sc = m.top.getScene()
-    if sc <> invalid and sc.dialog <> invalid then return
+    if hDialogUp() then return
     m.top.setFocus(true)
 end sub
 

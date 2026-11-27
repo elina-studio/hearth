@@ -68,14 +68,14 @@ sub hSubsDialog(it as object)
         i = i + 1
     end for
     if st.count() = 0 then labels = ["No subtitles for this one"]
-    d = CreateObject("roSGNode", "StandardMessageDialog")
+    d = CreateObject("roSGNode", "HearthDialog")
     d.title = "Subtitles"
     d.buttons = labels
     d.buttonFocused = focusAt
     d.observeField("buttonSelected", "hSubsOnPicked")
     d.observeField("wasClosed", "hSubsOnClosed")
     m.subsDialog = d
-    m.top.getScene().dialog = d
+    hShowDialog(d)
 end sub
 
 sub hSubsOnPicked()

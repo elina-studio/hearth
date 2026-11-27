@@ -548,19 +548,19 @@ sub mixMenu()
     end for
     labels.push("Music options")
     m.mixKeys = keys
-    d = CreateObject("roSGNode", "StandardMessageDialog")
+    d = CreateObject("roSGNode", "HearthDialog")
     d.title = "Hearth"
     d.message = ["Mute the fire or the music on their own."]
     d.buttons = labels
     d.observeField("buttonSelected", "onMix")
     d.observeField("wasClosed", "onMuClosed")
     m.mixDialog = d
-    m.top.getScene().dialog = d
+    hShowDialog(d)
 end sub
 
 ' * in the Visualizer: the look picker first, then the usual music options
 sub vizMenu()
-    d = CreateObject("roSGNode", "StandardMessageDialog")
+    d = CreateObject("roSGNode", "HearthDialog")
     d.title = "Visualizer"
     c = vizChoice()
     if c = "shuffle" then now = "Shuffling your starred looks" else now = "Always " + vizLabel(c)
@@ -570,7 +570,7 @@ sub vizMenu()
     d.observeField("buttonSelected", "onVizMenu")
     d.observeField("wasClosed", "onMuClosed")
     m.vizDialog = d
-    m.top.getScene().dialog = d
+    hShowDialog(d)
 end sub
 
 sub onVizMenu()

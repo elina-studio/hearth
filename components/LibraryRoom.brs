@@ -271,7 +271,7 @@ sub refresh(unused as dynamic)
     if m.top.kind = "" then return
     libs = m.global.libraries
     if libs = invalid or libs[m.top.kind] = invalid
-        m.empty.text = "Loading your library…"
+        hWaitOn(m.empty, "Plex")
         if m.global.hasField("plexDown") and m.global.plexDown = true
             m.empty.text = "Can't reach Plex. Check the server is on. Hearth tries again every 15 seconds."
             m.top.ready = true
@@ -316,7 +316,7 @@ sub loadTab(t as integer)
     m.index = 0
     m.top0 = 0
     drawGrid()
-    m.empty.text = "Loading…"
+    hWaitOn(m.empty, "Plex")
     m.countLabel.text = ""
     if name = "Continue"
         hPlex("resume", { section: m.section, limit: 45 }, "onTab", name)
@@ -384,7 +384,7 @@ sub openGenre(g as object)
     layoutAZ()
     m.items = []
     drawGrid()
-    m.empty.text = "Loading " + g.genreName + "…"
+    hWaitOn(m.empty, "Plex")
     hPlex("list", { section: m.section, genre: g.genreKey, sort: "titleSort", limit: 500 }, "onGenre", g.genreName)
 end sub
 
@@ -838,13 +838,13 @@ end sub
 
 sub pick(kind as string, title as string, labels as object)
     m.pickKind = kind
-    d = CreateObject("roSGNode", "StandardMessageDialog")
+    d = CreateObject("roSGNode", "HearthDialog")
     d.title = title
     d.buttons = labels
     d.observeField("buttonSelected", "onPicked")
     d.observeField("wasClosed", "onPickClosed")
     m.dialog = d
-    m.top.getScene().dialog = d
+    hShowDialog(d)
 end sub
 
 sub onPicked()

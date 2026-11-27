@@ -17,13 +17,13 @@ sub hOptions(item as object)
         labels.push("Mark watched") : m.optActions.push("played")
     end if
     labels.push("Close") : m.optActions.push("close")
-    d = CreateObject("roSGNode", "StandardMessageDialog")
+    d = CreateObject("roSGNode", "HearthDialog")
     d.title = hTitle(item)
     d.message = [hSubtitle(item)]
     d.buttons = labels
     d.observeField("buttonSelected", "onOptions")
     m.optDialog = d
-    m.top.getScene().dialog = d
+    hShowDialog(d)
 end sub
 
 sub hOptionsChosen()
@@ -44,13 +44,13 @@ sub onOptionDone(event as object)
 end sub
 
 sub hMessage(title as string, text as string)
-    d = CreateObject("roSGNode", "StandardMessageDialog")
+    d = CreateObject("roSGNode", "HearthDialog")
     d.title = title
     d.message = [text]
     d.buttons = ["OK"]
     d.observeField("buttonSelected", "onMessageClosed")
     m.msgDialog = d
-    m.top.getScene().dialog = d
+    hShowDialog(d)
 end sub
 
 sub onMessageClosed()

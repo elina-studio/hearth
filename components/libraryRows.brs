@@ -34,7 +34,7 @@ end sub
 sub loadRows()
     applyView()
     sec = m.section
-    if m.rowData.all = invalid then m.empty.text = "Loading…"
+    if m.rowData.all = invalid then hWaitOn(m.empty, "Plex")
     hPlex("resume", { section: sec, limit: 20 }, "onRowData", "continue")
     hPlex("latest", { section: sec, limit: 40 }, "onRowData", "latest")
     hPlex("list", { section: sec, sort: "titleSort", limit: 2000 }, "onRowData", "all")

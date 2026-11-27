@@ -649,7 +649,7 @@ sub panelMore()
     labels.push("Visualizer") : m.moreActs.push("milk")
     labels.push("More music options...") : m.moreActs.push("options")
     labels.push("Close") : m.moreActs.push("close")
-    d = CreateObject("roSGNode", "StandardMessageDialog")
+    d = CreateObject("roSGNode", "HearthDialog")
     d.title = "Music"
     n = muNow()
     d.message = [n.title]
@@ -657,7 +657,7 @@ sub panelMore()
     d.observeField("buttonSelected", "onPanelMore")
     d.observeField("wasClosed", "onMuClosed")
     m.moreDialog = d
-    m.top.getScene().dialog = d
+    hShowDialog(d)
 end sub
 
 sub onPanelMore()

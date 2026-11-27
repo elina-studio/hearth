@@ -372,12 +372,12 @@ sub showCaptions()
         end for
     end if
     if labels.count() = 1 then labels = ["No captions for this one"] : m.capTracks = [""]
-    d = CreateObject("roSGNode", "StandardMessageDialog")
+    d = CreateObject("roSGNode", "HearthDialog")
     d.title = "Captions"
     d.buttons = labels
     d.observeField("buttonSelected", "onCaptionPicked")
     m.capDialog = d
-    m.top.getScene().dialog = d
+    hShowDialog(d)
 end sub
 
 sub onCaptionPicked()

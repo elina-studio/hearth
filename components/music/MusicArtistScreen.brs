@@ -465,14 +465,14 @@ sub albumOptions(i as integer)
     if i < 0 or i >= m.albums.Count() then return
     m.optAlbum = i
     m.optTrack = -1
-    d = CreateObject("roSGNode", "StandardMessageDialog")
+    d = CreateObject("roSGNode", "HearthDialog")
     d.title = pxStr(m.albums[i].md.title)
     d.message = [pxStr(m.albums[i].md.parentTitle)]
     d.buttons = ["Play album", "Shuffle album", "Play next", "Add to queue", "Close"]
     d.observeField("buttonSelected", "onAlbumOption")
     d.observeField("wasClosed", "onShown")
     m.dialog = d
-    m.top.getScene().dialog = d
+    hShowDialog(d)
 end sub
 
 sub trackOptions(i as integer, k as integer)
@@ -480,14 +480,14 @@ sub trackOptions(i as integer, k as integer)
     m.optAlbum = i
     m.optTrack = k
     md = m.albums[i].tracks[k]
-    d = CreateObject("roSGNode", "StandardMessageDialog")
+    d = CreateObject("roSGNode", "HearthDialog")
     d.title = pxStr(md.title)
     d.message = [pxStr(m.albums[i].md.title)]
     d.buttons = ["Play from here", "Play next", "Add to queue", "More like this", "Close"]
     d.observeField("buttonSelected", "onAlbumOption")
     d.observeField("wasClosed", "onShown")
     m.dialog = d
-    m.top.getScene().dialog = d
+    hShowDialog(d)
 end sub
 
 sub onAlbumOption()

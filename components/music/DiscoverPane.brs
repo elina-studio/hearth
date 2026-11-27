@@ -274,7 +274,7 @@ sub ask()
     if m.asking then return
     m.asking = true
     m.askedAt = CreateObject("roDateTime").AsSeconds()
-    if m.data = invalid then m.note.text = "Asking the NAS" + Chr(8230)
+    if m.data = invalid then hWaitOn(m.note, "the NAS")
     nasCall("GET", "/api/discover", "", "onData", "discover")
 end sub
 

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The one waiting state (walk 2, item 21). A room calls hWaitOn(itsEmptyLabel, "Plex") (source/util.brs); the
+     firefly pulses where that label sits, and after 8 seconds one line says what Hearth is waiting on.
+     It ends by itself the moment the room writes anything else into that label (results, an empty-state line,
+     an error) or hides it, so no room needs a matching "off" call. -->
+<component name="Waiting" extends="Group">
+  <children>
+    <Poster id="fly" uri="pkg:/images/w/firefly-main.png" width="48" height="48" />
+    <Label id="late" translation="[0, 60]" color="0xB5AF8CFF" visible="false" />
+    <Timer id="slow" duration="8" />
+    <Animation id="pulse" duration="1.6" repeat="true" easeFunction="inOutQuad">
+      <FloatFieldInterpolator key="[0.0, 0.5, 1.0]" keyValue="[0.35, 1.0, 0.35]" fieldToInterp="fly.opacity" />
+    </Animation>
+  </children>
+  <interface>
+    <field id="label" type="node" onChange="onLabel" />
+  </interface>
+  <script type="text/brightscript" uri="pkg:/source/util.brs" />
+  <script type="text/brightscript" uri="pkg:/components/ui/Waiting.brs" />
+</component>

@@ -5,6 +5,52 @@ function hMediaKey(key as string) as boolean
     return key = "play" or key = "rewind" or key = "fastforward" or key = "replay"
 end function
 
+' ---------- Hearth's own menu sheet (components/ui/HearthDialog) ----------
+' Shows d in place of a Roku dialog: it sits on top of the scene, takes focus, and hands focus back when it closes.
+sub hShowDialog(d as object)
+    sc = m.top.getScene()
+    if sc = invalid or d = invalid then return
+    if not sc.hasField("sheet") then sc.addField("sheet", "node", false)
+    old = sc.sheet
+    if old <> invalid and not old.isSameNode(d) then old.close = true
+    ' whatever holds focus now gets it back afterwards
+    node = sc
+    for i = 0 to 40
+        f = node.focusedChild
+        if f = invalid or f.isSameNode(node) then exit for
+        node = f
+    end for
+    sc.appendChild(d)
+    sc.sheet = d
+    d.callFunc("open", node)
+end sub
+
+' ---------- the one waiting state (components/ui/Waiting) ----------
+' Puts the room's empty-state label into waiting: a pulsing firefly in its place, and after 8 s "Still waiting on <what>".
+' Writing anything else into the label ends it.
+sub hWaitOn(node as object, what as string)
+    if node = invalid then return
+    if not node.hasField("waitNode")
+        par = node.getParent()
+        if par <> invalid
+            w = par.createChild("Waiting")
+            node.addField("waitNode", "node", false)
+            node.waitNode = w
+            w.label = node
+        end if
+    end if
+    node.text = Chr(8203) + what
+end sub
+
+' true while a Roku dialog (the keyboard) or a Hearth sheet is open
+function hDialogUp() as boolean
+    sc = m.top.getScene()
+    if sc = invalid then return false
+    if sc.dialog <> invalid then return true
+    if sc.hasField("sheet") and sc.sheet <> invalid then return true
+    return false
+end function
+
 function hFont(kind as string, size as integer) as object
     f = CreateObject("roSGNode", "Font")
     ' final font set (whimsy spec): HearthSans = Ysabeau Bold with tall digits, for titles, caps kickers,

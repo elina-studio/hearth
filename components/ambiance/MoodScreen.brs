@@ -384,7 +384,7 @@ end sub
 ' focus must stay on this screen or Back goes nowhere
 sub refocus()
     if m.controls.visible then return
-    if m.top.getScene().dialog <> invalid then return
+    if hDialogUp() then return
     if not m.top.hasFocus() then m.top.setFocus(true)
 end sub
 
@@ -525,7 +525,7 @@ sub setSleep(minutes as integer)
 end sub
 
 sub sleepMenu()
-    d = CreateObject("roSGNode", "StandardMessageDialog")
+    d = CreateObject("roSGNode", "HearthDialog")
     d.title = titleOf(m.top.mood)
     d.message = ["Sound and sleep timer"]
     if soundOn() then snd = "Turn sound off" else snd = "Turn sound on"
@@ -541,7 +541,7 @@ sub sleepMenu()
     d.observeField("buttonSelected", "onMenu")
     d.observeField("wasClosed", "onMenuClosed")
     m.dialog = d
-    m.top.getScene().dialog = d
+    hShowDialog(d)
 end sub
 
 sub onMenu()
