@@ -30,29 +30,17 @@ sub open(prev = invalid as dynamic)
         openPopup()
         return
     end if
+    ' a menu: a card in the middle too (owner, Nov 27: popups, not side panels). side = true keeps the old side sheet.
+    side = (m.top.side = true)
+    px = 618
+    if side then px = 1168
+    tx = px + 52
     m.titleL.text = m.top.title
-    y = 68 + m.titleL.boundingRect().height + 10
-    lines = m.top.message
-    body = ""
-    if lines <> invalid
-        for each ln in lines
-            if ln <> invalid and ln <> ""
-                if body <> "" then body = body + Chr(10)
-                body = body + ln
-            end if
-        end for
-    end if
+    th = m.titleL.boundingRect().height
+    body = bodyText()
     m.msg.text = body
-    if body <> ""
-        m.msg.translation = [1220, y]
-        y = y + m.msg.boundingRect().height + 14
-    else
-        y = y + 4
-    end if
-    m.rule.translation = [1220, y]
-    y = y + 20
-    m.list.translation = [1206, y]
-    m.viewH = 936 - y
+    bh = 0
+    if body <> "" then bh = m.msg.boundingRect().height + 14 else bh = 4
     ' y of every row; a group title sits above the button it is keyed to
     m.ys = []
     m.headY = {}
@@ -67,6 +55,40 @@ sub open(prev = invalid as dynamic)
         m.ys.push(yy)
         yy = yy + m.rowH
     end for
+    ' above the list: 40 to the title, the title, the words, the rule and 20 under it. Below: "n more", the hint, 34.
+    headH = 40 + th + 10 + bh + 20
+    footH = 16 + 30 + 8 + 28 + 34
+    m.viewH = yy
+    top = 28
+    cardH = 1024
+    if not side
+        if m.viewH > 980 - headH - footH then m.viewH = 980 - headH - footH
+        cardH = headH + m.viewH + footH
+        top = Int((1080 - cardH) / 2)
+    else
+        m.viewH = cardH - headH - footH
+    end if
+    panel = m.top.findNode("panel")
+    ring = m.top.findNode("panelRing")
+    ' panel.9 carries 13 px of clear edge on every side
+    panel.translation = [px, top - 13]
+    panel.width = 684
+    panel.height = cardH + 26
+    ring.translation = [px - 2, top - 15]
+    ring.width = 688
+    ring.height = cardH + 30
+    ring.visible = not side
+    if not side then m.top.findNode("shade").color = "0x0B0E09D9"
+    y = top + 40
+    m.titleL.translation = [tx, y]
+    y = y + th + 10
+    m.msg.translation = [tx, y]
+    y = y + bh
+    m.rule.translation = [tx, y]
+    y = y + 20
+    m.list.translation = [tx - 14, y]
+    m.more.translation = [tx, y + m.viewH + 16]
+    m.hint.translation = [tx, y + m.viewH + 16 + 30 + 8]
     m.sel = m.top.buttonFocused
     if m.sel < 0 or m.sel >= m.btns.count() then m.sel = 0
     m.scroll = 0

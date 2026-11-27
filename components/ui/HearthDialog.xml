@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Hearth's own menu and message sheet (walk 2, item 14; mockups/walk2/14-menu-sheet.png). It takes the place of
+<!-- Hearth's own menu and message popup (walk 2, item 14; a centred card since build 122, mockups/popups/). It takes the place of
      Roku's StandardMessageDialog everywhere, with the same fields, so a caller only changes how it is shown:
      hShowDialog(d) (source/util.brs) instead of scene.dialog = d.
      buttons: "Label" or "Label: value" (the value is drawn on the right). heads: { "<button index>": "GROUP" }
@@ -27,6 +27,8 @@
     <!-- a question or a notice ("Leave Hearth?"): a small card in the middle with its buttons side by side,
          instead of the side sheet that menus use (mockups/leave-popup/leave-popup.png) -->
     <field id="popup" type="boolean" value="false" />
+    <!-- menus are a centred card too; side = true puts one back on the right edge as a side sheet -->
+    <field id="side" type="boolean" value="false" />
     <field id="buttonFocused" type="integer" value="0" />
     <field id="buttonSelected" type="integer" value="0" alwaysNotify="true" />
     <field id="close" type="boolean" value="false" onChange="onClose" />
