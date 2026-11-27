@@ -440,17 +440,31 @@ sub openRooms()
     s = cur()
     labels = []
     for each r in m.pickList
-        mark = "  "
+        mark = ": Off"
         for each id in s.rooms
-            if id = r.id then mark = "ON  "
+            if id = r.id then mark = ": On"
         end for
-        labels.push(mark + r.name)
+        labels.push(r.name + mark)
     end for
     labels.push("Done")
     d = CreateObject("roSGNode", "HearthDialog")
     d.title = "Rooms"
-    d.message = ["OK ticks or unticks a speaker."]
+    d.icon = "pkg:/images/music/icons/house.png"
+    d.message = ["Where this schedule plays. OK turns a speaker on or off."]
     d.buttons = labels
+    roomIcons = []
+    roomKinds = []
+    for i = 0 to labels.count() - 1
+        if i < labels.count() - 1
+            roomIcons.push("pkg:/images/music/icons/speaker.png")
+            roomKinds.push("")
+        else
+            roomIcons.push("")
+            roomKinds.push("main")
+        end if
+    end for
+    d.icons = roomIcons
+    d.kinds = roomKinds
     d.observeField("buttonSelected", "onRoomPick")
     d.observeField("wasClosed", "onMuClosed")
     m.dlg = d
@@ -496,8 +510,10 @@ sub pickPlaylist()
     labels.push("Cancel")
     d = CreateObject("roSGNode", "HearthDialog")
     d.title = "Plays"
+    d.icon = "pkg:/images/music/icons/list.png"
     d.message = ["Music Assistant plays this Plex playlist on the speakers."]
     d.buttons = labels
+    d.icons = hPickIcons(labels.count(), -1, "pkg:/images/music/icons/list.png")
     d.observeField("buttonSelected", "onPlaylistPick")
     d.observeField("wasClosed", "onMuClosed")
     m.dlg = d

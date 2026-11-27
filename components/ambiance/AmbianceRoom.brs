@@ -308,6 +308,10 @@ sub clipInfo(it as object)
         d.message = [it.sub]
     end if
     d.buttons = ["Close"]
+    d.kinds = ["main"]
+    pic = "pkg:/images/amb/col-window.jpg"
+    if it.mood = "hearth" or it.mood = "rain" or it.mood = "lightsout" or it.mood = "fireflies" or it.mood = "window" then pic = "pkg:/images/amb/tile-" + it.mood + ".jpg"
+    d.hero = { art: pic, shape: "square", kicker: "Ambiance" }
     d.observeField("buttonSelected", "onClipInfoClosed")
     d.observeField("wasClosed", "onClipInfoClosed")
     m.clipDialog = d

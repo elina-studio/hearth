@@ -59,18 +59,26 @@ sub hSubsDialog(it as object)
     labels = ["None"]
     focusAt = 0
     i = 1
+    lines = [""]
     for each s in st
-        tag = ""
-        if s.key <> invalid then tag = "  (file)"
-        if s.forced = true then tag = tag + "  (forced)"
-        labels.push(hSubsName(s) + tag)
+        tag = "Inside the video"
+        if s.key <> invalid then tag = "A subtitle file beside the video"
+        if s.forced = true then tag = tag + "  ·  only the foreign parts"
+        labels.push(hSubsName(s))
+        lines.push(tag)
         if s.selected = true then focusAt = i
         i = i + 1
     end for
-    if st.count() = 0 then labels = ["No subtitles for this one"]
+    if st.count() = 0
+        labels = ["No subtitles for this one"]
+        lines = [""]
+    end if
     d = CreateObject("roSGNode", "HearthDialog")
     d.title = "Subtitles"
+    d.icon = "pkg:/images/icons/d-cc.png"
     d.buttons = labels
+    d.subs = lines
+    if st.count() > 0 then d.icons = hPickIcons(labels.count(), focusAt, "pkg:/images/icons/d-cc.png")
     d.buttonFocused = focusAt
     d.observeField("buttonSelected", "hSubsOnPicked")
     d.observeField("wasClosed", "hSubsOnClosed")

@@ -840,7 +840,16 @@ sub pick(kind as string, title as string, labels as object)
     m.pickKind = kind
     d = CreateObject("roSGNode", "HearthDialog")
     d.title = title
+    d.icon = "pkg:/images/icons/home-filter.png"
     d.buttons = labels
+    ' a tick on the one in use, and focus starts there
+    now = 0
+    for i = 1 to labels.count() - 1
+        if kind = "decade" and m.decade <> invalid and m.decade <> "" and Left(labels[i], 4) = m.decade then now = i
+        if kind = "genre" and m.genreF <> invalid and labels[i] = m.genreF.genreName then now = i
+    end for
+    d.icons = hPickIcons(labels.count(), now, "")
+    d.buttonFocused = now
     d.observeField("buttonSelected", "onPicked")
     d.observeField("wasClosed", "onPickClosed")
     m.dialog = d

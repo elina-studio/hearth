@@ -527,17 +527,25 @@ end sub
 sub sleepMenu()
     d = CreateObject("roSGNode", "HearthDialog")
     d.title = titleOf(m.top.mood)
-    d.message = ["Sound and sleep timer"]
-    if soundOn() then snd = "Turn sound off" else snd = "Turn sound on"
+    d.icon = "pkg:/images/music/icons/moon.png"
+    if soundOn() then snd = "Sound: On" else snd = "Sound: Off"
     m.menuMins = [-1, 0, 30, 60, 90, -2]
     labels = [snd]
+    lines = ["The fire, the rain, the night"]
+    icons = ["pkg:/images/music/icons/speaker.png"]
     for each mins in [0, 30, 60, 90]
         if mins = 0 then t = "No timer" else t = "Stop in " + mins.toStr() + " min"
-        if mins = m.sleepMin then t = t + "  (now)"
         labels.push(t)
+        if mins = 0 then lines.push("Stays on until you leave") else lines.push("Fades to black, then quiet")
+        if mins = m.sleepMin then icons.push("pkg:/images/music/icons/check.png") else icons.push("pkg:/images/music/icons/clock.png")
     end for
-    if m.cornerClock.visible then labels.push("Hide the clock") else labels.push("Show the clock")
+    if m.cornerClock.visible then labels.push("Corner clock: On") else labels.push("Corner clock: Off")
+    lines.push("A small clock in the corner")
+    icons.push("pkg:/images/music/icons/clock.png")
     d.buttons = labels
+    d.subs = lines
+    d.icons = icons
+    d.heads = { "0": "Sound", "1": "Sleep timer", "5": "On screen" }
     d.observeField("buttonSelected", "onMenu")
     d.observeField("wasClosed", "onMenuClosed")
     m.dialog = d

@@ -167,6 +167,32 @@ sub muSubMenu(title as string, labels as object, actions as object)
     d.title = title
     d.message = [""]
     d.buttons = labels
+    ic = "pkg:/images/music/icons/"
+    about = {
+        radioNope: [ic + "thumbdown.png", "It stays out of radios for a month"],
+        radioCloser: [ic + "collapse.png", "Stay near the song or mood you picked"],
+        radioWander: [ic + "expand.png", "Roam further from where it started"],
+        radioStop: [ic + "close.png", "Back to your own queue"],
+        lyricsToggle: [ic + "lyrics.png", "The words beside the cover"],
+        lyricsEarlier: [ic + "left.png", "When the words come in late"],
+        lyricsLater: [ic + "right.png", "When the words come in early"],
+        close: [ic + "left.png", "Back to the music menu"]
+    }
+    icons = []
+    subs = []
+    for each a in actions
+        info = about[a]
+        if info <> invalid
+            icons.push(info[0])
+            subs.push(info[1])
+        else
+            icons.push("")
+            subs.push("")
+        end if
+    end for
+    d.icons = icons
+    d.subs = subs
+    if Left(title, 5) = "Radio" then d.icon = ic + "radio.png" else d.icon = ic + "lyrics.png"
     d.observeField("buttonSelected", "onMuOption")
     d.observeField("wasClosed", "onMuClosed")
     m.muDialog = d

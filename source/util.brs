@@ -42,6 +42,15 @@ sub hWaitOn(node as object, what as string)
     node.text = Chr(8203) + what
 end sub
 
+' For a pick-one popup: the icon list for HearthDialog.icons, with a tick on the current choice and other on the rest
+function hPickIcons(n as integer, chosen as integer, other as string) as object
+    out = []
+    for i = 0 to n - 1
+        if i = chosen then out.push("pkg:/images/music/icons/check.png") else out.push(other)
+    end for
+    return out
+end function
+
 ' true while a Roku dialog (the keyboard) or a Hearth sheet is open
 function hDialogUp() as boolean
     sc = m.top.getScene()

@@ -247,6 +247,13 @@ sub onMoods(event as object)
     dlg.title = "A mood"
     dlg.message = ["Pick a mood. The radio plays songs Plex has tagged with it."]
     dlg.buttons = labels
+    dlg.icon = "pkg:/images/music/icons/radio.png"
+    moodNow = -1
+    for i = 0 to m.moods.Count() - 1
+        if m.moodKey <> invalid and m.moods[i].key = m.moodKey then moodNow = i
+    end for
+    dlg.icons = hPickIcons(labels.count(), moodNow, "pkg:/images/music/icons/wave.png")
+    if moodNow >= 0 then dlg.buttonFocused = moodNow
     dlg.observeField("buttonSelected", "onMoodPick")
     dlg.observeField("wasClosed", "onMuClosed")
     m.moodDialog = dlg

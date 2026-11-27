@@ -374,7 +374,13 @@ sub showCaptions()
     if labels.count() = 1 then labels = ["No captions for this one"] : m.capTracks = [""]
     d = CreateObject("roSGNode", "HearthDialog")
     d.title = "Captions"
+    d.icon = "pkg:/images/icons/d-cc.png"
     d.buttons = labels
+    capIcons = []
+    for i = 0 to labels.count() - 1
+        if i = 0 then capIcons.push("pkg:/images/icons/d-ccx.png") else capIcons.push("pkg:/images/icons/d-cc.png")
+    end for
+    d.icons = capIcons
     d.observeField("buttonSelected", "onCaptionPicked")
     m.capDialog = d
     hShowDialog(d)

@@ -8,7 +8,7 @@
 
      buttons   "Label", or "Label: value". The value is drawn on the right: On / Off as a switch, anything else
                as a chip. A label ending in "..." gets a chevron instead of the dots.
-               A button called "Close" is not drawn when there are others (Back closes); indexes do not shift.
+               A button called "Close" or "Cancel" is not drawn when there are others (Back closes); indexes do not shift.
      heads     { "<button index>": "GROUP" } puts a group title above that button.
      subs      second line for each button, by index ("" for none).
      icons     picture uri for each button's icon, by index ("" for none). White art; it is tinted.

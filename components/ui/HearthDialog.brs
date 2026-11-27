@@ -62,7 +62,7 @@ sub open(prev = invalid as dynamic)
     for i = 0 to n - 1
         caption = btns[i]
         if caption = invalid then caption = ""
-        if not (LCase(caption) = "close" and n > 1 and not m.ask)
+        if not ((LCase(caption) = "close" or LCase(caption) = "cancel") and n > 1 and not m.ask)
             it = { i: i, name: caption, value: "", go: false, sub: strAt(m.top.subs, i), icon: strAt(m.top.icons, i), pic: strAt(m.top.pics, i), kind: strAt(m.top.kinds, i) }
             if m.ask then it.kind = "btn"
             if it.kind = "" then it.kind = "row"
@@ -82,6 +82,11 @@ sub open(prev = invalid as dynamic)
             end if
             m.items.push(it)
         end if
+    end for
+    ' when any row has an icon, every row leaves room for one so the names line up
+    m.anyIcon = false
+    for each it in m.items
+        if it.kind = "row" and it.icon <> "" then m.anyIcon = true
     end for
 
     ' ---- size of the card ----
@@ -445,6 +450,7 @@ sub drawRow(g as object, it as object)
         ringAround(g, -6, -2, w + 12, 80)
     end if
     tx = 22
+    if m.anyIcon then tx = 70
     if it.icon <> ""
         ic = g.createChild("Poster")
         ic.uri = it.icon
