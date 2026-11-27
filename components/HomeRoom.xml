@@ -114,5 +114,6 @@
   <script type="text/brightscript" uri="pkg:/components/dialogs.brs" />
   <script type="text/brightscript" uri="pkg:/components/requests/reqdata.brs" />
   <script type="text/brightscript" uri="pkg:/components/music/plex.brs" />
+  <script type="text/brightscript" uri="pkg:/components/ambiance/ambianceData.brs" />
   <script type="text/brightscript" uri="pkg:/components/HomeRoom.brs" />
 </component>

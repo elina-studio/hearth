@@ -639,6 +639,13 @@ sub buildReqLines()
     hWaitOn(m.reqEmpty, "Plex")
     m.reqCells = []
     holder = m.top.findNode("reqLines")
+    ' one full line for the newest arrival instead of five names cut short (walk 2, item 18)
+    m.reqNewest = holder.createChild("Label")
+    m.reqNewest.font = hFont("regular", 22)
+    m.reqNewest.width = 476
+    m.reqNewest.maxLines = 1
+    m.reqNewest.translation = [0, 132]
+    m.reqNewest.color = "0xEDE6CAFF"
     for i = 0 to 4
         g = holder.createChild("Group")
         g.translation = [i * 98, 0]
@@ -650,14 +657,7 @@ sub buildReqLines()
         pic.width = 84
         pic.height = 126
         pic.loadDisplayMode = "scaleToZoom"
-        nm = g.createChild("Label")
-        nm.font = hFont("regular", 22)
-        nm.width = 90
-        nm.height = 24
-        nm.translation = [0, 130]
-        nm.maxLines = 1
-        nm.color = "0xEDE6CAFF"
-        g.addFields({ pic: pic, name: nm })
+        g.addFields({ pic: pic })
         g.visible = false
         m.reqCells.push(g)
     end for
@@ -727,14 +727,18 @@ sub onArrivedHome(event as object)
         g = m.reqCells[i]
         if i < items.count()
             g.pic.uri = items[i].image
-            g.name.text = items[i].title
             g.visible = true
         else
             g.visible = false
         end if
     end for
+    m.reqNewest.text = ""
     if items.count() > 0
         m.reqEmpty.text = ""
+        nw = items[0]
+        line = "Newest: " + nw.title
+        if nw.data <> invalid and nw.data.when <> invalid and nw.data.when.text <> "" then line = line + "  ·  " + nw.data.when.text
+        m.reqNewest.text = line
     else if not t.ok
         m.reqEmpty.text = "Couldn't reach Plex"
     else
@@ -748,27 +752,29 @@ sub onArrivedHome(event as object)
 end sub
 
 ' ---------- Set the mood ----------
+' Three moods with the names and pictures the Ambiance room uses (the person's own clips once Plex has
+' answered), then All moods (walk 2, item 18).
 sub buildMoods()
-    m.moodKeys = ["hearth", "rain", "lightsout", "fireflies"]
-    names = ["HEARTH", "RAIN", "LIGHTS LOW", "FIREFLIES"]
+    m.moodKeys = ["hearth", "rain", "lightsout", "all"]
     m.moodRings = []
+    m.moodTiles = []
     holder = m.top.findNode("moodTiles")
     for i = 0 to 3
         g = holder.createChild("Group")
         g.translation = [(i mod 2) * 242, Int(i / 2) * 74]
         pic = g.createChild("Poster")
-        pic.uri = "pkg:/images/amb/tile-" + m.moodKeys[i] + ".jpg"
         pic.width = 230
         pic.height = 62
         pic.loadDisplayMode = "scaleToZoom"
         shade = g.createChild("Rectangle")
         shade.width = 230
         shade.height = 62
-        shade.color = "0x0A0D08A6"
+        shade.color = "0x0A0D08B3"
         l = g.createChild("Label")
         l.font = hFont("caps", 24)
-        l.text = names[i]
         l.translation = [18, 0]
+        l.width = 200
+        l.maxLines = 1
         l.height = 62
         l.vertAlign = "center"
         l.color = "0xEDE6CAFF"
@@ -780,12 +786,61 @@ sub buildMoods()
         ring.height = 82
         ring.visible = false
         m.moodRings.push(ring)
+        m.moodTiles.push({ pic: pic, name: l })
     end for
+    paintMoods()
+end sub
+
+sub paintMoods()
+    if m.moodTiles = invalid then return
+    for i = 0 to 3
+        t = m.moodTiles[i]
+        if m.moodKeys[i] = "all"
+            t.name.text = "ALL MOODS  " + Chr(8250)
+            t.pic.uri = "pkg:/images/amb/tile-window.jpg"
+        else
+            it = ambMood(m.moodKeys[i])
+            if it <> invalid
+                t.name.text = UCase(it.title)
+                uri = "pkg:/images/amb/tile-" + it.mood + ".jpg"
+                if it.plexStill <> invalid and it.plexStill <> "" and m.global.plexServer <> invalid and m.global.plexServer <> ""
+                    uri = m.global.plexServer + "/photo/:/transcode?width=460&height=124&minSize=1&upscale=1&url=" + hEscape(it.plexStill) + "&X-Plex-Token=" + m.global.plexServerToken
+                end if
+                if t.pic.uri <> uri then t.pic.uri = uri
+            end if
+        end if
+    end for
+end sub
+
+' Ask Plex for the Ambiance clips once, so the tiles match the room before it has been opened
+sub loadMoodClips()
+    if m.moodAsked = true or m.global.hasField("ambItems") then return
+    libs = m.global.libraries
+    if libs = invalid or libs.Count() = 0 then return
+    m.moodAsked = true
+    sec = ""
+    if libs.ambiance <> invalid then sec = libs.ambiance
+    hPlex("clips", { section: sec }, "onMoodClips")
+end sub
+
+sub onMoodClips(event as object)
+    t = hTaskFrom(event)
+    if not t.ok or t.response = invalid or t.response.Clips = invalid
+        m.moodAsked = false
+        return
+    end if
+    if t.response.Clips.count() > 0 and not m.global.hasField("ambItems")
+        m.global.addFields({ ambItems: [] })
+        m.global.ambItems = ambMerge(t.response.Clips)
+    end if
+    paintMoods()
 end sub
 
 ' ---------- data ----------
 sub refresh(unused as dynamic)
     showGreeting()
+    loadMoodClips()
+    paintMoods()
     loadRequests()
     hPlex("resume", { limit: 12 }, "onResume")
     hPlex("nextup", { limit: 12 }, "onNextUp")
@@ -1191,7 +1246,8 @@ sub activate()
         else if m.dash = 3
             m.top.request = { action: "room", name: "Requests", tab: "new" }
         else
-            m.top.request = { action: "mood", mood: m.moodKeys[m.dash - 4] }
+            mk = m.moodKeys[m.dash - 4]
+            if mk = "all" then m.top.request = { action: "room", name: "Ambiance" } else m.top.request = { action: "mood", mood: mk }
         end if
     else
         card = m.rows[m.row].callFunc("current", invalid)
