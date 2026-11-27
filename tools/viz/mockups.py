@@ -12,7 +12,7 @@ def ring(img, x, y, w, h, i):
     # a 9-patch: draw it stretched (close enough for a mockup)
     img.alpha_composite(r.resize((w, h)), (x, y))
 def star(img, x, y):
-    s = Image.open(R + "/images/music/icons/star.png").convert("RGBA").resize((28, 28))
+    s = Image.open(R + "/images/music/icons/heart.png").convert("RGBA").resize((28, 28))
     col = Image.new("RGBA", s.size, C("E0B34AFF")); col.putalpha(s.getchannel("A")); img.alpha_composite(col, (x, y))
 
 def picker(focus, stars, choice, name):
@@ -21,14 +21,16 @@ def picker(focus, stars, choice, name):
     items = [{"n": "shuffle", "label": "Shuffle"}] + [{"n": str(l["n"]), "label": l["label"]} for l in LOOKS]
     it = items[focus]
     if it["n"] == "shuffle":
-        title = "Shuffle"; sub = "A different look for every song, from your %d starred looks." % len(stars)
+        title = "Shuffle"; sub = "A different look for every song, from your %d hearted looks." % len(stars)
     else:
-        title = it["label"]; sub = ("Starred" if it["n"] in stars else "Not starred") + ("  ·  In use for every song" if it["n"] == choice else "")
+        title = it["label"]; sub = ("Hearted" if it["n"] in stars else "Not hearted") + ("  ·  In use for every song" if it["n"] == choice else "")
     d.text((132, 104), title, font=F("bold", 52), fill=C("EDE6CA"))
     d.text((132, 184), sub, font=F("regular", 28), fill=C("B5AF8C"))
     tw, th, gx, gy, cols = 186, 105, 24, 76, 8
+    top = max(0, focus // cols - 3)   # four rows show; the grid scrolls to keep the focus in view
     for i, t in enumerate(items):
-        x = 132 + (i % cols) * (tw + gx); y = 262 + (i // cols) * (th + gy)
+        if not (top <= i // cols <= top + 3): continue
+        x = 132 + (i % cols) * (tw + gx); y = 262 + (i // cols - top) * (th + gy)
         if i == focus: ring(img, x - 18, y - 18, tw + 36, th + 36, i)
         d.rectangle([x, y, x + tw - 1, y + th - 1], fill=C("1D2418"))
         if t["n"] == "shuffle":
@@ -42,7 +44,7 @@ def picker(focus, stars, choice, name):
         f = F("regular", 22); lab = t["label"]
         while d.textlength(lab, font=f) > tw and len(lab) > 3: lab = lab[:-2].rstrip() + "…" if not lab.endswith("…") else lab[:-2] + "…"
         d.text((x + tw / 2, y + th + 24), lab, font=f, fill=C("EDE6CA" if i == focus else "B5AF8C"), anchor="ma")
-    d.text((960, 992), "OK uses this look  ·  Play/Pause stars it  ·  Back closes", font=F("regular", 24), fill=C("B5AF8C"), anchor="ma")
+    d.text((960, 992), "OK uses this look  ·  Play/Pause hearts it  ·  Back closes", font=F("regular", 24), fill=C("B5AF8C"), anchor="ma")
     img.convert("RGB").save(OUT + "/" + name)
 
 def viz(name):
