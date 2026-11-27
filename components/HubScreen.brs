@@ -374,15 +374,6 @@ sub paintPills()
     ' one firefly: under the focused label on the bar, else under the settled room
     fi = ci
     if m.zone = "pills" then fi = m.pillIndex
-    ' a gold line under the focused room, so focus reads from the couch (UX review item 9)
-    if m.pillLine = invalid
-        m.pillLine = m.top.createChild("Rectangle")
-        m.pillLine.height = 4
-        m.pillLine.color = "0xE0B34AFF"
-    end if
-    m.pillLine.visible = (m.zone = "pills")
-    m.pillLine.translation = [m.tabX[fi] + 2, 92]
-    m.pillLine.width = m.tabW[fi] - 4
     target = [m.tabX[fi] + Int(m.tabW[fi] / 2) - 32, 64]
     if m.flyAt < 0
         m.flyMain.translation = target
