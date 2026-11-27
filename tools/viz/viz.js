@@ -138,7 +138,7 @@ async function timeLook(preset, w, h) {
 async function sizeFor(look, preset) {
   const known = knownSize(look);
   if (known !== undefined) return known;
-  const need = cfg.fps * (+process.env.HEARTH_VIZ_HEADROOM || 1.25);
+  const need = cfg.fps * (+process.env.HEARTH_VIZ_HEADROOM || 1.1);
   let pick = null; const seen = [];
   for (const [w, h] of SIZES) {
     if (w > cfg.width) continue;
@@ -326,7 +326,8 @@ async function handle(req, res) {
     if (!body.audioUrl || !/^https?:\/\//.test(body.audioUrl)) return json(res, 400, { error: 'no audio' });
     const job = startJob(body);
     if (body.prefetch) return json(res, 202, { ok: true, id: job.id, state: job.state });
-    const ok = await waitReady(job, 25000);
+    // the helper waits 16 s for this answer and the TV 20 s for the helper's, so answer well inside that
+    const ok = await waitReady(job, 13000);
     if (!ok) return json(res, 503, { error: job.error || 'not ready in time', state: job.state });
     return json(res, 200, { ok: true, id: job.id, path: `/s/${job.id}/index.m3u8`, look: job.look });
   }
@@ -400,7 +401,8 @@ async function selfUpdate() {
     let out;
     try { out = fs.openSync(path.join(HERE, 'serve.log'), 'a'); } catch { out = fs.openSync(path.join(HERE, 'serve-updated.log'), 'a'); }
     spawn(process.execPath, [path.join(HERE, 'viz.js'), 'serve'], { cwd: HERE, detached: true, stdio: ['ignore', out, out], env: Object.assign({}, process.env, { HEARTH_VIZ_RESTART: '1' }), windowsHide: true }).unref();
-    try { if (browserP) (await browserP).close(); } catch {}
+    // never wait long on the browser: the new copy needs the port
+    try { if (browserP) await Promise.race([browserP.then(b => b.close()), new Promise(r => setTimeout(r, 3000))]); } catch {}
     process.exit(0);
   } catch (e) {
     log('could not update from the helper:', e.message);
@@ -422,7 +424,7 @@ async function serve() {
   await hello();
   setInterval(hello, 60000);
   // looks added since the loops were made get theirs now, between songs
-  setTimeout(() => timeLooks().catch(e => log('timing:', e.message)).then(() => loops(true)).catch(e => log('loops:', e.message)), 30000);
+  setTimeout(() => loops(true).catch(e => log('loops:', e.message)).then(() => timeLooks()).catch(e => log('timing:', e.message)), 30000);
 }
 
 // ---------------------------------------------------------------- bench and loops
@@ -486,10 +488,12 @@ async function loops(keep) {
   pcm = pcm.subarray(from, Math.min(pcm.length, from + need));
   if (pcm.length < need) pcm = Buffer.concat([pcm, testTone(34).subarray(0, need - pcm.length)]);
   let made = 0;
-  for (const look of LOOKS) {
+  // looks with no loop at all first (until they have one the TV shows another look in their place), then redrawn ones
+  const order = LOOKS.filter(l => !(have.looks || []).includes(l.n)).concat(LOOKS.filter(l => (have.looks || []).includes(l.n)));
+  for (const look of order) {
     if (fresh(look)) { if (!keep) log(`loop ${look.n} ${look.label}: already on the NAS`); continue; }
     // a song on the TV comes first
-    while (keep && (active || queue.length)) await new Promise(r => setTimeout(r, 5000));
+    while (keep && (active || queue.length || timing)) await new Promise(r => setTimeout(r, 5000));
     const raw = path.join(WORK, `loop-${look.n}-raw.mp4`), out = path.join(WORK, `loop-${look.n}.mp4`);
     const enc = encoder(['-f', 'image2pipe', '-framerate', String(cfg.fps), '-c:v', 'mjpeg', '-i', '-', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '14', '-pix_fmt', 'yuv420p', raw]);
     loopJob = keep ? { cancelled: false } : null;

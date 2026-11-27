@@ -403,6 +403,19 @@ def loop_file(look):
     return p if os.path.isfile(p) else None
 
 
+def stand_in(alt, look):
+    """A look whose backup loop is on the NAS, for a look that has none yet: the first of the TV's own
+    list (alt, comma separated: its hearted or all looks) that has one, else Dusk flight, Angel flight, any."""
+    order = [a for a in (alt or "").split(",") if a.strip().isdigit()] + ["213", "57"]
+    if os.path.isdir(LOOPS):
+        order += sorted(m.group(1) for m in (re.match(r"^(\d+)\.mp4$", f) for f in os.listdir(LOOPS)) if m)
+    for a in order:
+        a = a.strip()
+        if a != str(look) and loop_file(a):
+            return a, loop_file(a)
+    return None, None
+
+
 # ---------------------------------------------------------------- routes
 
 def start(h, q):
@@ -442,6 +455,12 @@ def start(h, q):
                 return h.send_json({"ok": True, "url": url, "kind": "live", "look": look})
             print("mix: NucBox render failed:", why, flush=True)
         lf = loop_file(look)
+        shown = look
+        if not lf:
+            # a new look the NucBox can't draw right now and that has no loop yet: show another look rather than none
+            shown, lf = stand_in(g("alt"), look)
+            if lf:
+                print("mix: no loop for look %s yet, showing %s" % (look, shown), flush=True)
         if prefetch:
             if lf:
                 threading.Thread(target=loop_session, args=(lf, song, ss), daemon=True).start()
@@ -452,7 +471,8 @@ def start(h, q):
         sid, why2 = loop_session(lf, song, ss)
         if not sid:
             return h.send_json({"ok": False, "why": why2}, 500)
-        return h.send_json({"ok": True, "url": PUBLIC_URL + "/api/mix/s/%s/index.m3u8" % sid, "kind": "loop", "look": look})
+        return h.send_json({"ok": True, "url": PUBLIC_URL + "/api/mix/s/%s/index.m3u8" % sid, "kind": "loop", "look": shown,
+                            "asked": look, "why": "" if shown == look else (why or "")})
     return h.send_json({"ok": False, "why": "kind must be fire or viz"}, 400)
 
 

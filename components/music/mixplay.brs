@@ -162,6 +162,8 @@ function mixQuery(tr as object, ss as integer, ahead = false as boolean) as stri
             m.mixAskLook = look
         end if
         q = q + "&look=" + look
+        ' looks the helper may show instead when this one isn't ready (no NucBox and no backup loop yet)
+        q = q + "&alt=" + vizPool().Join(",")
     else
         q = q + "&clip=" + pxEscape(m.mix.clip)
     end if
@@ -249,6 +251,14 @@ sub onMixStart(event as object)
     if t.ok and resp.url <> invalid and resp.url <> ""
         tr = m.top.track
         if tr = invalid or tr.id <> r.id then return
+        ' the look asked for isn't ready, so the helper sent another one: name the one really on screen
+        shown = pxStr(resp.look)
+        if shown <> "" and r.look <> invalid and r.look <> "" and shown <> r.look and vizLabel(shown) <> ""
+            say(vizLabel(r.look) + " isn't ready yet, showing " + vizLabel(shown))
+            r.look = shown
+            m.vizFor[tr.id] = shown
+            m.top.vizLook = shown
+        end if
         if r.live = true
             ' the song is still playing: change over when it reaches the stream's start
             if m.top.state <> "playing"
