@@ -370,6 +370,8 @@ sub startHearth()
     m.sound = CreateObject("roSGNode", "AmbientSound")
     if m.sound <> invalid
         m.sound.mood = "hearth"
+        ' the song (or the fire + song stream) owns the TV's one player: the crackle is always the SoundEffect loop
+        m.sound.preferSfx = true
         m.top.findNode("moodHolder").appendChild(m.sound)
     end if
     clip = hearthClip()

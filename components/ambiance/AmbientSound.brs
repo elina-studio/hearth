@@ -24,7 +24,8 @@ function musicPlaying() as boolean
     if not m.global.hasField("music") then return false
     mu = m.global.music
     if mu = invalid then return false
-    return (mu.state = "playing")
+    ' buffering counts: the song is about to take the TV's one player (a new song, or a change-over to a video stream)
+    return (mu.state = "playing" or mu.state = "buffering")
 end function
 
 sub update()
