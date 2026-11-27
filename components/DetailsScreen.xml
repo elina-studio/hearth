@@ -41,6 +41,8 @@
     <KeyHints id="hints" translation="[1824, 1018]" />
     <!-- the rooms bar stays on top while the page scrolls under it -->
     <RoomBar id="roomBar" />
+    <!-- the clock, weather and now-playing chip, as on every room (walk 2, item 25) -->
+    <ClockCorner id="corner" />
     <SideSheet id="sheet" />
     <SubsFinder id="finder" />
     <SubsAuto id="auto" />

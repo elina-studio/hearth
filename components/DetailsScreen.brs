@@ -373,7 +373,19 @@ sub fillTags()
             hTag(row, "Converts to play", "wand", "plain")
         end if
     end if
+    ' a film Plex has not matched has no year, description, cast or art: say why, once (walk 2, item 26)
+    if unmatchedFilm(it)
+        hTag(row, "Plex hasn't matched this film", "wand", "plain")
+        if m.overview <> invalid and m.overview.text = "" then m.overview.text = "Plex has not matched this file to a film yet, so there is no description, cast or artwork for it. It plays as normal. More has Fix match."
+    end if
 end sub
+
+' Only a full fetch knows: no outside ids (IMDb, TMDB) and no year means Plex is still showing the file name.
+function unmatchedFilm(it as object) as boolean
+    if it = invalid or m.isShow or it.Type <> "Movie" then return false
+    if it.Ids = invalid then return false
+    return it.Ids.Count() = 0 and it.ProductionYear = invalid
+end function
 
 ' ---------------------------------------------------------------- action row
 

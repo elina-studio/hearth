@@ -36,6 +36,8 @@ sub init()
     m.buildTag.text = ""
     m.buildTag.visible = false
     ' weather from Home Assistant (same settings as the photo slideshow), refreshed every 15 minutes
+    ' the weather line is shared with screens outside the hub (components/ui/ClockCorner)
+    if not m.global.hasField("wx") then m.global.addFields({ wx: {} })
     wt = m.top.findNode("weatherTimer")
     wt.observeField("fire", "loadWeather")
     wt.control = "start"
@@ -571,6 +573,7 @@ sub onWeather(event as object)
     if a <> invalid and a.temperature <> invalid then s = s + ", " + Int(a.temperature + 0.5).toStr() + "°"
     m.wxIcon.uri = wxIconFor(t.response.state)
     m.weather.text = s
+    m.global.wx = { text: s, icon: m.wxIcon.uri }
     layoutWeather()
 end sub
 
