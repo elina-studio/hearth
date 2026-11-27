@@ -159,7 +159,12 @@ sub fillSlot(g as object, c as object, w as integer)
     if c.item <> invalid
         if c.item.Type = "Person" then isPerson = true
     end if
-    if isPerson
+    if c.DoesExist("az")
+        ' the "everything" tile at the end of a library row: a big A-Z, with its name and count as the caption
+        g.fb.font = hFontCached("pica", 56)
+        g.fb.color = "0xD9B25EFF"
+        g.fb.text = "A-Z"
+    else if isPerson
         ' cast without a photo: big initials instead of a shouted name (UX review item 18)
         g.fb.font = hFontCached("pica", 64)
         g.fb.color = "0xD9B25EFF"
@@ -179,7 +184,6 @@ sub fillSlot(g as object, c as object, w as integer)
             track.height = 12
             clip = g.bar.createChild("Group")
             clip.translation = [1, 1]
-            clip.id = "clip"
             body = clip.createChild("Poster")
             body.uri = "pkg:/images/w/progress-fill-body.png"
             body.width = 512
@@ -188,13 +192,14 @@ sub fillSlot(g as object, c as object, w as integer)
             tip.uri = "pkg:/images/w/progress-fill-tip.png"
             tip.width = 12
             tip.height = 10
-            tip.id = "tip"
+            ' kept as fields: findNode("clip") finds this row's own strip holder first and clipped the whole row to a sliver
+            g.addFields({ barClip: clip, barTip: tip })
             g.built = true
         end if
         fillW = Int((w - 2) * c.progress / 100)
         if fillW < 15 then fillW = 15
-        g.bar.findNode("clip").clippingRect = [0, 0, fillW - 12, 10]
-        g.bar.findNode("tip").translation = [1 + fillW - 12, 1]
+        g.barClip.clippingRect = [0, 0, fillW - 12, 10]
+        g.barTip.translation = [1 + fillW - 12, 1]
     end if
     g.cap.visible = m.top.showCaption
     g.sub2.visible = m.top.showCaption

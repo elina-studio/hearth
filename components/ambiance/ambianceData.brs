@@ -106,12 +106,14 @@ function ambMerge(clips as object) as object
                 if it.mood = md
                     it.clip = c
                     ' the clip's own name says what it is ("Fire in the woods")
-                    if c.Name <> invalid and c.Name <> "" then it.sub = c.Name
+                    nice = ambNice(c)
+                    ' "fireflies.mp4" on Fireflies says nothing new: keep the mood's own line then
+                    if nice <> "" and not ambSameWord(nice, it) then it.sub = nice
                     if c.thumb <> invalid then it.plexStill = c.thumb
                 end if
             end for
         else
-            extra.push({ mood: "plex" + c.Id.toStr(), title: c.Name, sub: "Your own footage", still: "pkg:/images/amb/col-window.jpg", plexStill: c.thumb, video: "", credit: "", clip: c })
+            extra.push({ mood: "plex" + c.Id.toStr(), title: ambNice(c), sub: ambOwnLine(ambNice(c)), still: "pkg:/images/amb/col-window.jpg", plexStill: c.thumb, video: "", credit: "", clip: c })
         end if
     end for
     for each it in items
@@ -127,6 +129,52 @@ function ambMerge(clips as object) as object
         out.push(it)
     end for
     return out
+end function
+
+' A clip's name as a title: "peaceful creek-tv" -> "Peaceful creek" (the "-tv" copy is the same footage)
+function ambNice(c as object) as string
+    n = ""
+    if c.Name <> invalid then n = c.Name.toStr()
+    if n = "" then n = ambBase(c.file)
+    n = n.Trim()
+    if Len(n) > 3 and LCase(Right(n, 3)) = "-tv" then n = Left(n, Len(n) - 3).Trim()
+    out = ""
+    for i = 1 to Len(n)
+        ch = Mid(n, i, 1)
+        if ch = "_" or ch = "-" then ch = " "
+        out = out + ch
+    end for
+    if out = "" then return ""
+    return UCase(Left(out, 1)) + Mid(out, 2)
+end function
+
+' true when the clip's name is just the mood's own word ("fireflies" on Fireflies, "embers" on Lights out)
+function ambSameWord(nice as string, it as object) as boolean
+    a = LCase(nice)
+    if a = LCase(it.title) then return true
+    if ambClipMood(a) = it.mood and Instr(1, a, " ") = 0 then return true
+    return false
+end function
+
+' The small line under one of your own clips, from words in its name
+function ambOwnLine(nice as string) as string
+    n = LCase(nice)
+    for each w in ["creek", "river", "stream", "brook", "falls"]
+        if Instr(1, n, w) > 0 then return "Water over stones"
+    end for
+    for each w in ["handpan", "guitar", "piano", "harp", "flute"]
+        if Instr(1, n, w) > 0 then return "Played in the forest"
+    end for
+    for each w in ["flower", "meadow", "bloom", "garden"]
+        if Instr(1, n, w) > 0 then return "In bloom"
+    end for
+    for each w in ["snow", "winter"]
+        if Instr(1, n, w) > 0 then return "Snow falling"
+    end for
+    for each w in ["ocean", "sea", "wave", "lake", "beach"]
+        if Instr(1, n, w) > 0 then return "By the water"
+    end for
+    return "Your own footage"
 end function
 
 ' How well the TV will play a clip: 2 for a "-tv" copy, +1 when it needs no converting

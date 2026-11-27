@@ -2,7 +2,7 @@ sub init()
     ' same order and label positions as HubScreen (whimsy spec 2)
     m.names = ["Home", "Shows", "Movies", "Music", "Requests", "Ambiance", "Photos", "Search"]
     m.tabX = [100, 240, 398, 570, 719, 931, 1152, 1324]
-    m.tabW = [101, 120, 133, 110, 174, 182, 134, 136]
+    m.tabW = [101, 120, 133, 110, 174, 182, 134, 60]
     m.labels = m.top.findNode("labels")
     for i = 0 to m.names.count() - 1
         p = m.labels.createChild("Poster")

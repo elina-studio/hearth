@@ -890,9 +890,22 @@ sub cacheWrite(name as string, data as object)
     if not WriteAsciiFile(cachePath(name), text) then WriteAsciiFile("tmp:/" + Mid(cachePath(name), 10), text)
 end sub
 
+' true when a file is there. Reading a missing file works but writes an error line to the TV log every time.
+function cacheHas(path as string) as boolean
+    i = Instr(1, path, ":/")
+    if i = 0 then return false
+    want = Mid(path, i + 2)
+    for each f in ListDir(Left(path, i + 1))
+        if f = want then return true
+    end for
+    return false
+end function
+
 function cacheRead(name as string) as object
-    text = ReadAsciiFile(cachePath(name))
-    if text = "" then text = ReadAsciiFile("tmp:/" + Mid(cachePath(name), 10))
+    text = ""
+    if cacheHas(cachePath(name)) then text = ReadAsciiFile(cachePath(name))
+    tmpPath = "tmp:/" + Mid(cachePath(name), 10)
+    if text = "" and cacheHas(tmpPath) then text = ReadAsciiFile(tmpPath)
     if text = "" then return invalid
     return ParseJson(hFixText(text))
 end function

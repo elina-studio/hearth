@@ -1118,7 +1118,8 @@ sub paint()
     for r = 0 to m.rows.count() - 1
         m.rows[r].active = focused and m.zone = "rows" and m.row = r
     end for
-    y = 0
+    ' 16 down at rest: the hero and Tonight panels' top edges sat under the room bar (walk 2)
+    y = 16
     if m.zone = "rows" then y = -(m.rowY[m.row] - 60)
     m.scroll.control = "stop"
     m.scrollTo.keyValue = [m.content.translation, [0, y]]

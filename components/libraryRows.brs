@@ -55,18 +55,43 @@ sub onRowData(event as object)
     buildRowsList()
 end sub
 
+' The same order all day (a title you noticed in a row is still there when you come back), a new one tomorrow.
+' Each title gets a number from its id and today's date; the row is sorted by it.
 function rowsShuffle(list as object) as object
+    if m.rowsDay = invalid
+        dt = CreateObject("roDateTime")
+        dt.ToLocalTime()
+        m.rowsDay = dt.GetDayOfMonth() * 37 + dt.GetMonth() * 101
+    end if
     a = []
     for each x in list
+        k = ""
+        if x.Id <> invalid then k = x.Id.toStr()
+        h = m.rowsDay
+        for i = 1 to Len(k)
+            h = (h * 31 + Asc(Mid(k, i, 1))) mod 1000003
+        end for
+        x._ord = h
         a.push(x)
     end for
-    for i = a.count() - 1 to 1 step -1
-        j = Rnd(i + 1) - 1
-        tmp = a[i]
-        a[i] = a[j]
-        a[j] = tmp
-    end for
+    a.SortBy("_ord")
     return a
+end function
+
+' Titles already shown in an earlier row are passed over, so Comedy and Drama don't open with the same posters.
+' If that would leave a thin row (under 6), the row keeps its own picks.
+function rowsFresh(list as object, used as object, n as integer) as object
+    out = []
+    for each x in list
+        k = ""
+        if x.Id <> invalid then k = x.Id.toStr()
+        if out.count() < n and not used.DoesExist(k) then out.push(x)
+    end for
+    if out.count() < 6 then out = rowsTake(list, n)
+    for each x in out
+        if x.Id <> invalid then used[x.Id.toStr()] = true
+    end for
+    return out
 end function
 
 function rowsTake(list as object, n as integer) as object
@@ -122,6 +147,7 @@ sub buildRowsList()
         if it.Id <> invalid then byId[it.Id.toStr()] = it
     end for
     defs = []
+    m.rowsUsed = {}
     defs.push({ key: "continue", title: "Continue watching", icon: "home-play", wide: true, items: cont })
     if shows
         newEps = []
@@ -145,9 +171,9 @@ sub buildRowsList()
             if it.ViewedLeafCount <> invalid and it.ViewedLeafCount = 0 then fresh.push(it)
             if it.UserData <> invalid and it.UserData.Played = true then done.push(it)
         end for
-        defs.push({ key: "fresh", title: "Not started yet", icon: "d-film", wide: false, items: rowsTake(rowsShuffle(fresh), 20) })
+        defs.push({ key: "fresh", title: "Not started yet", icon: "d-film", wide: false, items: rowsFresh(rowsShuffle(fresh), m.rowsUsed, 20) })
         rowsGenreDefs(defs, all)
-        defs.push({ key: "done", title: "Finished", icon: "d-film", wide: false, items: rowsTake(rowsShuffle(done), 20) })
+        defs.push({ key: "done", title: "Finished", icon: "d-film", wide: false, items: rowsFresh(rowsShuffle(done), m.rowsUsed, 20) })
     else
         short = []
         unw = []
@@ -158,9 +184,9 @@ sub buildRowsList()
                 if it.RunTimeTicks <> invalid and it.RunTimeTicks > 0 and it.RunTimeTicks / 600000000 <= 100 then short.push(it)
             end if
         end for
-        defs.push({ key: "short", title: "Short enough for tonight", icon: "d-film", wide: false, items: rowsTake(rowsShuffle(short), 20) })
+        defs.push({ key: "short", title: "Short enough for tonight", icon: "d-film", wide: false, items: rowsFresh(rowsShuffle(short), m.rowsUsed, 20) })
         defs.push({ key: "added", title: "Recently added", icon: "d-layers", wide: false, items: rowsDedupe(latest) })
-        defs.push({ key: "unw", title: "Unwatched", icon: "d-film", wide: false, items: rowsTake(rowsShuffle(unw), 20) })
+        defs.push({ key: "unw", title: "Unwatched", icon: "d-film", wide: false, items: rowsFresh(rowsShuffle(unw), m.rowsUsed, 20) })
         rowsGenreDefs(defs, all)
     end if
     ' rows with nothing in them are left out; the rest are rebuilt only when what they hold changed
@@ -216,7 +242,7 @@ sub buildRowsList()
             if d.wide then cards.push(hCard(it, "wide")) else cards.push(hCard(it, "tall"))
         end for
         ' the way out to everything: last tile of every row
-        cards.push({ az: true, title: "All " + noun + " A to Z", sub: "", image: "", progress: 0 })
+        cards.push({ az: true, title: "All " + noun, sub: all.count().toStr() + " titles, A to Z", image: "", progress: 0 })
         r.cards = cards
         if oldIdx[d.key] <> invalid and oldIdx[d.key] < cards.count() then r.index = oldIdx[d.key]
         if d.key = oldKey then m.rowI = i
@@ -257,7 +283,7 @@ sub rowsGenreDefs(defs as object, all as object)
         end for
         list = rowsShuffle(fresh)
         list.append(rowsShuffle(seen))
-        defs.push({ key: "g:" + g, title: g, icon: "d-heart", wide: false, items: rowsTake(list, 20) })
+        defs.push({ key: "g:" + g, title: g, icon: "d-heart", wide: false, items: rowsFresh(list, m.rowsUsed, 20) })
     end for
 end sub
 

@@ -265,11 +265,12 @@ sub fillHeaderBasic(it as object)
     d = 0
     if fit.lines = 2 then d = fit.height - 78
     if d < 0 then d = 0
-    if d > 44 then d = 44
-    m.meta.translation = [0, 166 + d]
-    m.tags.translation = [0, 206 + d]
-    m.overview.translation = [0, 250 + d]
-    m.actionsBox.translation = [0, 334 + d]
+    if d > 36 then d = 36
+    ' the badge row is centred on its y: it sat on top of the line above it (walk 2). Each line now clears the last.
+    m.meta.translation = [0, 174 + d]
+    m.tags.translation = [0, 230 + d]
+    m.overview.translation = [0, 262 + d]
+    m.actionsBox.translation = [0, 342 + d]
     m.poster.uri = hImageAny(it, ["Primary"], 300)
     ov = it.Overview
     if ov = invalid then ov = ""
@@ -317,11 +318,11 @@ sub fillHeader()
     fillTags()
 end sub
 
-' "‹ MOVIES": where Back takes you. The title is already big below, so it isn't repeated here.
+' "MOVIES" after the back arrow icon: where Back takes you. The title is already big below, so it isn't repeated here.
 function backTo(dflt as string) as string
     f = m.top.from
     if f = "" or f = "Back" then f = dflt
-    return Chr(8249) + " " + UCase(f)
+    return UCase(f)
 end function
 
 sub fillTags()

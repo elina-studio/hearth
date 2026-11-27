@@ -136,7 +136,45 @@ function hTitle(item as object) as string
     if item = invalid then return ""
     if item.Type = "Episode" and item.SeriesName <> invalid then return hClean(item.SeriesName)
     if item.Name = invalid then return ""
+    ' a film Plex couldn't match has no year and keeps its raw file name: show the readable part of it
+    if item.Type = "Movie" and item.ProductionYear = invalid then return hTidyName(hClean(item.Name))
     return hClean(item.Name)
+end function
+
+' "05 Scary Movie 5 Comedy 2013 Eng Subs" -> "Scary Movie 5 Comedy"; "www site org Some Film 1080p" -> "Some Film".
+' Only used for unmatched files (see hTitle); a matched title is never touched.
+function hTidyName(raw as string) as string
+    flat = ""
+    for i = 1 to Len(raw)
+        ch = Mid(raw, i, 1)
+        if ch = "." or ch = "_" then ch = " "
+        flat = flat + ch
+    end for
+    words = []
+    for each w in flat.Split(" ")
+        if w <> "" then words.push(w)
+    end for
+    ' a leading "www site org"
+    if words.count() > 3 and LCase(words[0]) = "www"
+        words.shift()
+        words.shift()
+        tld = LCase(words[0])
+        if tld = "org" or tld = "com" or tld = "net" or tld = "to" then words.shift()
+    end if
+    ' a leading list number ("05 ...") when a name follows
+    if words.count() > 2 and Len(words[0]) <= 2 and Val(words[0]) > 0 then words.shift()
+    junk = { "1080p": 1, "720p": 1, "2160p": 1, "480p": 1, "x264": 1, "x265": 1, "h264": 1, "hevc": 1, "bluray": 1, "brrip": 1, "webrip": 1, "web-dl": 1, "hdtv": 1, "dvdrip": 1, "eng": 1, "subs": 1, "latino": 1 }
+    out = []
+    for wi = 0 to words.count() - 1
+        w = words[wi]
+        low = LCase(w)
+        ' the first year after the name, or the first rip word, ends the title
+        if wi > 0 and Len(w) = 4 and (Left(w, 2) = "19" or Left(w, 2) = "20") and Val(w) > 1900 then exit for
+        if wi > 0 and junk.DoesExist(low) then exit for
+        out.push(w)
+    end for
+    if out.count() = 0 then return raw
+    return out.join(" ")
 end function
 
 ' An artist name to show, or "" when Plex only knows it as "[unknown]" (UX review item 34)

@@ -278,7 +278,12 @@ sub runTask()
             for each h in res.body.MediaContainer.Hub
                 if h.Metadata <> invalid
                     for each md in h.Metadata
-                        if not isBlocked(blocked, md) and not isHiddenItem(md) and not isHiddenName(toS(md.librarySectionTitle, "")) then items.push(norm(md))
+                        if not isBlocked(blocked, md) and not isHiddenItem(md) and not isHiddenName(toS(md.librarySectionTitle, ""))
+                            nm = norm(md)
+                            ' Plex says why when a result matched through a person ("actor") rather than its title
+                            if md.reason <> invalid then nm.Reason = md.reason
+                            items.push(nm)
+                        end if
                     end for
                 end if
             end for
