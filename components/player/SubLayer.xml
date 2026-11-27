@@ -5,7 +5,7 @@
   <children>
     <Rectangle id="box" color="0x000000A0" visible="false" />
     <Group id="shadows" />
-    <Label id="text" width="1600" wrap="true" maxLines="4" horizAlign="center" translation="[160, 0]" />
+    <Label id="text" width="1600" wrap="true" lineSpacing="2" maxLines="4" horizAlign="center" translation="[160, 0]" />
   </children>
   <interface>
     <field id="cues" type="array" onChange="onCues" />

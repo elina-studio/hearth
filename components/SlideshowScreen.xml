@@ -64,7 +64,7 @@
       <Poster uri="pkg:/images/pill.9.png" blendColor="0x0B0E09CC" translation="[-130, -40]" width="260" height="80" />
       <Label id="pausedText" translation="[-130, -40]" width="260" height="80" horizAlign="center" vertAlign="center" color="0xEDE6CAFF" text="❚❚  Paused" />
     </Group>
-    <Label id="status" translation="[96, 500]" width="1728" horizAlign="center" wrap="true" color="0xB5AF8CFF" />
+    <Label id="status" translation="[96, 500]" width="1728" horizAlign="center" wrap="true" lineSpacing="2" color="0xB5AF8CFF" />
     <Group id="hint" translation="[1824, 1004]">
       <KeyHints id="hintKeys" />
     </Group>

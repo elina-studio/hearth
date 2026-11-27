@@ -35,7 +35,7 @@
       </Group>
     </Group>
     <QueueSheet id="queue" translation="[1010, 150]" visible="false" />
-    <Label id="empty" translation="[690, 160]" width="1150" wrap="true" color="0xB5AF8CFF" />
+    <Label id="empty" translation="[690, 160]" width="1150" wrap="true" lineSpacing="2" color="0xB5AF8CFF" />
     <Label id="toast" translation="[690, 880]" width="1150" color="0xE0B34AFF" />
     <Timer id="toastTimer" duration="4" repeat="false" />
     <Timer id="buildTimer" duration="6" repeat="false" />

@@ -18,7 +18,7 @@
     <Group id="albumClip" translation="[86, 584]" clippingRect="[0, 0, 1760, 300]">
       <Group id="albums" translation="[10, 10]" />
     </Group>
-    <Label id="note" translation="[96, 600]" width="1728" wrap="true" maxLines="4" color="0xB5AF8CFF" />
+    <Label id="note" translation="[96, 600]" width="1728" wrap="true" lineSpacing="2" maxLines="4" color="0xB5AF8CFF" />
     <Animation id="winFade" duration="1.5" easeFunction="inOutQuad">
       <FloatFieldInterpolator id="winIn" key="[0.0, 1.0]" keyValue="[0.0, 1.0]" fieldToInterp="winA.opacity" />
       <FloatFieldInterpolator id="winOut" key="[0.0, 1.0]" keyValue="[1.0, 0.0]" fieldToInterp="winB.opacity" />

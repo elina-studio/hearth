@@ -34,6 +34,7 @@ sub init()
     ph.color = "0xB5AF8CFF"
     ph.width = m.width
     ph.wrap = true
+    ph.lineSpacing = 2
     ph.translation = [0, 164 + 7 * (m.keyH + m.gap) + 8]
     host = CreateObject("roRegistrySection", "hearth").Read("nasUrl")
     if host = "" then host = "http://192.168.254.41:8765"

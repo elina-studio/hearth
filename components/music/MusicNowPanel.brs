@@ -609,6 +609,7 @@ sub drawCast()
     ht.translation = [96, 782]
     ht.width = 460
     ht.wrap = true
+    ht.lineSpacing = 2
     ht.maxLines = 2
     wh = g.createChild("MusicChip")
     wh.icon = "house"

@@ -100,6 +100,7 @@ function drawItem(g as object, it as object) as integer
         l = lbl(g, sval(it.text), hFont("regular", 20), "0xC9C3A2FF", 30, 4)
         l.width = 680
         l.wrap = true
+        l.lineSpacing = 2
         l.maxLines = 3
         return 30 + Int(l.boundingRect().height)
     else if k = "row"
@@ -282,6 +283,7 @@ function drawItem(g as object, it as object) as integer
             l = lbl(g, sval(it.note), hFont("regular", 19), "0xC9C3A2FF", 30, y - 4)
             l.width = 680
             l.wrap = true
+            l.lineSpacing = 2
             l.maxLines = 2
             y = y + Int(l.boundingRect().height) + 10
         end if

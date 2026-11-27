@@ -9,7 +9,7 @@
     <Poster uri="pkg:/images/w/panel.9.png" translation="[1168, 28]" width="684" height="1024" blendColor="0x141A11FF" />
     <Poster id="hIcon" translation="[1220, 84]" width="36" height="36" blendColor="0xE0B34AFF" />
     <Label id="heading" translation="[1272, 70]" width="540" maxLines="1" color="0xEDE6CAFF" />
-    <Label id="note" translation="[1220, 132]" width="600" maxLines="2" wrap="true" color="0xB5AF8CFF" />
+    <Label id="note" translation="[1220, 132]" width="600" maxLines="2" wrap="true" lineSpacing="2" color="0xB5AF8CFF" />
     <Group id="list" translation="[1206, 160]" />
     <Label id="more" translation="[1220, 958]" width="600" color="0xB5AF8CFF" />
     <Label id="hint" translation="[1220, 994]" width="600" color="0xB5AF8CFF" />

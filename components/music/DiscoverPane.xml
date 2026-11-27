@@ -14,10 +14,10 @@
       <Label id="meta" translation="[0, 82]" width="650" maxLines="1" color="0xB5AF8CFF" />
       <Group id="btns" translation="[0, 128]" />
       <Group id="grid" translation="[0, 216]" />
-      <Label id="gridNote" translation="[0, 226]" width="620" wrap="true" color="0xB5AF8CFF" />
+      <Label id="gridNote" translation="[0, 226]" width="620" wrap="true" lineSpacing="2" color="0xB5AF8CFF" />
     </Group>
     <Group id="rel" translation="[0, 96]" />
-    <Label id="note" translation="[8, 104]" width="1100" wrap="true" color="0xB5AF8CFF" />
+    <Label id="note" translation="[8, 104]" width="1100" wrap="true" lineSpacing="2" color="0xB5AF8CFF" />
     <Label id="count" translation="[8, 786]" width="640" maxLines="1" color="0xB5AF8CFF" />
     <Label id="toast" translation="[8, 784]" width="700" maxLines="1" color="0xE0B34AFF" />
     <KeyHints id="hints" translation="[1150, 776]" visible="false" />

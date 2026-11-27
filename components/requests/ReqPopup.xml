@@ -14,8 +14,8 @@
         <Poster id="star" uri="pkg:/images/requests/star.png" width="22" height="22" blendColor="0xD9A066FF" visible="false" />
         <Label id="rating" color="0xD9A066FF" />
         <Label id="rt" color="0xF0907CFF" />
-        <Label id="title" translation="[0, 34]" width="660" wrap="true" maxLines="2" color="0xEDE6CAFF" />
-        <Label id="overview" translation="[0, 124]" width="660" wrap="true" maxLines="3" color="0xB5AF8CFF" />
+        <Label id="title" translation="[0, 34]" width="660" wrap="true" lineSpacing="2" maxLines="2" color="0xEDE6CAFF" />
+        <Label id="overview" translation="[0, 124]" width="660" wrap="true" lineSpacing="2" maxLines="3" color="0xB5AF8CFF" />
         <Group id="items" translation="[0, 250]" />
         <Group id="hints" />
       </Group>

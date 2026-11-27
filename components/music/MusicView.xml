@@ -32,7 +32,7 @@
 
     <Group id="hearth" visible="false">
       <Group id="moodHolder" />
-      <Label id="noFire" translation="[160, 480]" width="1600" horizAlign="center" wrap="true" color="0xB5AF8CFF" visible="false" />
+      <Label id="noFire" translation="[160, 480]" width="1600" horizAlign="center" wrap="true" lineSpacing="2" color="0xB5AF8CFF" visible="false" />
     </Group>
 
     <LyricsPanel id="lyrics" translation="[1060, 150]" />
@@ -44,7 +44,7 @@
       <Label id="sEyebrow" translation="[280, 898]" width="900" color="0xD9A066FF" />
       <Label id="sTitle" translation="[280, 936]" width="1000" maxLines="1" color="0xEDE6CAFF" />
       <Label id="sSub" translation="[280, 990]" width="1000" maxLines="1" color="0xB5AF8CFF" />
-      <Label id="sHint" translation="[1220, 912]" width="604" horizAlign="right" wrap="true" color="0xB5AF8CFF" />
+      <Label id="sHint" translation="[1220, 912]" width="604" horizAlign="right" wrap="true" lineSpacing="2" color="0xB5AF8CFF" />
       <Label id="sToast" translation="[1220, 1010]" width="604" horizAlign="right" maxLines="1" color="0xE0B34AFF" />
     </Group>
 

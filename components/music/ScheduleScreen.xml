@@ -16,8 +16,8 @@
     <Label id="gA" translation="[1050, 572]" width="300" color="0xB5AF8CFF" />
     <Label id="gB" translation="[1520, 572]" width="270" horizAlign="right" color="0xB5AF8CFF" />
     <Label id="gMax" translation="[1052, 196]" width="300" color="0xEDE6CAFF" />
-    <Label id="gText" translation="[1020, 640]" width="800" wrap="true" color="0xB5AF8CFF" />
-    <Label id="note" translation="[1020, 860]" width="800" wrap="true" color="0xE0B34AFF" />
+    <Label id="gText" translation="[1020, 640]" width="800" wrap="true" lineSpacing="2" color="0xB5AF8CFF" />
+    <Label id="note" translation="[1020, 860]" width="800" wrap="true" lineSpacing="2" color="0xE0B34AFF" />
     <Timer id="enableTimer" duration="3" repeat="false" />
   </children>
   <interface>

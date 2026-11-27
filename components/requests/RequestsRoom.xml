@@ -32,12 +32,12 @@
       <Group id="gridClip" translation="[540, 140]" clippingRect="[-14, -14, 1310, 800]">
         <Group id="grid" />
       </Group>
-      <Label id="empty" translation="[540, 160]" width="1200" wrap="true" color="0xB5AF8CFF" />
+      <Label id="empty" translation="[540, 160]" width="1200" wrap="true" lineSpacing="2" color="0xB5AF8CFF" />
       <Group id="musicPanel" translation="[540, 140]" visible="false">
         <Poster uri="pkg:/images/tile.9.png" blendColor="0xFFFFFF0F" width="700" height="330" />
         <Poster uri="pkg:/images/requests/note.png" translation="[50, 50]" width="80" height="80" blendColor="0xE0B34AFF" />
         <Label id="musicTitle" translation="[50, 160]" text="ASK LIDARR FOR AN ARTIST" color="0xE0B34AFF" />
-        <Label id="musicSub" translation="[50, 214]" width="600" wrap="true" color="0xB5AF8CFF" text="Press OK to type an artist. Lidarr adds them and looks for their albums." />
+        <Label id="musicSub" translation="[50, 214]" width="600" wrap="true" lineSpacing="2" color="0xB5AF8CFF" text="Press OK to type an artist. Lidarr adds them and looks for their albums." />
       </Group>
       <!-- below the SEARCH OVERSEERR label, not on top of it (UX review item 15) -->
       <Group id="searchPanel" translation="[540, 60]" visible="false">
@@ -47,7 +47,7 @@
       </Group>
     </Group>
     <Group id="setup" visible="false" translation="[96, 20]">
-      <Label id="setupText" width="1000" wrap="true" color="0xB5AF8CFF" />
+      <Label id="setupText" width="1000" wrap="true" lineSpacing="2" color="0xB5AF8CFF" />
       <HearthKeyboard id="keyKb" translation="[1174, 0]" mode="full" placeholder="Paste or type the key" />
       <HearthPill id="saveKey" translation="[1174, 740]" width="554" text="Save key" button="true" />
     </Group>

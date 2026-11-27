@@ -17,7 +17,7 @@
     <Group id="chips" translation="[1084, 236]" />
     <Label id="count" translation="[1084, 314]" width="712" color="0xB5AF8CFF" />
     <Group id="list" translation="[1084, 360]" />
-    <Label id="note" translation="[1084, 380]" width="712" wrap="true" maxLines="8" color="0xB5AF8CFF" />
+    <Label id="note" translation="[1084, 380]" width="712" wrap="true" lineSpacing="2" maxLines="8" color="0xB5AF8CFF" />
     <LayoutGroup id="hint" translation="[1084, 976]" layoutDirection="horiz" itemSpacings="[10, 30, 10, 30, 10]" vertAlignment="center" />
     <Timer id="poll" duration="2" repeat="true" />
   </children>

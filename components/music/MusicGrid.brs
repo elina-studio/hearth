@@ -49,6 +49,7 @@ sub makeSlot()
     fb.width = s - 24
     fb.height = s - 20
     fb.wrap = true
+    fb.lineSpacing = 2
     fb.vertAlign = "center"
     fb.horizAlign = "center"
     fb.font = hFont("bold", 18)

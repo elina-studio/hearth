@@ -14,7 +14,7 @@
         <Label id="title" translation="[0, 88]" width="1480" maxLines="1" color="0xEDE6CAFF" />
         <Label id="meta" translation="[0, 166]" width="1480" maxLines="1" color="0xB5AF8CFF" />
         <LayoutGroup id="tags" translation="[0, 206]" layoutDirection="horiz" vertAlignment="center" itemSpacings="[22]" />
-        <Label id="overview" translation="[0, 250]" width="1460" maxLines="2" wrap="true" color="0xEDE6CAFF" />
+        <Label id="overview" translation="[0, 250]" width="1460" maxLines="2" wrap="true" lineSpacing="2" color="0xEDE6CAFF" />
         <Group id="actions" translation="[0, 334]" />
       </Group>
       <Group id="tabsBox" translation="[100, 440]" visible="false">

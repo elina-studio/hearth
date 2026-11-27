@@ -22,11 +22,11 @@
       <Group clippingRect="[-12, 290, 960, 330]">
         <Group id="pvAlbums" translation="[0, 302]" />
       </Group>
-      <Label id="pvNote" translation="[0, 640]" width="936" wrap="true" color="0xB5AF8CFF" />
+      <Label id="pvNote" translation="[0, 640]" width="936" wrap="true" lineSpacing="2" color="0xB5AF8CFF" />
     </Group>
-    <Label id="empty" translation="[844, 160]" width="936" wrap="true" color="0xB5AF8CFF" />
+    <Label id="empty" translation="[844, 160]" width="936" wrap="true" lineSpacing="2" color="0xB5AF8CFF" />
     <Group id="setup" visible="false" translation="[96, 170]">
-      <Label id="setupText" width="1700" wrap="true" color="0xB5AF8CFF" />
+      <Label id="setupText" width="1700" wrap="true" lineSpacing="2" color="0xB5AF8CFF" />
     </Group>
     <Label id="toast" translation="[844, 940]" width="936" color="0xE0B34AFF" />
     <Timer id="debounce" duration="0.6" repeat="false" />

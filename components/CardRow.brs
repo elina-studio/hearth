@@ -93,6 +93,7 @@ sub makeSlot(w as integer, h as integer, k as integer)
     fb.height = h - 20
     fb.translation = [15, 10]
     fb.wrap = true
+    fb.lineSpacing = 2
     fb.vertAlign = "center"
     fb.horizAlign = "center"
     fb.font = hFont("bold", 22)

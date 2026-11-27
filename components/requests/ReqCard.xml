@@ -3,7 +3,7 @@
 <component name="ReqCard" extends="Group">
   <children>
     <Rectangle id="bg" width="180" height="270" color="0x1D2418FF" />
-    <Label id="fallback" translation="[12, 10]" width="156" height="250" wrap="true" horizAlign="center" vertAlign="center" color="0xEDE6CAFF" />
+    <Label id="fallback" translation="[12, 10]" width="156" height="250" wrap="true" lineSpacing="2" horizAlign="center" vertAlign="center" color="0xEDE6CAFF" />
     <Poster id="poster" width="180" height="270" loadWidth="180" loadHeight="270" loadDisplayMode="scaleToZoom" />
     <Group id="score" translation="[104, 8]" visible="false">
       <Rectangle width="68" height="30" color="0x0B0E09D0" />
@@ -14,7 +14,7 @@
       <Poster uri="pkg:/images/tile.9.png" blendColor="0xFFFFFF0F" width="180" height="270" />
       <Poster id="tileIcon" translation="[58, 70]" width="64" height="64" blendColor="0xE0B34AFF" />
       <Label id="tileTitle" translation="[0, 150]" width="180" horizAlign="center" color="0xE0B34AFF" />
-      <Label id="tileSub" translation="[14, 190]" width="152" wrap="true" maxLines="2" horizAlign="center" color="0xB5AF8CFF" />
+      <Label id="tileSub" translation="[14, 190]" width="152" wrap="true" lineSpacing="2" maxLines="2" horizAlign="center" color="0xB5AF8CFF" />
     </Group>
     <Group id="chip" translation="[0, 270]">
       <Rectangle id="chipBg" width="180" height="40" />

@@ -7,7 +7,7 @@
     <MusicFrame page="Last.fm" />
     <Label id="title" translation="[100, 150]" color="0xEDE6CAFF" text="Last.fm" />
     <Poster id="rule" uri="pkg:/images/w/twig-1500-s5.png" translation="[300, 116]" width="1540" height="120" />
-    <Label id="sub" translation="[100, 230]" width="900" wrap="true" color="0xB5AF8CFF" />
+    <Label id="sub" translation="[100, 230]" width="900" wrap="true" lineSpacing="2" color="0xB5AF8CFF" />
     <Group id="dyn" />
     <Label id="note" translation="[100, 960]" width="1700" color="0xE0B34AFF" />
     <Timer id="poll" duration="3" repeat="true" />

@@ -11,7 +11,7 @@
     <Rectangle id="thumbBg" translation="[1160, 716]" width="256" height="144" color="0x1A2214FF" />
     <Poster id="thumb" translation="[1160, 716]" width="256" height="144" loadDisplayMode="scaleToZoom" />
     <Label id="kicker" translation="[1440, 720]" width="350" color="0xE0B34AFF" />
-    <Label id="title" translation="[1440, 750]" width="350" maxLines="2" wrap="true" color="0xEDE6CAFF" />
+    <Label id="title" translation="[1440, 750]" width="350" maxLines="2" wrap="true" lineSpacing="2" color="0xEDE6CAFF" />
     <Label id="meta" translation="[1440, 832]" width="350" color="0xB5AF8CFF" />
     <Group id="btnPlay" translation="[1160, 886]">
       <Poster id="playBg" translation="[-12, -12]" width="254" height="84" />

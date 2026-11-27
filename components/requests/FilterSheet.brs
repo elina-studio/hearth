@@ -50,6 +50,7 @@ sub draw()
         l.text = "Pick Movies or Shows to narrow Trending by genre, streaming service, rating or sort."
         l.width = maxW
         l.wrap = true
+        l.lineSpacing = 2
         l.translation = [0, y + 6]
         y = y + 90
         list = [{ kind: "done", label: "Show results", wide: 560 }]

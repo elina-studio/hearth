@@ -74,6 +74,7 @@ sub buildSlots()
         fb.height = m.ch - 24
         fb.translation = [12, 12]
         fb.wrap = true
+        fb.lineSpacing = 2
         fb.horizAlign = "center"
         fb.vertAlign = "center"
         fb.color = "0xEDE6CAFF"
