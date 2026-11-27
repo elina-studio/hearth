@@ -103,8 +103,8 @@ sub onLfmDone(event as object)
     if Left(tag, 9) = "scrobble:" or Left(tag, 6) = "retry:"
         body = Mid(tag, Instr(1, tag, ":") + 1)
         if ok
+            ' quietly: the tick on the progress bar is enough (owner asked for no notice, Nov 27)
             m.top.lfmState = "counted"
-            say("Scrobbled to Last.fm")
         else if t.response.error = "not connected"
             m.top.lfmState = "off"
             say("Last.fm isn't connected any more. Connect it again in the * options.")
