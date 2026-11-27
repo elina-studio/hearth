@@ -133,5 +133,6 @@ if ($SkipLoops) {
 }
 $st = Invoke-RestMethod "$Helper/api/viz/status" -Headers @{ "X-Hearth-Token" = $Token } -TimeoutSec 10
 Write-Host ""
-Write-Host ("ALL DONE. Loops on the NAS: " + $st.loops + " of 31. Renderer seen by the NAS: " + [bool]$st.nucbox) -ForegroundColor Green
+$nLooks = @(Get-Content (Join-Path $Dir "looks.json") -Raw | ConvertFrom-Json).Count
+Write-Host ("ALL DONE. Loops on the NAS: " + $st.loops + " of " + $nLooks + " (the renderer makes any missing ones itself, between songs). Renderer seen by the NAS: " + [bool]$st.nucbox) -ForegroundColor Green
 Write-Host "Open Music on the TV, play a song, and pick Visualizer."

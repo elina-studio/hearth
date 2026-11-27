@@ -78,8 +78,9 @@ def fallback(name):
     for l in lines: d.text((960, y), l, font=f, fill=C("B5AF8C"), anchor="ma"); y += 42
     img.convert("RGB").save(OUT + "/" + name)
 
-stars = {"57", "60", "75", "98", "35"}
+stars = {"57", "60", "75", "98", "35", "101", "113"}
 picker(14, stars, "shuffle", "viz-picker.png")
+picker(45, stars, "shuffle", "viz-picker-more.png")
 picker(0, stars, "shuffle", "viz-picker-shuffle.png")
 viz("viz-playing.png")
 fallback("viz-unavailable.png")

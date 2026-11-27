@@ -33,7 +33,31 @@ function vizLooks() as object
         { n: "83", label: "Fractal drop" },
         { n: "94", label: "Rewop" },
         { n: "98", label: "Star ornament" },
-        { n: "99", label: "True visionary" }
+        { n: "99", label: "True visionary" },
+        { n: "101", label: "Passage" },
+        { n: "102", label: "Prismo" },
+        { n: "103", label: "Starfield sectors" },
+        { n: "104", label: "Explosive minds" },
+        { n: "105", label: "Planet" },
+        { n: "106", label: "Infinity" },
+        { n: "107", label: "Royal mashup" },
+        { n: "108", label: "Hexcollie" },
+        { n: "109", label: "Spark" },
+        { n: "110", label: "In da mash" },
+        { n: "111", label: "Disco mashup" },
+        { n: "112", label: "Toffee and icing" },
+        { n: "113", label: "Dark galaxy" },
+        { n: "114", label: "Potion of ink" },
+        { n: "115", label: "Diabolo" },
+        { n: "116", label: "Stitchcraft" },
+        { n: "117", label: "Witchcraft 2" },
+        { n: "118", label: "Disconnected" },
+        { n: "119", label: "Bouncing balls" },
+        { n: "120", label: "Rainbow pools" },
+        { n: "121", label: "Ghost city" },
+        { n: "122", label: "Amulet" },
+        { n: "123", label: "Big guns" },
+        { n: "124", label: "Neon blobs" }
     ]
 end function
 
