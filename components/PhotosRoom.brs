@@ -16,7 +16,7 @@ sub init()
     m.eyebrow.font = hFont("caps", 30)
     m.eyeIcon = m.top.findNode("eyeIcon")
     m.title = m.top.findNode("title")
-    m.title.font = hFont("caps", 96)
+    m.title.font = hFont("caps", 84)
     m.caption = m.top.findNode("caption")
     m.caption.font = hFont("regular", 28)
     m.buttonsGroup = m.top.findNode("buttons")
@@ -30,6 +30,8 @@ sub init()
 
     m.buttons = []
     m.albums = []
+    m.railItems = []
+    m.rail = "albums"
     m.windowPhotos = []
     m.winPos = -1
     m.zone = "buttons"
@@ -76,6 +78,7 @@ sub showEmpty()
     m.title.text = "NO PHOTOS YET"
     m.caption.text = ""
     m.albums = []
+    m.railItems = []
     m.albumGroup.removeChildrenIndex(m.albumGroup.getChildCount(), 0)
     m.albumsLabel.visible = false
     m.note.text = "Add your photos folder to Plex as a Photos library. Each folder inside it becomes an album here. Then press OK to check again."
@@ -146,6 +149,7 @@ sub onWindowPhotos(event as object)
     end if
     m.winPos = -1
     nextWindow()
+    buildRail()
 end sub
 
 sub nextWindow()
@@ -195,26 +199,51 @@ sub onAlbums(event as object)
     if not t.ok then return
     list = t.response.Items
     if list = invalid then list = []
-    m.albums = []
+    m.albums = list
+    buildRail()
+end sub
+
+' The rail: Plex albums (folders) when there are any; otherwise the photos in tonight's window, so the lower half
+' of the room is never empty. m.rail = "albums" | "window"
+sub buildRail()
     m.albumGroup.removeChildrenIndex(m.albumGroup.getChildCount(), 0)
-    for each a in list
-        i = m.albums.count()
-        m.albums.push(a)
-        tile = m.albumGroup.createChild("PhotoTile")
-        tile.translation = [i * 296, 0]
-        tile.title = a.Name
-        n = a.count
-        if n = invalid then tile.sub = "Album" else if n = 1 then tile.sub = "1 photo" else tile.sub = hThousands(n) + " photos"
-        if a.years <> invalid and a.years <> "" then
-            baseSub = tile.sub
-            tile.sub = a.years + " " + Chr(183) + " " + baseSub
-        end if
-        ' covers load only for the first screenful; the rest as you scroll to them
-        if i < 8 then tile.image = pPhotoUrl(a, 272, 172, true)
-    end for
-    m.albumsLabel.visible = m.albums.count() > 0
-    if m.sel >= m.albums.count() then m.sel = 0
-    if m.zone = "albums" and m.albums.count() = 0 then m.zone = "buttons"
+    m.railItems = []
+    if m.albums.count() > 0
+        m.rail = "albums"
+        m.albumsLabel.text = "ALBUMS"
+        for each a in m.albums
+            i = m.railItems.count()
+            m.railItems.push(a)
+            tile = m.albumGroup.createChild("PhotoTile")
+            tile.translation = [i * 296, 0]
+            tile.title = a.Name
+            n = a.count
+            if n = invalid then tile.sub = "Album" else if n = 1 then tile.sub = "1 photo" else tile.sub = hThousands(n) + " photos"
+            if a.years <> invalid and a.years <> "" then
+                baseSub = tile.sub
+                tile.sub = a.years + " " + Chr(183) + " " + baseSub
+            end if
+            ' covers load only for the first screenful; the rest as you scroll to them
+            if i < 8 then tile.image = pPhotoUrl(a, 272, 172, true)
+        end for
+    else
+        m.rail = "window"
+        m.albumsLabel.text = "IN THE WINDOW TONIGHT"
+        for each ph in m.windowPhotos
+            i = m.railItems.count()
+            m.railItems.push(ph)
+            tile = m.albumGroup.createChild("PhotoTile")
+            tile.translation = [i * 296, 0]
+            cap = pPhotoCaption(ph)
+            if cap = "" then cap = "Photo"
+            tile.title = cap
+            tile.sub = windowLine(ph, 0, 0)
+            if i < 8 then tile.image = pPhotoUrl(ph, 272, 172, true)
+        end for
+    end if
+    m.albumsLabel.visible = m.railItems.count() > 0
+    if m.sel >= m.railItems.count() then m.sel = 0
+    if m.zone = "albums" and m.railItems.count() = 0 then m.zone = "buttons"
     paint()
 end sub
 
@@ -237,9 +266,9 @@ sub paint()
     first = 0
     if m.sel > 4 then first = m.sel - 4
     for i = first to first + 7
-        if i < n and i < m.albums.count()
+        if i < n and i < m.railItems.count()
             tile = m.albumGroup.getChild(i)
-            if tile.image = "" then tile.image = pPhotoUrl(m.albums[i], 272, 172, true)
+            if tile.image = "" then tile.image = pPhotoUrl(m.railItems[i], 272, 172, true)
         end if
     end for
     m.scroll.control = "stop"
@@ -261,8 +290,11 @@ sub openSelected()
         if b.id = "@onthisday" then name = "On this day"
         if b.id = "@favourites" then name = "Favourites"
         m.top.request = { action: "slideshow", albumId: b.id, albumName: name }
-    else if m.sel < m.albums.count()
-        a = m.albums[m.sel]
+    else if m.rail = "window"
+        ' a photo from the window: the slideshow of everything
+        m.top.request = { action: "slideshow", albumId: "", albumName: "" }
+    else if m.sel < m.railItems.count()
+        a = m.railItems[m.sel]
         m.top.request = { action: "slideshow", albumId: a.Id, albumName: a.Name }
     end if
 end sub
@@ -280,7 +312,7 @@ function hKeyInner(key as string, press as boolean) as boolean
             toPills()
         end if
     else if key = "down"
-        if m.zone = "buttons" and m.albums.count() > 0
+        if m.zone = "buttons" and m.railItems.count() > 0
             m.zone = "albums"
             paint()
         end if
@@ -290,7 +322,7 @@ function hKeyInner(key as string, press as boolean) as boolean
         paint()
     else if key = "right"
         if m.zone = "buttons" and m.btn < m.buttons.count() - 1 then m.btn = m.btn + 1
-        if m.zone = "albums" and m.sel < m.albums.count() - 1 then m.sel = m.sel + 1
+        if m.zone = "albums" and m.sel < m.railItems.count() - 1 then m.sel = m.sel + 1
         paint()
     else if key = "OK"
         if pLibrary() = "" or m.loadedFor = "" or m.buttons.count() = 0

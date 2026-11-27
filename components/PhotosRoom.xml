@@ -1,19 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Photos room, layout C "The window": a live photo fills the room behind three buttons; albums on one rail. -->
+<!-- Photos room, layout C "The window": a live photo fills the room behind three buttons; albums on one rail.
+     Walk 2, item 17: the three text lines clear each other, only the left edge and the foot of the photo are shaded,
+     and with no albums in Plex the rail shows the photos in tonight's window instead of nothing. -->
 <component name="PhotosRoom" extends="Group">
   <children>
     <!-- the room sits 150 px below the top of the screen; the window photo fills the whole screen -->
     <Group id="window" translation="[0, -150]">
       <Poster id="winA" width="1920" height="1080" loadWidth="1280" loadHeight="720" loadDisplayMode="scaleToZoom" opacity="0" />
       <Poster id="winB" width="1920" height="1080" loadWidth="1280" loadHeight="720" loadDisplayMode="scaleToZoom" opacity="0" />
-      <Poster uri="pkg:/images/photos/room-shade.png" width="1920" height="1080" />
+      <Poster uri="pkg:/images/photos/room-shade-left.png" width="1920" height="1080" />
     </Group>
     <Poster id="eyeIcon" uri="pkg:/images/icons/icon-album.png" blendColor="0xE0B34AFF" translation="[96, 182]" width="30" height="30" />
     <Label id="eyebrow" translation="[140, 180]" width="1200" color="0xE0B34AFF" />
-    <Label id="title" translation="[96, 214]" width="1700" color="0xEDE6CAFF" />
+    <Label id="title" translation="[96, 208]" width="1700" color="0xEDE6CAFF" />
     <!-- "Saturday 15 June · Lake Tahoe · 12 of 30" for the photo in the window -->
-    <Label id="caption" translation="[96, 324]" width="1700" maxLines="1" color="0xB5AF8CFF" />
-    <Group id="buttons" translation="[96, 384]" />
+    <Label id="caption" translation="[96, 314]" width="1700" maxLines="1" color="0xB5AF8CFF" />
+    <Group id="buttons" translation="[96, 378]" />
     <Label id="albumsLabel" translation="[96, 548]" width="600" color="0xB5AF8CFF" text="ALBUMS" />
     <Group id="albumClip" translation="[86, 584]" clippingRect="[0, 0, 1760, 300]">
       <Group id="albums" translation="[10, 10]" />
