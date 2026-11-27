@@ -116,6 +116,19 @@ function ambMerge(clips as object) as object
             extra.push({ mood: "plex" + c.Id.toStr(), title: ambNice(c), sub: ambOwnLine(ambNice(c)), still: "pkg:/images/amb/col-window.jpg", plexStill: c.thumb, video: "", credit: "", clip: c })
         end if
     end for
+    ' Lights out is embers that fade to dark: with no embers clip of its own it borrows the Hearth fire clip
+    fireClip = invalid
+    for each it in items
+        if it.mood = "hearth" and it.clip <> invalid then fireClip = it
+    end for
+    if fireClip <> invalid
+        for each it in items
+            if it.mood = "lightsout" and it.clip = invalid
+                it.clip = fireClip.clip
+                if fireClip.plexStill <> invalid then it.plexStill = fireClip.plexStill
+            end if
+        end for
+    end if
     for each it in items
         if it.clip <> invalid then print "[ambiance] mood "; it.mood; " plays '"; it.clip.file; "'" else print "[ambiance] mood "; it.mood; " has NO clip"
     end for
