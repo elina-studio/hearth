@@ -242,7 +242,7 @@ sub paintMix()
     m.controls.item = m.item
     m.controls.mode = mixMode()
     if m.dimIndex = 0 then m.controls.dimText = "Bright" else m.controls.dimText = Int(m.dimLevels[m.dimIndex] * 100).toStr() + "%"
-    if m.sleepMin = 0 then m.controls.timerText = "No timer" else m.controls.timerText = m.sleepMin.toStr() + " min"
+    if m.sleepMin = 0 then m.controls.timerText = "Off" else m.controls.timerText = m.sleepMin.toStr() + " min"
     if m.controls.visible then m.controls.callFunc("paint", invalid)
 end sub
 

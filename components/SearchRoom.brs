@@ -142,6 +142,7 @@ sub runSearch()
         showIdle()
         return
     end if
+    showPhoneCard(false, 0)
     m.term = term
     m.tried = term
     if m.rows.count() = 0 or (m.showingRecent = true and m.zone <> "results")
@@ -322,6 +323,44 @@ sub showIdle()
     end if
     m.showingRecent = true
     setRows(rows)
+    showPhoneCard(true, rows.count())
+end sub
+
+' The phone card sits under the recent searches (or under the hint line when there are none) and goes the moment
+' a search runs.
+sub showPhoneCard(on as boolean, nRecent as integer)
+    card = m.top.findNode("phoneCard")
+    if card = invalid then return
+    if not on
+        card.visible = false
+        return
+    end if
+    if m.phoneBuilt <> true
+        m.phoneBuilt = true
+        m.top.findNode("pcKicker").font = hFont("fell", 34)
+        m.top.findNode("pcTitle").font = hFont("bold", 32)
+        m.top.findNode("pcLine1").font = hFont("regular", 24)
+        m.top.findNode("pcLine2").font = hFont("regular", 24)
+        host = CreateObject("roRegistrySection", "hearth").Read("nasUrl")
+        if host = "" then host = "http://192.168.254.41:8765"
+        host = host.Replace("http://", "").Replace("https://", "")
+        ' the picture of the code is for this one address; any other gets words only
+        if host = "192.168.254.41:8765"
+            m.top.findNode("pcLine2").text = "Or open " + host
+        else
+            m.top.findNode("qr").visible = false
+            m.top.findNode("qrBack").visible = false
+            m.top.findNode("phoneWords").translation = [34, 0]
+            m.top.findNode("pcTitle").text = "Open this on your phone"
+            m.top.findNode("pcLine2").text = host
+        end if
+    end if
+    y = 150
+    if nRecent > 0 then y = 70 + nRecent * 64 + 36
+    ' never over the key hints at the foot of the list
+    if y > 610 then y = 610
+    card.translation = [760, y]
+    card.visible = true
 end sub
 
 ' ---------- the list ----------

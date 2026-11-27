@@ -7,16 +7,16 @@ sub init()
     m.DARK = "0x1A1408FF"
     ' focus stops, left to right
     m.stops = [
-        { id: "prev", x: 478, y: 30, w: 68, h: 60 },
-        { id: "play", x: 566, y: 30, w: 68, h: 60 },
-        { id: "next", x: 654, y: 30, w: 68, h: 60 },
-        { id: "minus", x: 746, y: 34, w: 48, h: 52 },
-        { id: "plus", x: 990, y: 34, w: 48, h: 52 },
-        { id: "fire", x: 1084, y: 34, w: 136, h: 52 },
-        { id: "music", x: 1222, y: 34, w: 136, h: 52 },
-        { id: "both", x: 1360, y: 34, w: 136, h: 52 },
-        { id: "dim", x: 1532, y: 22, w: 68, h: 60 },
-        { id: "timer", x: 1618, y: 22, w: 68, h: 60 }
+        { id: "prev", x: 404, y: 30, w: 68, h: 60 },
+        { id: "play", x: 492, y: 30, w: 68, h: 60 },
+        { id: "next", x: 580, y: 30, w: 68, h: 60 },
+        { id: "minus", x: 670, y: 34, w: 48, h: 52 },
+        { id: "plus", x: 898, y: 34, w: 48, h: 52 },
+        { id: "fire", x: 982, y: 34, w: 136, h: 52 },
+        { id: "music", x: 1120, y: 34, w: 136, h: 52 },
+        { id: "both", x: 1258, y: 34, w: 136, h: 52 },
+        { id: "dim", x: 1422, y: 30, w: 134, h: 60 },
+        { id: "timer", x: 1564, y: 30, w: 138, h: 60 }
     ]
     m.focus = 1
     mp = musicNode()
@@ -90,30 +90,30 @@ sub paint()
         end if
         playing = (mp.state = "playing" or mp.state = "buffering")
     end if
-    text(UCase(title), 116, 20, 340, hFont("caps", 30), m.CREAM)
-    text(subt, 116, 62, 340, hFont("fell", 26), m.MUTED)
+    text(UCase(title), 116, 20, 266, hFont("caps", 30), m.CREAM)
+    text(subt, 116, 62, 266, hFont("fell", 26), m.MUTED)
     ' transport
-    for each b in [["prev", 478], ["play", 566], ["next", 654]]
+    for each b in [["prev", 404], ["play", 492], ["next", 580]]
         bx(b[1], 30, 68, 60, "pkg:/images/amb/mix-fill.9.png", "0xEDE6CAFF", 0.09)
         nm = b[0]
         if nm = "play" and playing then nm = "pause"
         icon(nm, b[1] + 18, 44, 32, m.CREAM)
     end for
     ' TV timing (only matters while the TV plays the music with the speakers)
-    bx(742, 34, 300, 52, "pkg:/images/amb/mix-fill.9.png", "0xEDE6CAFF", 0.09)
-    icon("minus", 756, 46, 28, m.GOLD)
-    icon("sync", 800, 46, 28, m.CREAM)
+    bx(666, 34, 284, 52, "pkg:/images/amb/mix-fill.9.png", "0xEDE6CAFF", 0.09)
+    icon("minus", 680, 46, 28, m.GOLD)
+    icon("sync", 724, 46, 28, m.CREAM)
     d = 1.5
     if mp <> invalid and mp.castDelay <> invalid then d = mp.castDelay
-    text("Timing " + fmt1(d) + " s", 834, 46, 150, hFont("regular", 24), m.CREAM)
-    icon("plus", 1000, 46, 28, m.GOLD)
-    bx(1062, 30, 2, 60, "pkg:/images/amb/mix-fill.9.png", "0x3A3A2EFF")
+    text("Timing " + fmt1(d) + " s", 758, 46, 136, hFont("regular", 24), m.CREAM)
+    icon("plus", 908, 46, 28, m.GOLD)
+    bx(964, 30, 2, 60, "pkg:/images/amb/mix-fill.9.png", "0x3A3A2EFF")
     ' sound switch
-    bx(1080, 30, 420, 60, "pkg:/images/amb/mix-roundring.9.png", m.GOLD, 0.5)
+    bx(978, 30, 420, 60, "pkg:/images/amb/mix-roundring.9.png", m.GOLD, 0.5)
     lab = ambSoundLabel(m.top.item)
     segs = [["fire", lab.word, [lab.icon]], ["music", "Music", ["note"]], ["both", "Both", [lab.icon, "note"]]]
     for i = 0 to 2
-        x = 1084 + i * 138
+        x = 982 + i * 138
         on = (segs[i][0] = m.top.mode)
         col = m.CREAM
         if on
@@ -127,13 +127,13 @@ sub paint()
         end for
         text(segs[i][1], ix + 4, 46, 136 - (ix + 4 - x), hFont("regular", 24), col)
     end for
-    bx(1514, 30, 2, 60, "pkg:/images/amb/mix-fill.9.png", "0x3A3A2EFF")
-    ' dim and timer, with their value underneath
-    for each b in [["sun", 1532, m.top.dimText], ["timer", 1618, m.top.timerText]]
-        bx(b[1], 22, 68, 60, "pkg:/images/amb/mix-fill.9.png", "0xEDE6CAFF", 0.09)
-        icon(b[0], b[1] + 18, 36, 32, m.CREAM)
-        l = text(b[2], b[1] - 10, 86, 88, hFont("regular", 22), m.MUTED)
-        l.horizAlign = "center"
+    bx(1410, 30, 2, 60, "pkg:/images/amb/mix-fill.9.png", "0x3A3A2EFF")
+    ' dim and timer: the value sits beside its icon at the same size as every other word on the bar (walk 2, item 19)
+    for each b in [["sun", 1422, 134, m.top.dimText], ["timer", 1564, 138, m.top.timerText]]
+        bx(b[1], 30, b[2], 60, "pkg:/images/amb/mix-fill.9.png", "0xEDE6CAFF", 0.09)
+        icon(b[0], b[1] + 12, 46, 28, m.CREAM)
+        l = text(b[3], b[1] + 48, 46, b[2] - 58, hFont("regular", 24), m.CREAM)
+        l.maxLines = 1
     end for
     ' focus ring
     s = m.stops[m.focus]
