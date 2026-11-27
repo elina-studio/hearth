@@ -44,12 +44,17 @@ end sub
 function makeTile(i as integer, it as object) as object
     t = m.grid.createChild("Group")
     t.translation = [(i mod m.cols) * (m.tw + m.gx), Int(i / m.cols) * (m.th + m.gy)]
-    ring = t.createChild("Poster")
-    ring.uri = "pkg:/images/w/focus-ring" + hVar(i) + ".9.png"
-    ring.translation = [-18, -18]
-    ring.width = m.tw + 36
-    ring.height = m.th + 36
+    ' focus: a solid gold frame around the picture, so the look in focus is plain to see
+    ring = t.createChild("Group")
     ring.visible = false
+    b = 6
+    for each r in [[-b - 4, -b - 4, m.tw + 2 * b + 8, b], [-b - 4, m.th + 4, m.tw + 2 * b + 8, b], [-b - 4, -4, b, m.th + 8], [m.tw + 4, -4, b, m.th + 8]]
+        e = ring.createChild("Rectangle")
+        e.translation = [r[0], r[1]]
+        e.width = r[2]
+        e.height = r[3]
+        e.color = "0xE0B34AFF"
+    end for
     bg = t.createChild("Rectangle")
     bg.width = m.tw
     bg.height = m.th

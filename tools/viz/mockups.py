@@ -31,7 +31,7 @@ def picker(focus, stars, choice, name):
     for i, t in enumerate(items):
         if not (top <= i // cols <= top + 3): continue
         x = 132 + (i % cols) * (tw + gx); y = 262 + (i // cols - top) * (th + gy)
-        if i == focus: ring(img, x - 18, y - 18, tw + 36, th + 36, i)
+        if i == focus: d.rectangle([x - 10, y - 10, x + tw + 9, y + th + 9], fill=C("E0B34A"))
         d.rectangle([x, y, x + tw - 1, y + th - 1], fill=C("1D2418"))
         if t["n"] == "shuffle":
             ic = Image.open(R + "/images/music/icons/shuffle.png").convert("RGBA").resize((56, 56))
