@@ -6,13 +6,37 @@ sub init()
     m.MUTED = "0xB5AF8CFF"
     m.DARK = "0x1A1408FF"
     ' focus stops, left to right
-    m.stops = [
+    m.allStops = [
+        { id: "music", x: 852, y: 30, w: 258, h: 60 },
         { id: "sound", x: 1148, y: 30, w: 170, h: 60 },
         { id: "dim", x: 1338, y: 30, w: 150, h: 60 },
         { id: "timer", x: 1508, y: 30, w: 194, h: 60 }
     ]
+    m.stops = m.allStops
     m.focus = 0
+    mp = musicNode()
+    if mp <> invalid
+        mp.observeFieldScoped("rooms", "paint")
+        mp.observeFieldScoped("queue", "paint")
+    end if
 end sub
+
+' The speaker the song can go to while the mood's video has the TV: Maxwell if it is there, else the first one.
+' invalid when nothing is queued or no speaker is known (then the bar has no Music button).
+function moodSpeaker() as dynamic
+    mp = musicNode()
+    if mp = invalid or mp.queue = invalid or mp.queue.count() = 0 or mp.rooms = invalid then return invalid
+    pick = invalid
+    for each rm in mp.rooms
+        if rm.kind = "speaker"
+            if pick = invalid then pick = rm
+            if Instr(1, LCase(rm.name), "maxwell") > 0 then pick = rm
+            ' a speaker already playing is the one to show
+            if rm.on = true then return rm
+        end if
+    end for
+    return pick
+end function
 
 function musicNode() as dynamic
     if not m.global.hasField("music") then return invalid
@@ -20,6 +44,8 @@ function musicNode() as dynamic
 end function
 
 sub open(unused as dynamic)
+    mp = musicNode()
+    if mp <> invalid then mp.command = { cmd: "castRefresh" }
     m.focus = 0
     paint()
     m.top.setFocus(true)
@@ -56,6 +82,20 @@ sub paint()
     m.row.removeChildrenIndex(m.row.getChildCount(), 0)
     bx(0, 0, 1728, 120, "pkg:/images/amb/mix-round.9.png", "0x0A0C09FF", 0.85)
     bx(0, 0, 1728, 120, "pkg:/images/amb/mix-roundring.9.png", m.GOLD, 0.35)
+    ' the Music button is there only when a song is queued and a speaker can take it
+    spk = moodSpeaker()
+    was = m.stops[m.focus].id
+    if spk <> invalid
+        m.stops = m.allStops
+    else
+        m.stops = [m.allStops[1], m.allStops[2], m.allStops[3]]
+    end if
+    m.focus = 0
+    for i = 0 to m.stops.count() - 1
+        if m.stops[i].id = was then m.focus = i
+    end for
+    tw = 990
+    if spk <> invalid then tw = 696
     ' the mood: its name and its own line
     it = m.top.item
     lab = ambSoundLabel(it)
@@ -67,10 +107,24 @@ sub paint()
         if it.title <> invalid then title = it.title
         if it.sub <> invalid then subt = it.sub
     end if
-    tl = text(UCase(title), 116, 20, 990, hFont("caps", 30), m.CREAM)
+    tl = text(UCase(title), 116, 20, tw, hFont("caps", 30), m.CREAM)
     tl.maxLines = 1
-    sl = text(subt, 116, 62, 990, hFont("fell", 26), m.MUTED)
+    sl = text(subt, 116, 62, tw, hFont("fell", 26), m.MUTED)
     sl.maxLines = 1
+    if spk <> invalid
+        ' the song on a speaker: the TV's one player stays with the video
+        bx(832, 30, 2, 60, "pkg:/images/amb/mix-fill.9.png", "0x3A3A2EFF")
+        bx(852, 30, 258, 60, "pkg:/images/amb/mix-fill.9.png", "0xEDE6CAFF", 0.09)
+        col = m.CREAM
+        if spk.on = true
+            bx(852, 30, 258, 60, "pkg:/images/amb/mix-round.9.png", m.GOLD)
+            col = m.DARK
+        end if
+        icon("note", 864, 46, 28, col)
+        if spk.on = true then w = spk.name + ": On" else w = "Music on " + spk.name
+        ml = text(w, 900, 46, 200, hFont("regular", 24), col)
+        ml.maxLines = 1
+    end if
     bx(1128, 30, 2, 60, "pkg:/images/amb/mix-fill.9.png", "0x3A3A2EFF")
     ' sound, dim and timer: each value sits beside its icon
     for each b in [[lab.icon, 1148, 170, "Sound " + m.top.soundText], ["sun", 1338, 150, m.top.dimText], ["timer", 1508, 194, "Timer " + m.top.timerText]]
@@ -91,7 +145,11 @@ end function
 
 sub activate()
     id = m.stops[m.focus].id
-    if id = "sound"
+    if id = "music"
+        spk = moodSpeaker()
+        mp = musicNode()
+        if spk <> invalid and mp <> invalid then mp.command = { cmd: "castMood", id: spk.id }
+    else if id = "sound"
         m.top.request = { act: "sound" }
     else if id = "dim"
         m.top.request = { act: "dim" }

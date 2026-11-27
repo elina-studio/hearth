@@ -107,12 +107,13 @@ sub onChipArt()
     end if
 end sub
 
-' same rule as the hub: right-aligned just left of the clock, starting no further left than 40 px past the Search glass
+' same rule as the hub: centred between the Search glass and the twig's leaf
 sub layoutChip()
     if not m.npChip.visible then return
-    right = m.clock.translation[0] - 14
-    if right > 1684 then right = 1684
-    left = 1424
+    ' the gap it lives in: from the Search glass (its picture ends at 1370) to the twig's first leaf (1663);
+    ' 20 px clear of the glass, and short of the twig's left tip at 1634
+    left = 1390
+    right = 1622
     fixed = 60 + 10 + 18 + 18
     m.npTitle.width = 0
     m.npArtist.width = 0
@@ -128,5 +129,7 @@ sub layoutChip()
     w = fixed + tw
     m.npBack.width = w
     m.npBars.translation = [60 + tw + 10, 18]
-    m.npChip.translation = [right - w, 26]
+    ' centred in the gap between the Search glass and the twig's leaf, and on the same line as the room names
+    x = Int((left + right - w) / 2)
+    m.npChip.translation = [x, 35]
 end sub

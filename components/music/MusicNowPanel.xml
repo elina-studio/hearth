@@ -11,7 +11,12 @@
 <component name="MusicNowPanel" extends="Group">
   <children>
     <Rectangle id="bg" width="620" height="930" color="0xFFFFFF08" />
+    <!-- column layout: the panel's right edge is hand-cut (tools/art/panel_edge.py), tinted like the panel -->
+    <Poster id="edge" uri="pkg:/images/w/rough/panel-edge.png" translation="[604, 0]" width="24" height="930" blendColor="0xFFFFFF08" visible="false" />
     <Rectangle id="rule" width="1920" height="2" color="0xD9A06644" visible="false" />
+    <!-- the player itself, in one group so "nothing queued" can take its place (hidden, not painted over:
+         a cover goes see-through when the room is only previewed at part opacity, and both showed at once) -->
+    <Group id="player">
     <Rectangle id="artBg" color="0x1D2418FF" />
     <Poster id="art" loadDisplayMode="scaleToZoom" />
     <Label id="eyebrow" color="0xD9A066FF" />
@@ -25,6 +30,7 @@
     <Label id="scrobText" horizAlign="center" color="0xE0B34AFF" />
     <Group id="chips" />
     <Label id="chipName" color="0xB5AF8CFF" />
+    </Group>
     <Group id="castList" visible="false" />
     <!-- nothing queued (walk 2, item 15; mockups/walk2/15-music-nothing-queued.png): two real choices and what was
          played lately, drawn over the empty player. Column layout only. -->

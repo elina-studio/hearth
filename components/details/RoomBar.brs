@@ -2,13 +2,14 @@ sub init()
     ' same order and label positions as HubScreen (whimsy spec 2)
     m.names = ["Home", "Shows", "Movies", "Music", "Requests", "Ambiance", "Photos", "Search"]
     m.tabX = [100, 240, 398, 570, 719, 931, 1152, 1324]
-    m.tabW = [101, 120, 133, 110, 174, 182, 134, 60]
+    ' exactly the pictures' own sizes (52 tall): any other size squashes the lettering
+    m.tabW = [101, 121, 133, 111, 174, 182, 134, 60]
     m.labels = m.top.findNode("labels")
     for i = 0 to m.names.count() - 1
         p = m.labels.createChild("Poster")
-        p.translation = [m.tabX[i], 42]
+        p.translation = [m.tabX[i], 38]
         p.width = m.tabW[i]
-        p.height = 44
+        p.height = 52
         p.loadDisplayMode = "noScale"
     end for
     m.glow = m.top.findNode("glow")
