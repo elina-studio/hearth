@@ -425,7 +425,8 @@ def start(h, q):
     if kind == "viz":
         look = g("look") or "57"
         prefetch = g("prefetch") == "1"
-        nb = nucbox()
+        # noLive: the TV couldn't play the NucBox's stream of this song, so it asks for the backup loop
+        nb = None if g("noLive") == "1" else nucbox()
         why = "the NucBox renderer is off"
         if nb:
             if prefetch:
@@ -442,7 +443,7 @@ def start(h, q):
             return h.send_json({"ok": True, "kind": "prefetch" if lf else "none"})
         if not lf:
             # short: the TV shows it in one line
-            return h.send_json({"ok": False, "why": "NucBox off, no backup loop yet" if not nb else "NucBox busy, no backup loop yet"}, 404)
+            return h.send_json({"ok": False, "why": "no backup loop for this look yet" if g("noLive") == "1" else "NucBox off, no backup loop yet"}, 404)
         sid, why2 = loop_session(lf, song, ss)
         if not sid:
             return h.send_json({"ok": False, "why": why2}, 500)

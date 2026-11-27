@@ -175,7 +175,7 @@ function segments(job) {
 function vodPlaylist(job) {
   const total = Math.floor(job.seconds * cfg.fps) / cfg.fps;
   const n = Math.max(1, Math.ceil(total / 2 - 1e-6));
-  const lines = ['#EXTM3U', '#EXT-X-VERSION:3', '#EXT-X-TARGETDURATION:2', '#EXT-X-MEDIA-SEQUENCE:0', '#EXT-X-PLAYLIST-TYPE:VOD', '#EXT-X-INDEPENDENT-SEGMENTS'];
+  const lines = ['#EXTM3U', '#EXT-X-VERSION:6', '#EXT-X-TARGETDURATION:2', '#EXT-X-MEDIA-SEQUENCE:0', '#EXT-X-PLAYLIST-TYPE:VOD', '#EXT-X-INDEPENDENT-SEGMENTS'];
   for (let i = 0; i < n; i++) {
     const d = i < n - 1 ? 2 : total - 2 * (n - 1);
     lines.push('#EXTINF:' + d.toFixed(6) + ',', 's' + String(i).padStart(4, '0') + '.ts');
@@ -207,7 +207,9 @@ function startJob(body) {
   }
   job.used = Date.now();
   if (!body.prefetch) {
-    // the song the TV wants now goes first; whatever else was rendering or waiting is dropped
+    // the song the TV wants now goes first; whatever else was rendering or waiting is dropped,
+    // and a backup loop being made stops at once (it is made again later), so the song gets the whole machine
+    if (loopJob) loopJob.cancelled = true;
     job.prefetch = false;
     if (active && active !== job) active.cancelled = true;
     for (let i = queue.length - 1; i >= 0; i--) if (queue[i] !== job) { queue[i].cancelled = true; queue[i].state = 'cancelled'; queue.splice(i, 1); }
@@ -221,7 +223,7 @@ function startJob(body) {
 async function waitReady(job, ms) {
   const until = Date.now() + ms;
   while (Date.now() < until) {
-    if (job.state === 'done' || segments(job) >= 2) return true;
+    if (job.state === 'done' || segments(job) >= 3) return true;
     if (job.state === 'failed' || job.state === 'cancelled') return false;
     await new Promise(r => setTimeout(r, 200));
   }
@@ -390,6 +392,8 @@ async function bench() {
   (await browser()).close();
 }
 
+let loopJob = null;
+
 // a 30 second loop per look, made seamless by fading the last 3 seconds into the first.
 // In the service (keep = true) it makes only the missing ones, between songs, and leaves the browser open.
 async function loops(keep) {
@@ -420,9 +424,19 @@ async function loops(keep) {
     while (keep && (active || queue.length)) await new Promise(r => setTimeout(r, 5000));
     const raw = path.join(WORK, `loop-${look.n}-raw.mp4`), out = path.join(WORK, `loop-${look.n}.mp4`);
     const enc = encoder(['-f', 'image2pipe', '-framerate', String(cfg.fps), '-c:v', 'mjpeg', '-i', '-', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '14', '-pix_fmt', 'yuv420p', raw]);
-    await drawFrames(pcm, look.preset, cfg.width, cfg.height, enc, null);
+    loopJob = keep ? { cancelled: false } : null;
+    await drawFrames(pcm, look.preset, cfg.width, cfg.height, enc, loopJob);
     enc.stdin.end();
     const r = await enc.done;
+    if (loopJob && loopJob.cancelled) {
+      // a song came in: drop this one and come back to it when the TV is quiet again
+      loopJob = null;
+      fs.rmSync(raw, { force: true });
+      log(`loop ${look.n}: paused for a song, will finish later`);
+      setTimeout(() => loops(true).catch(e => log('loops:', e.message)), 60000);
+      return;
+    }
+    loopJob = null;
     if (r.code !== 0) { log('loop failed', look.n, r.err.slice(-200)); continue; }
     await run(['-y', '-i', raw, '-filter_complex',
       '[0:v]split=3[a][b][c];[a]trim=3:30,setpts=PTS-STARTPTS[main];[b]trim=30:33,setpts=PTS-STARTPTS[end];[c]trim=0:3,setpts=PTS-STARTPTS[start];' +

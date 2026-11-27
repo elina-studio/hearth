@@ -19,6 +19,7 @@ sub mixInit()
     m.mixPending = invalid
     m.mixShownLook = ""
     m.mixAskLook = ""
+    m.mixNoLive = ""
     m.vizFor = {}
 end sub
 
@@ -104,6 +105,9 @@ sub mixLook(look as string)
     if tr = invalid or look = "" then return
     m.vizFor[tr.id] = look
     m.top.vizLook = look
+    ' a new pick always gets a fresh try, even if this song's stream failed before
+    m.mixSkip = ""
+    m.mixNoLive = ""
     if m.mix <> invalid and m.mix.kind = "viz" and not castActive()
         if m.top.state = "playing"
             mixSwitch()
@@ -150,6 +154,7 @@ end sub
 function mixQuery(tr as object, ss as integer, ahead = false as boolean) as string
     q = "kind=" + m.mix.kind + "&file=" + pxEscape(tr.file) + "&ss=" + ss.toStr()
     if ahead then q = q + "&prefetch=1"
+    if m.mixNoLive = tr.id then q = q + "&noLive=1"
     if m.mix.kind = "viz"
         look = vizLookFor(tr)
         if not ahead
@@ -296,6 +301,13 @@ end sub
 sub onMixVideoState()
     if m.mix = invalid or not m.out.isSameNode(m.mix.video) then return
     v = m.mix.video
+    if v.state = "error" and m.top.mixKind = "live" and m.top.track <> invalid and m.mixNoLive <> m.top.track.id
+        ' the NucBox couldn't keep up with this look: carry on with the NAS's ready-made loop of it
+        print "[music] live stream error ("; v.errorMsg; "), trying the backup loop"
+        m.mixNoLive = m.top.track.id
+        playIndex(m.top.index, m.top.position)
+        return
+    end if
     if v.state = "error"
         print "[music] joined stream error: "; v.errorMsg
         tr = m.top.track
