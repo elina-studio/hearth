@@ -22,5 +22,5 @@ services:
       - ./data:/data            # HTTPS certificate, lyrics cache, Last.fm session
       - /volume1/music:/volume1/music:ro            # .lrc lyrics files next to songs
       - /volume1/plex/plex/music:/volume1/plex/plex/music:ro
-      - /volume1/plex/plex:/volume1/plex/plex:ro    # your Ambiance clips (the hearth folder), read only
+      - /volume1/plex:/volume1/plex:ro    # your Ambiance clips (plex/hearth on the NAS), read only
     restart: unless-stopped

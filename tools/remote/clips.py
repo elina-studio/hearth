@@ -23,7 +23,7 @@ import mix
 
 DATA_DIR = os.environ.get("DATA_DIR", "/data")
 PUBLIC_URL = os.environ.get("PUBLIC_URL", "http://192.168.254.41:8765").rstrip("/")
-FOLDERS = [d for d in os.environ.get("CLIPS_DIRS", "/volume1/plex/plex/hearth:/volume1/plex/plex/movies/hearth").split(":") if d]
+FOLDERS = [d for d in os.environ.get("CLIPS_DIRS", "/volume1/plex/hearth:/volume1/plex/plex/hearth:/volume1/plex/plex/movies/hearth").split(":") if d]
 CACHE = os.path.join(DATA_DIR, "amb-clips")
 VIDEO_EXT = (".mp4", ".mov", ".m4v", ".mkv", ".webm", ".avi")
 # the built-in moods' own words: their clips are made ready before the others
@@ -35,11 +35,13 @@ _wake = threading.Event()
 _started = {"v": False}
 
 
+def folders():
+    """Every hearth folder that exists. The clips of all of them count; a file name in two folders is taken from the first."""
+    return [d for d in FOLDERS if os.path.isdir(d)]
+
+
 def folder():
-    for d in FOLDERS:
-        if os.path.isdir(d):
-            return d
-    return ""
+    return ", ".join(folders())
 
 
 def _id(path):
@@ -59,20 +61,22 @@ def scan():
     """Reads the folder: new files join the list (and the queue), files that left are forgotten."""
     d = folder()
     seen = {}
-    if d:
+    taken = set()
+    for one in folders():
         try:
-            names = sorted(os.listdir(d))
+            names = sorted(os.listdir(one))
         except OSError:
             names = []
         for n in names:
             # ._name files are the Mac's own notes about a file, not videos
-            if n.startswith(".") or not n.lower().endswith(VIDEO_EXT):
+            if n.startswith(".") or not n.lower().endswith(VIDEO_EXT) or n.lower() in taken:
                 continue
-            p = os.path.join(d, n)
+            p = os.path.join(one, n)
             try:
                 if not os.path.isfile(p) or os.path.getsize(p) < 1024:
                     continue
                 seen[_id(p)] = p
+                taken.add(n.lower())
             except OSError:
                 continue
     added = False
@@ -236,7 +240,7 @@ def text():
     if not li["folder"]:
         return "NOFOLDER\nNo hearth folder found (looked for: %s)\n" % ", ".join(FOLDERS)
     busy = [c for c in li["clips"] if c["state"] in ("waiting", "converting")]
-    lines = ["WORKING" if busy else "DONE", "Folder %s: %d clips" % (li["folder"], len(li["clips"]))]
+    lines = ["WORKING" if busy else "DONE", "Found in %s: %d clips" % (li["folder"], len(li["clips"]))]
     for c in li["clips"]:
         if c["state"] == "ready":
             how = "ready for the TV" + (" (made a TV copy)" if c["converted"] else " (plays as it is)")
