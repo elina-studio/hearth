@@ -145,7 +145,7 @@ def _prune():
         _sessions.pop(sid, None)
 
 
-def loop_session(video, song, ss):
+def loop_session(video, song, ss, wait=20):
     """Starts (or reuses) ffmpeg joining a looping video with the song from ss. Returns (id, error)."""
     sid = _sid(video, os.path.getmtime(video), song, round(ss))
     with _lock:
@@ -170,10 +170,15 @@ def loop_session(video, song, ss):
             s = {"dir": d, "proc": subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=err), "used": time.time()}
             _sessions[sid] = s
             _prune()
-    # copying the picture is quick: the first pieces are there within a second or two
-    until = time.time() + 15
-    while time.time() < until:
-        if _segments(s["dir"]) >= 2 or (s["proc"].poll() == 0 and _segments(s["dir"]) >= 1):
+    # Copying the picture is quick, so wait for the whole song (the playlist's ENDLIST): a growing playlist makes
+    # the TV treat the song as live, jump in near its newest piece and skip the start. If it takes too long,
+    # hand over the growing one anyway after `wait` seconds.
+    until = time.time() + wait
+    while time.time() < until + 15:
+        done = s["proc"].poll() == 0
+        if done and _segments(s["dir"]) >= 1:
+            return sid, None
+        if time.time() >= until and _segments(s["dir"]) >= 2:
             return sid, None
         if s["proc"].poll() not in (None, 0):
             try:
@@ -323,6 +328,10 @@ def start(h, q):
         clip, why = fire_clip(g("clip"))
         if not clip:
             return h.send_json({"ok": False, "why": why}, 202 if why == "preparing" else 404)
+        if g("prefetch") == "1":
+            # the next song, made now so it is whole by the time the TV gets there
+            threading.Thread(target=loop_session, args=(clip, song, ss), daemon=True).start()
+            return h.send_json({"ok": True, "kind": "prefetch"})
         sid, why = loop_session(clip, song, ss)
         if not sid:
             return h.send_json({"ok": False, "why": why}, 500)
@@ -340,9 +349,11 @@ def start(h, q):
             if url:
                 return h.send_json({"ok": True, "url": url, "kind": "live", "look": look})
             print("mix: NucBox render failed:", why, flush=True)
-        if prefetch:
-            return h.send_json({"ok": True, "kind": "none"})
         lf = loop_file(look)
+        if prefetch:
+            if lf:
+                threading.Thread(target=loop_session, args=(lf, song, ss), daemon=True).start()
+            return h.send_json({"ok": True, "kind": "prefetch" if lf else "none"})
         if not lf:
             return h.send_json({"ok": False, "why": why + " and there's no ready-made loop for this look yet"}, 404)
         sid, why2 = loop_session(lf, song, ss)

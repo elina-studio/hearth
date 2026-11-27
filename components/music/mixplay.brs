@@ -142,11 +142,12 @@ sub mixPlay(i as integer, startAt as float)
     nasCall("GET", "/api/mix/start?" + mixQuery(tr, ss), "", "onMixStart", m.mixSeq.toStr())
 end sub
 
-function mixQuery(tr as object, ss as integer) as string
+function mixQuery(tr as object, ss as integer, ahead = false as boolean) as string
     q = "kind=" + m.mix.kind + "&file=" + pxEscape(tr.file) + "&ss=" + ss.toStr()
+    if ahead then q = q + "&prefetch=1"
     if m.mix.kind = "viz"
         look = vizLookFor(tr)
-        m.top.vizLook = look
+        if not ahead then m.top.vizLook = look
         q = q + "&look=" + look
     else
         q = q + "&clip=" + pxEscape(m.mix.clip)
@@ -282,6 +283,12 @@ sub onMixVideoState()
         playIndex(m.top.index, m.top.position)
         return
     end if
+    if v.state = "finished" and m.top.duration > 0 and m.top.position < m.top.duration - 3
+        ' the stream ran out before the song did: carry on from here, never skip ahead to the next song
+        print "[music] joined stream ended early at "; m.top.position; " of "; m.top.duration
+        playIndex(m.top.index, m.top.position)
+        return
+    end if
     outState(v.state, v.errorMsg)
 end sub
 
@@ -296,10 +303,10 @@ sub onMixVideoPos()
     mixPrefetch()
 end sub
 
-' near the end of a song, ask the NucBox to start on the next one so it is ready in time
+' near the end of a song, have the next one's stream made now, so it is whole and ready the moment it's needed
 sub mixPrefetch()
-    if m.mix.kind <> "viz" or m.top.duration <= 0 then return
-    if m.top.duration - m.top.position > 30 then return
+    if m.top.duration <= 0 then return
+    if m.top.duration - m.top.position > 40 then return
     q = m.top.queue
     nxt = m.top.index + 1
     if m.top.repeat = "one" then nxt = m.top.index
@@ -307,7 +314,7 @@ sub mixPrefetch()
     tr = q[nxt]
     if m.mixPrefetched = tr.id or tr.file = invalid or tr.file = "" then return
     m.mixPrefetched = tr.id
-    nasCall("GET", "/api/mix/start?kind=viz&prefetch=1&ss=0&file=" + pxEscape(tr.file) + "&look=" + vizLookFor(tr), "", "onMixPrefetch")
+    nasCall("GET", "/api/mix/start?" + mixQuery(tr, 0, true), "", "onMixPrefetch")
 end sub
 
 sub onMixPrefetch(event as object)

@@ -29,9 +29,17 @@ echo
 echo "=== Last step, on the NucBox ==="
 echo "On the NucBox: click Start, type PowerShell, right-click it, pick 'Run as administrator', then paste this one line:"
 echo
-printf '%s\n' "\$c='$SHA'; & ([scriptblock]::Create((irm https://raw.githubusercontent.com/elina-studio/hearth/\$c/tools/viz/install.ps1))) -Commit \$c -Token $K"
-echo
-echo "It takes about 15 to 25 minutes (most of it is making the loops) and ends with ALL DONE."
-echo "That line holds your house key: paste it only on the NucBox."
+LOOPS=$(echo "$ST" | grep -o '"loops": *[0-9]*' | grep -o '[0-9]*$')
+if [ "${LOOPS:-0}" -ge 31 ]; then
+  # already set up: update the renderer only (it keeps its key and the loops are all there)
+  printf '%s\n' "\$c='$SHA'; & ([scriptblock]::Create((irm https://raw.githubusercontent.com/elina-studio/hearth/\$c/tools/viz/install.ps1))) -Commit \$c -SkipLoops"
+  echo
+  echo "It takes about 2 minutes and ends with ALL DONE."
+else
+  printf '%s\n' "\$c='$SHA'; & ([scriptblock]::Create((irm https://raw.githubusercontent.com/elina-studio/hearth/\$c/tools/viz/install.ps1))) -Commit \$c -Token $K"
+  echo
+  echo "It takes about 15 to 25 minutes (most of it is making the loops) and ends with ALL DONE."
+  echo "That line holds your house key: paste it only on the NucBox."
+fi
 echo
 echo "The Hearth fire view needs nothing more: it works as soon as the helper is updated."

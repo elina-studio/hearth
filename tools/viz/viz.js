@@ -168,6 +168,34 @@ function segments(job) {
   try { return (fs.readFileSync(path.join(job.dir, 'index.m3u8'), 'utf8').match(/\.ts/g) || []).length; } catch { return 0; }
 }
 
+// The TV gets the whole song's playlist up front, marked as a finished (VOD) stream, even while it is still
+// being drawn. Segments are exactly 2 s (a keyframe every 2 s), so every one can be listed ahead; a segment
+// that isn't drawn yet is held back until it is. A growing (EVENT) playlist makes the TV treat the song as
+// live: it jumps in near the newest piece, skipping the start, and ends the song when drawing falls behind.
+function vodPlaylist(job) {
+  const total = Math.floor(job.seconds * cfg.fps) / cfg.fps;
+  const n = Math.max(1, Math.ceil(total / 2 - 1e-6));
+  const lines = ['#EXTM3U', '#EXT-X-VERSION:3', '#EXT-X-TARGETDURATION:2', '#EXT-X-MEDIA-SEQUENCE:0', '#EXT-X-PLAYLIST-TYPE:VOD', '#EXT-X-INDEPENDENT-SEGMENTS'];
+  for (let i = 0; i < n; i++) {
+    const d = i < n - 1 ? 2 : total - 2 * (n - 1);
+    lines.push('#EXTINF:' + d.toFixed(6) + ',', 's' + String(i).padStart(4, '0') + '.ts');
+  }
+  lines.push('#EXT-X-ENDLIST', '');
+  return lines.join('\n');
+}
+
+// wait until segment `name` is finished (ffmpeg lists it only once it is closed)
+async function segmentReady(job, name, ms) {
+  const until = Date.now() + ms;
+  while (Date.now() < until) {
+    try { if (fs.readFileSync(path.join(job.dir, 'index.m3u8'), 'utf8').split('\n').includes(name)) return true; } catch {}
+    if (job.state === 'failed' || job.state === 'cancelled') return false;
+    if (job.state === 'done') return fs.existsSync(path.join(job.dir, name));
+    await new Promise(r => setTimeout(r, 150));
+  }
+  return false;
+}
+
 function startJob(body) {
   const id = crypto.createHash('sha1').update([body.audioUrl.replace(/[?&]t=[^&]*/, ''), body.look, Math.round(body.ss || 0)].join('|')).digest('hex').slice(0, 16);
   let job = jobs.get(id);
@@ -239,9 +267,19 @@ async function handle(req, res) {
   if (m && req.method === 'GET') {
     const job = jobs.get(m[1]);
     const file = path.join(WORK, m[1], m[2]);
-    if (!job || !fs.existsSync(file)) return json(res, 404, { error: 'gone' });
+    if (!job) return json(res, 404, { error: 'gone' });
     job.used = Date.now();
-    const data = fs.readFileSync(file);
+    let data;
+    if (m[2] === 'index.m3u8' && job.seconds > 0) {
+      data = Buffer.from(vodPlaylist(job));
+    } else if (m[2] === 'index.m3u8') {
+      if (!fs.existsSync(file)) return json(res, 404, { error: 'gone' });
+      data = fs.readFileSync(file);
+    } else {
+      // a piece the TV asks for ahead of the drawing: hold the answer until it exists
+      if (!(await segmentReady(job, m[2], 20000))) return json(res, 404, { error: 'not drawn' });
+      data = fs.readFileSync(file);
+    }
     res.writeHead(200, { 'Content-Type': TYPES[path.extname(file)], 'Content-Length': data.length, 'Cache-Control': 'no-store', 'Access-Control-Allow-Origin': '*' });
     return res.end(data);
   }

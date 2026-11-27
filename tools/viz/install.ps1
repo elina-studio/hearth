@@ -7,7 +7,7 @@
 # sign-in, and makes the ready-made loops the NAS plays when this machine is off. Safe to run again.
 param(
     [Parameter(Mandatory = $true)][string]$Commit,
-    [Parameter(Mandatory = $true)][string]$Token,
+    [string]$Token = "",
     [string]$Helper = "http://192.168.254.41:8765",
     [switch]$SkipLoops
 )
@@ -15,6 +15,11 @@ $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"
 $Dir = Join-Path $env:LOCALAPPDATA "HearthViz"
 $Port = 8790
+# an update can leave the key out: it is already in config.json from the first setup
+if (-not $Token) {
+    $cf = Join-Path $Dir "config.json"
+    if (Test-Path $cf) { $Token = (Get-Content $cf -Raw | ConvertFrom-Json).token }
+}
 
 function Step($n, $text) { Write-Host ""; Write-Host "[$n/7] $text" -ForegroundColor Yellow }
 function Fail($text) { Write-Host ""; Write-Host "STOPPED: $text" -ForegroundColor Red; Write-Host "Send me the lines above."; throw "setup stopped" }
@@ -27,6 +32,7 @@ function Refresh-Path {
 
 $admin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 if (-not $admin) { Fail "PowerShell isn't running as administrator. Right-click PowerShell, pick 'Run as administrator', and paste the command again." }
+if (-not $Token) { Fail "no house key: this is the first setup on this machine, so use the command the Mac setup prints (it has -Token)." }
 
 Step 1 "Node.js and ffmpeg"
 Refresh-Path
