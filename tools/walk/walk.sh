@@ -103,6 +103,18 @@ launch() {
   curl -s -m 8 -X POST "$ECP/launch/dev?walk=1" >/dev/null
 }
 
+# After a crash: start Hearth again and wait for a hub line that is newer than the crash (an old line must not count).
+relaunch() {
+  mark=$(wc -l < "$WLOG" | tr -d ' ')
+  launch
+  i=0
+  while [ $i -lt 60 ]; do
+    if tail -n +$((mark+1)) "$WLOG" | grep -q 'HWALK stack=HubScreen>'; then sleep 3; return 0; fi
+    sleep 1; i=$((i+1))
+  done
+  return 1
+}
+
 # ---------------------------------------------------------------- state helpers (from the HWALK lines)
 last_stack() { grep 'HWALK stack=' "$WLOG" | tail -1; }
 last_key()   { grep 'HWALK key=' "$WLOG" | tail -1; }
@@ -121,6 +133,29 @@ in_pills() {
 app_alive() { curl -s -m 5 "$ECP/query/active-app" | grep -q 'id="dev"'; }
 
 STEP=0; PATHID="boot"; PATHTITLE=""; PREVSUM=""; SHOTFAIL=0; CUR=0; ERRPOS=0
+# CRASHED=1 from a crash until the next path begins: the rest of that path is skipped, later paths run as normal
+CRASHED=0; CRASHLIST="$OUT/.crashes"; : > "$CRASHLIST"
+# a dev build that hits a runtime error stops in the BrightScript debugger: still "running", but deaf to every key
+CRASHRE='Brightscript Debugger>|\(runtime error|Backtrace:'
+
+# one crash: say what it was (once per distinct error), start Hearth again, skip the rest of this path
+crashed() { # key shot state newlog
+  sig=$(echo "$4" | grep -E '\(runtime error' | head -1 | sed -e 's/^.*BRIGHTSCRIPT: //' | cut -c1-200)
+  [ -n "$sig" ] || sig="Hearth stopped without a runtime error in the log"
+  if grep -qxF "$sig" "$CRASHLIST"; then
+    row WARN "$1" "Hearth crashed again with the crash already reported: $sig" "$2" "$3"
+  else
+    echo "$sig" >> "$CRASHLIST"
+    row FAIL "$1" "Hearth crashed on this press: $sig" "$2" "$3"
+  fi
+  say "   Hearth crashed; starting it again. The rest of $PATHID is skipped, later paths carry on."
+  CRASHED=1; PREVSUM=""
+  if relaunch; then
+    STEP=$((STEP+1)); row INFO "note" "Hearth started again after the crash; the rest of $PATHID was skipped" "" ""
+  else
+    STEP=$((STEP+1)); row FAIL "note" "Hearth did not come back within 60 s of the crash" "" "$(last_stack)"
+  fi
+}
 safe() { echo "$1" | tr '\t\r\n' '   ' | cut -c1-300; }
 
 take_shot() {
@@ -145,6 +180,7 @@ row() { # verdict key note shot state
 # press KEY: send it, wait, screenshot, check log and app
 press() {
   k="$1"
+  [ "$CRASHED" = "1" ] && return 1
   STEP=$((STEP+1))
   b_log=$(wc -l < "$LOG" | tr -d ' ')
   b_w=$(wc -l < "$WLOG" | tr -d ' ')
@@ -160,12 +196,8 @@ press() {
   v="PASS"; note=""
   errs=$(echo "$newlog" | grep -E "$ERRRE" | head -3)
   if [ -n "$errs" ]; then v="FAIL"; note="log error: $errs"; fi
-  if ! app_alive; then
-    v="FAIL"; note="app is not running after this press (crash or exit). $note"
-    row "$v" "$k" "$note" "$shot" "$st"
-    say "   App stopped; relaunching and carrying on."
-    launch; wait_hub 60 || true
-    PREVSUM=""
+  if echo "$newlog" | grep -Eq "$CRASHRE" || ! app_alive; then
+    crashed "$k" "$shot" "$st" "$newlog"
     return 1
   fi
   if [ "$v" = "PASS" ]; then
@@ -183,6 +215,7 @@ presses() { for kk in "$@"; do press "$kk"; done; }
 
 # a check: PATTERN must match the current stack line + last key line
 expect() { # label regex
+  [ "$CRASHED" = "1" ] && return 1
   STEP=$((STEP+1))
   cur="$(last_stack) | $(last_key)"
   if echo "$cur" | grep -Eq "$2"; then row PASS "expect" "$1" "" "$(safe "$cur")"; return 0; fi
@@ -192,6 +225,7 @@ expect() { # label regex
   return 1
 }
 expect_not() {
+  [ "$CRASHED" = "1" ] && return 1
   STEP=$((STEP+1))
   cur="$(last_stack) | $(last_key)"
   if echo "$cur" | grep -Eq "$2"; then
@@ -200,10 +234,11 @@ expect_not() {
   fi
   row PASS "expect" "$1" "" "$(safe "$cur")"; return 0
 }
-note() { STEP=$((STEP+1)); row INFO "note" "$1" "" ""; }
+note() { [ "$CRASHED" = "1" ] && return 0; STEP=$((STEP+1)); row INFO "note" "$1" "" ""; }
 
 # press KEY until the last key line matches PATTERN (at most MAX presses). Returns 1 if never reached.
 go_zone() { # key regex max
+  [ "$CRASHED" = "1" ] && return 1
   i=0
   while [ $i -lt "$3" ]; do
     if last_key | grep -Eq "$2"; then return 0; fi
@@ -212,6 +247,7 @@ go_zone() { # key regex max
   last_key | grep -Eq "$2"
 }
 need() { # label key regex max : must reach, else fail the path step
+  [ "$CRASHED" = "1" ] && return 1
   if go_zone "$2" "$3" "$4"; then return 0; fi
   STEP=$((STEP+1))
   shot="shots/$(printf '%04d' $STEP)-$PATHID-zone.jpg"; take_shot "$OUT/$shot" || shot=""
@@ -239,6 +275,7 @@ wait_top() { # screen secs
 
 # Back until the room bar is focused, never pressing Back on the bar itself (that opens the leave prompt).
 unwind() {
+  [ "$CRASHED" = "1" ] && return 0
   i=0
   while [ $i -lt 10 ]; do
     if in_pills; then
@@ -252,7 +289,7 @@ unwind() {
   STEP=$((STEP+1)); shot="shots/$(printf '%04d' $STEP)-$PATHID-stuck.jpg"; take_shot "$OUT/$shot" || shot=""
   row FAIL "unwind" "Back could not reach the room bar in 10 presses" "$shot" "$(last_stack)"
   # recover so later paths can run
-  launch; wait_hub 60 || true
+  relaunch || true
   return 1
 }
 
@@ -270,7 +307,7 @@ goto_room() { # index
 }
 
 begin() { # id title
-  PATHID="$1"; PATHTITLE="$2"
+  PATHID="$1"; PATHTITLE="$2"; CRASHED=0
   if [ -n "$ONLY" ]; then
     echo " $ONLY " | grep -q " $1 " || return 1
   fi
@@ -312,16 +349,27 @@ play_walk() {
   if ! wait_top PlayerScreen 25; then STEP=$((STEP+1)); row FAIL "play" "Player did not open within 25 s" "" "$(last_stack)"; return 1; fi
   sleep 10
   note "player running; $(echo "$(grep -c '\[hearth-ui\]' "$LOG") player lines so far")"
-  presses Down Down Right Right Right Select
-  sleep 1
-  presses Down Back Right Select
-  sleep 1
-  presses Back Right Right Right Right Right Right Right Right Right Right Right Right
-  presses Left Left Select
-  sleep 1
-  presses Back Left Select
-  sleep 1
-  presses Back Up Right Left Back
+  # pause screen (build 115 layout): timeline, the big transport buttons, then the settings chips
+  if go_zone Down 'screen=PauseOverlay.*zone:big ' 3; then
+    presses Left Right Right Left
+  fi
+  if go_zone Down 'screen=PauseOverlay.*zone:chips ' 3; then
+    press Select; sleep 1            # Subtitles
+    presses Down Back; sleep 1
+  fi
+  if go_zone Down 'screen=PauseOverlay.*zone:chips ' 4; then
+    presses Right Select; sleep 1    # Audio
+    presses Down Back; sleep 1
+  fi
+  if go_zone Down 'screen=PauseOverlay.*zone:chips ' 4; then
+    presses Right Right Right Right Right Right Right Right   # the last chip is More
+    press Select; sleep 1
+    expect "More opens a Hearth sheet" 'dialog=HearthDialog:More'
+    presses Down Back; sleep 1
+    expect_not "Back closed More" 'dialog=HearthDialog'
+  fi
+  go_zone Up 'screen=PauseOverlay.*zone:bar ' 3 && presses Right Left
+  press Back
   presses Play Play Info
   sleep 1
   presses Back Rev Fwd InstantReplay Left Right
@@ -365,6 +413,7 @@ library_walk() { # shows or movies, already inside the room (build 112: rows fir
 
 # open one music screen over ECP (walk build only), press KEYS, then Back must leave it
 open_walk() { # mode screen "keys"
+  [ "$CRASHED" = "1" ] && return 1
   unwind || true
   STEP=$((STEP+1)); row INFO "open" "open $1 directly" "" ""
   curl -s -m 5 -X POST "$ECP/input?walkOpen=$1" >/dev/null
@@ -394,20 +443,20 @@ fi
 if begin P02 "Hub * menu opens and closes (nothing selected)"; then
   unwind
   press Info; sleep 1
-  expect "* opens the Hearth dialog" 'dialog=StandardMessageDialog:Hearth'
+  expect "* opens the Hearth dialog" 'dialog=HearthDialog:Hearth'
   press Down; press Up; press Back; sleep 1
-  expect_not "Back closed the dialog" 'dialog=StandardMessageDialog'
+  expect_not "Back closed the dialog" 'dialog=HearthDialog'
   unwind
 fi
 
 if begin P03 "Leave prompt: Stay keeps you in"; then
   unwind
   press Back; sleep 1
-  if ! last_stack | grep -q 'dialog=StandardMessageDialog:Leave Hearth'; then press Back; sleep 1; fi
-  expect "Back on Home bar shows Leave Hearth?" 'dialog=StandardMessageDialog:Leave Hearth'
+  if ! last_stack | grep -q 'dialog=HearthDialog:Leave Hearth'; then press Back; sleep 1; fi
+  expect "Back on Home bar shows Leave Hearth?" 'dialog=HearthDialog:Leave Hearth'
   presses Right Left
   press Back; sleep 1
-  expect_not "dialog closed" 'dialog=StandardMessageDialog'
+  expect_not "dialog closed" 'dialog=HearthDialog'
   expect "still in the hub" 'stack=HubScreen> '
   unwind
 fi

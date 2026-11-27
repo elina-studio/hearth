@@ -2,7 +2,8 @@
 """A pretend Roku running a tiny Hearth model, for testing tools/walk/walk.sh without the TV.
 ECP on :18060, dev web on :18080 (screenshots, install), debug log on :18085.
 It is not the app: it only prints HWALK lines shaped like the real trace, so the walk script's logic can be checked.
-Usage: python3 tools/walk/fake_tv.py [--crash-at N] [--error-at N]"""
+Usage: python3 tools/walk/fake_tv.py [--crash-at N] [--error-at N] [--debug-at N]
+--debug-at N: at press N the app hits a runtime error and stops in the debugger: still the active app, deaf to keys."""
 import socket, threading, sys, time, hashlib, re, io, zipfile
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -13,6 +14,7 @@ ZONES = {"LibraryRoom": ["buttons", "tabs", "chips", "grid"], "HomeRoom": ["hero
 args = sys.argv[1:]
 CRASH_AT = int(args[args.index("--crash-at") + 1]) if "--crash-at" in args else -1
 ERROR_AT = int(args[args.index("--error-at") + 1]) if "--error-at" in args else -1
+DEBUG_AT = int(args[args.index("--debug-at") + 1]) if "--debug-at" in args else -1
 SILENT = "--silent-install" in args  # install works but the TV answers nothing (seen live Nov 27)
 INSTALLED = ["110"]
 
@@ -22,14 +24,14 @@ class App:
         self.reset()
     def reset(self):
         self.stack = ["HubScreen"]; self.hubzone = "room"; self.pill = 0; self.room = 0; self.zi = 0; self.dialog = ""
-        self.top_zi = 0; self.term = ""; self.last = ""; self.view = "rows"; self.col = 0
+        self.top_zi = 0; self.term = ""; self.last = ""; self.view = "rows"; self.col = 0; self.deaf = False
     def log(self, line):
         for c in list(self.clients):
             try: c.sendall((line + "\n").encode())
             except OSError: self.clients.remove(c)
     def sig(self):
         top = self.stack[-1]
-        if self.dialog: chain = "Group#stack>HubScreen>StandardMessageDialog>"
+        if self.dialog: chain = "HearthDialog>"
         elif top == "HubScreen" and self.hubzone == "pills": chain = "Group#stack>HubScreen>Group#pills>Poster>"
         elif top == "HubScreen": chain = "Group#stack>HubScreen>Group#roomHolder>%s>" % ROOMS[self.room]
         else: chain = "Group#stack>%s>" % top
@@ -38,7 +40,7 @@ class App:
         while True:
             time.sleep(0.4)
             with self.lock:
-                if not self.running: continue
+                if not self.running or self.deaf: continue
                 s = self.sig()
                 if s != self.last: self.last = s; self.log("HWALK " + s)
     def keyline(self, key, handled, screen, st):
@@ -47,6 +49,12 @@ class App:
         with self.lock:
             if not self.running: return
             self.presses += 1
+            if self.deaf: return
+            if self.presses == DEBUG_AT:
+                self.log("Type Mismatch. (runtime error &h18) in pkg:/source/util.brs(584)")
+                self.log("Backtrace:")
+                self.log("Brightscript Debugger> ")
+                self.deaf = True; return
             if self.presses == ERROR_AT:
                 self.log("BRIGHTSCRIPT: ERROR: roSGNode.CallFunc: no such function: pkg:/components/Fake.brs(12)")
                 self.log("Backtrace begin")
@@ -66,15 +74,15 @@ class App:
                     self.room = self.pill; self.hubzone = "room"; self.zi = 0
                 elif key == "back":
                     if self.pill != 0 or self.room != 0: self.pill = 0; self.room = 0
-                    else: self.dialog = "StandardMessageDialog:Leave Hearth?"
-                elif key == "options": self.dialog = "StandardMessageDialog:Hearth"
+                    else: self.dialog = "HearthDialog:Leave Hearth?"
+                elif key == "options": self.dialog = "HearthDialog:Hearth"
                 self.keyline(key, True, "HubScreen", "zone:pills pillIndex:%d current:x " % self.pill); return
             if top == "HubScreen" and ROOMS[self.room] == "LibraryRoom" and self.view == "rows":
                 # build 112: Shows/Movies open on rows; the last tile of each row (col 20+) opens the A to Z grid
                 if key == "back" or (key == "up" and self.zi == 0): self.hubzone = "pills"
                 elif key == "down": self.zi = min(self.zi + 1, 5)
                 elif key == "up": self.zi -= 1
-                elif key == "options": self.dialog = "StandardMessageDialog:Options"
+                elif key == "options": self.dialog = "HearthDialog:Options"
                 elif key == "right": self.col = min(self.col + 1, 20)
                 elif key == "left": self.col = max(self.col - 1, 0)
                 elif key == "OK":
