@@ -48,7 +48,7 @@ sub mixOn(c as object)
     if m.mix <> invalid and m.mix.video.isSameNode(v) and m.mix.kind = pxStr(c.kind)
         ' asked again (the fire clip is ready now): try this song again where it is
         m.mixSkip = ""
-        if m.out = m.audio and (m.top.state = "playing" or m.top.state = "buffering") and not castActive()
+        if m.out.isSameNode(m.audio) and (m.top.state = "playing" or m.top.state = "buffering") and not castActive()
             playIndex(m.top.index, m.top.position)
         end if
         return
@@ -69,7 +69,7 @@ end sub
 sub mixOff()
     if m.mix = invalid then return
     v = m.mix.video
-    wasMixing = (m.out <> m.audio)
+    wasMixing = (not m.out.isSameNode(m.audio))
     live = (m.top.state = "playing" or m.top.state = "buffering")
     at = m.top.position
     v.unobserveField("state")
@@ -113,7 +113,7 @@ end function
 sub mixStopVideo()
     m.mixSeq = m.mixSeq + 1
     m.mixReq = invalid
-    if m.mix <> invalid and m.out <> m.audio
+    if m.mix <> invalid and not m.out.isSameNode(m.audio)
         m.out = m.audio
         m.mix.video.control = "stop"
     end if
@@ -175,7 +175,7 @@ sub mixFallBack(why as string)
 end sub
 
 sub onMixVideoState()
-    if m.mix = invalid or m.out <> m.mix.video then return
+    if m.mix = invalid or not m.out.isSameNode(m.mix.video) then return
     v = m.mix.video
     if v.state = "error"
         print "[music] joined stream error: "; v.errorMsg
@@ -190,7 +190,7 @@ sub onMixVideoState()
 end sub
 
 sub onMixVideoPos()
-    if m.mix = invalid or m.out <> m.mix.video then return
+    if m.mix = invalid or not m.out.isSameNode(m.mix.video) then return
     v = m.mix.video
     m.top.position = m.mixBase + v.position
     tr = m.top.track

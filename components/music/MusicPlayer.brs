@@ -518,7 +518,7 @@ end sub
 
 ' The TV plays one Audio node at a time; if another one took over while we were paused, start again where we were
 sub resume()
-    if m.mix <> invalid and m.out = m.audio and mixWanted(m.top.track)
+    if m.mix <> invalid and m.out.isSameNode(m.audio) and mixWanted(m.top.track)
         ' a music view wants the joined stream: start it here instead of the paused Audio
         playIndex(m.top.index, m.top.position)
     else if m.out.state = "paused"
@@ -556,7 +556,7 @@ sub restart()
     if m.top.queue = invalid or m.top.queue.count() = 0 then return
     if castActive()
         playIndex(m.top.index)
-    else if m.out <> m.audio
+    else if not m.out.isSameNode(m.audio)
         ' the joined stream starts where the song started: ask for it again from the top
         playIndex(m.top.index)
     else if m.top.state = "playing" or m.top.state = "paused"
@@ -568,7 +568,7 @@ sub restart()
 end sub
 
 sub onAudioState()
-    if m.out <> m.audio then return
+    if not m.out.isSameNode(m.audio) then return
     outState(m.audio.state, m.audio.errorMsg)
 end sub
 
@@ -630,7 +630,7 @@ sub trackFinished()
 end sub
 
 sub onPosition()
-    if m.out <> m.audio then return
+    if not m.out.isSameNode(m.audio) then return
     m.top.position = m.audio.position
     if m.audio.duration > 0 then m.top.duration = m.audio.duration
     afterPosition()
