@@ -151,13 +151,9 @@ function makePanel(i as integer) as object
     p.num = num
     t = g.createChild("Label")
     ' your own clips can have long names: step the size down so they stay on one line
-    size = 92
-    if Len(it.title) > 10 then size = 66
-    if Len(it.title) > 15 then size = 52
-    t.font = hFont("caps", size)
+    ' step the size down until the whole name fits (UX review item 5: "LIGHTS O..." was cut off)
     t.translation = [40, 76]
-    t.width = m.W - 60
-    t.text = UCase(it.title)
+    hFitTitle(t, UCase(it.title), "caps", [92, 80, 70, 60, 52, 46], m.W - 70)
     p.title = t
     s = g.createChild("Label")
     s.font = hFont("fell", 34)
@@ -205,59 +201,15 @@ function clipHint(md as string) as string
     return pre[md] + "-anything.mp4"
 end function
 
+' A built-in mood with no clip of the person's own keeps its drawn scene (UX review item 5): no dashed setup box.
+' One quiet line says the drawn scene is standing in; the file name to add lives in the mood's * options.
 sub missingPanel(g as object, pic as object, file as string)
-    pic.uri = ""
-    pic.visible = false
-    bg = g.createChild("Rectangle")
-    bg.width = m.W
-    bg.height = m.H
-    bg.color = "0xFFFFFF06"
-    ' dashes along the four edges (no dashed-line image in the package)
-    dash = 16
-    gap = 10
-    col = "0xFFFFFF22"
-    x = 0
-    while x < m.W
-        l = dash
-        if x + l > m.W then l = m.W - x
-        for each y in [0, m.H - 3]
-            r = g.createChild("Rectangle")
-            r.width = l
-            r.height = 3
-            r.color = col
-            r.translation = [x, y]
-        end for
-        x = x + dash + gap
-    end while
-    y = 0
-    while y < m.H
-        l = dash
-        if y + l > m.H then l = m.H - y
-        for each x in [0, m.W - 3]
-            r = g.createChild("Rectangle")
-            r.width = 3
-            r.height = l
-            r.color = col
-            r.translation = [x, y]
-        end for
-        y = y + dash + gap
-    end while
     a = g.createChild("Label")
-    a.font = hFont("regular", 26)
-    a.color = "0xB5AF8CFF"
-    a.horizAlign = "center"
-    a.width = m.W - 60
-    a.wrap = true
-    a.lineSpacing = 10
-    a.translation = [30, 430]
-    a.text = "No clip yet." + Chr(10) + "Add one to Plex named"
-    f = g.createChild("Label")
-    f.font = hFont("bold", 28)
-    f.color = "0xE0B34AFF"
-    f.horizAlign = "center"
-    f.width = m.W - 60
-    f.translation = [30, 518]
-    f.text = file
+    a.font = hFont("regular", 24)
+    a.color = "0xB5AF8CCC"
+    a.width = m.W - 80
+    a.translation = [40, m.H - 140]
+    a.text = "Drawn scene · your own clip replaces it"
 end sub
 
 sub paint()
@@ -331,6 +283,9 @@ function hKeyInner(key as string, press as boolean) as boolean
             m.top.request = { action: "mood", mood: it.mood }
         end if
         return true
+    else if key = "options"
+        clipInfo(m.items[m.index])
+        return true
     else if key = "up" or key = "back"
         m.active = false
         paint()
@@ -339,6 +294,30 @@ function hKeyInner(key as string, press as boolean) as boolean
     end if
     return true
 end function
+
+' * on a mood: where its picture comes from, and how to use your own clip instead
+sub clipInfo(it as object)
+    d = CreateObject("roSGNode", "StandardMessageDialog")
+    d.title = it.title
+    hint = clipHint(it.mood)
+    if it.clip <> invalid
+        d.message = ["Playing your own clip from Plex: " + it.clip.Name]
+    else if hint <> ""
+        d.message = ["This mood shows a drawn scene.", "To use your own clip, add a video to the Plex Ambiance library named " + hint]
+    else
+        d.message = [it.sub]
+    end if
+    d.buttons = ["Close"]
+    d.observeField("buttonSelected", "onClipInfoClosed")
+    d.observeField("wasClosed", "onClipInfoClosed")
+    m.clipDialog = d
+    m.top.getScene().dialog = d
+end sub
+
+sub onClipInfoClosed()
+    if m.clipDialog <> invalid then m.clipDialog.close = true
+    m.top.setFocus(true)
+end sub
 
 ' menu sound for whatever the handler above took (source/util.brs hKeySfx)
 function onKeyEvent(key as string, press as boolean) as boolean

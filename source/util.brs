@@ -23,6 +23,9 @@ function hFont(kind as string, size as integer) as object
     else
         f.uri = "pkg:/fonts/HearthText-Regular.ttf"
     end if
+    ' readable from the couch: the TV shows this 1080p layout at 720p, so a size under 22 ends up under 15 px.
+    ' Nothing is drawn smaller than 22 (UX review Nov 27, item 2).
+    if size < 22 then size = 22
     f.size = size
     return f
 end function

@@ -9,12 +9,13 @@ sub hOptions(item as object)
     favorite = (item.UserData <> invalid and item.UserData.IsFavorite = true)
     m.optActions = []
     labels = []
+    ' Open details first: the watched switch changes data, so it is never the button the dialog opens on
+    labels.push("Open details") : m.optActions.push("details")
     if played
         labels.push("Mark unwatched") : m.optActions.push("unplayed")
     else
         labels.push("Mark watched") : m.optActions.push("played")
     end if
-    labels.push("Open details") : m.optActions.push("details")
     labels.push("Close") : m.optActions.push("close")
     d = CreateObject("roSGNode", "StandardMessageDialog")
     d.title = hTitle(item)

@@ -31,7 +31,9 @@ sub init()
     m.wxIcon = m.top.findNode("wxIcon")
     m.buildTag = m.top.findNode("buildTag")
     m.buildTag.font = hFont("regular", 16)
-    m.buildTag.text = "build " + CreateObject("roAppInfo").GetValue("build_version")
+    ' the build number lives in the Hearth menu (*), not under the clock
+    m.buildTag.text = ""
+    m.buildTag.visible = false
     ' weather from Home Assistant (same settings as the photo slideshow), refreshed every 15 minutes
     wt = m.top.findNode("weatherTimer")
     wt.observeField("fire", "loadWeather")
@@ -497,9 +499,10 @@ sub openMenu()
     d = CreateObject("roSGNode", "StandardMessageDialog")
     d.title = "Hearth"
     srv = m.global.plexServerName
-    if srv = invalid or srv = "" then srv = m.global.plexServer
-    if srv = invalid or srv = "" then srv = "Plex"
-    d.message = ["Signed in to " + srv]
+    ' a friendly name only: never the raw address
+    if srv = invalid or srv = "" then srv = "Plex" else srv = "Plex on " + srv
+    ai = CreateObject("roAppInfo")
+    d.message = ["Signed in to " + srv, "Hearth build " + ai.GetValue("build_version")]
     if m.global.sfxOn then snd = "Menu sounds: On" else snd = "Menu sounds: Off"
     d.buttons = ["Close", snd, "Sign out"]
     d.observeField("buttonSelected", "onMenu")

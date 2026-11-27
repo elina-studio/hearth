@@ -1,6 +1,7 @@
 sub init()
     m.top.backgroundColor = "0x0B0E09FF"
     m.top.backgroundUri = ""
+    applyDialogPalette()
     m.stack = m.top.findNode("stack")
     m.reg = CreateObject("roRegistrySection", "hearth")
 
@@ -493,4 +494,23 @@ sub walkOpen(mode as string)
     if not m.global.hasField("walk") or m.global.walk <> true then return
     print "HWALK open "; mode
     handle({ action: "musicView", mode: mode })
+end sub
+
+' Every Roku dialog (options, Leave Hearth?, the Hearth, Music and sleep menus) takes its colours from the scene's
+' palette, so they all look like Hearth instead of the stock lavender: dark panel, ink text, gold focus.
+sub applyDialogPalette()
+    p = CreateObject("roSGNode", "RSGPalette")
+    p.colors = {
+        DialogBackgroundColor: "0x161D12FF"
+        DialogTextColor: "0xEDE6CAFF"
+        DialogItemColor: "0xEDE6CAFF"
+        DialogSecondaryTextColor: "0xB5AF8CFF"
+        DialogSecondaryItemColor: "0xB5AF8CFF"
+        DialogFocusColor: "0xE0B34AFF"
+        DialogFocusItemColor: "0x1F1606FF"
+        DialogFootprintColor: "0x3A4429FF"
+        DialogInputFieldColor: "0x0B0E09FF"
+        DialogKeyboardColor: "0x141A11FF"
+    }
+    m.top.palette = p
 end sub

@@ -17,7 +17,7 @@ sub init()
     m.scrobText = m.top.findNode("scrobText")
     m.scrobText.font = hFont("regular", 22)
     m.castTop = 0
-    m.names = { prev: "Previous", toggle: "Play", next: "Next", shuffle: "Shuffle", repeat: "Repeat", cover: "Cover", milk: "Visualizer", hearth: "Hearth fire", big: "Big view", library: "Back to the library", cast: "Play in other rooms", like: "Like", dislike: "Dislike", queue: "Queue" }
+    m.names = { more: "More", prev: "Previous", toggle: "Play", next: "Next", shuffle: "Shuffle", repeat: "Repeat", cover: "Cover", milk: "Visualizer", hearth: "Hearth fire", big: "Big view", library: "Back to the library", cast: "Play in other rooms", like: "Like", dislike: "Dislike", queue: "Queue" }
     m.r = 0
     m.c = 1
     p = muPlayer()
@@ -37,6 +37,7 @@ end sub
 sub build()
     m.chips.removeChildrenIndex(m.chips.getChildCount(), 0)
     m.grid = []
+    m.capLabels = invalid
     m.rule.visible = false
     m.elapsed.visible = true
     m.total.visible = true
@@ -130,11 +131,23 @@ sub build()
         m.fill.translation = [x, 652]
         setText(m.elapsed, [x, 668], 200, "regular", 24)
         setText(m.total, [x + w - 200, 668], 200, "regular", 24)
-        ' top row: transport, then Dislike and Like over the last two boxes of the row below; cast moves to the second row
-        gap = 76
-        addRow([x, 714], [["prev", "", "prev"], ["play", "", "toggle"], ["next", "", "next"], ["thumbdown", "", "dislike", x + 4 * gap], ["thumbup", "", "like", x + 5 * gap], ["queue", "", "queue", x + 6 * gap]], 0)
-        addRow([x, 812], [["cast", "", "cast"], ["shuffle", "", "shuffle"], ["repeat", "", "repeat"], ["cover", "", "cover"], ["viz", "", "milk"], ["fire", "", "hearth"], ["expand", "", "big"]], 1)
-        setText(m.chipName, [x, 888], w, "regular", 22)
+        ' five big controls with a word under each (UX review item 4); everything else is under More
+        addRow([x, 714], [["prev", "", "prev"], ["play", "", "toggle"], ["next", "", "next"], ["shuffle", "", "shuffle"], ["more", "", "more"]], 0)
+        slot = Int(w / 5)
+        m.capLabels = {}
+        for i = 0 to m.grid[0].Count() - 1
+            it = m.grid[0][i]
+            c = it.node
+            c.translation = [x + i * slot + Int((slot - c.width) / 2), c.translation[1]]
+            l = m.chips.createChild("Label")
+            l.translation = [x + i * slot - 10, 806]
+            l.width = slot + 20
+            l.horizAlign = "center"
+            l.font = hFont("regular", 24)
+            l.color = "0xB5AF8CFF"
+            m.capLabels[it.action] = l
+        end for
+        setText(m.chipName, [x, 888], 10, "regular", 22)
     end if
     m.track.width = m.barW
     ' Last.fm: a tick where the song counts (half way), and a word once it has
@@ -202,16 +215,22 @@ sub showNow()
     n = muNow()
     p = muPlayer()
     m.eyebrow.text = n.eyebrow
-    m.title.text = n.title
+    ' set the scrolling title only when it changes: setting it again restarts the scroll, which showed the
+    ' title twice on top of itself (live walk Nov 27)
+    if m.title.text <> n.title then m.title.text = n.title
     m.sub.text = n.sub
     if n.track <> invalid
+        place(m.art, m.artBg.translation, m.artSize, m.artSize)
         m.art.uri = pxImage(n.track.thumb, m.artSize, m.artSize)
     else
+        ' nothing queued: a small lantern in the middle of the art box, not one that fills the panel
+        sm = Int(m.artSize / 2)
+        place(m.art, [m.artBg.translation[0] + Int(sm / 2), m.artBg.translation[1] + Int(sm / 2)], sm, sm)
         m.art.uri = "pkg:/images/lantern.png"
     end if
     if not pxReady()
         m.eyebrow.text = "PLEX ISN'T LINKED"
-        m.title.text = "Sign in to Plex"
+        if m.title.text <> "Sign in to Plex" then m.title.text = "Sign in to Plex"
         m.sub.text = "Hearth's setup links Plex at plex.tv/link."
     end if
     playing = (p.state = "playing" or p.state = "buffering")
@@ -238,6 +257,11 @@ sub showNow()
             end if
         end for
     end for
+    if m.capLabels <> invalid
+        for each k in m.capLabels
+            if m.names[k] <> invalid then m.capLabels[k].text = m.names[k]
+        end for
+    end if
     showTime()
     paint()
 end sub
@@ -329,7 +353,7 @@ function handleKey(key as string) as string
 end function
 
 sub act(a as string)
-    if not pxReady() and a <> "cover" and a <> "milk" and a <> "hearth" and a <> "library" and a <> "big" then return
+    if not pxReady() and a <> "cover" and a <> "milk" and a <> "hearth" and a <> "library" and a <> "big" and a <> "more" then return
     if a = "cast"
         if m.top.castOpen
             closeCast()
@@ -339,6 +363,8 @@ sub act(a as string)
             m.r = 2
             m.top.castOpen = true
         end if
+    else if a = "more"
+        panelMore()
     else if a = "queue"
         m.top.request = { action: "queue" }
     else if a = "big"
@@ -602,4 +628,44 @@ sub setBraid(fillPx as float)
     if fillW < 15 then fillW = 15
     m.braid.clip.clippingRect = [0, 0, fillW - 12, 10]
     m.braid.tip.translation = [1 + fillW - 12, 1]
+end sub
+
+' More (UX review item 4): what used to be nine small icons, as one list
+sub panelMore()
+    p = muPlayer()
+    m.moreActs = []
+    labels = []
+    if p.castCount > 0 then labels.push("Play in other rooms (" + p.castCount.toStr() + " on)") else labels.push("Play in other rooms")
+    m.moreActs.push("cast")
+    labels.push("Queue") : m.moreActs.push("queue")
+    labels.push(muRepeatLabel()) : m.moreActs.push("repeat")
+    if p.liked = "like" then labels.push("Liked (undo)") else labels.push("Like this song")
+    m.moreActs.push("like")
+    labels.push("Dislike this song") : m.moreActs.push("dislike")
+    labels.push("Big view") : m.moreActs.push("big")
+    labels.push("Hearth fire") : m.moreActs.push("hearth")
+    labels.push("Cover") : m.moreActs.push("cover")
+    labels.push("Visualizer") : m.moreActs.push("milk")
+    labels.push("More music options...") : m.moreActs.push("options")
+    labels.push("Close") : m.moreActs.push("close")
+    d = CreateObject("roSGNode", "StandardMessageDialog")
+    d.title = "Music"
+    n = muNow()
+    d.message = [n.title]
+    d.buttons = labels
+    d.observeField("buttonSelected", "onPanelMore")
+    d.observeField("wasClosed", "onMuClosed")
+    m.moreDialog = d
+    m.top.getScene().dialog = d
+end sub
+
+sub onPanelMore()
+    a = m.moreActs[m.moreDialog.buttonSelected]
+    m.moreDialog.close = true
+    if a = "close" then return
+    if a = "options"
+        muOptions(true)
+    else
+        act(a)
+    end if
 end sub

@@ -28,6 +28,14 @@
       <Label id="empty" translation="[100, 520]" width="1700" color="0xB5AF8CFF" visible="false" />
       <Group id="below" translation="[100, 0]" />
     </Group>
+    <!-- pinned show header (UX review item 3): once the title scrolls away, the show, season and focused episode
+         stay readable just under the rooms bar -->
+    <Group id="sticky" visible="false">
+      <Rectangle translation="[0, 120]" width="1920" height="92" color="0x0B0E09F5" />
+      <Rectangle translation="[100, 210]" width="1720" height="2" color="0x404B2DFF" />
+      <Label id="stTitle" translation="[100, 128]" width="1100" maxLines="1" color="0xEDE6CAFF" />
+      <Label id="stSub" translation="[100, 172]" width="1720" maxLines="1" color="0xE0B34AFF" />
+    </Group>
     <!-- where Back goes and the other keys (picked layout: path as kicker + hint strip, K3) -->
     <Rectangle translation="[0, 1000]" width="1920" height="80" color="0x0B0E09E6" />
     <KeyHints id="hints" translation="[1824, 1018]" />

@@ -95,7 +95,7 @@ sub makeSlot(w as integer, h as integer, k as integer)
     fb.wrap = true
     fb.vertAlign = "center"
     fb.horizAlign = "center"
-    fb.font = hFont("bold", 18)
+    fb.font = hFont("bold", 22)
     fb.color = "0xEDE6CAFF"
     p = g.createChild("Poster")
     p.width = w
@@ -115,12 +115,12 @@ sub makeSlot(w as integer, h as integer, k as integer)
     cap = g.createChild("Label")
     cap.width = w
     cap.translation = [0, h + 34]
-    cap.font = hFont("bold", 22)
+    cap.font = hFont("bold", 26)
     cap.color = "0xEDE6CAFF"
     sub2 = g.createChild("Label")
     sub2.width = w
-    sub2.translation = [0, h + 64]
-    sub2.font = hFont("regular", 20)
+    sub2.translation = [0, h + 68]
+    sub2.font = hFont("regular", 22)
     sub2.color = "0xB5AF8CFF"
     ' focus (whimsy spec 4): rough rope-gold line with a soft glow, and moss on the focused card only
     ring = g.createChild("Poster")

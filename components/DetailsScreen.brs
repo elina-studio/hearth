@@ -748,10 +748,13 @@ sub paint()
         h = vb[m.belowSel].rowHeight + 40
     end if
     off = m.offset
+    ' room for the pinned show header while the episode list or rows below are in view
+    minTop = 130
+    if m.isShow = true and (m.zone = "eps" or m.zone = "tabs" or m.zone = "below") then minTop = 230
     if m.zone = "act" or m.zone = "bar"
         off = 80
     else
-        if top + off < 130 then off = 130 - top
+        if top + off < minTop then off = minTop - top
         if top + h + off > 995 then off = 995 - top - h
         if off > 80 then off = 80
     end if
@@ -762,7 +765,39 @@ sub paint()
         m.offset = off
     end if
     placeRows()
+    paintSticky()
     paintHints()
+end sub
+
+' The show's name, the season and the focused episode, pinned under the rooms bar once the page has scrolled
+' past the title (UX review item 3).
+sub paintSticky()
+    if m.sticky = invalid
+        m.sticky = m.top.findNode("sticky")
+        m.stTitle = m.top.findNode("stTitle")
+        m.stTitle.font = hFont("bold", 36)
+        m.stSub = m.top.findNode("stSub")
+        m.stSub.font = hFont("caps", 24)
+    end if
+    show = (m.isShow = true and m.full <> invalid and m.offset < -60)
+    m.sticky.visible = show
+    if not show then return
+    name = m.full.Name
+    if name = invalid then name = ""
+    m.stTitle.text = name
+    parts = []
+    if m.sIdx >= 0 and m.sIdx < m.seasons.count()
+        sn = m.seasons[m.sIdx]
+        if sn.index = 0 then parts.push("SPECIALS") else parts.push("SEASON " + sn.index.toStr())
+    end if
+    if m.zone = "eps" and m.epSel >= 0 and m.epSel < m.eps.count()
+        ep = m.eps[m.epSel]
+        lbl = ""
+        if ep.IndexNumber <> invalid then lbl = "E" + ep.IndexNumber.toStr()
+        if ep.Name <> invalid and ep.Name <> "" then lbl = (lbl + "  " + UCase(ep.Name)).Trim()
+        if lbl <> "" then parts.push(lbl)
+    end if
+    m.stSub.text = parts.join("  ·  ")
 end sub
 
 sub paintHints()
