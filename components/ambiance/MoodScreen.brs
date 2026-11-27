@@ -149,9 +149,9 @@ end sub
 '   music = your music keeps playing; the clip's still drifts slowly (no video)
 '   both  = music + the generated crackle/rain loop (a SoundEffect, which can play alongside music)
 function mixMode() as string
-    v = m.reg.Read("ambMix")
-    if v <> "music" and v <> "both" then v = "fire"
-    return v
+    ' Music with an Ambiance video is gone (Nov 27): the TV has one player, so a mood always plays its
+    ' own clip and sound, and the TV's music waits until you leave. Speakers in other rooms keep the song.
+    return "fire"
 end function
 
 function musicNode() as dynamic
@@ -241,6 +241,7 @@ end sub
 sub paintMix()
     m.controls.item = m.item
     m.controls.mode = mixMode()
+    if soundOn() then m.controls.soundText = "On" else m.controls.soundText = "Off"
     if m.dimIndex = 0 then m.controls.dimText = "Bright" else m.controls.dimText = Int(m.dimLevels[m.dimIndex] * 100).toStr() + "%"
     if m.sleepMin = 0 then m.controls.timerText = "Off" else m.controls.timerText = m.sleepMin.toStr() + " min"
     if m.controls.visible then m.controls.callFunc("paint", invalid)
@@ -272,10 +273,9 @@ sub onControls()
     if r = invalid then return
     if r.act = "close"
         closeControls()
-    else if r.act = "mix"
-        m.reg.Write("ambMix", r.mode)
-        m.reg.Flush()
-        applyMix()
+    else if r.act = "sound"
+        toggleSound()
+        paintMix()
     else if r.act = "dim"
         m.dimIndex = (m.dimIndex + 1) mod 4
         m.dim.opacity = m.dimLevels[m.dimIndex]

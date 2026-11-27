@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- A mood, full screen. Down or OK = control bar (music, sound switch, dim, timer), Left/Right = next mood, * = sound and sleep timer, Back = leave. -->
+<!-- A mood, full screen. Down or OK = control bar (sound, dim, timer), Left/Right = next mood, * = sound and sleep timer, Back = leave. -->
 <component name="MoodScreen" extends="Group">
   <children>
     <!-- behind your own clip, so a clip that isn't 16:9 shows black bars (it is fitted, not cropped) -->

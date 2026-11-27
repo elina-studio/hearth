@@ -514,7 +514,7 @@ end sub
 
 ' ---------- lending the TV to a video (the Ambiance hearth) ----------
 ' tvYield: only the TV's own Audio stops, so a Video node can play. Speakers keep going and the
-' player stays "playing" (our clock keeps the position). With no speakers it's a pause.
+' player stays "playing" (our clock keeps the position). With no speakers the song stops and waits.
 sub tvYield()
     if m.tvYielded = true then return
     hasQueue = (m.top.queue <> invalid and m.top.queue.count() > 0)
@@ -526,7 +526,11 @@ sub tvYield()
         m.audio.control = "stop"
         if live then castStartClock()
     else
-        if live then m.audio.control = "pause"
+        ' a paused player still counts as the TV's one playing instance, so stop it; resume() starts
+        ' the song again from this spot when the video is done
+        m.out.control = "stop"
+        m.audio.control = "stop"
+        m.out = m.audio
         m.top.state = "paused"
         m.tvYieldResume = live
     end if
