@@ -26,11 +26,16 @@
     <Group id="chips" />
     <Label id="chipName" color="0xB5AF8CFF" />
     <Group id="castList" visible="false" />
+    <!-- nothing queued (walk 2, item 15; mockups/walk2/15-music-nothing-queued.png): two real choices and what was
+         played lately, drawn over the empty player. Column layout only. -->
+    <Group id="idle" visible="false" />
   </children>
   <interface>
     <field id="layout" type="string" value="column" onChange="build" />
     <field id="active" type="boolean" value="false" onChange="paint" />
     <field id="castOpen" type="boolean" value="false" onChange="build" />
+    <!-- the room's "played lately" items (Plex metadata), for the nothing-queued list -->
+    <field id="recent" type="array" onChange="onRecent" />
     <field id="request" type="assocarray" alwaysNotify="true" />
     <function name="handleKey" />
   </interface>

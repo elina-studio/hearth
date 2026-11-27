@@ -16,6 +16,10 @@ sub init()
     m.scrobTick = m.top.findNode("scrobTick")
     m.scrobText = m.top.findNode("scrobText")
     m.scrobText.font = hFont("regular", 22)
+    m.idle = m.top.findNode("idle")
+    m.idleOn = false
+    m.idleSel = 0
+    m.idleItems = []
     m.castTop = 0
     m.names = { more: "More", prev: "Previous", toggle: "Play", next: "Next", shuffle: "Shuffle", repeat: "Repeat", cover: "Cover", milk: "Visualizer", hearth: "Hearth fire", big: "Big view", library: "Back to the library", cast: "Play in other rooms", like: "Like", dislike: "Dislike", queue: "Queue" }
     m.r = 0
@@ -263,8 +267,181 @@ sub showNow()
         end for
     end if
     showTime()
+    idleNow = (m.top.layout = "column" and not m.top.castOpen and n.track = invalid and pxReady())
+    m.idleOn = idleNow
     paint()
 end sub
+
+' ---------- nothing queued ----------
+function idleLast() as dynamic
+    reg = CreateObject("roRegistrySection", "hearth")
+    v = reg.Read("lastPlay")
+    if v = invalid or v = "" then return invalid
+    bits = v.Split("|")
+    if bits.count() < 4 or bits[3] = "" then return invalid
+    if bits[0] <> "c" and bits[0] <> "r" then return invalid
+    return { mode: bits[0], kind: bits[1], id: bits[2], label: bits[3] }
+end function
+
+sub onRecent()
+    drawIdle()
+end sub
+
+sub drawIdle()
+    m.idle.visible = m.idleOn
+    m.idle.removeChildrenIndex(m.idle.getChildCount(), 0)
+    m.idleItems = []
+    if not m.idleOn then return
+    ' covers the empty player underneath; the same tone as the panel
+    cover = m.idle.createChild("Rectangle")
+    cover.width = 620
+    cover.height = 930
+    cover.color = "0x131611FF"
+    k = m.idle.createChild("Label")
+    k.font = hFont("caps", 24)
+    k.color = "0xE0B34AFF"
+    k.text = "NOTHING PLAYING"
+    k.translation = [96, 40]
+    h = m.idle.createChild("Label")
+    h.font = hFont("bold", 44)
+    h.color = "0xEDE6CAFF"
+    h.text = "What shall we hear?"
+    h.width = 460
+    h.translation = [96, 72]
+    y = 152
+    m.idleItems.push({ kind: "btn", y: y, h: 84, icon: "shuffle", caption: "Shuffle my music", act: "shuffleAll" })
+    y = y + 84 + 14
+    lp = idleLast()
+    if lp <> invalid
+        m.idleItems.push({ kind: "btn", y: y, h: 72, icon: "play", caption: "Carry on: " + lp.label, act: "carry", last: lp })
+        y = y + 72 + 14
+    end if
+    rec = m.top.recent
+    if rec <> invalid and rec.count() > 0
+        y = y + 22
+        t = m.idle.createChild("Label")
+        t.font = hFont("fell", 30)
+        t.color = "0xEDE6CAFF"
+        t.text = "Played lately"
+        t.translation = [96, y]
+        y = y + 50
+        for i = 0 to rec.count() - 1
+            if i < 4
+                m.idleItems.push({ kind: "row", y: y, h: 84, md: rec[i], act: "recent" })
+                y = y + 84
+            end if
+        end for
+    end if
+    if m.idleSel >= m.idleItems.count() then m.idleSel = 0
+    for i = 0 to m.idleItems.count() - 1
+        it = m.idleItems[i]
+        g = m.idle.createChild("Group")
+        g.translation = [96, it.y]
+        focused = (m.top.active and i = m.idleSel)
+        if it.kind = "btn"
+            bg = g.createChild("Poster")
+            bg.translation = [-12, -12]
+            bg.width = 460 + 24
+            bg.height = it.h + 24
+            ink = "0xEDE6CAFF"
+            if focused
+                bg.uri = "pkg:/images/w/button-fill-v2.9.png"
+                bg.blendColor = "0xE0B34AFF"
+                ink = "0x1F1606FF"
+            else
+                bg.uri = "pkg:/images/w/button-outline-v2.9.png"
+                ' the first choice keeps a gold edge so it reads as the main one
+                if i = 0 then bg.blendColor = "0xE0B34AFF" else bg.blendColor = "0x5F6E45FF"
+            end if
+            ic = g.createChild("Poster")
+            ic.uri = "pkg:/images/music/icons/" + it.icon + ".png"
+            ic.width = 32
+            ic.height = 32
+            ic.blendColor = ink
+            ic.translation = [28, Int(it.h / 2) - 16]
+            l = g.createChild("Label")
+            if i = 0 then l.font = hFont("bold", 32) else l.font = hFont("bold", 26)
+            l.text = it.caption
+            l.color = ink
+            l.width = 460 - 78 - 20
+            l.maxLines = 1
+            l.height = it.h
+            l.vertAlign = "center"
+            l.translation = [78, 0]
+        else
+            if focused
+                bg = g.createChild("Poster")
+                bg.uri = "pkg:/images/w/panel.9.png"
+                bg.blendColor = "0x1E2716FF"
+                bg.translation = [-24, -8]
+                bg.width = 460 + 36
+                bg.height = 72 + 16
+                ring = g.createChild("Poster")
+                ring.uri = "pkg:/images/w/focus-ring.9.png"
+                ring.translation = [-39, -23]
+                ring.width = 460 + 66
+                ring.height = 72 + 46
+            end if
+            ab = g.createChild("Rectangle")
+            ab.width = 64
+            ab.height = 64
+            ab.color = "0x1D2418FF"
+            ab.translation = [0, 4]
+            art = g.createChild("Poster")
+            art.width = 64
+            art.height = 64
+            art.loadDisplayMode = "scaleToZoom"
+            art.translation = [0, 4]
+            if it.md.thumb <> invalid then art.uri = pxImage(it.md.thumb, 128, 128)
+            l = g.createChild("Label")
+            l.font = hFont("bold", 28)
+            l.text = pxStr(it.md.title)
+            if focused then l.color = "0xFFE7A0FF" else l.color = "0xEDE6CAFF"
+            l.width = 372
+            l.maxLines = 1
+            l.translation = [82, 2]
+            sb = g.createChild("Label")
+            sb.font = hFont("regular", 24)
+            sb.color = "0xB5AF8CFF"
+            who = pxStr(it.md.parentTitle)
+            if who = "" and pxStr(it.md.type) = "playlist" then who = "Playlist"
+            if who = "" and pxStr(it.md.type) = "artist" then who = "Artist"
+            sb.text = who
+            sb.width = 372
+            sb.maxLines = 1
+            sb.translation = [82, 38]
+        end if
+    end for
+end sub
+
+function idleKey(key as string) as string
+    n = m.idleItems.count()
+    edge = ""
+    if key = "up"
+        if m.idleSel > 0 then m.idleSel = m.idleSel - 1 else edge = "up"
+    else if key = "down"
+        if m.idleSel < n - 1 then m.idleSel = m.idleSel + 1 else edge = "down"
+    else if key = "left" or key = "right"
+        edge = key
+    else if key = "OK" and n > 0
+        it = m.idleItems[m.idleSel]
+        if it.act = "shuffleAll"
+            muSend("shuffleAll")
+        else if it.act = "carry"
+            if it.last.mode = "c"
+                muSend("playContainer", { kind: it.last.kind, id: it.last.id, shuffle: false, label: it.last.label })
+            else
+                muSend("radioStart", { kind: it.last.kind, mood: it.last.id, moodName: it.last.label })
+            end if
+        else
+            muSend("playContainer", { kind: pxStr(it.md.type), id: pxStr(it.md.ratingKey), shuffle: false, label: pxStr(it.md.title) })
+        end if
+    else if key = "options"
+        muOptions(true)
+    end if
+    drawIdle()
+    return edge
+end function
 
 sub showScrob()
     s = muPlayer().lfmState
@@ -305,6 +482,7 @@ end sub
 
 sub paint()
     name = ""
+    drawIdle()
     if m.top.castOpen and m.top.layout = "column" then drawCast()
     for r = 0 to m.grid.Count() - 1
         for c = 0 to m.grid[r].Count() - 1
@@ -323,6 +501,7 @@ function handleKey(key as string) as string
         paint()
         return edge
     end if
+    if m.idleOn then return idleKey(key)
     row = m.grid[m.r]
     edge = ""
     if key = "left"

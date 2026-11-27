@@ -276,6 +276,15 @@ sub onShelf(event as object)
     arrived()
 end sub
 
+'' Plex names its shelves "Recently Played Music", "Recently Added in Music"; Hearth uses its own words (walk 2, item 16)
+function muShelfName(name as string) as string
+    low = LCase(name)
+    if Instr(1, low, "recently played") > 0 then return "Played lately"
+    if Instr(1, low, "recently added") > 0 then return "New in your library"
+    if Instr(1, low, "most played") > 0 then return "Played the most"
+    return name
+end function
+
 sub build()
     m.builtOnce = true
     m.top.ready = true
@@ -316,7 +325,8 @@ sub build()
             r.seed = prevSeed
             r.viewWidth = 1150
             r.noMoss = true
-            r.title = name
+            r.title = muShelfName(name)
+            if Instr(1, LCase(name), "recently played") > 0 then m.panel.recent = slimItems(items)
             r.cardWidth = 200
             r.cardHeight = 200
             if items[0].type = "artist" then r.roundCards = true
@@ -325,7 +335,7 @@ sub build()
                 cards.push(pxCard(md, 200))
             end for
             r.cards = cards
-            if name = keepTitle then r.index = keepIndex
+            if r.title = keepTitle then r.index = keepIndex
             m.rows.push(r)
             y = y + r.rowHeight + 20
         end if
