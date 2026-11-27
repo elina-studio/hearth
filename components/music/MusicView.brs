@@ -85,19 +85,25 @@ end sub
 sub roomsMenu()
     p = muPlayer()
     m.roomIds = []
-    labels = []
+    ic = "pkg:/images/music/icons/"
+    rb = rbNew()
     for each r in p.rooms
         if r.kind = "speaker"
-            if r.on = true then labels.push(r.name + ": On") else labels.push(r.name + ": Off")
+            if m.roomIds.Count() = 0 then rbHead(rb, "Speakers")
+            if r.on = true then w = r.name + ": On" else w = r.name + ": Off"
+            rbAdd(rb, w, "", ic + "speaker.png", "")
             m.roomIds.push(r.id)
         end if
     end for
     if m.roomIds.Count() > 1
-        labels.push("Every room") : m.roomIds.push("all")
+        rbAdd(rb, "Every room", "Turn every speaker on", ic + "house.png", "") : m.roomIds.push("all")
     end if
-    labels.push("Done") : m.roomIds.push("done")
+    rbAdd(rb, "Done", "", "", "main") : m.roomIds.push("done")
+    labels = rb.labels
     d = CreateObject("roSGNode", "HearthDialog")
     d.title = "Play in other rooms"
+    d.icon = ic + "cast.png"
+    rbSet(d, rb)
     if m.roomIds.Count() = 1
         d.message = ["Looking for speakers..."]
     else if p.castCount > 0
@@ -105,7 +111,6 @@ sub roomsMenu()
     else
         d.message = ["Pick the rooms to play in. The picture stays on this TV."]
     end if
-    d.buttons = labels
     m.roomsSigWas = roomsSig()
     if m.roomFocus <> invalid and m.roomFocus < labels.Count() then d.buttonFocused = m.roomFocus
     d.observeField("buttonSelected", "onRoomsMenu")
@@ -644,17 +649,24 @@ end sub
 sub mixMenu()
     names = ["Fire + music", "Fire only", "Music only"]
     keys = ["both", "fire", "music"]
-    labels = []
+    icn = ["fire.png", "fire.png", "disc.png"]
+    ic = "pkg:/images/music/icons/"
+    rb = rbNew()
+    rbHead(rb, "What you hear")
     for i = 0 to 2
-        if keys[i] = m.mix then labels.push(names[i] + "  (on)") else labels.push(names[i])
+        sub2 = ""
+        if keys[i] = m.mix then sub2 = "Playing"
+        rbAdd(rb, names[i], sub2, ic + icn[i], "tile")
     end for
-    labels.push(roomsLabel())
-    labels.push("Music options")
+    rbHead(rb, "More")
+    rbAdd(rb, roomsLabel(), "The speakers play the song; the fire stays here", ic + "cast.png", "")
+    rbAdd(rb, "Music options...", "Shuffle, repeat, radio, Last.fm", ic + "more.png", "")
     m.mixKeys = keys
     d = CreateObject("roSGNode", "HearthDialog")
     d.title = "Hearth"
-    d.message = ["Mute the fire or the music on their own."]
-    d.buttons = labels
+    d.icon = ic + "fire.png"
+    muNowBox(d)
+    rbSet(d, rb)
     d.observeField("buttonSelected", "onMix")
     d.observeField("wasClosed", "onMuClosed")
     m.mixDialog = d
@@ -670,31 +682,42 @@ sub vizMenu()
     hearts = vizHearts()
     md = vizPlayMode()
     m.vizActs = []
-    labels = []
+    ic = "pkg:/images/music/icons/"
+    rb = rbNew()
+    rbHead(rb, "This look")
     if look <> ""
-        if hearts[look] = true then labels.push("Unheart " + vizLabel(look)) else labels.push("Heart " + vizLabel(look))
+        if hearts[look] = true
+            rbAdd(rb, "Unheart " + vizLabel(look), "Take it out of your hearted looks", ic + "heart.png", "")
+        else
+            rbAdd(rb, "Heart " + vizLabel(look), "Add it to the looks Next and Shuffle play", ic + "heart.png", "")
+        end if
         m.vizActs.push("heart")
     end if
     if md = "hearted" and hearts.Count() > 0
-        labels.push("Play: Hearted looks (" + hearts.Count().toStr() + ")")
+        rbAdd(rb, "Play: Hearted (" + hearts.Count().toStr() + ")", "What Next, Shuffle and Left/Right go through", ic + "shuffle.png", "")
     else
-        labels.push("Play: All looks (" + vizLooks().Count().toStr() + ")")
+        rbAdd(rb, "Play: All (" + vizLooks().Count().toStr() + ")", "What Next, Shuffle and Left/Right go through", ic + "shuffle.png", "")
     end if
     m.vizActs.push("play")
-    labels.push("Choose a look...") : m.vizActs.push("choose")
-    labels.push(roomsLabel()) : m.vizActs.push("rooms")
-    labels.push("Music options") : m.vizActs.push("options")
-    labels.push("Close") : m.vizActs.push("close")
+    rbAdd(rb, "Choose a look...", "Every look, with pictures", ic + "viz.png", "") : m.vizActs.push("choose")
+    rbHead(rb, "More")
+    rbAdd(rb, roomsLabel(), "The speakers play the song; the picture stays here", ic + "cast.png", "") : m.vizActs.push("rooms")
+    rbAdd(rb, "Music options...", "Shuffle, repeat, radio, Last.fm", ic + "more.png", "") : m.vizActs.push("options")
+    labels = rb.labels
     d = CreateObject("roSGNode", "HearthDialog")
     d.title = "Visualizer"
-    if look <> "" then now = "Now: " + vizLabel(look) else now = "Starting the visualizer"
-    if vizChoice() <> "shuffle" then now = now + "  ·  kept for every song" else now = now + "  ·  a new look each song"
-    d.message = [now]
+    d.icon = ic + "viz.png"
+    if vizChoice() <> "shuffle" then how = "Kept for every song" else how = "A new look each song"
+    if look <> ""
+        d.now = { art: "pkg:/images/music/viz/" + look + ".jpg", kicker: "On screen", title: vizLabel(look), sub: how }
+    else
+        d.now = { art: "pkg:/images/music/viz/10.jpg", kicker: "Starting", title: "The visualizer", sub: how }
+    end if
     if m.vizMsg <> invalid
-        d.message = [now, m.vizMsg]
+        d.message = [m.vizMsg]
         m.vizMsg = invalid
     end if
-    d.buttons = labels
+    rbSet(d, rb)
     if m.vizFocus <> invalid and m.vizFocus < labels.Count() then d.buttonFocused = m.vizFocus
     m.vizFocus = invalid
     d.observeField("buttonSelected", "onVizMenu")
@@ -825,3 +848,39 @@ end function
 function onKeyEvent(key as string, press as boolean) as boolean
     return hKeySfx(key, press, hKeyInner(key, press))
 end function
+
+' ---- building a rich HearthDialog (icons, second lines, tiles), as muOptions does ----
+function rbNew() as object
+    return { labels: [], subs: [], icons: [], kinds: [], pics: [], heads: {} }
+end function
+
+sub rbHead(rb as object, words as string)
+    rb.heads[rb.labels.count().toStr()] = words
+end sub
+
+sub rbAdd(rb as object, caption as string, line as string, iconUri as string, kind as string)
+    rb.labels.push(caption)
+    rb.subs.push(line)
+    rb.icons.push(iconUri)
+    rb.kinds.push(kind)
+    rb.pics.push("")
+end sub
+
+sub rbSet(d as object, rb as object)
+    d.buttons = rb.labels
+    d.subs = rb.subs
+    d.icons = rb.icons
+    d.kinds = rb.kinds
+    d.pics = rb.pics
+    d.heads = rb.heads
+end sub
+
+' the song that is playing, in the dialog's "playing now" box
+sub muNowBox(d as object)
+    n = muNow()
+    if n.track = invalid then return
+    k = "Playing now"
+    p = muPlayer()
+    if p.state <> "playing" and p.state <> "buffering" then k = "Paused"
+    d.now = { art: pxImage(n.track.thumb, 208, 208), kicker: k, title: n.title, sub: n.sub }
+end sub
