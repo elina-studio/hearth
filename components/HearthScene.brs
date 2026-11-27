@@ -466,6 +466,7 @@ sub walkTick()
     while node <> invalid and n < 14
         f = node.focusedChild
         if f = invalid then exit while
+        if f.isSameNode(node) then exit while
         nm = f.subtype()
         if f.id <> "" then nm = nm + "#" + f.id
         chain = chain + nm + ">"

@@ -587,10 +587,10 @@ end sub
 function cover(al as object) as string
     if al.images = invalid then return ""
     for each im in al.images
-        if im.coverType = "cover" and im.remoteUrl <> invalid then return im.remoteUrl
+        if im.coverType = "cover" and webUrl(im.remoteUrl) then return im.remoteUrl
     end for
     for each im in al.images
-        if im.remoteUrl <> invalid then return im.remoteUrl
+        if webUrl(im.remoteUrl) then return im.remoteUrl
     end for
     return ""
 end function
@@ -598,12 +598,19 @@ end function
 function poster(a as object) as string
     if a.images = invalid then return ""
     for each im in a.images
-        if im.coverType = "poster" and im.remoteUrl <> invalid then return im.remoteUrl
+        if im.coverType = "poster" and webUrl(im.remoteUrl) then return im.remoteUrl
     end for
     for each im in a.images
-        if im.remoteUrl <> invalid then return im.remoteUrl
+        if webUrl(im.remoteUrl) then return im.remoteUrl
     end for
     return ""
+end function
+
+' Lidarr sometimes hands back its own disk path (/config/MediaCover/...) for artists it already has; the TV can't load those
+function webUrl(u as dynamic) as boolean
+    if u = invalid then return false
+    if type(u) <> "String" and type(u) <> "roString" then return false
+    return LCase(Left(u, 4)) = "http"
 end function
 
 function owned(a as object) as boolean

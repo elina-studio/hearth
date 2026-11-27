@@ -430,6 +430,8 @@ sub paintHints(kind as string)
 end sub
 
 function hKeyInner(key as string, press as boolean) as boolean
+    ' hidden but still holding focus (Roku keeps focus on a hidden child): let the screen behind take the key
+    if not m.top.visible then return false
     if not press then return false
     if key = "back"
         m.top.action = { cmd: "close" }

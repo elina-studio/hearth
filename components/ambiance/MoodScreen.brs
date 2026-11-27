@@ -298,6 +298,9 @@ end sub
 
 sub closeControls()
     m.controls.visible = false
+    ' Roku leaves focus on the child when its parent asks for it back: release it first
+    ' (live walk Nov 27: Back closed the bar, but the hidden bar kept every key and Back could never leave)
+    m.controls.setFocus(false)
     m.top.setFocus(true)
     showHud()
 end sub

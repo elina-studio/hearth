@@ -79,6 +79,7 @@ fi
 # The loop reconnects whenever the TV drops the log (it does when the app restarts).
 ( while true; do nc -d "$TV" "$LOG_PORT"; sleep 1; done ) 2>/dev/null | tee -a "$LOG" | grep --line-buffered HWALK >> "$WLOG" &
 NCPID=$!
+disown $NCPID 2>/dev/null
 sleep 2
 
 launch() {
@@ -266,7 +267,8 @@ begin() { # id title
 details_walk() {
   expect "Details screen is on top" 'stack=[^ ]*DetailsScreen> ' || return 1
   sleep 2
-  presses Right Right Left Down Right Down Left Down Up Up Up
+  details_to_act
+  presses Right Right Left Down Left Down Left Down Up Up Up
   if go_zone Up 'zone:act ' 6; then
     press Info; sleep 1; press Back
   fi
@@ -278,7 +280,17 @@ details_walk() {
   elif go_zone Down 'zone:below ' 4; then
     presses Right Right Left Down Up
   fi
+  # leave no sheet open behind us
+  if last_key | grep -q 'screen=SideSheet'; then press Back; sleep 1; fi
   return 0
+}
+
+# Details remembers where you were (it can open on an episode). Find out with a harmless Left, then climb to the buttons.
+details_to_act() {
+  press Left
+  if last_key | grep -q 'screen=SideSheet'; then press Back; sleep 1; fi
+  go_zone Up 'zone:(act|bar) ' 8
+  if last_key | grep -q 'zone:bar '; then press Down; fi
 }
 
 play_walk() {
@@ -383,7 +395,8 @@ fi
 
 if begin P05 "Home hero: OK opens Details or the player"; then
   goto_room 0
-  presses Up Up Up
+  press Left
+  expect "Home opens on the hero" 'HomeRoom.*zone:hero '
   press Select; sleep 3
   t=$(top_screen)
   if [ "$t" = "DetailsScreen" ]; then details_walk
@@ -409,8 +422,10 @@ if begin P08 "Details to Player: play, pause screen, panels, Back"; then
   if need "reach the poster grid" Down 'zone:grid ' 8; then
     press Select; sleep 3
     if expect "Details opened" 'stack=[^ ]*DetailsScreen> '; then
-      go_zone Up 'zone:act ' 6
+      sleep 2
+      details_to_act
       presses Left Left Left
+      expect "on the first Details button" 'DetailsScreen.*zone:act btn:0 '
       press Select
       play_walk
     fi
