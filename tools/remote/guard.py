@@ -28,7 +28,7 @@ OPEN_PATHS = ("/lastfm", "/lastfm/done")
 TV_PREFIXES = ("/api/",)
 TV_PATHS = ("/lastfm/qr.png",)
 # the projector's browser can't type a long key, so its address may open its own page and what that page reads
-PROJECTOR_PREFIXES = ("/hearth", "/px/", "/api/pj/")
+PROJECTOR_PREFIXES = ("/hearth", "/px/", "/api/pj/", "/api/clips", "/api/lyrics", "/api/viz/loops", "/api/viz/loopfile", "/api/ratings")
 
 SEC_HEADERS = (
     ("X-Content-Type-Options", "nosniff"),
