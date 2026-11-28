@@ -23,7 +23,7 @@ sub init()
     m.idleSel = 0
     m.idleItems = []
     m.castTop = 0
-    m.names = { more: "More", prev: "Previous", toggle: "Play", next: "Next", shuffle: "Shuffle", repeat: "Repeat", cover: "Cover", milk: "Visualizer", hearth: "Hearth fire", big: "Big view", library: "Back to the library", cast: "Play in other rooms", like: "Like", dislike: "Dislike", queue: "Queue" }
+    m.names = { more: "More", prev: "Previous", toggle: "Play", next: "Next", shuffle: "Shuffle", repeat: "Repeat", cover: "Cover", milk: "Visualizer", hearth: "Hearth fire", big: "Big view", library: "Back to the library", cast: "Play in other rooms", like: "Like", dislike: "Dislike", queue: "Queue", look: "Heart this look, or pick another" }
     m.r = 0
     m.c = 1
     p = muPlayer()
@@ -92,7 +92,12 @@ sub build()
         m.fill.translation = [x, 420]
         setText(m.elapsed, [x, 438], 300, "regular", 24)
         setText(m.total, [x + w - 300, 438], 300, "regular", 24)
-        addRow([x, 490], [["prev", "", "prev"], ["play", "", "toggle"], ["next", "", "next"], ["shuffle", "", "shuffle"], ["repeat", "", "repeat"], ["", "", "sep"], ["cover", "", "cover"], ["viz", "", "milk"], ["fire", "", "hearth"]], 0)
+        if m.top.over = "milk"
+            ' over the Visualizer: the same row, with a Look button (heart, hearted or all, every look) where the Visualizer button was
+            addRow([x, 490], [["prev", "", "prev"], ["play", "", "toggle"], ["next", "", "next"], ["shuffle", "", "shuffle"], ["repeat", "", "repeat"], ["", "", "sep"], ["cover", "", "cover"], ["fire", "", "hearth"], ["", "", "sep"], ["viz", "Look", "look"]], 0)
+        else
+            addRow([x, 490], [["prev", "", "prev"], ["play", "", "toggle"], ["next", "", "next"], ["shuffle", "", "shuffle"], ["repeat", "", "repeat"], ["", "", "sep"], ["cover", "", "cover"], ["viz", "", "milk"], ["fire", "", "hearth"]], 0)
+        end if
         ' the Library button sits at the right end of the same row
         lib = m.chips.createChild("MusicChip")
         lib.icon = "collapse"
@@ -539,7 +544,7 @@ function handleKey(key as string) as string
 end function
 
 sub act(a as string)
-    if not pxReady() and a <> "cover" and a <> "milk" and a <> "hearth" and a <> "library" and a <> "big" and a <> "more" then return
+    if not pxReady() and a <> "cover" and a <> "milk" and a <> "hearth" and a <> "library" and a <> "big" and a <> "more" and a <> "look" then return
     if a = "cast"
         if m.top.castOpen
             closeCast()
@@ -557,6 +562,8 @@ sub act(a as string)
         m.top.request = { action: "musicView", mode: "big" }
     else if a = "library"
         m.top.request = { action: "back" }
+    else if a = "look"
+        m.top.request = { action: "look" }
     else if a = "prev" or a = "next"
         muSend(a)
     else if a = "like" or a = "dislike"

@@ -47,6 +47,24 @@ sub init()
     m.stripTimer = m.top.findNode("stripTimer")
     m.stripTimer.observeField("fire", "hideStrip")
     m.lyrics = m.top.findNode("lyrics")
+    m.ctl = m.top.findNode("ctl")
+    m.panel = m.top.findNode("panel")
+    m.panel.observeField("request", "onPanelRequest")
+    m.ctlTag = m.top.findNode("ctlTag")
+    m.ctlTag.font = hFont("caps", 26)
+    m.ctlToast = m.top.findNode("ctlToast")
+    m.ctlToast.font = hFont("regular", 26)
+    m.top.findNode("ctlNextTitle").font = hFont("fell", 40)
+    m.ctlNext = m.top.findNode("ctlNext")
+    m.ctlIn = m.top.findNode("ctlIn")
+    m.ctlOut = m.top.findNode("ctlOut")
+    m.ctlOut.observeField("state", "onCtlOut")
+    m.ctlTimer = m.top.findNode("ctlTimer")
+    m.ctlTimer.observeField("fire", "onCtlTimer")
+    m.ctlOn = false
+    m.noteOn = false
+    m.noteText = ""
+    m.ctlMsg = ""
     m.mix = "both"
     m.sound = invalid
     m.vizOn = false
@@ -191,7 +209,7 @@ sub onMode()
     ' music is the point of these views: start it if nothing is on
     p = muPlayer()
     if mode <> "hearth" and p.state <> "playing" and p.state <> "buffering" then muSend("play")
-    showStrip()
+    if mode = "milk" then showControls() else showStrip()
 end sub
 
 ' ---------- now playing ----------
@@ -233,6 +251,8 @@ sub showNow()
         end if
         m.sEyebrow.text = "VISUALIZER" + how + "  ·  " + n.eyebrow
         if n.track <> invalid then m.vizBack.uri = pxImage(n.track.thumb, 480, 270, 40)
+        ctlTagPaint()
+        muNextTiles(m.ctlNext)
         keys = keys + Chr(10) + "Left and Right change the look  ·  OK all looks and options"
     else
         keys = keys + Chr(10) + "OK music options"
@@ -252,11 +272,20 @@ sub showTime()
 end sub
 
 sub onMessage()
-    m.sToast.text = muPlayer().message
+    msg = muPlayer().message
+    if m.top.mode = "milk"
+        ' with the controls up the words sit under the buttons; without them, in the small tag at the top
+        m.ctlMsg = msg
+        if m.ctlOn then ctlWords() else tagSay(msg)
+        return
+    end if
+    m.sToast.text = msg
     showStrip()
 end sub
 
 sub showStrip()
+    ' the Visualizer has the whole player over the picture instead (showControls)
+    if m.top.mode = "milk" then return
     if m.strip.opacity < 1
         m.stripOut.control = "stop"
         m.top.findNode("stripInI").keyValue = [m.strip.opacity, 1.0]
@@ -279,8 +308,7 @@ sub startViz()
     p = muPlayer()
     m.vizOn = true
     m.vizLoop = false
-    m.vizNote.text = "Starting the visualizer..."
-    m.vizNote.visible = true
+    vizSay("Starting the visualizer...")
     if p.castCount > 0
         startVizLoop()
     else
@@ -316,12 +344,11 @@ sub onVizLoopState()
     v = m.vizVideo
     if v.state = "playing"
         v.visible = true
-        m.vizNote.visible = false
+        vizSay("")
     else if v.state = "error"
         print "[music] visualizer loop error: "; v.errorMsg
         v.visible = false
-        m.vizNote.text = "No ready-made loop for this look on the NAS yet. The music carries on in the other rooms." + Chr(10) + "Run the visualizer setup on the NucBox to make the loops."
-        m.vizNote.visible = true
+        vizSay("No ready-made loop for this look on the NAS yet. The music carries on in the other rooms." + Chr(10) + "Run the visualizer setup on the NucBox to make the loops.")
     end if
 end sub
 
@@ -350,13 +377,11 @@ sub onMixState()
     if m.top.mode = "milk" and m.vizOn and m.vizLoop <> true
         m.vizVideo.visible = (st = "on")
         if st = "on"
-            m.vizNote.visible = false
+            vizSay("")
         else if st = "failed"
-            m.vizNote.text = "No visualizer for this song: " + p.mixNote + "." + Chr(10) + "The music carries on, and the next song tries again."
-            m.vizNote.visible = true
+            vizSay("No visualizer for this song: " + p.mixNote + "." + Chr(10) + "The music carries on, and the next song tries again.")
         else if st = "starting"
-            m.vizNote.text = "Starting the visualizer..."
-            m.vizNote.visible = true
+            vizSay("Starting the visualizer...")
         end if
     else if m.top.mode = "hearth" and m.fireMix <> invalid
         m.fireMix.visible = (st = "on")
@@ -395,7 +420,16 @@ sub showLookTag(look as dynamic)
     if look = invalid or look = "" then return
     name = vizLabel(look)
     if name = "" then return
-    m.presetName.text = UCase(name)
+    ctlTagPaint()
+    ' with the controls up, the look is named in their top line
+    if m.ctlOn then return
+    tagSay(name)
+end sub
+
+' a few words in the small tag at the top left, for three seconds
+sub tagSay(words as dynamic)
+    if words = invalid or words = "" then return
+    m.presetName.text = UCase(words)
     w = m.presetName.boundingRect().width
     if w < 100 then w = 100
     m.lookTagBg.width = w + 48
@@ -801,9 +835,11 @@ end sub
 
 sub muRestoreFocus()
     m.top.setFocus(true)
+    if m.ctlOn then ctlKeep()
 end sub
 
 sub leave()
+    m.ctlTimer.control = "stop"
     m.lookTimer.control = "stop"
     m.lookWant = ""
     m.lyrics.callFunc("lyricsStop", invalid)
@@ -829,6 +865,7 @@ function hKeyInner(key as string, press as boolean) as boolean
         m.picker.callFunc("handleKey", key)
         return true
     end if
+    if m.top.mode = "milk" then return vizKey(key)
     if key = "back"
         leave()
         return true
@@ -841,8 +878,6 @@ function hKeyInner(key as string, press as boolean) as boolean
     if key = "options" or key = "OK"
         if m.top.mode = "hearth"
             mixMenu()
-        else if m.top.mode = "milk"
-            vizMenu()
         else
             muOptions(false)
         end if
@@ -858,14 +893,160 @@ function hKeyInner(key as string, press as boolean) as boolean
         showStrip()
         return true
     end if
-    if m.top.mode = "milk" and (key = "left" or key = "right")
-        if key = "left" then stepLook(-1) else stepLook(1)
-        showStrip()
-        return true
-    end if
     showStrip()
     return true
 end function
+
+' ---------- the Visualizer's controls: the Big view's player over the picture ----------
+' Controls up: every key goes to the panel, as in the Big view (Left/Right along the buttons, OK presses one,
+' * opens Music options); Back puts them away. Controls away: Left/Right change the look, Up shows or hides
+' the lyrics, Back leaves, and OK (or anything else) brings the controls up.
+function vizKey(key as string) as boolean
+    if muMediaKey(key)
+        showControls()
+        return true
+    end if
+    if m.ctlOn
+        if key = "back"
+            hideControls()
+        else
+            m.panel.callFunc("handleKey", key)
+            ctlKeep()
+        end if
+        return true
+    end if
+    if key = "back"
+        leave()
+    else if key = "left"
+        stepLook(-1)
+    else if key = "right"
+        stepLook(1)
+    else if key = "up"
+        muSend("lyricsToggle")
+    else
+        showControls()
+    end if
+    return true
+end function
+
+sub showControls()
+    m.ctlOn = true
+    m.ctlOut.control = "stop"
+    m.ctl.visible = true
+    m.panel.active = true
+    ' the lyrics plaque and the small look tag would sit on top of the player
+    m.lyrics.opacity = 0
+    m.tagTimer.control = "stop"
+    m.tagIn.control = "stop"
+    m.tagOut.control = "stop"
+    m.lookTag.opacity = 0
+    ctlTagPaint()
+    ctlWords()
+    if m.ctl.opacity < 1
+        m.top.findNode("ctlInI").keyValue = [m.ctl.opacity, 1.0]
+        m.ctlIn.control = "start"
+    end if
+    ctlKeep()
+end sub
+
+' another eight seconds before the controls go
+sub ctlKeep()
+    m.ctlTimer.control = "stop"
+    m.ctlTimer.control = "start"
+end sub
+
+sub onCtlTimer()
+    ' a menu or the look picker is open over the controls: they wait for it
+    if m.picker.visible or not m.top.hasFocus()
+        ctlKeep()
+        return
+    end if
+    hideControls()
+end sub
+
+sub hideControls()
+    if not m.ctlOn then return
+    m.ctlOn = false
+    m.ctlMsg = ""
+    m.ctlTimer.control = "stop"
+    m.panel.active = false
+    m.ctlIn.control = "stop"
+    m.ctlOut.control = "start"
+    m.lyrics.opacity = 1
+    ctlWords()
+end sub
+
+sub onCtlOut()
+    if m.ctlOut.state = "stopped" and not m.ctlOn
+        m.ctl.opacity = 0
+        m.ctl.visible = false
+    end if
+end sub
+
+' the controls' top line: which look is on, and whether it is drawn live
+sub ctlTagPaint()
+    p = muPlayer()
+    look = p.vizLook
+    if m.vizLoop = true then look = m.vizLoopLook
+    if m.lookWant <> "" then look = m.lookWant
+    t = "VISUALIZER"
+    if look <> invalid and look <> ""
+        if vizLabel(look) <> "" then t = t + "  ·  " + UCase(vizLabel(look))
+    end if
+    if m.vizLoop = true
+        t = t + "  ·  LOOP"
+    else if p.mixState = "on" and p.mixKind = "loop"
+        t = t + "  ·  LOOP (NUCBOX OFF)"
+    else if p.mixState = "on"
+        t = t + "  ·  LIVE"
+    end if
+    m.ctlTag.text = t
+end sub
+
+' why there is no picture ("Starting the visualizer...", "No visualizer for this song..."): in the middle of the
+' screen, or under the buttons while the controls are up
+sub vizSay(words as string)
+    m.noteText = words
+    m.noteOn = (words <> "")
+    ctlWords()
+end sub
+
+sub ctlWords()
+    m.vizNote.text = m.noteText
+    m.vizNote.visible = (m.noteOn and not m.ctlOn)
+    if m.ctlMsg <> "" then m.ctlToast.text = m.ctlMsg else if m.noteOn then m.ctlToast.text = m.noteText else m.ctlToast.text = ""
+end sub
+
+sub onPanelRequest()
+    r = m.panel.request
+    if r = invalid then return
+    a = r.action
+    if a = "refocus"
+        muRestoreFocus()
+    else if a = "look"
+        vizMenu()
+    else if a = "back"
+        leave()
+    else if a = "musicView" and r.mode = "milk"
+        hideControls()
+    else if a = "musicView" and (r.mode = "cover" or r.mode = "hearth")
+        ' the other two pictures open here, in place of the Visualizer
+        m.ctlOn = false
+        m.ctlTimer.control = "stop"
+        m.ctlIn.control = "stop"
+        m.panel.active = false
+        m.ctl.opacity = 0
+        m.ctl.visible = false
+        m.lyrics.opacity = 1
+        m.lookTimer.control = "stop"
+        m.lookWant = ""
+        vizSay("")
+        stopViz()
+        m.top.mode = r.mode
+    else
+        m.top.request = r
+    end if
+end sub
 
 ' menu sound for whatever the handler above took (source/util.brs hKeySfx)
 function onKeyEvent(key as string, press as boolean) as boolean

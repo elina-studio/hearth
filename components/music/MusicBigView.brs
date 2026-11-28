@@ -38,40 +38,7 @@ sub showNext()
     p = muPlayer()
     tr = p.track
     if tr <> invalid then m.backdrop.uri = pxImage(tr.thumb, 640, 360, 40) else m.backdrop.uri = ""
-    m.next.removeChildrenIndex(m.next.getChildCount(), 0)
-    q = p.queue
-    if q = invalid then return
-    k = 0
-    for i = p.index + 1 to q.Count() - 1
-        if k >= 4 then exit for
-        t = q[i]
-        g = m.next.createChild("Group")
-        g.translation = [k * 430, 0]
-        bg = g.createChild("Rectangle")
-        bg.width = 90
-        bg.height = 90
-        bg.color = "0x1D2418FF"
-        art = g.createChild("Poster")
-        art.width = 90
-        art.height = 90
-        art.loadDisplayMode = "scaleToZoom"
-        art.uri = pxImage(t.thumb, 90, 90)
-        a = g.createChild("Label")
-        a.translation = [106, 16]
-        a.width = 300
-        a.maxLines = 1
-        a.font = hFont("bold", 24)
-        a.color = "0xEDE6CAFF"
-        a.text = t.title
-        b = g.createChild("Label")
-        b.translation = [106, 50]
-        b.width = 300
-        b.maxLines = 1
-        b.font = hFont("regular", 22)
-        b.color = "0xB5AF8CFF"
-        b.text = t.artist + "  ·  " + pxClock(t.duration)
-        k = k + 1
-    end for
+    muNextTiles(m.next)
 end sub
 
 function hKeyInner(key as string, press as boolean) as boolean

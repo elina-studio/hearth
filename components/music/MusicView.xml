@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Full-screen music: mode "cover" (big album art), "milk" (MilkDrop, rendered for each song) or "hearth" (the fire, with
-     fire + music / fire only / music only). The now-playing strip shows on any key and fades after a few seconds. -->
+     fire + music / fire only / music only). The now-playing strip shows on any key and fades after a few seconds.
+     The Visualizer has the Big view's whole player over the picture instead of the strip (group "ctl"). -->
 <component name="MusicView" extends="Group">
   <children>
     <Rectangle width="1920" height="1080" color="0x0B0E09FF" />
@@ -45,6 +46,26 @@
     </Group>
 
     <LyricsPanel id="lyrics" translation="[500, 270]" />
+
+    <!-- the Visualizer's controls: the Big view's player, drawn over the picture (mockups/visualizer/viz-controls.png).
+         Shown on OK and on entry, gone after a few idle seconds or on Back. Keys go to the panel as in the Big view. -->
+    <Group id="ctl" opacity="0" visible="false">
+      <Rectangle width="1920" height="1080" color="0x0B0E0980" />
+      <Poster width="1920" height="1080" uri="pkg:/images/shade.png" opacity="0.6" />
+      <Label id="ctlTag" translation="[96, 48]" width="1728" maxLines="1" color="0xD9A066FF" />
+      <MusicNowPanel id="panel" layout="big" over="milk" active="false" />
+      <Label id="ctlToast" translation="[780, 650]" width="1040" wrap="true" maxLines="2" lineSpacing="2" color="0xE0B34AFF" />
+      <Label id="ctlNextTitle" translation="[96, 808]" color="0xB5AF8CFF" text="Up next" />
+      <Poster uri="pkg:/images/w/twig-1580-s5.png" translation="[236, 770]" width="1620" height="120" />
+      <Group id="ctlNext" translation="[96, 870]" />
+    </Group>
+    <Animation id="ctlIn" duration="0.25" easeFunction="outQuad">
+      <FloatFieldInterpolator id="ctlInI" key="[0.0, 1.0]" keyValue="[0.0, 1.0]" fieldToInterp="ctl.opacity" />
+    </Animation>
+    <Animation id="ctlOut" duration="0.6" easeFunction="inOutQuad">
+      <FloatFieldInterpolator key="[0.0, 1.0]" keyValue="[1.0, 0.0]" fieldToInterp="ctl.opacity" />
+    </Animation>
+    <Timer id="ctlTimer" duration="8" repeat="false" />
 
     <Group id="strip" opacity="0">
       <Rectangle translation="[0, 860]" width="1920" height="220" color="0x0B0E09D9" />

@@ -231,3 +231,42 @@ sub muDo(a as string)
         m.top.request = { action: "musicView", mode: a }
     end if
 end sub
+
+' the next four songs in the queue, as small tiles in `holder` (Big view, and the controls over the Visualizer)
+sub muNextTiles(holder as object)
+    holder.removeChildrenIndex(holder.getChildCount(), 0)
+    p = muPlayer()
+    q = p.queue
+    if q = invalid then return
+    k = 0
+    for i = p.index + 1 to q.Count() - 1
+        if k >= 4 then exit for
+        t = q[i]
+        g = holder.createChild("Group")
+        g.translation = [k * 430, 0]
+        bg = g.createChild("Rectangle")
+        bg.width = 90
+        bg.height = 90
+        bg.color = "0x1D2418FF"
+        art = g.createChild("Poster")
+        art.width = 90
+        art.height = 90
+        art.loadDisplayMode = "scaleToZoom"
+        art.uri = pxImage(t.thumb, 90, 90)
+        a = g.createChild("Label")
+        a.translation = [106, 16]
+        a.width = 300
+        a.maxLines = 1
+        a.font = hFont("bold", 24)
+        a.color = "0xEDE6CAFF"
+        a.text = t.title
+        b = g.createChild("Label")
+        b.translation = [106, 50]
+        b.width = 300
+        b.maxLines = 1
+        b.font = hFont("regular", 22)
+        b.color = "0xB5AF8CFF"
+        b.text = t.artist + "  ·  " + pxClock(t.duration)
+        k = k + 1
+    end for
+end sub
