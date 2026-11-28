@@ -409,7 +409,7 @@ sub drawIdle()
             if it.md.thumb <> invalid then art.uri = pxImage(it.md.thumb, 128, 128)
             l = g.createChild("Label")
             l.font = hFont("bold", 28)
-            if hOutsideFont(it.md.title) then l.font = hSysFont("bold", 28)
+            if hOutsideFont(it.md.title) then l.font = hSysFont("bold", 28, it.md.title)
             l.text = pxStr(it.md.title)
             if focused then l.color = "0xFFE7A0FF" else l.color = "0xEDE6CAFF"
             l.width = 372

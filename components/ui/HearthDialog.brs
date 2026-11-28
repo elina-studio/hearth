@@ -200,7 +200,7 @@ sub open(prev = invalid as dynamic)
             tx = pad + 56
         end if
         t = addLabel(m.headG, m.top.title, "fell", 42, m.ink, tx, y, w - pad - tx - 70)
-        if hOutsideFont(m.top.title) then t.font = hSysFont("bold", 38)
+        if hOutsideFont(m.top.title) then t.font = hSysFont("bold", 38, m.top.title)
         y = y + 64
         if now <> invalid
             nbox = m.headG.createChild("Rectangle")

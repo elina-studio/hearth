@@ -171,7 +171,7 @@ sub fillSlot(g as object, c as object, w as integer)
         g.fb.text = hInitials(title)
     else
         g.fb.font = hFontCached("book", 28)
-        if hOutsideFont(title) then g.fb.font = hSysFont("book", 28)
+        if hOutsideFont(title) then g.fb.font = hSysFont("book", 28, title)
         g.fb.color = "0xEDE6CAFF"
         g.fb.text = hClean(title)
     end if

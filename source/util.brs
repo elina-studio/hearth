@@ -106,9 +106,32 @@ function hOutsideFont(t as dynamic) as boolean
     return false
 end function
 
-function hSysFont(kind as string, size as integer) as object
+' Chinese, Japanese or Korean in the text? The TV's own font has no letters for those either (build 148 photo:
+' lyrics came out as rows of boxes), so they are drawn in the bundled HearthCJK font (Noto Sans CJK cut down to
+' the common characters, plus Western letters for mixed lines).
+function hCjk(t as dynamic) as boolean
+    if t = invalid then return false
+    if type(t) <> "String" and type(t) <> "roString" then return false
+    n = Len(t)
+    if n > 80 then n = 80
+    for i = 1 to n
+        c = Asc(Mid(t, i, 1))
+        if (c >= 11904 and c <= 40959) or (c >= 44032 and c <= 55203) or (c >= 65280 and c <= 65519) then return true
+    end for
+    return false
+end function
+
+' Font for text the Hearth fonts cannot draw: the bundled CJK font when t holds Chinese, Japanese or Korean,
+' otherwise the TV's own font. Pass the text as t.
+function hSysFont(kind as string, size as integer, t = invalid as dynamic) as object
     f = CreateObject("roSGNode", "Font")
-    if kind = "bold" or kind = "caps" or kind = "pica" then f.uri = "font:BoldSystemFontFile" else f.uri = "font:SystemFontFile"
+    if hCjk(t)
+        f.uri = "pkg:/fonts/HearthCJK-Regular.ttf"
+    else if kind = "bold" or kind = "caps" or kind = "pica"
+        f.uri = "font:BoldSystemFontFile"
+    else
+        f.uri = "font:SystemFontFile"
+    end if
     if size < 22 then size = 22
     f.size = size
     return f
@@ -119,11 +142,12 @@ end function
 sub hFontText(node as object, t as dynamic, kind as string)
     fnow = node.font
     if fnow = invalid then return
-    isSys = (Left(fnow.uri, 5) = "font:")
+    isSys = (Left(fnow.uri, 5) = "font:" or Instr(1, fnow.uri, "HearthCJK") > 0)
     want = hOutsideFont(t)
-    if want and not isSys
-        node.font = hSysFont(kind, fnow.size)
-    else if isSys and not want
+    if want
+        ' always re-pick: the same label may go from a Korean name to a Hebrew one, which use different fonts
+        node.font = hSysFont(kind, fnow.size, t)
+    else if isSys
         node.font = hFontCached(kind, fnow.size)
     end if
 end sub
@@ -608,7 +632,8 @@ function hTextWidth(ttl as string, kind as string, size as integer) as integer
         p.opacity = 0
         m.hProbe = p
     end if
-    p.font = hFontCached(kind, size)
+    ' measure in the font the text will really be drawn in
+    if hOutsideFont(ttl) then p.font = hSysFont(kind, size, ttl) else p.font = hFontCached(kind, size)
     p.text = ttl
     w = Int(p.boundingRect().width)
     p.text = ""
@@ -630,7 +655,7 @@ function hFitTitle(node as object, ttl as string, kind as string, sizes as objec
     fitSz = hFitSize(ttl, kind, sizes, width)
     if fitSz = 0 then fitSz = sizes[sizes.count() - 1]
     node.font = hFontCached(kind, fitSz)
-    if hOutsideFont(ttl) then node.font = hSysFont(kind, fitSz)
+    if hOutsideFont(ttl) then node.font = hSysFont(kind, fitSz, ttl)
     if node.subtype() = "ScrollingLabel"
         node.maxWidth = width
     else
@@ -649,7 +674,7 @@ function hFitTitle2(node as object, ttl as string, kind as string, sizes as obje
         node.wrap = false
         node.maxLines = 1
         node.font = hFontCached(kind, fitSz)
-        if hOutsideFont(ttl) then node.font = hSysFont(kind, fitSz)
+        if hOutsideFont(ttl) then node.font = hSysFont(kind, fitSz, ttl)
         node.text = ttl
         return { lines: 1, height: Int(fitSz * 1.35), drop: Int((sizes[0] - fitSz) * 0.8) }
     end if
@@ -657,7 +682,7 @@ function hFitTitle2(node as object, ttl as string, kind as string, sizes as obje
     node.wrap = true
     node.maxLines = 2
     node.font = hFontCached(kind, fitSz)
-    if hOutsideFont(ttl) then node.font = hSysFont(kind, fitSz)
+    if hOutsideFont(ttl) then node.font = hSysFont(kind, fitSz, ttl)
     node.text = ttl
     h = Int(node.boundingRect().height)
     ' the measured height can be missing on the first frame; two lines of this font are about 2.7 x the size

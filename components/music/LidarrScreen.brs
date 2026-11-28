@@ -286,7 +286,7 @@ sub drawMatches()
         l.vertAlign = "center"
         l.maxLines = 1
         l.font = hFont("regular", 28)
-        if hOutsideFont(a.artistName) then l.font = hSysFont("regular", 28)
+        if hOutsideFont(a.artistName) then l.font = hSysFont("regular", 28, a.artistName)
         l.text = pxStr(a.artistName)
         ' what tells two artists of the same name apart: Lidarr's own note, else the genre, else the kind of act
         note = matchNote(a)

@@ -218,7 +218,7 @@ sub paintRows()
             size = 32
             if k = 1 or k = 3 then size = 36
             if hOutsideFont(txt)
-                m.rowNodes[k].font = hSysFont("regular", size - 4)
+                m.rowNodes[k].font = hSysFont("regular", size - 4, txt)
             else if lyPlain(txt)
                 m.rowNodes[k].font = hFontCached("bold", size - 6)
             else
