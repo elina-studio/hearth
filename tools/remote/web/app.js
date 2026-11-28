@@ -267,7 +267,7 @@ function remoteKey(k) {
 const ROOMS = ['Home', 'Shows', 'Movies', 'Music', 'Requests', 'Ambiance', 'Photos', 'Search', 'Test'];
 const LIVE = new Set(['Home', 'Shows', 'Movies', 'Music', 'Requests', 'Ambiance', 'Photos', 'Search', 'Test']);
 let cur = 'Home', renderTok = 0, autoF = null;
-const RBX = { Home: [280, 101], Shows: [420, 121], Movies: [578, 133], Music: [750, 111], Requests: [899, 174], Ambiance: [1111, 182], Photos: [1332, 134], Search: [1504, 136] };
+const RBX = { Home: [100, 101], Shows: [240, 121], Movies: [398, 133], Music: [570, 111], Requests: [719, 174], Ambiance: [931, 182], Photos: [1152, 134], Search: [1324, 136] };
 function drawBar() {
   $('#rooms').innerHTML = ROOMS.map(r => `<div class="fx rm ${RBX[r] ? '' : 'tst'} ${r === cur ? 'cur' : ''}" data-a="room" data-r="${r}">${RBX[r] ? '' : r}</div>`).join('')
     + '<img class="bf" id="bglow" src="img/w/firefly-glow.png" alt=""><img class="bf" id="bf1" src="img/w/firefly-small.png" width="48" height="48" alt=""><img class="bf" id="bf2" src="img/w/firefly-small.png" width="48" height="48" style="opacity:.45" alt=""><img class="bf" id="bfly" src="img/w/firefly-main.png" width="64" height="64" alt="">';
@@ -331,7 +331,35 @@ function soon(room, name) {
 
 /* ---------- Home ---------- */
 const MOODS = [['hearth', 'Hearth'], ['rain', 'Rain'], ['fireflies', 'Fireflies'], ['lightsout', 'Lights out']];
+const TN = { eps: [], movies: [], lists: [], bump: 0 };
+const tnLen = min => min >= 60 ? (min % 60 ? Math.floor(min / 60) + ' h ' + (min % 60) : Math.floor(min / 60) + ' h') : min + ' min';
+// A short episode, a film and a playlist for the time of day; the date and time bucket seed the choice (same as the Roku)
+function pickTonight() {
+  if (cur !== 'Home' || !$('#rows')) return;
+  const t = new Date(), h = t.getHours(), dow = t.getDay();
+  const late = h >= 22 || h < 5; const bucket = late ? 3 : h >= 17 ? 2 : h >= 11 ? 1 : 0;
+  const note = ['Morning', 'Afternoon', 'Evening', 'Late evening'][bucket];
+  const epMax = late ? 25 : bucket === 2 ? 35 : 45, movieMax = late || (bucket === 2 && dow >= 1 && dow <= 5) ? 100 : 180;
+  const seed = t.getFullYear() * 372 + (t.getMonth() + 1) * 31 + t.getDate() + bucket * 7 + TN.bump;
+  const mins = x => Math.round((x.duration || 0) / 60000);
+  const out = [];
+  let c = TN.eps.filter(x => mins(x) > 0 && mins(x) <= epMax);
+  if (!c.length && TN.eps.length) c = [TN.eps.slice().sort((a, b) => mins(a) - mins(b))[0]];
+  if (c.length) { const it = c[seed % c.length], cd = cardOf(it); out.push({ a: `data-a="play" data-k="${it.ratingKey}" data-t="${it.type}"`, ic: 'episode', kick: 'A QUICK ONE · ' + tnLen(mins(it)).toUpperCase(), title: cd.title, pic: img(cd.pic, 296, 90) }); }
+  c = TN.movies.filter(x => mins(x) > 0 && mins(x) <= movieMax);
+  if (c.length) { const it = c[(seed * 3 + 1) % c.length]; out.push({ a: `data-a="play" data-k="${it.ratingKey}" data-t="movie"`, ic: 'film', kick: 'A FILM · ' + tnLen(mins(it)).toUpperCase(), title: it.title, pic: img(it.art || it.thumb, 296, 90) }); }
+  let ls = TN.lists; const calm = ls.filter(x => /calm|quiet|soft|sleep|wind|chill|night|evening|ambient|relax|mellow|lull/i.test(x.title));
+  if (bucket >= 2 && calm.length) ls = calm;
+  if (ls.length) { const it = ls[(seed * 5 + 2) % ls.length], m2 = mins(it); out.push({ a: `data-a="album" data-k="${it.ratingKey}" data-t="playlist"`, ic: 'home-note', kick: 'A PLAYLIST' + (m2 ? ' · ' + tnLen(m2).toUpperCase() : ''), title: it.title, pic: img(it.composite || it.thumb, 300, 300) }); }
+  const old = $('#tonight'); const had = old && old.contains(focusEl); if (old) old.remove();
+  if (!out.length) return;
+  const sec = document.createElement('div'); sec.id = 'tonight'; sec.dataset.o = -1;
+  sec.innerHTML = hd('Tonight', note) + `<div class="row">${out.map(o => `<div class="fx card tn" ${o.a}><div class="img" data-bg="${o.pic}"></div><div class="tk"><i class="ic" style="--m:url(img/icons/${o.ic}.png)"></i>${esc(o.kick)}</div><div class="t">${esc(o.title)}</div></div>`).join('')}</div>`;
+  const rows = $('#rows'); rows.insertBefore(sec, rows.firstChild);
+  if (had) setFocus($('.fx', sec));
+}
 async function roomHome(room, tok) {
+  TN.eps = []; TN.movies = []; TN.lists = [];
   await libs();
   const mood = MOODS.map(([m, n]) => `<div class="fx mtile" data-a="mood" data-m="${m}" style="background-image:url(img/tile-${m}.jpg)"><b>${n}</b></div>`).join('');
   room.innerHTML = `<div class="scroll">
@@ -350,6 +378,7 @@ async function roomHome(room, tok) {
     const resume = items.find(m => m.viewOffset > 0);
     fillHero(resume);
     const nextUp = items.filter(m => m.type === 'episode' && !m.viewOffset);
+    TN.eps = nextUp; pickTonight();
     addRow('Next up', 'to watch', nextUp.map(cardHTML), 0);
   }).catch(() => { if (tok === renderTok) $('#hero').innerHTML = `<div class="kick" style="position:absolute;left:40px;top:24px;color:var(--ember)">Can't reach your library</div><h1 style="position:absolute;left:40px;top:60px;margin:0;font:700 60px HearthSans">NAS OFFLINE?</h1>`; });
   pj('/library/recentlyAdded', { 'X-Plex-Container-Size': 60 }).then(mc => {
@@ -360,12 +389,14 @@ async function roomHome(room, tok) {
       const key = m.type === 'movie' ? m.ratingKey : (m.grandparentTitle || m.parentTitle || m.title);
       if (seen.has(key)) continue; seen.add(key); out.push(m);
     }
+    TN.movies = (mc.Metadata || []).filter(m => m.type === 'movie' && !hiddenItem(m) && !m.viewCount); pickTonight();
     addRow('Recently added', 'new', out.slice(0, 20).map(cardHTML), 1);
   }).catch(() => {});
   if (musicLib) pj(`/library/sections/${musicLib.key}/albums`, { sort: 'addedAt:desc', 'X-Plex-Container-Size': 20 }).then(mc => {
     if (tok !== renderTok) return;
     addRow('Music · new albums', 'albums', (mc.Metadata || []).map(albumHTML), 2);
   }).catch(() => {});
+  pj('/playlists', { playlistType: 'audio' }).then(mc => { TN.lists = (mc.Metadata || []).filter(x => x.leafCount > 0); pickTonight(); }).catch(() => {});
   fetch('/px/overseerr/api/v1/request/count').then(r => r.json()).then(c => {
     if (tok !== renderTok) return;
     $('#rn').textContent = (c.pending || 0) + (c.processing || 0);
@@ -660,7 +691,9 @@ async function playItem(rk, type, o) {
   } else md = (await pj('/library/metadata/' + rk)).Metadata?.[0];
   if (!md) { toast('Plex has no such item'); return; }
   const media = md.Media?.[0], part = media?.Part?.[0];
-  const full = (await pj('/library/metadata/' + md.ratingKey)).Metadata?.[0] || md;
+  const full = (await pj('/library/metadata/' + md.ratingKey, { includeMarkers: 1, includeChapters: 1 })).Metadata?.[0] || md;
+  let nextEp = null;
+  if (full.type === 'episode' && full.grandparentRatingKey) { try { const all = (await pj(`/library/metadata/${full.grandparentRatingKey}/allLeaves`)).Metadata || []; const i = all.findIndex(x => x.ratingKey === full.ratingKey); nextEp = i >= 0 ? all[i + 1] || null : null; } catch (e) { /* no next */ } }
   const dur = (full.duration || 0) / 1000;
   let start = o.from != null ? o.from : ((full.viewOffset || 0) / 1000);
   if (dur && (start < 10 || start > dur * .95)) start = 0;
@@ -671,7 +704,7 @@ async function playItem(rk, type, o) {
   let audId = o.audio !== undefined ? o.audio : audDef, subId = o.sub !== undefined ? o.sub : defSub(full);
   if (mode === 'direct' && audId && audId !== audDef) mode = 'hls1080';
   const sub = full.type === 'episode' ? `${full.grandparentTitle} · S${full.parentIndex} E${full.index}` : (full.year || '');
-  const L = openLayer('player', `<video id="pv" playsinline poster="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" disablepictureinpicture disableremoteplayback controlslist="nodownload noremoteplayback"></video><div class="hudbox"><div class="stats" id="pst"></div><div class="subs" id="psub"></div><div class="pov show" id="pov"><h3>${esc(full.type === 'episode' ? full.title : full.title)}</h3><div class="sub">${esc(sub)}</div><div class="tm"><span id="pcur">0:00</span><div class="tr"><i id="pbar"></i></div><span id="pdur">${fmt(dur)}</span></div><div class="pbtns"><div class="fx chip" data-a="back">‹ Back</div><div class="fx chip" data-a="pseek" data-d="-10">⏪ 10s</div><div class="fx chip live" data-a="ppp">Play / Pause</div><div class="fx chip" data-a="pseek" data-d="30">30s ⏩</div><div class="fx chip" data-a="pcc">CC</div><div class="fx chip" data-a="paud">Audio</div><div class="fx chip" data-a="pstats">Stats</div></div></div><div class="msg" id="pmsg" style="display:none"></div></div>`, {
+  const L = openLayer('player', `<video id="pv" playsinline poster="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" disablepictureinpicture disableremoteplayback controlslist="nodownload noremoteplayback"></video><div class="hudbox"><div class="stats" id="pst"></div><div class="subs" id="psub"></div><div class="pov show" id="pov"><h3>${esc(full.type === 'episode' ? full.title : full.title)}</h3><div class="sub">${esc(sub)}</div><div class="tm"><span id="pcur">0:00</span><div class="tr"><i id="pbar"></i></div><span id="pdur">${fmt(dur)}</span></div><div class="pbtns"><div class="fx chip" data-a="back">‹ Back</div><div class="fx chip" data-a="pseek" data-d="-10">⏪ 10s</div><div class="fx chip live" data-a="ppp">Play / Pause</div><div class="fx chip" data-a="pseek" data-d="30">30s ⏩</div><div class="fx chip" data-a="pchap">Chapters</div><div class="fx chip" data-a="pcc">CC</div><div class="fx chip" data-a="paud">Audio</div><div class="fx chip" data-a="pstats">Stats</div></div></div><div class="msg" id="pmsg" style="display:none"></div><div class="fx skipb" id="pskip" data-a="pskip" style="display:none">Skip intro ›</div><div class="pausescr" id="ppause"><div class="pk">PAUSED</div><div class="pt">${esc(full.title)}</div><div class="ps">${esc(sub)}</div><div class="pc" id="ppch"></div></div><div class="upnext" id="pup" style="display:none"><div class="uk">UP NEXT</div><div class="ut" id="put"></div><div class="us" id="pus"></div><div class="ub"><div class="fx chip live" data-a="pupplay">Play now</div><div class="fx chip" data-a="pupno">Watch credits</div></div></div></div>`, {
     onKey(e) {
       const v = L.v, k = e.key;
       if (k === ' ' || k === 'Enter' || k === 'MediaPlayPause') { v.paused ? v.play() : v.pause(); L.hud(); return true; }
@@ -722,6 +755,35 @@ async function playItem(rk, type, o) {
     $('#pcur', L.el).textContent = fmt(L.pos()); $('#pbar', L.el).style.width = (dur ? L.pos() / dur * 100 : 0) + '%';
     if (L.stats) { const q = v.getVideoPlaybackQuality ? v.getVideoPlaybackQuality() : {}; const buf = v.buffered.length ? v.buffered.end(v.buffered.length - 1) - v.currentTime : 0; $('#pst', L.el).textContent = `mode      ${L.mode}\nsource    ${media?.container}/${media?.videoCodec}/${media?.audioCodec} ${media?.width}x${media?.height}\nshown     ${v.videoWidth}x${v.videoHeight}\ndropped   ${q.droppedVideoFrames || 0} of ${q.totalVideoFrames || 0}\nbuffered  ${buf.toFixed(1)}s\nposition  ${fmt(L.pos())}`; }
   }, 500);
+  // Skip intro, Up next, pause screen (same rules as the Roku player)
+  const marks = full.Marker || [], chaps = full.Chapter || [];
+  let intro = null, creditsAt = null; L.upDone = false; L.skipDone = false;
+  for (const mk of marks) {
+    if (mk.type === 'intro' && !intro && mk.endTimeOffset > mk.startTimeOffset + 5000 && mk.endTimeOffset / 1000 < dur * .5) intro = [mk.startTimeOffset / 1000, mk.endTimeOffset / 1000];
+    if (mk.type === 'credits' && mk.startTimeOffset / 1000 > dur * .5) creditsAt = Math.max(creditsAt || 0, mk.startTimeOffset / 1000);
+  }
+  if (creditsAt == null && dur > 120) creditsAt = dur - Math.min(40, dur * .08);
+  const chapAt = p => { let c = null; for (const x of chaps) if (x.startTimeOffset / 1000 <= p) c = x; return c; };
+  L.step = () => {
+    const p = L.pos(), skip = $('#pskip', L.el), up = $('#pup', L.el);
+    const inIntro = intro && !L.skipDone && p >= intro[0] - 1 && p < intro[1] - 1 && !v.paused;
+    skip.style.display = inIntro ? 'block' : 'none';
+    if (inIntro && !focusEl) setFocus(skip);
+    if (nextEp && creditsAt != null && !L.upDone && p >= creditsAt && !v.paused) {
+      L.upDone = true; L.upLeft = PREF('autoplay', 'on') === 'off' ? 0 : 10;
+      $('#put', L.el).textContent = (nextEp.title || 'Next episode'); $('#pus', L.el).textContent = `S${nextEp.parentIndex} E${nextEp.index}`;
+      up.style.display = 'block'; setFocus($('#pup .fx', L.el));
+      clearInterval(L.upT);
+      if (L.upLeft) L.upT = setInterval(() => { L.upLeft--; $('#pus', L.el).textContent = `S${nextEp.parentIndex} E${nextEp.index}  ·  playing in ${L.upLeft}`; if (L.upLeft <= 0) { clearInterval(L.upT); L.goNext(); } }, 1000);
+    }
+    const pa = $('#ppause', L.el); const showP = v.paused && !L.closing && !$('#pmenu', L.el);
+    pa.classList.toggle('on', showP);
+    if (showP) { const c = chapAt(p); $('#ppch', L.el).textContent = (c ? (c.tag || 'Chapter') + '  ·  ' : '') + fmt(p) + ' of ' + fmt(dur); }
+  };
+  L.goNext = () => { clearInterval(L.upT); fetch(`${PX}/:/scrobble?key=${full.ratingKey}&identifier=com.plexapp.plugins.library`).catch(() => {}); closeLayer(); setTimeout(() => playItem(nextEp.ratingKey, 'episode', { from: 0 }).catch(e => toast(e.message)), 350); };
+  L.doSkip = () => { L.skipDone = true; $('#pskip', L.el).style.display = 'none'; L.seekTo(intro[1]); setFocus(null); };
+  L.pickChap = () => { if (!chaps.length) { toast('No chapters in this one'); return; } L.menu('Chapters', chaps.map((c, i) => ({ label: `${fmt(c.startTimeOffset / 1000)}  ${c.tag || 'Chapter ' + (i + 1)}`, on: chapAt(L.pos()) === c })), i => L.seekTo(chaps[i].startTimeOffset / 1000)); };
+  L.stepT = setInterval(L.step, 400);
   L.rt = setInterval(() => report(v.paused ? 'paused' : 'playing'), 10000);
   v.addEventListener('ended', () => { fetch(`${PX}/:/scrobble?key=${full.ratingKey}&identifier=com.plexapp.plugins.library`).catch(() => {}); closeLayer(); });
   L.cues = [];
@@ -757,7 +819,7 @@ async function playItem(rk, type, o) {
   };
   L.setSub(subId);
   aud.pause(); M.playing = false; M.paint();
-  L.close = () => { clearInterval(L.iv); clearInterval(L.rt); clearInterval(L.subTick); clearTimeout(L.ht); report('stopped'); if (L.hls) L.hls.destroy(); v.pause(); v.removeAttribute('src'); v.load(); if (L.mode !== 'direct') fetch(`${PX}/video/:/transcode/universal/stop?session=${session}`).catch(() => {}); };
+  L.close = () => { L.closing = true; clearInterval(L.stepT); clearInterval(L.upT); clearInterval(L.iv); clearInterval(L.rt); clearInterval(L.subTick); clearTimeout(L.ht); report('stopped'); if (L.hls) L.hls.destroy(); v.pause(); v.removeAttribute('src'); v.load(); if (L.mode !== 'direct') fetch(`${PX}/video/:/transcode/universal/stop?session=${session}`).catch(() => {}); };
   load(mode, mode === 'direct' ? start : start);
   L.hud(); setFocus(null);
 }
@@ -950,6 +1012,7 @@ async function openDetail(id, type, opt) {
     }
     const allW = L.isShow ? !((md.leafCount || 0) - (md.viewedLeafCount || 0)) : !!md.viewCount;
     acts.push(allW ? ['checkc', 'Watched', 'unwatch'] : ['eye', 'Mark watched', 'watch']);
+    acts.push(['more', 'More', 'more']);
     L.acts = acts;
     const people = (md.Role || []).slice(0, 24);
     $('#dp', L.el).innerHTML = `<div class="dhead"><div class="dpanel"></div><div class="dposter" style="background-image:url('${img(md.thumb, 200, 300)}')"></div>
@@ -1155,7 +1218,7 @@ const rqYear = r => { const d = r.releaseDate || r.firstAirDate || ''; return d.
 function rqMediaCard(r) {
   const st = r.mediaInfo && r.mediaInfo.status != null ? r.mediaInfo.status : -1;
   const title = r.title || r.name || '';
-  return { kind: 'media', title, image: tmdb(r.posterPath, 'w185'), chip: rqMediaChip(st), progress: -1, data: { id: r.id, mediaType: r.mediaType, title, year: rqYear(r), overview: r.overview, poster: r.posterPath, rating: r.voteAverage, mediaStatus: st } };
+  return { kind: 'media', title, image: tmdb(r.posterPath, 'w185'), chip: rqMediaChip(st), progress: -1, data: { id: r.id, mediaType: r.mediaType, title, year: rqYear(r), overview: r.overview, poster: r.posterPath, rating: r.voteAverage, mediaStatus: st }, score: r.voteAverage > 0 ? (Math.round(r.voteAverage * 10) / 10).toFixed(1) : '', vote: r.voteAverage || 0, genreIds: r.genreIds || [], date: r.releaseDate || r.firstAirDate || '' };
 }
 function rqWhen(iso) {
   if (!iso) return ''; const d = new Date(iso), n = new Date();
@@ -1204,6 +1267,17 @@ const arrivedWhen = secs => {
   if (days < 7) return { band: d.toLocaleDateString([], { weekday: 'short' }).toUpperCase(), text: d.toLocaleDateString([], { weekday: 'long' }), today: false };
   const md = d.toLocaleDateString([], { month: 'short', day: 'numeric' }); return { band: md.toUpperCase(), text: md, today: false };
 };
+const RQ_FILT = ['trending', 'movies', 'tv'];
+const rqNF = kind => ({ kind: kind || 'movie', genres: [], provider: '', minRating: 0, sort: 'popular' });
+// The streaming services worth showing (TMDB has hundreds), in a fixed order, without the "with ads" and channel variants
+function rqPickProviders(all) {
+  const out = [];
+  for (const [k, n] of [['netflix', 'Netflix'], ['max', 'Max'], ['disney', 'Disney+'], ['prime video', 'Prime'], ['apple tv', 'Apple TV+'], ['hulu', 'Hulu'], ['paramount', 'Paramount+'], ['peacock', 'Peacock'], ['tubi', 'Tubi']]) {
+    const p = all.find(x => { const nm = (x.name || '').toLowerCase(); return (k === 'max' ? (nm === 'max' || nm === 'hbo max') : nm.includes(k)) && !nm.includes('ads') && !nm.includes('channel'); });
+    if (p) out.push({ id: p.id, name: n, logoPath: p.logoPath });
+  }
+  return out;
+}
 const RLISTS = [
   { key: 'search', icon: 'search', name: 'Search', about: 'TYPE A TITLE' },
   { key: 'new', icon: 'down', name: 'New', about: 'NEWLY DOWNLOADED · NEWEST FIRST' },
@@ -1221,6 +1295,7 @@ function roomRequests(room, tok) {
   room.innerHTML = `<div class="rr"><div class="rrail" id="rrail">${RLISTS.map((l, i) => `<div class="fx rli" data-a="rail" data-i="${i}">${ricon(l.icon)}<span>${l.name}</span><em></em></div>`).join('')}</div>
     <div class="rhead"><div class="reb" id="reb"></div><div class="rtt" id="rtt"></div></div>
     <div class="rtabs" id="rtabs"></div>
+    <div class="rfbar" id="rfb"><div class="fx rfbtn" data-a="rqfilter">${ricon('list')}<span>Filter &amp; sort</span></div><div class="rfsum" id="rfs"></div></div>
     <div class="rgrid scroll" id="rg"><div class="rgg" id="rgg"></div></div>
     <div class="rempty" id="rem"></div>
     <div class="rsearch" id="rs"><div class="skb"><div class="sdisp" id="rsd"></div><div class="srule"></div>
@@ -1229,7 +1304,7 @@ function roomRequests(room, tok) {
       <div class="rsres"><div class="rsh" id="rsh"></div><div id="rsl"></div></div></div>
     <div class="rmusic" id="rm">${ricon('note')}<h3>ASK LIDARR FOR AN ARTIST</h3><p>Music requests aren't on the projector yet. Use the TV for those for now.</p></div>
     <div class="rtoast" id="rto"><span id="rtt2"></span><em id="rth"></em></div></div>`;
-  const S = RQ = RQ && RQ.keep ? Object.assign(RQ, { room }) : { room, idx: 2, cards: {}, details: {}, newTab: 0, newAll: null, text: '', query: '', pending: null, seq: 0, keep: true };
+  const S = RQ = RQ && RQ.keep ? Object.assign(RQ, { room }) : { room, idx: 2, cards: {}, details: {}, newTab: 0, newAll: null, text: '', query: '', pending: null, seq: 0, keep: true, filters: { trending: rqNF('all'), movies: rqNF('movie'), tv: rqNF('tv') }, gen: {}, acc: {}, seen: {}, pageNo: {}, totalPages: {}, moreBusy: {}, busy: {}, listError: {}, totals: {}, loadedAt: {}, genres: { movie: [], tv: [] }, provs: { movie: [], tv: [] }, rt: {} };
   S.room = room; S.tok = tok; S.over = null;
   const $r = s => $(s, room);
   S.cur = () => RLISTS[S.idx];
@@ -1242,17 +1317,21 @@ function roomRequests(room, tok) {
   const chipHTML = ch => ch && ch.text ? `<div class="rchip ${ch.tone}">${ricon(ch.icon)}<span>${esc(ch.text.toUpperCase())}</span></div>` : '';
   S.cardHTML = (c, i) => {
     const sq = c.square, mine = S.cur().key === 'mine' && !S.over;
-    return `<div class="fx rc ${mine ? 'mine' : ''}" data-a="rqcard" data-i="${i}"><div class="rim ${sq ? 'sq' : ''}" data-bg="${esc(c.image || '')}"></div><div class="rph ${sq ? 'sq' : ''}">${esc(c.title)}</div>${chipHTML(c.chip)}${c.progress >= 0 ? `<div class="rbar"><i style="width:${Math.max(c.progress > 0 ? 8 : 0, Math.min(100, c.progress))}%"></i></div>` : ''}${c.caption ? `<div class="rcap"><b>${esc(c.title)}</b><span>${esc(c.caption)}</span></div>` : ''}</div>`;
+    return `<div class="fx rc ${mine ? 'mine' : ''}" data-a="rqcard" data-i="${i}"><div class="rim ${sq ? 'sq' : ''}" data-bg="${esc(c.image || '')}"></div><div class="rph ${sq ? 'sq' : ''}">${esc(c.title)}</div>${c.score && c.kind === 'media' ? `<div class="rscore">★ ${esc(c.score)}</div>` : ''}${chipHTML(c.chip)}${c.progress >= 0 ? `<div class="rbar"><i style="width:${Math.max(c.progress > 0 ? 8 : 0, Math.min(100, c.progress))}%"></i></div>` : ''}${c.caption ? `<div class="rcap"><b>${esc(c.title)}</b><span>${esc(c.caption)}</span></div>` : ''}</div>`;
   };
   S.show = () => {
     const l = S.cur(); S.paintRail();
+    if (RQ_FILT.includes(l.key) && !S.busy[l.key] && S.loadedAt[l.key] && Date.now() - S.loadedAt[l.key] > 300000) S.loadList(l.key);
     const k = l.key, ov_ = S.over;
     $r('#rs').style.display = k === 'search' && !ov_ ? 'block' : 'none';
     $r('#rm').style.display = k === 'music' && !ov_ ? 'flex' : 'none';
     $r('#rg').style.display = (k === 'search' || k === 'music') && !ov_ ? 'none' : 'block';
     $r('#rtabs').style.display = k === 'new' && !ov_ ? 'flex' : 'none';
-    $r('#rg').style.top = k === 'new' && !ov_ ? '210px' : '140px';
-    $r('#rem').style.top = k === 'new' && !ov_ ? '230px' : '160px';
+    const filt = RQ_FILT.includes(k) && !ov_;
+    $r('#rfb').style.display = filt ? 'flex' : 'none';
+    if (filt) $r('#rfs').textContent = S.summary(k);
+    $r('#rg').style.top = (k === 'new' || filt) && !ov_ ? '210px' : '140px';
+    $r('#rem').style.top = (k === 'new' || filt) && !ov_ ? '230px' : '160px';
     if (k === 'new') $r('#rtabs').innerHTML = RTABS.map(([, ic_, n], i) => `<div class="fx rtab ${i === S.newTab ? 'cur' : ''}" data-a="rtab" data-i="${i}">${ricon(ic_)}<span>${n}</span></div>`).join('');
     if (ov_) { S.header(ov_.eyebrow, ov_.title); S.draw(ov_.cards); return; }
     $r('#rem').textContent = '';
@@ -1263,7 +1342,9 @@ function roomRequests(room, tok) {
     $r('#rem').textContent = '';
     if (!cards) { $r('#rg #rgg') && ($r('#rgg').innerHTML = ''); $r('#rem').textContent = S.problem || (k === 'new' ? 'Asking Plex…' : 'Asking Overseerr…'); return; }
     if (k === 'new') { const want = RTABS[S.newTab][0]; S.draw(cards.filter(c => !want || c.data.kind === want)); } else S.draw(cards);
-    if (!cards.length) $r('#rem').textContent = k === 'mine' ? 'No requests yet. Pick something in Trending or Search and press OK.' : k === 'new' ? "Nothing new here yet. Things you request show up here once they've downloaded." : 'Nothing here right now.';
+    if (!cards.length && RQ_FILT.includes(k) && S.active(k)) $r('#rem').textContent = 'Nothing matches those filters. Open Filter & sort to change them.';
+    else if (!cards.length && S.listError[k]) $r('#rem').textContent = S.listError[k] + ' Open Filter & sort to change the filters.';
+    else if (!cards.length) $r('#rem').textContent = k === 'mine' ? 'No requests yet. Pick something in Trending or Search and press OK.' : k === 'new' ? "Nothing new here yet. Things you request show up here once they've downloaded." : 'Nothing here right now.';
   };
   S.draw = cards => {
     S.shown = cards; const g = $r('#rgg'); g.className = 'rgg' + (S.cur().key === 'mine' && !S.over ? ' mine' : '');
@@ -1280,8 +1361,105 @@ function roomRequests(room, tok) {
   };
   S.toastMsg = (text, hint, ms) => { $r('#rtt2').textContent = text; $r('#rth').textContent = hint || ''; $r('#rto').classList.add('show'); clearTimeout(S.tt); if (ms !== 0) S.tt = setTimeout(() => $r('#rto').classList.remove('show'), ms || 4000); };
   S.load = async () => {
-    for (const l of RLISTS) if (l.path) ov('GET', l.path + '?page=1').then(j => { S.cards[l.key] = (j.results || []).filter(r => r.mediaType === 'movie' || r.mediaType === 'tv').map(rqMediaCard); S.problem = ''; if (RQ === S && S.room === room) { S.paintRail(); if (S.cur().key === l.key && !S.over) S.show(); } }).catch(e => { if (e.status === 401 || e.status === 403 || e.status === 503) S.problem = 'Overseerr is not letting this in (' + e.message + '). Re-send the Overseerr key from the phone.'; else S.problem = "Can't reach Overseerr: " + e.message; if (S.cur().key === l.key) S.show(); });
+    for (const l of RLISTS) if (l.path) S.loadList(l.key);
+    ov('GET', '/api/v1/genres/movie').then(j => { S.genres.movie = j.results || []; }).catch(() => {});
+    ov('GET', '/api/v1/genres/tv').then(j => { S.genres.tv = j.results || []; }).catch(() => {});
+    for (const kind of ['movie', 'tv']) ov('GET', `/api/v1/watchproviders/${kind === 'movie' ? 'movies' : 'tv'}?watchRegion=US`).then(j => { S.provs[kind] = rqPickProviders(j.results || []); }).catch(() => {});
     S.loadMine(); S.loadNew();
+  };
+  /* Discover lists: every filter is a live Overseerr query; pages load as you scroll (Trending, once narrowed, asks the movie or show Discover list) */
+  S.eff = key => key === 'movies' ? 'movie' : key === 'tv' ? 'tv' : key === 'trending' ? S.filters.trending.kind : '';
+  S.pathFor = key => key === 'trending' && S.filters.trending.kind === 'movie' ? '/api/v1/discover/movies' : key === 'trending' && S.filters.trending.kind === 'tv' ? '/api/v1/discover/tv' : RLISTS.find(l => l.key === key).path;
+  S.loadList = key => {
+    S.gen[key] = (S.gen[key] || 0) + 1; S.acc[key] = []; S.seen[key] = new Set(); S.pageNo[key] = 0; S.totalPages[key] = 0; S.moreBusy[key] = false; S.loadedAt[key] = Date.now(); S.busy[key] = true; S.listError[key] = '';
+    S.page(key, 1);
+  };
+  S.page = (key, p) => {
+    const g = S.gen[key], path = S.pathFor(key);
+    ov('GET', path + '?' + S.query_(key, p)).then(j => {
+      if (S.gen[key] !== g) return;
+      S.busy[key] = false; S.moreBusy[key] = false;
+      const fresh = [];
+      for (const r of (j.results || [])) {
+        if (r.mediaType === undefined && r.title !== undefined) r.mediaType = 'movie';
+        if (r.mediaType !== 'movie' && r.mediaType !== 'tv') continue;
+        const id = r.mediaType + r.id;
+        if (!S.seen[key].has(id)) { S.seen[key].add(id); const c = rqMediaCard(r); S.acc[key].push(c); fresh.push(c); }
+      }
+      S.problem = ''; S.pageNo[key] = p; S.totalPages[key] = j.totalPages || 0; S.totals[key] = j.totalResults; S.cards[key] = S.acc[key];
+      if (RQ === S && S.room === room) {
+        S.paintRail();
+        if (S.cur().key === key && !S.over) {
+          if (p === 1) S.show();
+          else { const n = $$('.rc', room).length; $r('#rgg').insertAdjacentHTML('beforeend', fresh.map((c, i) => S.cardHTML(c, n + i)).join('')); S.shown = S.acc[key]; $r('#rfs').textContent = S.summary(key); }
+        }
+      }
+      if (p === 1) S.more(key);
+    }).catch(e => {
+      if (S.gen[key] !== g) return; S.busy[key] = false; S.moreBusy[key] = false;
+      if (e.status === 401 || e.status === 403 || e.status === 503) S.problem = 'Overseerr is not letting this in (' + e.message + '). Re-send the Overseerr key from the phone.';
+      else if (p === 1 && S.cards[key]) { S.listError[key] = "Overseerr couldn't do that search (" + e.message + ')'; S.acc[key] = []; S.cards[key] = []; }
+      else S.problem = "Can't reach Overseerr: " + e.message;
+      if (S.cur().key === key) S.show();
+    });
+  };
+  S.more = key => { if (S.moreBusy[key] || S.busy[key] || !S.pageNo[key] || S.pageNo[key] >= S.totalPages[key]) return; S.moreBusy[key] = true; S.page(key, S.pageNo[key] + 1); };
+  S.query_ = (key, p) => {
+    const q = new URLSearchParams({ page: p }), kind = S.eff(key);
+    if (kind !== 'movie' && kind !== 'tv') return q.toString();
+    const f = S.filters[key];
+    const ids = f.genres.map(n => (S.genres[kind].find(g => g.name === n) || {}).id).filter(Boolean); if (ids.length) q.set('genre', ids.join(','));
+    if (f.provider) { q.set('watchProviders', f.provider); q.set('watchRegion', 'US'); }
+    let votes = 0; if (f.minRating > 0) { q.set('voteAverageGte', f.minRating); votes = 50; }
+    const today = new Date().toISOString().slice(0, 10);
+    if (f.sort === 'rating') { q.set('sortBy', 'vote_average.desc'); votes = votes || 300; }
+    else if (f.sort === 'newest') { if (kind === 'movie') { q.set('sortBy', 'primary_release_date.desc'); q.set('primaryReleaseDateLte', today); } else { q.set('sortBy', 'first_air_date.desc'); q.set('firstAirDateLte', today); } votes = votes || 20; }
+    else if (f.sort === 'az') { q.set('sortBy', kind === 'movie' ? 'original_title.asc' : 'original_name.asc'); votes = votes || 20; }
+    if (votes) q.set('voteCountGte', votes);
+    return q.toString();
+  };
+  S.active = key => { const f = S.filters[key]; return (key === 'trending' && f.kind !== 'all') || f.genres.length > 0 || !!f.provider || f.minRating > 0 || f.sort !== 'popular'; };
+  S.summary = key => {
+    const f = S.filters[key], parts = [], kind = S.eff(key) === 'tv' ? 'tv' : 'movie';
+    if (key === 'trending' && f.kind !== 'all') parts.push(f.kind === 'tv' ? 'shows' : 'movies');
+    if (f.genres.length) parts.push(f.genres.join(' + '));
+    if (f.provider) { const p = S.provs[kind].find(x => String(x.id) === f.provider); if (p) parts.push('on ' + p.name); }
+    if (f.minRating) parts.push('rated ' + f.minRating + '.0+');
+    if (key !== 'trending' || f.kind !== 'all') parts.push({ popular: 'most popular', rating: 'top rated', newest: 'newest', az: 'A to Z' }[f.sort]);
+    const n = Math.max((S.cards[key] || []).length, S.totals[key] || 0);
+    return (S.busy[key] ? 'Asking Overseerr… · ' : (S.active(key) ? 'Filtered · ' : '') + n.toLocaleString() + ' titles · ') + parts.join(' · ');
+  };
+  S.sheet = () => {
+    const key = S.cur().key; S.fkey = key; S.fw = JSON.parse(JSON.stringify(S.filters[key]));
+    const L = openLayer('popup', '<div class="rfpanel" id="rfp"></div>', { close: () => S.applyFilters() });
+    S.drawSheet(); firstFocus(L.el);
+  };
+  S.drawSheet = () => {
+    const key = S.fkey, f = S.fw, ek = f.kind;
+    const chip = (k, v, label, on, extra) => `<div class="fx rfc ${on ? 'sel' : ''}" data-a="rqfc" data-k="${k}" data-v="${esc(v)}">${extra || ''}<span>${esc(label)}</span></div>`;
+    const head = `<div class="rfh">${esc(RLISTS.find(l => l.key === key).name)}</div>`;
+    const kinds = key === 'trending' ? `<div class="rfs">Show</div><div class="rfrow">${[['all', 'Trending now'], ['movie', 'Movies'], ['tv', 'Shows']].map(([v, t]) => chip('kind', v, t, f.kind === v)).join('')}</div>` : '';
+    if (ek === 'all') { $('#rfp').innerHTML = head + kinds + `<div class="rfs" style="font:24px HearthText;color:var(--muted)">Pick Movies or Shows to narrow Trending by genre, streaming service, rating or sort.</div><div class="rfrow rfend"><div class="fx rfc sel wide" data-a="rqfdone"><span>Show results</span></div></div>`; return; }
+    const names = S.genres[ek].map(g => g.name), provs = S.provs[ek] || [];
+    $('#rfp').innerHTML = head + kinds + `
+      <div class="rfs">Genre</div><div class="rfrow">${chip('any', '', 'Any', !f.genres.length)}${names.map(n => chip('genre', n, n, f.genres.includes(n))).join('')}</div>
+      ${provs.length ? `<div class="rfs">Streaming on</div><div class="rfrow">${chip('prov', '', 'Any', !f.provider)}${provs.map(p => chip('prov', String(p.id), p.name, f.provider === String(p.id), `<img src="${tmdb(p.logoPath, 'w92')}" alt="">`)).join('')}</div>` : ''}
+      <div class="rfs">Rating (TMDB)</div><div class="rfrow">${[[0, 'Any'], [6, '6.0+'], [7, '7.0+'], [8, '8.0+']].map(([v, t]) => chip('rate', v, t, f.minRating === v, v ? '<i class="rfstar">★</i>' : '')).join('')}</div>
+      <div class="rfs">Sort</div><div class="rfrow">${[['popular', 'Popular'], ['rating', 'Top rated'], ['newest', 'Newest'], ['az', 'A to Z']].map(([v, t]) => chip('sort', v, t, f.sort === v)).join('')}</div>
+      <div class="rfrow rfend"><div class="fx rfc sel wide" data-a="rqfdone"><span>Show results</span></div>${chip('reset', '', 'Reset', false)}</div>`;
+  };
+  S.fchip = el => {
+    const f = S.fw, k = el.dataset.k, v = el.dataset.v;
+    if (k === 'kind') { if (f.kind !== v) { f.kind = v; f.genres = []; f.provider = ''; if (v === 'all') { f.minRating = 0; f.sort = 'popular'; } } }
+    else if (k === 'any') f.genres = [];
+    else if (k === 'genre') f.genres = f.genres.includes(v) ? f.genres.filter(x => x !== v) : f.genres.concat(v);
+    else if (k === 'prov') f.provider = v; else if (k === 'rate') f.minRating = +v; else if (k === 'sort') f.sort = v;
+    else if (k === 'reset') Object.assign(f, rqNF(S.fkey === 'trending' ? 'all' : S.fkey === 'tv' ? 'tv' : 'movie'));
+    S.drawSheet(); const again = $$('#rfp .rfc').find(e => e.dataset.k === k && e.dataset.v === v) || $('#rfp .rfc'); setFocus(again);
+  };
+  S.applyFilters = () => {
+    const key = S.fkey; if (!key || JSON.stringify(S.fw) === JSON.stringify(S.filters[key])) return;
+    S.filters[key] = S.fw; S.loadList(key);
   };
   S.loadMine = async () => {
     try {
@@ -1381,6 +1559,11 @@ function roomRequests(room, tok) {
     const L = openLayer('popup', `<div class="rpanel"><div class="rpp" style="background-image:url('${esc(m.poster)}')"></div><div class="rpx"><div class="reb">${esc(m.eyebrow)}${m.rating ? `<i class="star">★</i>${esc(m.rating)}` : ''}</div><div class="rpt">${esc(m.title.toUpperCase())}</div><div class="rpo">${esc(m.overview)}</div>
       <div class="rpi">${m.items.map(it => `<div class="fx rpb ${it.check ? 'chk' : ''} ${it.locked ? 'locked' : ''} ${it.check ? 'checked' : ''}" data-a="rqpick" data-t="${it.tag}">${it.check ? '<i class="bx"></i>' : (it.icon ? ricon(it.icon) : '')}<span>${esc(it.label)}</span>${it.sub ? `<em>${esc(it.sub)}</em>` : ''}${it.right ? `<u>${esc(it.right)}</u>` : ''}</div>`).join('')}</div><div class="rph2">Back to close</div></div></div>`);
     L.card = c; L.rq = true;
+    if (c.kind === 'media' && c.data.id != null && m.rating !== '') {
+      const rk = c.data.mediaType + c.data.id, put = t => { const eb = $('.reb', L.el); if (t && eb && !eb.querySelector('.rtc')) eb.insertAdjacentHTML('beforeend', `<span class="rtc">${esc(t)}</span>`); };
+      if (S.rt[rk] !== undefined) put(S.rt[rk]);
+      else ov('GET', c.data.mediaType === 'tv' ? `/api/v1/tv/${c.data.id}/ratings` : `/api/v1/movie/${c.data.id}/ratingscombined`).then(j => { const r = j.rt || j; S.rt[rk] = r.criticsScore != null ? 'ROTTEN TOMATOES ' + Math.round(r.criticsScore) + '%' : ''; put(S.rt[rk]); }).catch(() => { S.rt[rk] = ''; });
+    }
   };
   S.pick = (L, el) => {
     const a = el.dataset.t, c = L.card, d = c.data;
@@ -1400,7 +1583,7 @@ function roomRequests(room, tok) {
   };
   S.tab = i => { S.newTab = i; S.show(); };
   RQLeave = () => { if (S.undo()) return true; if (S.over) { S.over = null; S.show(); setFocus($$('.rc', room)[0] || null); return true; } return false; };
-  RQInfo = i => { if (RQ === S && S.room === room) S.info(i); };
+  RQInfo = i => { if (RQ === S && S.room === room) { S.info(i); const k = S.cur().key; if (RQ_FILT.includes(k) && S.shown && S.shown.length - i <= 18) S.more(k); } };
   S.pollT = setInterval(() => { if (cur !== 'Requests' || RQ !== S) { clearInterval(S.pollT); return; } if (S.cur().key === 'mine' && S.mineActive && !layers.length) S.loadMine(); }, 10000);
   if (!$('#rg', room)) return;
   S.show(); S.load();
@@ -1635,6 +1818,13 @@ function act(el) {
     } else if (k === 'audio') {
       const al = audOf(L.full), cur = L.audSel !== undefined ? L.audSel : defAud(L.full);
       pickSheet('Audio', al.map(sLabel), i => { L.audSel = al[i].id; L.render(); setFocus($$('.ib', L.el)[L.acts.findIndex(x => x[2] === 'audio')]); }, al.findIndex(x => x.id === cur));
+    } else if (k === 'more') {
+      const md = L.md, m0 = L.full && L.full.Media && L.full.Media[0], pt = m0 && m0.Part && m0.Part[0];
+      const row = (n, v) => v ? `<div class="mr"><em>${esc(n)}</em><span>${esc(v)}</span></div>` : '';
+      const names = a => (a || []).map(x => x.tag).join(', ');
+      const size = pt && pt.size ? (pt.size / 1073741824).toFixed(1) + ' GB' : '';
+      const html = row('Studio', md.studio) + row('Directed by', names(md.Director)) + row('Written by', names(md.Writer)) + row('Genres', names(md.Genre)) + row('Country', names(md.Country)) + row('Added', md.addedAt ? new Date(md.addedAt * 1000).toLocaleDateString() : '') + row('File', pt && pt.file ? pt.file.split('/').pop() : '') + row('Size', size) + row('Video', m0 ? `${m0.width}x${m0.height} ${m0.videoCodec} ${m0.bitrate || ''} kbps` : '') + row('Container', m0 && m0.container);
+      openLayer('sheet more', `<div class="in" style="flex-direction:column"><h2>More</h2><div class="mlist scroll" style="position:relative;flex:1;overflow:auto">${html}</div><div class="fx chip" data-a="back">Close</div></div>`);
     } else if (k === 'resume') playTarget(L); else if (k === 'restart') playTarget(L, 0);
     else if (k.startsWith('trailer:')) playItem(k.slice(8), 'clip', { from: 0 }).catch(e => toast(e.message));
     else if (k === 'watch' || k === 'unwatch') fetch(`${PX}/:/${k === 'watch' ? 'scrobble' : 'unscrobble'}?key=${L.md.ratingKey}&identifier=com.plexapp.plugins.library`).then(() => { toast(k === 'watch' ? 'Marked watched' : 'Marked unwatched'); L.load(); }).catch(() => toast('Plex did not answer'));
@@ -1642,6 +1832,10 @@ function act(el) {
   else if (a === 'ep') { const L = layers[layers.length - 1]; L.epSel = +d.i; playTarget(L, null, L.eps[+d.i]); }
   else if (a === 'season') { const L = layers[layers.length - 1]; L.sIdx = +d.i; L.loadEps().then(() => { L.drawTabs(); L.drawEps(); setFocus($$('.stab', L.el)[L.sIdx]); }); }
   else if (a === 'shuffle') { const L = layers[layers.length - 1]; const e = L.eps[Math.random() * L.eps.length | 0]; playTarget(L, 0, e); }
+  else if (a === 'pskip') layers[layers.length - 1].doSkip();
+  else if (a === 'pupplay') layers[layers.length - 1].goNext();
+  else if (a === 'pupno') { const L = layers[layers.length - 1]; clearInterval(L.upT); $('#pup', L.el).style.display = 'none'; setFocus(null); }
+  else if (a === 'pchap') layers[layers.length - 1].pickChap();
   else if (a === 'clip') playItem(d.k, 'clip', { from: 0 }).catch(e => toast(e.message));
   else if (a === 'skey') { const c = d.c; if (c === '⌫') SR.set(SR.text.slice(0, -1)); else if (c === '⌧') SR.set(''); else SR.set(SR.text + c); }
   else if (a === 'spick') SR.set(d.t);
@@ -1654,6 +1848,9 @@ function act(el) {
   else if (a === 'rtab') RQ.tab(+d.i);
   else if (a === 'rqkey') { const c = d.c; if (c === '⌫') RQ.type(RQ.text.slice(0, -1)); else if (c === '⌧') RQ.type(''); else RQ.type(RQ.text + c); }
   else if (a === 'rqpick') RQ.pick(layers[layers.length - 1], el);
+  else if (a === 'rqfilter') RQ.sheet();
+  else if (a === 'rqfc') RQ.fchip(el);
+  else if (a === 'rqfdone') closeLayer();
   else if (a === 'pshow') openSlideshow(d.id, d.n);
   else if (a === 'soptsec') { const L = layers[layers.length - 1]; L.seconds = L.secs[(L.secs.indexOf(L.seconds) + 1) % L.secs.length]; SETPREF('photoSeconds', L.seconds); el.textContent = 'Time per photo: ' + L.seconds + ' s'; }
   else if (a === 'soptorder') { const L = layers[layers.length - 1]; L.order = L.order === 'order' ? 'shuffle' : 'order'; SETPREF('photoOrder', L.order); el.textContent = 'Order: ' + (L.order === 'order' ? 'Oldest first' : 'Shuffle') + ' (next batch)'; }

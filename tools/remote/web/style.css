@@ -13,7 +13,6 @@ body{color:var(--ink);font-family:HearthText,Georgia,serif}
 @keyframes ffd{0%{opacity:0}30%{opacity:.8}100%{opacity:.1;transform:translate(var(--dx),var(--dy))}}
 /* room bar */
 #bar{position:absolute;left:0;right:0;top:0;height:130px;z-index:5}
-#logo{position:absolute;left:100px;top:28px;width:44px;height:77px}
 #rooms{position:absolute;left:180px;right:330px;top:36px;display:flex;justify-content:center;gap:6px;font:26px/1 HearthPica;letter-spacing:.08em;text-transform:uppercase}
 .rm{position:relative;padding:8px 14px 26px;color:var(--muted);cursor:pointer}
 .rm.cur{color:var(--ink)}
@@ -320,6 +319,23 @@ video{position:absolute;inset:0;width:100%;height:100%;background:#000;object-fi
 .rcap{position:absolute;left:0;top:340px;width:180px;z-index:2}
 .rcap b{display:block;font:700 21px/1.2 HearthSans;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .rcap span{display:block;font:19px HearthText;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rscore{position:absolute;right:8px;top:8px;z-index:2;background:#0B0E09d0;color:var(--gold);font:700 20px/30px HearthSans;padding:0 9px;border-radius:5px}
+.rfbar{position:absolute;left:540px;top:128px;display:none;align-items:center;gap:26px}
+.rfbtn{display:flex;align-items:center;gap:12px;height:52px;padding:0 24px;border-radius:26px;background:#ffffff12;font:700 26px HearthSans}
+.rfbtn .ic{width:24px;height:24px}
+.rfsum{font:24px HearthText;color:var(--muted)}
+.rfpanel{width:900px;max-height:1000px;overflow:hidden;background:#141A11;border-radius:16px;border:2px solid #ffffff14;padding:26px 34px}
+.rfh{font:italic 42px HearthFell}
+.rfs{font:30px HearthFell;color:#D9A066;margin:14px 0 8px}
+.rfrow{display:flex;flex-wrap:wrap;gap:10px}
+.rfc{display:flex;align-items:center;gap:8px;height:46px;padding:0 20px;border-radius:23px;background:#ffffff12;font:700 22px HearthSans}
+.rfc img{width:30px;height:30px;border-radius:6px;margin-left:-8px}
+.rfc.sel{background:var(--gold);color:var(--goldInk)}
+.rfc.on{outline:4px solid #FFF3D0;outline-offset:3px}
+.rfc.wide{width:520px;justify-content:center}
+.rfstar{font-style:normal}
+.rfend{margin-top:22px}
+.rtc{margin-left:24px;color:#F0907C}
 .rempty{position:absolute;left:540px;top:160px;width:1200px;font:28px HearthText;color:var(--muted)}
 .rsearch{position:absolute;left:540px;top:20px;width:1300px;display:none}
 .rsearch .skb{position:absolute;left:0;top:44px}
@@ -399,3 +415,12 @@ video{position:absolute;inset:0;width:100%;height:100%;background:#000;object-fi
 .shint{position:absolute;right:96px;bottom:18px;font:20px HearthText;color:#fff8;opacity:.7}
 .sopt{display:none;position:absolute;right:96px;top:300px;width:560px;flex-direction:column;gap:14px;background:#0B0E09f0;border:2px solid #ffffff22;border-radius:16px;padding:26px}
 .sopt h4{margin:0;font:italic 36px HearthFell}
+
+.skipb{position:absolute;right:60px;bottom:170px;padding:16px 34px;background:#0B0E09dd;border:2px solid var(--gold,#D9A441);border-radius:14px;font:700 28px HearthSans;color:#fff}
+.pausescr{position:absolute;inset:0;display:none;flex-direction:column;justify-content:center;padding:0 140px;background:linear-gradient(90deg,#0B0E09ee,#0B0E0955 70%,transparent);pointer-events:none}
+.pausescr.on{display:flex}
+.pausescr .pk{font:600 22px 'IM Fell DW Pica SC',serif;letter-spacing:.2em;color:#D9A441}.pausescr .pt{font:700 64px HearthSans;margin:8px 0}.pausescr .ps{font:italic 30px 'IM Fell English',serif;color:#cfc8b0}.pausescr .pc{margin-top:26px;font:600 26px HearthSans;color:#fff9}
+.upnext{position:absolute;right:60px;bottom:90px;width:520px;padding:26px 30px;background:#0B0E09ee;border:2px solid #ffffff33;border-radius:20px}
+.upnext .uk{font:600 20px 'IM Fell DW Pica SC',serif;letter-spacing:.2em;color:#D9A441}.upnext .ut{font:700 38px HearthSans;margin:6px 0}.upnext .us{font:italic 26px 'IM Fell English',serif;color:#cfc8b0}.upnext .ub{display:flex;gap:14px;margin-top:18px}
+.mlist .mr{display:flex;gap:24px;padding:14px 0;border-bottom:1px solid #ffffff1a;font:600 26px HearthSans}.mlist em{width:240px;font:italic 26px 'IM Fell English',serif;color:#D9A441}.mlist span{flex:1;word-break:break-all}
+.tn .img{height:90px}.tn .tk{display:flex;align-items:center;gap:8px;margin-top:10px;font:600 17px 'IM Fell DW Pica SC',serif;letter-spacing:.12em;color:#E0B34A}.tn .tk .ic{width:22px;height:22px;background:#E0B34A;-webkit-mask:var(--m) center/contain no-repeat;mask:var(--m) center/contain no-repeat}

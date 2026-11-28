@@ -47,28 +47,28 @@
 #rooms{position:absolute;left:0;right:0;top:0;height:130px;display:block;font:0/0 serif;letter-spacing:0}
 .rm{position:absolute;top:42px;height:52px;padding:0;background:center/contain no-repeat;color:transparent}
 .rm .dot{display:none}
-.rm[data-r=Home]{left:280px;width:101px;background-image:url(img/w/room-home-dim.png)}
+.rm[data-r=Home]{left:100px;width:101px;background-image:url(img/w/room-home-dim.png)}
 .rm.cur[data-r=Home]{background-image:url(img/w/room-home-current.png)}
 .rm.on[data-r=Home]{background-image:url(img/w/room-home-focused.png)}
-.rm[data-r=Shows]{left:420px;width:121px;background-image:url(img/w/room-shows-dim.png)}
+.rm[data-r=Shows]{left:240px;width:121px;background-image:url(img/w/room-shows-dim.png)}
 .rm.cur[data-r=Shows]{background-image:url(img/w/room-shows-current.png)}
 .rm.on[data-r=Shows]{background-image:url(img/w/room-shows-focused.png)}
-.rm[data-r=Movies]{left:578px;width:133px;background-image:url(img/w/room-movies-dim.png)}
+.rm[data-r=Movies]{left:398px;width:133px;background-image:url(img/w/room-movies-dim.png)}
 .rm.cur[data-r=Movies]{background-image:url(img/w/room-movies-current.png)}
 .rm.on[data-r=Movies]{background-image:url(img/w/room-movies-focused.png)}
-.rm[data-r=Music]{left:750px;width:111px;background-image:url(img/w/room-music-dim.png)}
+.rm[data-r=Music]{left:570px;width:111px;background-image:url(img/w/room-music-dim.png)}
 .rm.cur[data-r=Music]{background-image:url(img/w/room-music-current.png)}
 .rm.on[data-r=Music]{background-image:url(img/w/room-music-focused.png)}
-.rm[data-r=Requests]{left:899px;width:174px;background-image:url(img/w/room-requests-dim.png)}
+.rm[data-r=Requests]{left:719px;width:174px;background-image:url(img/w/room-requests-dim.png)}
 .rm.cur[data-r=Requests]{background-image:url(img/w/room-requests-current.png)}
 .rm.on[data-r=Requests]{background-image:url(img/w/room-requests-focused.png)}
-.rm[data-r=Ambiance]{left:1111px;width:182px;background-image:url(img/w/room-ambiance-dim.png)}
+.rm[data-r=Ambiance]{left:931px;width:182px;background-image:url(img/w/room-ambiance-dim.png)}
 .rm.cur[data-r=Ambiance]{background-image:url(img/w/room-ambiance-current.png)}
 .rm.on[data-r=Ambiance]{background-image:url(img/w/room-ambiance-focused.png)}
-.rm[data-r=Photos]{left:1332px;width:134px;background-image:url(img/w/room-photos-dim.png)}
+.rm[data-r=Photos]{left:1152px;width:134px;background-image:url(img/w/room-photos-dim.png)}
 .rm.cur[data-r=Photos]{background-image:url(img/w/room-photos-current.png)}
 .rm.on[data-r=Photos]{background-image:url(img/w/room-photos-focused.png)}
-.rm[data-r=Search]{left:1504px;width:136px;background-image:url(img/w/room-search-dim.png)}
+.rm[data-r=Search]{left:1324px;width:136px;background-image:url(img/w/room-search-dim.png)}
 .rm.cur[data-r=Search]{background-image:url(img/w/room-search-current.png)}
 .rm.on[data-r=Search]{background-image:url(img/w/room-search-focused.png)}
 .rm.tst{left:auto;right:96px;top:112px;height:24px;width:auto;font:20px/24px HearthText;letter-spacing:.08em;color:#B5AF8C88;background:none;text-transform:uppercase}.rm.tst.on{color:var(--gold)}.rm.tst::after{display:none}
