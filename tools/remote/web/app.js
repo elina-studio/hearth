@@ -109,11 +109,33 @@ const io = window.IntersectionObserver ? new IntersectionObserver(es => {
   }
 }, { rootMargin: '500px' }) : null;
 new MutationObserver(() => {
+  if ($('.rc[data-sk]:not([data-sd])')) rqScoresSoon();
   $$('[data-bg]').forEach(el => {
     if (el._o) return; el._o = 1;
     if (io) io.observe(el); else { el.style.backgroundImage = `url("${el.dataset.bg}")`; }
   });
 }).observe(stage, { childList: true, subtree: true });
+
+/* ---------- IMDb and Rotten Tomatoes on Requests posters (build 139: the helper's ratings.py, mini badge) ---------- */
+const RSC = {}; let rscT = 0;
+function rqScoresSoon() { clearTimeout(rscT); rscT = setTimeout(rqScores, 250); }
+async function rqScores() {
+  const cards = $$('.rc[data-sk]:not([data-sd])'); if (!cards.length) return;
+  const want = [...new Set(cards.map(c => c.dataset.sk).filter(k => !(k in RSC)))].slice(0, 200);
+  if (want.length) {
+    try {
+      const r = await fetch('/api/ratings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids: want }) });
+      const j = await r.json(); const got = j.ratings || {}, pend = j.pending || [];
+      for (const k of want) if (got[k] || !pend.includes(k)) RSC[k] = got[k] || null;
+      if (pend.length) setTimeout(rqScoresSoon, 4000);
+    } catch (e) { return; }
+  }
+  for (const c of $$('.rc[data-sk]:not([data-sd])')) {
+    const k = c.dataset.sk; if (!(k in RSC)) continue;
+    c.dataset.sd = '1'; const v = RSC[k]; if (!v || (v.rt == null && v.imdb == null)) continue;
+    c.insertAdjacentHTML('beforeend', `<div class="rsc2">${v.rt != null ? `<img src="img/icons/${v.cert ? 'tomato-cert' : 'tomato'}.png" alt=""><b>${v.rt}%</b>` : ''}${v.imdb != null ? `<img src="img/icons/imdb.png" alt="" class="imdb"><b>${v.imdb}</b>` : ''}</div>`);
+  }
+}
 
 /* ---------- focus and navigation ---------- */
 let focusEl = null;
@@ -134,9 +156,12 @@ function reveal(el) {
     if (l < 40) row.scrollLeft += l - 40; else if (r > W - 40) row.scrollLeft += r - (W - 40);
   }
 }
+const FH = {};
 function setFocus(el) {
   if (focusEl) focusEl.classList.remove('on');
   focusEl = el;
+  if (el && FH.any) FH.any(el);
+  { const tl = layers[layers.length - 1]; if (tl && tl.onFocus) tl.onFocus(el); }
   mossOn(el); barFlies();
   if (el) { el.classList.add('on'); reveal(el); if (el.classList.contains('pc2') && el.dataset.i !== undefined && !el.closest('.layer') && typeof LRInfo === 'function') LRInfo(+el.dataset.i); if (el.classList.contains('rc') && typeof RQInfo === 'function') RQInfo(+el.dataset.i); if (el.dataset.a === 'rail' && RQ && cur === 'Requests' && RQ.idx !== +el.dataset.i) { RQ.idx = +el.dataset.i; RQ.over = null; RQ.show(); } }
 }
@@ -164,9 +189,13 @@ function move(dir) {
 /* ---------- layers (sheets, player, moods) and history ---------- */
 function openLayer(cls, html, handlers) {
   const el = document.createElement('div');
-  el.className = 'layer ' + cls; el.innerHTML = html;
-  // The video player sits outside the scaled stage: a video inside a scaled, animated page makes weak chips drop frames
-  (cls === 'player' ? $('#vlayers') : $('#layers')).appendChild(el);
+  el.className = 'layer ' + cls;
+  // The video player and the full-screen music views sit outside the scaled stage: a video inside a scaled, animated page
+  // makes weak chips drop frames. A popup opened over one of them goes there too, in its own scaled box.
+  const top = layers[layers.length - 1];
+  const inV = /\b(player|mview)\b/.test(cls) || (/\bdlg\b|\bqsheet\b/.test(cls) && top && top.el.parentNode === $('#vlayers'));
+  el.innerHTML = inV && !/\b(player|mview)\b/.test(cls) ? `<div class="hudbox" style="pointer-events:auto">${html}</div>` : html;
+  (inV ? $('#vlayers') : $('#layers')).appendChild(el);
   const L = Object.assign({ el, prev: focusEl }, handlers || {});
   layers.push(L);
   history.pushState({ n: layers.length }, '');
@@ -175,7 +204,7 @@ function openLayer(cls, html, handlers) {
   return L;
 }
 // While a full-screen layer is open, the pages underneath stop drawing (and the fireflies stop moving)
-function syncCover() { stage.classList.toggle('cover', layers.some(l => /player|mood|slide/.test(l.el.className))); }
+function syncCover() { stage.classList.toggle('cover', layers.some(l => /player|mood|slide|mview/.test(l.el.className))); paintChip(); }
 function closeLayer() { if (layers.length) history.back(); }
 addEventListener('popstate', () => {
   const L = layers.pop();
@@ -184,7 +213,10 @@ addEventListener('popstate', () => {
   L.el.remove(); syncCover();
   { const t = layers[layers.length - 1]; if (t && t.onShown) t.onShown(); }
   if (L.prev && document.contains(L.prev)) setFocus(L.prev); else firstFocus(layers.length ? layers[layers.length - 1].el : $('#room'));
+  if (L.after) { try { L.after(); } catch (e) { toast(e.message); } }
 });
+// close the top layer, then do something once it is really gone (history.back() finishes later)
+function closeThen(fn) { const L = layers[layers.length - 1]; if (!L) { fn(); return; } L.after = fn; history.back(); }
 history.replaceState({ n: 0 }, '');
 
 /* ---------- keys ---------- */
@@ -267,7 +299,7 @@ function remoteKey(k) {
 const ROOMS = ['Home', 'Shows', 'Movies', 'Music', 'Requests', 'Ambiance', 'Photos', 'Search', 'Test'];
 const LIVE = new Set(['Home', 'Shows', 'Movies', 'Music', 'Requests', 'Ambiance', 'Photos', 'Search', 'Test']);
 let cur = 'Home', renderTok = 0, autoF = null;
-const RBX = { Home: [100, 101], Shows: [240, 121], Movies: [398, 133], Music: [570, 111], Requests: [719, 174], Ambiance: [931, 182], Photos: [1152, 134], Search: [1324, 136] };
+const RBX = { Home: [100, 101], Shows: [240, 121], Movies: [398, 133], Music: [570, 111], Requests: [719, 174], Ambiance: [931, 182], Photos: [1152, 134], Search: [1324, 60] };
 function drawBar() {
   $('#rooms').innerHTML = ROOMS.map(r => `<div class="fx rm ${RBX[r] ? '' : 'tst'} ${r === cur ? 'cur' : ''}" data-a="room" data-r="${r}">${RBX[r] ? '' : r}</div>`).join('')
     + '<img class="bf" id="bglow" src="img/w/firefly-glow.png" alt=""><img class="bf" id="bf1" src="img/w/firefly-small.png" width="48" height="48" alt=""><img class="bf" id="bf2" src="img/w/firefly-small.png" width="48" height="48" style="opacity:.45" alt=""><img class="bf" id="bfly" src="img/w/firefly-main.png" width="64" height="64" alt="">';
@@ -305,7 +337,7 @@ function mossOn(el) {
 }
 async function go(name, keepFocus) {
   if (PH) PH.stop();
-  cur = name; drawBar();
+  cur = name; drawBar(); paintChip();
   const tok = ++renderTok;
   const room = $('#room'); room.innerHTML = '';
   let ok = true;
@@ -317,7 +349,7 @@ async function go(name, keepFocus) {
     else if (name === 'Requests') roomRequests(room, tok);
     else if (name === 'Photos') await roomPhotos(room, tok);
     else if (name === 'Shows') await roomLib(room, tok, 'show');
-    else if (name === 'Ambiance') roomAmbiance(room);
+    else if (name === 'Ambiance') await roomAmbiance(room, tok);
     else if (name === 'Test') await roomTest(room, tok);
     else soon(room, name);
   } catch (e) { if (tok === renderTok) { room.innerHTML = `<div class="msg">Can't reach your library right now.<br>${esc(e.message)}</div>`; } }
@@ -353,9 +385,9 @@ function pickTonight() {
   if (ls.length) { const it = ls[(seed * 5 + 2) % ls.length], m2 = mins(it); out.push({ a: `data-a="album" data-k="${it.ratingKey}" data-t="playlist"`, ic: 'home-note', kick: 'A PLAYLIST' + (m2 ? ' · ' + tnLen(m2).toUpperCase() : ''), title: it.title, pic: img(it.composite || it.thumb, 300, 300) }); }
   const old = $('#tonight'); const had = old && old.contains(focusEl); if (old) old.remove();
   if (!out.length) return;
-  const sec = document.createElement('div'); sec.id = 'tonight'; sec.dataset.o = -1;
-  sec.innerHTML = hd('Tonight', note) + `<div class="row">${out.map(o => `<div class="fx card tn" ${o.a}><div class="img" data-bg="${o.pic}"></div><div class="tk"><i class="ic" style="--m:url(img/icons/${o.ic}.png)"></i>${esc(o.kick)}</div><div class="t">${esc(o.title)}</div></div>`).join('')}</div>`;
-  const rows = $('#rows'); rows.insertBefore(sec, rows.firstChild);
+  const sec = document.createElement('div'); sec.id = 'tonight';
+  sec.innerHTML = `<div class="tnh"><i class="ic" style="--m:url(img/icons/icon-moon.png)"></i>Tonight<small>${esc(note)}</small></div><div class="row">${out.map(o => `<div class="fx card tn" ${o.a}><div class="img" data-bg="${o.pic}"></div><div class="tk"><i class="ic" style="--m:url(img/icons/${o.ic}.png)"></i>${esc(o.kick)}</div><div class="t">${esc(o.title)}</div></div>`).join('')}</div>`;
+  const box = $('#tnp'); if (!box) return; box.appendChild(sec); box.classList.add('on');
   if (had) setFocus($('.fx', sec));
 }
 async function roomHome(room, tok) {
@@ -363,7 +395,7 @@ async function roomHome(room, tok) {
   await libs();
   const mood = MOODS.map(([m, n]) => `<div class="fx mtile" data-a="mood" data-m="${m}" style="background-image:url(img/tile-${m}.jpg)"><b>${n}</b></div>`).join('');
   room.innerHTML = `<div class="scroll">
-    <div class="hero" id="hero"><div class="kick" style="left:40px;top:24px;position:absolute">Loading</div></div>
+    <div class="htop"><div class="hero" id="hero"><div class="kick" style="left:40px;top:24px;position:absolute">Loading</div></div><div class="tnp" id="tnp"></div></div>
     <div class="tri">
       <div class="panel mcard" id="mc">${musicCardInner()}</div>
       <div class="panel rcard" id="rc"><div class="fx" data-a="room" data-r="Requests" style="position:absolute;inset:0;border-radius:18px"></div><div class="eb">Requests</div><div class="big" id="rn">·</div><div class="ms" id="rt" style="margin-top:6px"></div></div>
@@ -432,10 +464,75 @@ function musicCardInner() {
   <div class="mbar"><i id="mc-bar"></i></div>`;
 }
 
+/* ---------- the rich popup (the Roku's HearthDialog: hand-cut card, twig, firefly, rows with icons) ---------- */
+// o = { title, icon, now: {art, kick, title, sub, chips}, hero: {art, kick, title, sub, shape}, message, q (a question: centred, buttons in a row),
+//       rows: [{ head, label, sub, icon, value ('On' / 'Off' draws a switch), arrow, tick, kind: '' | 'tile' | 'main' | 'pic', pic, hrt, cur }],
+//       split (first row of the right column), wide, pick(i, row, L, el) }
+// pick returns 'keep' to leave the popup open (after changing row.value etc.: the row is redrawn), otherwise the popup closes first.
+const MI = n => `img/music/${n}.png`;
+function dlgRow(r, i) {
+  const ico = r.icon ? `<i class="ic" style="--m:url(${r.icon})"></i>` : '';
+  if (r.kind === 'tile' || r.kind === 'main') return `<div class="fx dtile ${r.kind === 'main' ? 'main' : ''}" data-a="dlg" data-i="${i}">${ico}<b>${esc(r.label)}</b>${r.sub ? `<s>${esc(r.sub)}</s>` : ''}</div>`;
+  if (r.kind === 'pic') return `<div class="fx dpic ${r.cur ? 'cur' : ''}" data-a="dlg" data-i="${i}" style="background-image:url('${esc(r.pic || '')}')">${r.hrt ? `<i class="ic hrt" style="--m:url(${MI('heart')})"></i>` : ''}<b>${esc(r.label)}</b></div>`;
+  let right = '';
+  if (r.value === 'On' || r.value === 'Off') right = `<span class="sw ${r.value === 'On' ? 'on' : ''}"><i></i></span>`;
+  else if (r.value) right = `<span class="dv">${esc(r.value)}</span>`;
+  else if (r.tick) right = `<i class="ic tick" style="--m:url(${MI('check')})"></i>`;
+  else if (r.arrow) right = '<span class="da">›</span>';
+  return `<div class="fx dr ${r.dis ? 'dis' : ''}" data-a="dlg" data-i="${i}">${ico}<div class="dt"><b>${esc(r.label)}</b>${r.sub ? `<s>${esc(r.sub)}</s>` : ''}</div>${right}</div>`;
+}
+function dlgCol(rows, from, to) {
+  let h = '', i = from;
+  while (i < to) {
+    const r = rows[i];
+    if (r.head) h += `<div class="dh">${esc(r.head)}</div>`;
+    if (r.kind === 'tile' || r.kind === 'main' || r.kind === 'pic') {
+      const k = r.kind === 'pic' ? 'pic' : 'tile'; let j = i, part = '';
+      while (j < to && (k === 'pic' ? rows[j].kind === 'pic' : (rows[j].kind === 'tile' || rows[j].kind === 'main')) && (j === i || !rows[j].head)) { part += dlgRow(rows[j], j); j++; }
+      h += k === 'pic' ? `<div class="dpics ${rows[i].four ? 'four' : ''}">${part}</div>` : `<div class="dtiles">${part}</div>`;
+      i = j;
+    } else { h += dlgRow(r, i); i++; }
+  }
+  return h;
+}
+function dlg(o) {
+  const rows = o.rows || [];
+  const head = o.now ? `<div class="dnow"><div class="a" style="background-image:url('${esc(o.now.art || '')}')"></div><div class="w"><div class="k">${esc(o.now.kick || '')}</div><div class="t">${esc(o.now.title || '')}</div><div class="s">${esc(o.now.sub || '')}</div></div>${o.now.chips && o.now.chips.length ? `<div class="chips">${o.now.chips.map(c => `<span>${esc(c)}</span>`).join('')}</div>` : ''}</div>`
+    : o.hero ? `<div class="dhero"><div class="a ${o.hero.shape || ''}" style="background-image:url('${esc(o.hero.art || '')}')"></div><div class="w"><div class="k">${esc(o.hero.kick || '')}</div><div class="t">${esc(o.hero.title || '')}</div><div class="s">${esc(o.hero.sub || '')}</div></div></div>` : '';
+  const title = o.title ? `<div class="dtitle">${o.icon ? `<i class="ic" style="--m:url(${o.icon})"></i>` : ''}${esc(o.title)}</div>` : '';
+  const body = o.q ? `<div class="dbtns">${rows.map((r, i) => dlgRow(Object.assign({ kind: 'tile' }, r), i)).join('')}</div>`
+    : o.split ? `<div class="dcols"><div class="dcol">${dlgCol(rows, 0, o.split)}</div><div class="dcol">${dlgCol(rows, o.split, rows.length)}</div></div>` : dlgCol(rows, 0, rows.length);
+  const foot = `<div class="dfoot"><span><kbd>OK</kbd>Choose</span>${o.split ? '<span><kbd>◂ ▸</kbd>Other column</span>' : ''}<span><kbd>BACK</kbd>Close</span></div>`;
+  const L = openLayer('dlg', `<div class="dcard ${o.q ? 'q' : ''} ${o.split || o.wide ? 'wide' : ''}"><div class="twig"></div><div class="fly"></div>${title}${head}${o.message ? `<div class="dmsg">${esc(o.message)}</div>` : ''}<div class="dbody scroll">${body}</div>${foot}</div>`);
+  L.o = o; L.rows = rows;
+  const first = rows.findIndex(r => r.focus);
+  setFocus((first >= 0 && $(`.fx[data-i="${first}"]`, L.el)) || $('.fx', L.el) || null);
+  return L;
+}
+function dlgPick(el) {
+  const L = layers[layers.length - 1]; if (!L || !L.o) return;
+  const i = +el.dataset.i, r = L.rows[i];
+  if (r.dis) { if (r.why) toast(r.why); return; }
+  if (r.keep) {
+    const res = L.o.pick ? L.o.pick(i, r, L, el) : null;
+    if (res !== 'close') { const n = document.createElement('div'); n.innerHTML = dlgRow(r, i); const nn = n.firstChild; el.replaceWith(nn); setFocus(nn); return; }
+    closeLayer(); return;
+  }
+  closeThen(() => { if (L.o.pick) L.o.pick(i, r, L, el); });
+}
+// a question or a notice: centred, words, the buttons in one row
+function ask(title, message, buttons, cb) { return dlg({ q: true, title, message, rows: buttons.map((b, i) => ({ label: b, kind: i === 0 ? 'tile' : 'tile' })), pick: i => cb && cb(i) }); }
+// the old list sheet, now a popup with a tick on the current choice
+function pickSheet(title, labels, cb, cur) {
+  return dlg({ title, rows: labels.map((l, i) => ({ label: l, tick: i === cur, focus: i === cur })), pick: i => cb(i) });
+}
+
 /* ---------- Music engine ---------- */
 const aud = new Audio(); aud.preload = 'auto';
+const shuf = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.random() * (i + 1) | 0;[a[i], a[j]] = [a[j], a[i]]; } return a; };
+const mmss = s => { s = Math.max(0, s | 0); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
 const M = {
-  queue: [], i: -1, playing: false,
+  queue: [], i: -1, playing: false, shuffle: PREF0('shuffle') === '1', repeat: PREF0('repeat') || 'off', hooks: new Set(), held: false,
   cur() { return this.queue[this.i]; },
   trackOf(md) {
     const media = (md.Media || [])[0], part = media && (media.Part || [])[0];
@@ -444,27 +541,36 @@ const M = {
     const sid = 'hm' + md.ratingKey;
     const url = !part ? '' : okC ? `${PX}${part.key}`
       : `${PX}/music/:/transcode/universal/start.mp3?path=${encodeURIComponent('/library/metadata/' + md.ratingKey)}&mediaIndex=0&partIndex=0&protocol=http&directPlay=0&directStream=0&session=${sid}`;
-    return { id: md.ratingKey, title: md.title, artist: md.originalTitle || md.grandparentTitle || '', album: md.parentTitle || '', thumb: md.parentThumb || md.thumb || md.grandparentThumb, dur: (md.duration || 0) / 1000, url };
+    return { id: md.ratingKey, title: md.title, artist: md.originalTitle || md.grandparentTitle || '', album: md.parentTitle || '', albumKey: md.parentRatingKey || '', year: md.parentYear || md.year || '', thumb: md.parentThumb || md.thumb || md.grandparentThumb, dur: (md.duration || 0) / 1000, url, file: (part && part.file) || '' };
   },
   async playList(items, start, shuffle) {
-    let q = items.filter(m => m.type === 'track').map(m => this.trackOf(m)).filter(t => t.url);
+    const q = items.filter(m => m.type === 'track').map(m => this.trackOf(m)).filter(t => t.url);
     if (!q.length) { toast('Nothing playable there'); return; }
-    if (shuffle) { for (let i = q.length - 1; i > 0; i--) { const j = Math.random() * (i + 1) | 0;[q[i], q[j]] = [q[j], q[i]]; } start = 0; }
-    this.queue = q; this.i = Math.max(0, start || 0); this.load(true);
+    start = Math.max(0, start || 0);
+    if (shuffle || this.shuffle) { const first = q.splice(shuffle ? Math.random() * q.length | 0 : start, 1)[0]; shuf(q); q.unshift(first); start = 0; if (shuffle) this.setShuffle(true, true); }
+    this.queue = q; this.i = start; this.load(true);
   },
   load(play) {
     const t = this.cur(); if (!t) return;
     aud.src = t.url;
-    if (play) { aud.play().then(() => { this.playing = true; this.paint(); }).catch(() => { toast('The browser blocked sound until you press a key'); this.playing = false; this.paint(); }); }
+    if (play) { this.held = false; aud.play().then(() => { this.playing = true; this.paint(); }).catch(() => { toast('The browser blocked sound until you press a key'); this.playing = false; this.paint(); }); }
     try { localStorage.setItem('hearth.last', JSON.stringify(t)); } catch (e) { /* ignore */ }
-    this.paint();
+    this.paint(true);
   },
   toggle() {
     if (!this.cur()) { this.shuffleAll(); return; }
-    if (aud.paused) aud.play().then(() => { this.playing = true; this.paint(); }); else { aud.pause(); this.playing = false; this.paint(); }
+    if (aud.paused) aud.play().then(() => { this.playing = true; this.held = false; this.paint(); }); else { aud.pause(); this.playing = false; this.paint(); }
   },
-  next() { if (!this.queue.length) return; this.i = (this.i + 1) % this.queue.length; this.load(true); },
+  // the song ended (auto) or Next was pressed. Music never just stops: at the end of the queue it starts a fresh mix.
+  next(auto) {
+    if (!this.queue.length) return;
+    if (auto && this.repeat === 'one') { aud.currentTime = 0; aud.play().catch(() => {}); return; }
+    if (this.i + 1 < this.queue.length) { this.i++; this.load(true); return; }
+    if (this.repeat === 'all' || !auto) { this.i = 0; this.load(true); return; }
+    this.shuffleAll().catch(() => {});
+  },
   prev() { if (!this.queue.length) return; if (aud.currentTime > 4) { aud.currentTime = 0; return; } this.i = (this.i - 1 + this.queue.length) % this.queue.length; this.load(true); },
+  jump(i) { if (i >= 0 && i < this.queue.length) { this.i = i; this.load(true); } },
   async shuffleAll() {
     await libs();
     if (!musicLib) { toast('No music library found'); return; }
@@ -472,129 +578,531 @@ const M = {
     const mc = await pj(`/library/sections/${musicLib.key}/all`, { type: 10, sort: 'random', 'X-Plex-Container-Size': 60 });
     await this.playList(mc.Metadata || [], 0, false);
   },
-  paint() {
+  playNext(items) { const q = items.filter(m => m.type === 'track').map(m => this.trackOf(m)).filter(t => t.url); if (!this.cur()) { this.playList(items, 0); return; } this.queue.splice(this.i + 1, 0, ...q); toast(q.length === 1 ? 'Plays next' : q.length + ' songs play next'); this.paint(); },
+  addQueue(items) { const q = items.filter(m => m.type === 'track').map(m => this.trackOf(m)).filter(t => t.url); if (!this.cur()) { this.playList(items, 0); return; } this.queue.push(...q); toast(q.length === 1 ? 'Added to the queue' : q.length + ' songs added to the queue'); this.paint(); },
+  setShuffle(on, quiet) {
+    this.shuffle = on; SETPREF0('shuffle', on ? '1' : '0');
+    if (on && this.queue.length > this.i + 2) { const rest = this.queue.splice(this.i + 1); this.queue.push(...shuf(rest)); }
+    if (!quiet) toast(on ? 'Shuffle on' : 'Shuffle off');
+    this.paint();
+  },
+  cycleRepeat() { this.repeat = { off: 'all', all: 'one', one: 'off' }[this.repeat]; SETPREF0('repeat', this.repeat); toast({ off: 'Repeat off', all: 'Repeat all', one: 'Repeat this song' }[this.repeat]); this.paint(); },
+  // a mood or a video takes the sound: music stops, and comes back after if it was playing
+  hold() { if (this.playing) { aud.pause(); this.playing = false; this.held = true; this.paint(); } },
+  release() { if (this.held && this.cur()) { this.held = false; aud.play().then(() => { this.playing = true; this.paint(); }).catch(() => {}); } },
+  upNext(n) { const out = []; for (let k = 1; k <= n && this.i + k < this.queue.length; k++) out.push(this.queue[this.i + k]); return out; },
+  paint(song) {
     const t = this.cur();
     const set = (id, fn) => { const e = document.getElementById(id); if (e) fn(e); };
-    for (const p of ['mc', 'np']) {
-      set(p + '-t', e => e.textContent = t ? t.title : 'Shuffle my music');
-      set(p + '-s', e => e.textContent = t ? (t.artist + (t.album && p === 'np' ? ' · ' + t.album : '')) : 'OK to start a random mix');
-      set(p + '-eb', e => e.textContent = t ? (this.playing ? 'Now playing' : 'Paused') : 'Music');
-      set(p + '-pp', e => e.textContent = this.playing ? '❚❚' : '▶');
-      set(p + '-art', e => e.style.backgroundImage = t ? `url('${img(t.thumb, 360, 360)}')` : '');
-    }
+    set('mc-t', e => e.textContent = t ? t.title : 'Shuffle my music');
+    set('mc-s', e => e.textContent = t ? t.artist : 'OK to start a random mix');
+    set('mc-eb', e => e.textContent = t ? (this.playing ? 'Now playing' : 'Paused') : 'Music');
+    set('mc-pp', e => e.textContent = this.playing ? '❚❚' : '▶');
+    set('mc-art', e => e.style.backgroundImage = t ? `url('${img(t.thumb, 360, 360)}')` : '');
+    for (const f of this.hooks) { try { f(song); } catch (e) { console.error(e); } }
+    paintChip();
   }
 };
-aud.addEventListener('ended', () => M.next());
+function PREF0(k) { try { return localStorage.getItem('hearth.' + k) || ''; } catch (e) { return ''; } }
+function SETPREF0(k, v) { try { localStorage.setItem('hearth.' + k, v); } catch (e) { /* ignore */ } }
+aud.addEventListener('ended', () => M.next(true));
 aud.addEventListener('timeupdate', () => {
   const p = aud.duration ? aud.currentTime / aud.duration * 100 : 0;
-  for (const id of ['mc-bar', 'np-bar']) { const e = document.getElementById(id); if (e) e.style.width = p + '%'; }
+  for (const e of $$('#mc-bar,.mprog')) e.style.width = p + '%';
+  for (const e of $$('.mcur')) e.textContent = mmss(aud.currentTime);
+  for (const e of $$('.mdur')) e.textContent = mmss(aud.duration || (M.cur() || {}).dur || 0);
+  LY.tick();
 });
-aud.addEventListener('error', () => { if (M.cur()) { toast('Skipping a song that wouldn\'t play'); setTimeout(() => M.next(), 600); } });
+aud.addEventListener('error', () => { if (M.cur() && aud.src) { toast('Skipping a song that wouldn\'t play'); setTimeout(() => M.next(true), 600); } });
 try { const l = JSON.parse(localStorage.getItem('hearth.last') || 'null'); if (l && l.url) { M.queue = [l]; M.i = 0; aud.src = l.url; } } catch (e) { /* ignore */ }
 
-/* ---------- Music room ---------- */
+// the now-playing chip in the top bar: while music plays and Music is not the room (HubScreen.updateChip)
+function paintChip() {
+  const c = $('#npc'); if (!c) return;
+  const t = M.cur(), on = !!(t && M.playing && cur !== 'Music' && !stage.classList.contains('cover'));
+  c.classList.toggle('on', on);
+  if (!on) return;
+  $('#npc-t').textContent = t.title; $('#npc-s').textContent = t.artist;
+  const a = $('#npc-a'), u = `url("${img(t.thumb, 120, 120)}")`; if (a.style.backgroundImage !== u) a.style.backgroundImage = u;
+  // centred in the gap between the Search glass (1390) and the twig's leaf (1622), never wider than it
+  const w = Math.min(232, c.offsetWidth || 232); c.style.maxWidth = '232px';
+  c.style.left = Math.round((1390 + 1622 - w) / 2) + 'px';
+}
+
+/* ---------- lyrics plaque (LyricsPanel, build 144) ---------- */
+const LY = {
+  el: null, id: '', times: [], lines: [], plain: '', idx: -2, on: PREF0('lyricsOn') !== '0', found: false, hidden: false,
+  html() { return '<div class="lyr" id="lyr"><div class="bg"></div><div class="bd"></div><div class="tw a"></div><div class="tw b"></div>' + [0, 1, 2, 3, 4].map(k => `<div class="ln n${k === 2 ? 'c' : Math.abs(k - 2) === 1 ? '1' : '0'} ${k === 2 ? 'cur' : ''}"></div>`).join('') + '</div>'; },
+  attach(el) { this.el = el; this.idx = -2; this.load(); },
+  detach() { this.el = null; },
+  async load() {
+    const t = M.cur(); if (!t || !this.el) return;
+    if (t.id === this.id) { this.paint(); return; }
+    this.id = t.id; this.times = []; this.lines = []; this.plain = ''; this.found = false; this.idx = -2; this.show();
+    try {
+      const r = await fetch('/api/lyrics?' + new URLSearchParams({ artist: t.artist, title: t.title, album: t.album, duration: Math.round(t.dur), file: t.file }));
+      const j = await r.json();
+      if (t.id !== this.id) return;
+      this.times = j.times || []; this.lines = j.lines || []; this.plain = j.plain || '';
+      if (!this.times.length && this.plain) { this.lines = this.plain.split('\n').filter(x => x.trim()); }
+      this.found = this.lines.length > 0;
+    } catch (e) { this.found = false; }
+    this.idx = -2; this.show(); this.tick();
+  },
+  show() { if (this.el) $('#lyr', this.el).classList.toggle('on', this.on && this.found && !this.hidden); },
+  toggle() { this.on = !this.on; SETPREF0('lyricsOn', this.on ? '1' : '0'); this.show(); if (this.on && !this.found && this.el) toast('No words found for this song'); },
+  tick() {
+    if (!this.el || !this.found) return;
+    let i;
+    if (this.times.length) { i = 0; const p = aud.currentTime; for (let k = 0; k < this.times.length; k++) if (this.times[k] <= p) i = k; }
+    else i = Math.min(this.lines.length - 1, Math.floor((aud.currentTime / (aud.duration || 1)) * this.lines.length));
+    if (i === this.idx) return;
+    this.idx = i; this.paint();
+  },
+  paint() {
+    if (!this.el) return;
+    const ns = $$('.lyr .ln', this.el), ys = [52, 102, 212, 348, 402];
+    for (let k = 0; k < 5; k++) { const j = this.idx + k - 2; ns[k].textContent = j >= 0 && j < this.lines.length ? (this.lines[j] || '…') : ''; }
+    // the current line: 52, then 44 on one line; longer becomes two gold lines and the rest makes room
+    const c = ns[2]; c.classList.remove('s2'); c.style.top = ys[2] + 'px';
+    let up = 0, down = 0;
+    if (c.scrollHeight > 70) { c.classList.add('s2'); if (c.scrollHeight > 60) { up = 16; down = 24; c.style.top = (ys[2] + 39 - c.scrollHeight / 2) + 'px'; } }
+    ns[0].style.top = (ys[0] - up) + 'px'; ns[1].style.top = (ys[1] - up) + 'px'; ns[3].style.top = (ys[3] + down) + 'px'; ns[4].style.top = (ys[4] + down) + 'px';
+    $('.lyr .tw.a', this.el).style.top = (116 - up) + 'px'; $('.lyr .tw.b', this.el).style.top = (250 + down) + 'px';
+  }
+};
+
+/* ---------- Music room, layout B (MusicRoom + MusicNowPanel "column") ---------- */
+const MTABS = ['For you', 'Artists', 'Albums', 'Playlists', 'New'];
+const MR = { tab: +PREF0('musicTab') || 0, data: {}, scroll: 0 };
+function mtile(md, round) {
+  const a = md.type === 'artist' ? 'artist' : 'album';
+  const sub = md.type === 'artist' ? '' : md.type === 'playlist' ? `${md.leafCount || ''} songs` : (md.parentTitle || md.year || '');
+  return `<div class="fx mt2 ${round ? 'round' : ''}" data-a="malb" data-k="${md.ratingKey}" data-t="${md.type}"><div class="im" data-bg="${img(md.thumb || md.composite, 300, 300)}"></div><div class="t">${esc(md.title)}</div><div class="s">${esc(sub)}</div></div>`;
+}
+const chipHTML = (ic, a, cls, extra) => `<div class="fx mchip ${cls || ''}" data-a="${a}" ${extra || ''}><i class="ic" style="--m:url(${MI(ic)})"></i></div>`;
+function mcolHTML() {
+  const t = M.cur();
+  if (!t) {
+    let last = null; try { last = JSON.parse(localStorage.getItem('hearth.lastList') || 'null'); } catch (e) { /* none */ }
+    return `<div class="idle"><div class="k">Music</div><h2>Nothing playing</h2>
+      <div class="fx ib2" data-a="mshuffle" data-first><i class="ic" style="--m:url(${MI('shuffle')})"></i>Shuffle my music</div>
+      ${last ? `<div class="fx ib2" data-a="malb" data-k="${esc(last.k)}" data-t="${esc(last.t)}"><i class="ic" style="--m:url(${MI('play')})"></i>Carry on: ${esc(last.n)}</div>` : ''}
+      <div class="lh">Played lately</div><div id="mlately"></div></div>`;
+  }
+  return `<div class="art" style="background-image:url('${img(t.thumb, 440, 440)}')"></div>
+    <div class="eb">${M.playing ? 'Now playing' : 'Paused'} · ${M.i + 1} of ${M.queue.length}</div><div class="tt">${esc(t.title)}</div><div class="sb">${esc(t.artist + (t.album ? ' · ' + t.album : ''))}</div>
+    <div class="braid2"><i class="mprog" style="width:${aud.duration ? aud.currentTime / aud.duration * 100 : 0}%"></i></div><div class="tm"><span class="mcur">${mmss(aud.currentTime)}</span><span class="mdur">${mmss(t.dur)}</span></div>
+    <div class="ctl"><div>${chipHTML('prev', 'mprev', 'big')}<span>Previous</span></div><div>${chipHTML(M.playing ? 'pause' : 'play', 'mtoggle', 'big', 'data-first')}<span>${M.playing ? 'Pause' : 'Play'}</span></div><div>${chipHTML('next', 'mnext', 'big')}<span>Next</span></div><div>${chipHTML('shuffle', 'mshuf', 'big' + (M.shuffle ? ' lit' : ''))}<span>Shuffle</span></div><div>${chipHTML('more', 'mmore', 'big')}<span>More</span></div></div>`;
+}
+function paintMcol(song) {
+  const c = $('#mcol'); if (!c || cur !== 'Music') return;
+  const had = focusEl && c.contains(focusEl) ? focusEl.dataset.a : null;
+  const t = M.cur();
+  if (!song && t && $('.tt', c)) {
+    // just the play state: keep the nodes (and focus) where they are
+    $('.eb', c).textContent = `${M.playing ? 'Now playing' : 'Paused'} · ${M.i + 1} of ${M.queue.length}`;
+    const pp = $('[data-a=mtoggle]', c); if (pp) { $('.ic', pp).style.setProperty('--m', `url(${MI(M.playing ? 'pause' : 'play')})`); pp.nextElementSibling.textContent = M.playing ? 'Pause' : 'Play'; }
+    const sh = $('[data-a=mshuf]', c); if (sh) sh.classList.toggle('lit', M.shuffle);
+    return;
+  }
+  c.innerHTML = mcolHTML();
+  if (!t) mLately();
+  if (had) setFocus($(`[data-a=${had}]`, c) || $('[data-a=mtoggle]', c) || $('.fx', c));
+}
+async function mLately() {
+  const box = $('#mlately'); if (!box || !musicLib) return;
+  try {
+    const mc = await pj(`/library/sections/${musicLib.key}/albums`, { sort: 'lastViewedAt:desc', 'X-Plex-Container-Size': 4 });
+    if (!document.contains(box)) return;
+    box.innerHTML = (mc.Metadata || []).slice(0, 4).map(md => `<div class="fx li" data-a="malb" data-k="${md.ratingKey}" data-t="album"><div class="a" style="background-image:url('${img(md.thumb, 120, 120)}')"></div><div><b>${esc(md.title)}</b><s>${esc(md.parentTitle || '')}</s></div></div>`).join('') || '<div class="ms">Nothing yet</div>';
+  } catch (e) { box.innerHTML = ''; }
+}
+M.hooks.add(paintMcol);
 async function roomMusic(room, tok) {
   await libs();
   if (!musicLib) { room.innerHTML = '<div class="msg">No music library in Plex yet.</div>'; return; }
-  room.innerHTML = `<div class="scroll"><div class="np"><div class="al" id="np-art"></div><div>
-    <div class="kick" id="np-eb" style="color:var(--rope)">Music</div><h1 id="np-t">Shuffle my music</h1><div class="sub" id="np-s"></div>
-    <div class="pb"><i id="np-bar"></i></div>
-    <div class="ctl2"><div class="fx chip live" data-a="mtoggle"><span id="np-pp">▶</span></div><div class="fx chip" data-a="mprev">⏮ Back</div><div class="fx chip" data-a="mnext">Next ⏭</div><div class="fx chip" data-a="mshuffle">Shuffle all</div></div></div></div><div id="mrows"></div></div>`;
-  M.paint();
-  const rows = $('#mrows');
-  const add = (t, s, html) => { if (tok !== renderTok || !html.length) return; rows.insertAdjacentHTML('beforeend', hd(t, s) + `<div class="row">${html.join('')}</div>`); };
-  const rec = await pj(`/library/sections/${musicLib.key}/albums`, { sort: 'addedAt:desc', 'X-Plex-Container-Size': 24 });
-  add('Recently added', 'albums', (rec.Metadata || []).map(albumHTML));
-  pj('/playlists', { playlistType: 'audio' }).then(mc => add('Playlists', 'playlists', (mc.Metadata || []).map(albumHTML))).catch(() => {});
-  pj(`/library/sections/${musicLib.key}/albums`, { sort: 'titleSort', 'X-Plex-Container-Size': 120 }).then(mc => {
-    if (tok !== renderTok) return;
-    rows.insertAdjacentHTML('beforeend', hd('All albums', 'A to Z') + `<div class="grid">${(mc.Metadata || []).map(albumHTML).join('')}</div>`);
-  }).catch(() => {});
+  room.innerHTML = `<div class="mroom"><div class="mcol" id="mcol"></div>
+    <div class="mtabs">${MTABS.map((t, i) => `<div class="fx mword ${i === MR.tab ? 'cur' : ''}" data-a="mtab" data-i="${i}">${t}</div>`).join('')}</div>
+    <div id="mlet"></div><div class="mbody" id="mbody"><div class="scroll" id="mscroll"><div class="msg" style="position:relative;height:300px">Loading…</div></div></div></div>`;
+  paintMcol(true);
+  await mShowTab(tok);
+}
+async function mList(key, params) {
+  if (MR.data[key] && Date.now() - MR.data[key].at < 300000) return MR.data[key].v;
+  const mc = await pj(...params); const v = (mc.Metadata || []).filter(m => !hiddenItem(m));
+  MR.data[key] = { at: Date.now(), v }; return v;
+}
+async function mShowTab(tok) {
+  const sc = $('#mscroll'), body = $('#mbody'), let_ = $('#mlet'); if (!sc) return;
+  const tab = MR.tab; let_.innerHTML = ''; body.classList.remove('lettered');
+  const S = musicLib.key;
+  const letters = items => {
+    const first = {}; items.forEach((m, i) => { let c = (m.titleSort || m.title || '').trim().charAt(0).toUpperCase(); if (!/[A-Z]/.test(c)) c = '#'; if (first[c] === undefined) first[c] = i; });
+    let_.innerHTML = `<div class="mletters">${'#ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(c => first[c] !== undefined ? `<div class="fx" data-a="mlet" data-i="${first[c]}">${c}</div>` : `<div class="dim">${c}</div>`).join('')}</div>`;
+    body.classList.add('lettered');
+  };
+  try {
+    if (tab === 0) {
+      sc.innerHTML = '';
+      const shelf = (t, s, items, round) => { if (tok !== renderTok || MR.tab !== 0 || !items.length) return; sc.insertAdjacentHTML('beforeend', hd(t, s) + `<div class="row">${items.map(m => mtile(m, round)).join('')}</div>`); };
+      const [lately, recent, lists, artists] = await Promise.all([
+        mList('lately', [`/library/sections/${S}/albums`, { sort: 'lastViewedAt:desc', 'X-Plex-Container-Size': 20 }]).catch(() => []),
+        mList('recent', [`/library/sections/${S}/albums`, { sort: 'addedAt:desc', 'X-Plex-Container-Size': 20 }]).catch(() => []),
+        mList('lists', ['/playlists', { playlistType: 'audio' }]).catch(() => []),
+        mList('topart', [`/library/sections/${S}/all`, { type: 8, sort: 'viewCount:desc', 'X-Plex-Container-Size': 20 }]).catch(() => [])]);
+      shelf('Played lately', `${lately.length} albums`, lately.filter(m => m.lastViewedAt || m.viewCount));
+      shelf('Recently added', `${recent.length} albums`, recent);
+      shelf('Playlists', `${lists.length}`, lists.filter(x => x.leafCount > 0));
+      shelf('Artists you play', `${artists.length}`, artists, true);
+      if (!sc.children.length) sc.innerHTML = '<div class="mmsg" style="position:relative;left:0;top:0">Nothing here yet. Play something and it shows up.</div>';
+    } else if (tab === 1 || tab === 2 || tab === 3) {
+      const items = tab === 1 ? await mList('artists', [`/library/sections/${S}/all`, { type: 8, sort: 'titleSort' }])
+        : tab === 2 ? await mList('albums', [`/library/sections/${S}/albums`, { sort: 'titleSort' }])
+          : (await mList('lists', ['/playlists', { playlistType: 'audio' }])).filter(x => x.leafCount > 0);
+      if (tok !== renderTok || MR.tab !== tab) return;
+      if (tab !== 3) letters(items);
+      sc.innerHTML = items.length ? `<div class="mgrid">${items.map(m => mtile(m, tab === 1)).join('')}</div>` : '<div class="mmsg" style="position:relative;left:0;top:0">Nothing here yet.</div>';
+    } else {
+      const items = await mList('recent', [`/library/sections/${S}/albums`, { sort: 'addedAt:desc', 'X-Plex-Container-Size': 20 }]);
+      if (tok !== renderTok || MR.tab !== 4) return;
+      const sp = items[0];
+      sc.innerHTML = sp ? `<div class="mspot"><div class="im" style="background-image:url('${img(sp.thumb, 300, 300)}')"></div><div class="k">Newest in your library</div><div class="t">${esc(sp.title)}</div><div class="s">${esc((sp.parentTitle || '') + (sp.year ? ' · ' + sp.year : ''))}</div>
+        <div class="ch"><div class="fx mchip wide" data-a="mplayk" data-k="${sp.ratingKey}"><i class="ic" style="--m:url(${MI('play')})"></i>Play</div><div class="fx mchip wide" data-a="mshufk" data-k="${sp.ratingKey}"><i class="ic" style="--m:url(${MI('shuffle')})"></i>Shuffle</div><div class="fx mchip wide" data-a="malb" data-k="${sp.ratingKey}" data-t="album"><i class="ic" style="--m:url(${MI('more')})"></i>More</div></div></div>`
+        + hd('Also new', `${items.length - 1} albums`) + `<div class="mgrid">${items.slice(1).map(m => mtile(m)).join('')}</div>` : '<div class="mmsg" style="position:relative;left:0;top:0">Nothing new yet.</div>';
+    }
+  } catch (e) {
+    if (tok === renderTok) sc.innerHTML = `<div class="mmsg" style="position:relative;left:0;top:0">Plex didn't answer. <div class="fx mchip wide" data-a="mtab" data-i="${tab}" style="display:inline-flex;margin-left:20px"><i class="ic" style="--m:url(${MI('right')})"></i>Try again</div></div>`;
+  }
+}
+// an album, playlist or artist: the Roku's album menu (cover, four big buttons, then more)
+async function albumKids(id, type) {
+  if (type === 'playlist') return ((await pj(`/playlists/${id}/items`)).Metadata || []).filter(t => !hiddenItem(t));
+  if (type === 'artist') return ((await pj(`/library/metadata/${id}/allLeaves`)).Metadata || []).filter(t => !hiddenItem(t));
+  return ((await pj(`/library/metadata/${id}/children`)).Metadata || []).filter(t => !hiddenItem(t));
+}
+async function albumMenu(id, type) {
+  const meta = type === 'playlist' ? ((await pj(`/playlists/${id}`)).Metadata || [])[0] || {} : ((await pj(`/library/metadata/${id}`)).Metadata || [])[0] || {};
+  const kids = await albumKids(id, type);
+  const total = kids.reduce((a, k) => a + (k.duration || 0), 0) / 60000 | 0;
+  try { localStorage.setItem('hearth.lastList', JSON.stringify({ k: id, t: type, n: meta.title || '' })); } catch (e) { /* ignore */ }
+  const rows = [
+    { label: 'Play', sub: 'From the top', icon: MI('play'), kind: 'main', go: () => M.playList(kids, 0) },
+    { label: 'Shuffle', sub: 'Mixed up', icon: MI('shuffle'), kind: 'tile', go: () => M.playList(kids, 0, true) },
+    { label: 'Play next', sub: 'After this song', icon: MI('next'), kind: 'tile', go: () => M.playNext(kids) },
+    { label: 'Add to queue', sub: 'At the end', icon: MI('queue'), kind: 'tile', go: () => M.addQueue(kids) },
+    { label: 'Songs', sub: `All ${kids.length}, pick one to start there`, icon: MI('list'), arrow: true, go: () => openAlbum(id, type) }];
+  if (type === 'artist') {
+    try {
+      const albs = ((await pj(`/library/metadata/${id}/children`)).Metadata || []).slice(0, 8);
+      albs.forEach((a, i) => rows.push({ head: i === 0 ? 'Albums' : '', label: a.title, pic: img(a.thumb, 300, 300), kind: 'pic', four: true, go: () => albumMenu(a.ratingKey, 'album').catch(e => toast(e.message)) }));
+    } catch (e) { /* no albums list */ }
+  }
+  dlg({
+    wide: type === 'artist',
+    hero: { art: img(meta.thumb || meta.composite, 300, 300), shape: type === 'artist' ? 'round' : '', kick: type === 'artist' ? 'Artist' : type === 'playlist' ? 'Playlist' : 'Album' + (meta.year ? ' · ' + meta.year : ''), title: meta.title || '', sub: [type === 'album' ? meta.parentTitle : '', kids.length + ' songs', total ? total + ' min' : ''].filter(Boolean).join(' · ') },
+    rows, pick: (i, r) => r.go()
+  });
 }
 async function openAlbum(id, type) {
-  let kids, meta;
-  if (type === 'playlist') { kids = (await pj(`/playlists/${id}/items`)).Metadata || []; meta = (await pj(`/playlists/${id}`)).Metadata?.[0] || {}; }
-  else if (type === 'artist') { kids = (await pj(`/library/metadata/${id}/allLeaves`)).Metadata || []; meta = (await pj(`/library/metadata/${id}`)).Metadata?.[0] || {}; }
-  else { kids = (await pj(`/library/metadata/${id}/children`)).Metadata || []; meta = (await pj(`/library/metadata/${id}`)).Metadata?.[0] || {}; }
-  kids = kids.filter(t => !hiddenItem(t));
-  const rows = kids.map((t, n) => `<div class="fx trk" data-a="mtrack" data-n="${n}"><b>${t.index || n + 1}</b><span>${esc(t.title)}</span><em>${t.duration ? Math.floor(t.duration / 60000) + ':' + String(Math.floor(t.duration / 1000) % 60).padStart(2, '0') : ''}</em></div>`).join('');
+  const kids = await albumKids(id, type);
+  const meta = type === 'playlist' ? ((await pj(`/playlists/${id}`)).Metadata || [])[0] || {} : ((await pj(`/library/metadata/${id}`)).Metadata || [])[0] || {};
+  const rows = kids.map((t, n) => `<div class="fx trk" data-a="mtrack" data-n="${n}"><b>${t.index || n + 1}</b><span>${esc(t.title)}</span><em>${t.duration ? mmss(t.duration / 1000) : ''}</em></div>`).join('');
   const L = openLayer('sheet', `<div class="in"><div class="cov" style="background-image:url('${img(meta.thumb || meta.composite, 720, 720)}')"></div>
     <div style="position:relative;flex:1"><h2>${esc(meta.title || '')}</h2><div class="ar">${esc(meta.parentTitle || meta.leafCount && meta.leafCount + ' songs' || '')}</div>
     <div style="display:flex;gap:16px;margin-bottom:22px"><div class="fx chip live" data-a="sheetplay">▶ Play</div><div class="fx chip" data-a="sheetshuf">Shuffle</div><div class="fx chip" data-a="back">‹ Back</div></div>
-    <div style="position:absolute;left:0;right:0;top:150px;bottom:0;overflow:hidden" class="tl-wrap"><div class="tl scroll" style="padding:6px 0 80px">${rows}</div></div></div></div>`);
+    <div style="position:absolute;left:0;right:0;top:150px;bottom:0;overflow:hidden" class="tl-wrap"><div class="tl scroll" style="padding:6px 0 80px">${rows || '<div class="ms">No songs here.</div>'}</div></div></div></div>`);
   L.kids = kids;
 }
-
-/* ---------- Ambiance ---------- */
-const AMB = [['hearth', 'Hearth', 'A log fire, crackling'], ['rain', 'Rain', 'On the glass, after dark'], ['fireflies', 'Fireflies', 'A summer night outside'], ['lightsout', 'Lights out', 'Embers, then dark in 30 min'], ['window', 'The Window', 'Your photos']];
-function roomAmbiance(room) {
-  room.innerHTML = `<div class="scroll"><div class="hd" style="margin-top:20px">Set the mood<small>music keeps playing underneath</small></div>
-  <div class="row" style="gap:28px">${AMB.map(([m, n, s]) => `<div class="fx card" style="width:316px" data-a="mood" data-m="${m}"><div class="img" style="width:316px;height:387px;background-image:url(img/col-${m}.jpg)"></div><div class="t" style="font-size:30px">${n}</div><div class="s">${s}</div></div>`).join('')}</div></div>`;
+// More: the music options popup (mockups/popups-rich/1-music-options.png)
+function musicOptions() {
+  const t = M.cur();
+  const left = (aud.duration || (t && t.dur) || 0) - aud.currentTime, nx = M.upNext(1)[0];
+  const rows = [
+    { head: 'Playback', label: 'Shuffle', sub: 'Mix up what is queued', icon: MI('shuffle'), value: M.shuffle ? 'On' : 'Off', keep: true, go: r => { M.setShuffle(!M.shuffle); r.value = M.shuffle ? 'On' : 'Off'; } },
+    { label: 'Repeat', sub: 'Off, all, or one song', icon: MI('repeat'), value: M.repeat.toUpperCase(), keep: true, go: r => { M.cycleRepeat(); r.value = M.repeat.toUpperCase(); } },
+    { head: 'Words', label: 'Lyrics', sub: 'Show the words as it plays', icon: MI('lyrics'), value: LY.on ? 'On' : 'Off', keep: true, go: r => { LY.toggle(); r.value = LY.on ? 'On' : 'Off'; } },
+    { label: 'Queue', sub: t ? `${M.queue.length} songs · what plays next` : 'Nothing queued yet', icon: MI('queue'), arrow: true, dis: !t, why: 'Nothing queued yet', go: () => queueSheet() },
+    { head: 'On screen', label: 'Cover', pic: t ? img(t.thumb, 300, 300) : 'img/col-window.jpg', kind: 'pic', go: () => musicView('cover') },
+    { label: 'Visualizer', pic: 'img/viz/221.jpg', kind: 'pic', go: () => musicView('milk') },
+    { label: 'Hearth fire', pic: 'img/col-hearth.jpg', kind: 'pic', go: () => musicView('hearth') },
+    { head: 'Player', label: 'Big view', sub: 'The player, full screen', icon: MI('expand'), arrow: true, go: () => musicView('big') },
+    { label: 'Shuffle my music', sub: 'A fresh mix from everything', icon: MI('wave'), go: () => M.shuffleAll().catch(e => toast(e.message)) }];
+  dlg({
+    title: 'Music', icon: MI('disc'), split: 4,
+    now: t ? { art: img(t.thumb, 200, 200), kick: M.playing ? 'Playing now' : 'Paused', title: t.title, sub: t.artist + (t.album ? ' · ' + t.album : ''), chips: [mmss(left) + ' left'].concat(nx ? ['Up next: ' + nx.title] : []) } : null,
+    rows, pick: (i, r) => r.go(r)
+  });
 }
-const SOUND = { hearth: 'fire', rain: 'rain', fireflies: 'night', lightsout: 'fire', window: null };
-const BG = { hearth: 'hearth-bg', rain: 'rain-bg', fireflies: 'night-bg', lightsout: 'hearth-bg' };
+// QueueSheet A: the queue as a side sheet; OK plays from that song
+function queueSheet() {
+  if (!M.queue.length) { toast('Nothing queued yet'); return; }
+  const rows = M.queue.map((t, i) => `<div class="fx qrow ${i === M.i ? 'now' : ''}" data-a="qjump" data-i="${i}"><div class="a" data-bg="${img(t.thumb, 120, 120)}" style="background-image:url('${img(t.thumb, 120, 120)}')"></div><div class="w"><b>${esc(t.title)}</b><s>${esc(t.artist)}</s></div><em>${i === M.i ? 'Playing' : mmss(t.dur)}</em></div>`).join('');
+  const L = openLayer('qsheet', `<div class="qp"><h2>Queue</h2><div class="qs">${M.queue.length} songs · OK plays from that song</div><div class="scroll">${rows}</div></div>`);
+  setFocus($(`.qrow[data-i="${M.i}"]`, L.el) || $('.qrow', L.el));
+}
+
+/* ---------- full-screen music: Big view, Cover, Visualizer, Hearth fire (MusicView) ---------- */
+const LOOKS = [['40', 'Truly soft'], ['57', 'Angel flight'], ['58', 'Another kind of groove'], ['61', 'Chain breaker'], ['62', 'Charisma'], ['74', 'Reflections on black tiles'], ['77', 'Witchcraft'], ['78', 'Fata morgana'], ['94', 'Rewop'], ['99', 'True visionary'], ['102', 'Prismo'], ['108', 'Hexcollie'], ['109', 'Spark'], ['110', 'In da mash'], ['111', 'Disco mashup'], ['117', 'Witchcraft 2'], ['119', 'Bouncing balls'], ['201', 'Leaf mandala'], ['202', 'Ladybug swarm'], ['203', 'Leaf down a creek'], ['204', 'Dandelion drift'], ['205', 'Firefly meadow'], ['206', 'Rain on the pond'], ['213', 'Dusk flight'], ['221', 'Moth lantern'], ['222', 'Murmuration'], ['223', 'Mushrooms'], ['224', 'Smoke rings'], ['225', 'Tree rings'], ['226', 'Fern crown'], ['227', 'Fiddleheads'], ['228', 'Moonlit fronds'], ['229', 'Constellation weave'], ['230', 'Honeycomb glow'], ['231', 'Jellyfish'], ['232', 'Aurora over the hills'], ['233', 'Dew on the web'], ['234', 'Mycelium']];
+const lookName = n => (LOOKS.find(l => l[0] === n) || [n, 'Look ' + n])[1];
+const VZ = {
+  choice: PREF0('vizLook') || 'all', // 'all', 'hearted' or a look number
+  stars: new Set((PREF0('vizStars') || '').split(',').filter(Boolean)),
+  have: null, // looks that have a loop on the NAS
+  async loops() {
+    if (this.have) return this.have;
+    try { const j = await (await fetch('/api/viz/loops')).json(); this.have = new Set((j.looks || []).map(String)); } catch (e) { this.have = new Set(); }
+    return this.have;
+  },
+  setStar(n, on) { if (on) this.stars.add(n); else this.stars.delete(n); SETPREF0('vizStars', [...this.stars].join(',')); },
+  setChoice(c) { this.choice = c; SETPREF0('vizLook', c); },
+  pool() { const all = LOOKS.map(l => l[0]).filter(n => !this.have || !this.have.size || this.have.has(n)); const h = all.filter(n => this.stars.has(n)); return this.choice === 'hearted' && h.length ? h : all; },
+  pick(not) { if (/^\d+$/.test(this.choice)) return this.choice; const p = this.pool().filter(n => n !== not); return p.length ? p[Math.random() * p.length | 0] : '221'; }
+};
+let FIRE = PREF0('fireMix') || 'both'; // both, fire (fire only), music (music only)
+function musicView(mode) {
+  const top = layers[layers.length - 1];
+  if (top && top.mv) { top.setMode(mode); return; }
+  if (!M.cur() && mode !== 'hearth') { toast('Play something first'); M.shuffleAll().catch(() => {}); }
+  const L = openLayer('mview ' + mode, `<div class="bgart"></div><video class="vz" muted playsinline loop preload="auto" style="display:none"></video>
+    <div class="hudbox hud"><div class="note" style="display:none"></div>${LY.html()}
+    <div class="ctl"><div class="shadeA"></div><div class="tag"></div><div class="cart"></div><div class="art6"></div><div class="eb"></div><div class="tt"></div><div class="sb"></div>
+      <div class="braid2 bv"><i class="mprog"></i></div><div class="tm"><span class="mcur">0:00</span><span class="mdur">0:00</span></div>
+      <div class="row6"></div><div class="cname"></div><div class="toast2"></div>
+      <div class="unx">Up next</div><div class="unt"></div><div class="unl"></div></div></div>`, {
+    onKey(e) { return L.key(e); }
+  });
+  L.mv = true; L.mode = null; L.look = null; L.ctlOn = true;
+  const v = $('video.vz', L.el), fx = new Audio('sound/fire.mp3'); fx.loop = true; fx.volume = .55; L.sfx = fx;
+  const ctl = $('.ctl', L.el);
+  L.showCtl = (on) => {
+    L.ctlOn = on; ctl.classList.toggle('off', !on); clearTimeout(L.ct);
+    LY.hidden = on && L.mode !== 'cover'; LY.show();
+    if (on) { if (!focusEl || !L.el.contains(focusEl)) setFocus($('.row6 [data-a=mvtoggle]', L.el) || $('.row6 .fx', L.el)); if (L.mode !== 'big') L.ct = setTimeout(() => L.showCtl(false), 8000); }
+    else setFocus(null);
+  };
+  L.row = () => {
+    const ch = (ic, a, name, cls) => `<div class="fx mchip ${cls || ''}" data-a="${a}" data-n="${esc(name)}"><i class="ic" style="--m:url(${MI(ic)})"></i></div>`;
+    const sep = '<div class="sepv"></div>';
+    let h = ch('prev', 'mvprev', 'Previous') + ch(M.playing ? 'pause' : 'play', 'mvtoggle', M.playing ? 'Pause' : 'Play', 'big') + ch('next', 'mvnext', 'Next') + ch('shuffle', 'mvshuf', 'Shuffle ' + (M.shuffle ? 'on' : 'off'), M.shuffle ? 'lit' : '') + ch('repeat', 'mvrep', 'Repeat ' + M.repeat, M.repeat !== 'off' ? 'lit' : '') + sep;
+    if (L.mode === 'milk') h += ch('cover', 'mvmode', 'Cover').replace('data-a="mvmode"', 'data-a="mvmode" data-m="cover"') + ch('fire', 'mvmode', 'Hearth fire').replace('data-a="mvmode"', 'data-a="mvmode" data-m="hearth"') + sep + `<div class="fx mchip wide" data-a="mvlook" data-n="Heart this look, or pick another"><i class="ic" style="--m:url(${MI('viz')})"></i>Look</div>`;
+    else if (L.mode === 'hearth') h += ch('cover', 'mvmode', 'Cover').replace('data-a="mvmode"', 'data-a="mvmode" data-m="cover"') + ch('viz', 'mvmode', 'Visualizer').replace('data-a="mvmode"', 'data-a="mvmode" data-m="milk"') + sep + `<div class="fx mchip wide" data-a="mvfire" data-n="Fire and music, fire only, or music only"><i class="ic" style="--m:url(${MI('fire')})"></i>Fire</div>`;
+    else h += ch('cover', 'mvmode', 'Cover').replace('data-a="mvmode"', 'data-a="mvmode" data-m="cover"') + ch('viz', 'mvmode', 'Visualizer').replace('data-a="mvmode"', 'data-a="mvmode" data-m="milk"') + ch('fire', 'mvmode', 'Hearth fire').replace('data-a="mvmode"', 'data-a="mvmode" data-m="hearth"');
+    h += `<div class="fx mchip wide lib" data-a="mvlib" data-n="Back to the Music room"><i class="ic" style="--m:url(${MI('collapse')})"></i>Library</div>`;
+    const was = focusEl && L.el.contains(focusEl) ? (focusEl.dataset.a + (focusEl.dataset.m || '')) : null;
+    $('.row6', L.el).innerHTML = h;
+    if (was) setFocus($$('.row6 .fx', L.el).find(x => x.dataset.a + (x.dataset.m || '') === was) || null);
+  };
+  L.tag = () => {
+    const t = { big: 'Big view', cover: 'Cover', milk: 'Visualizer · ' + (L.look ? lookName(L.look) : '…'), hearth: 'Hearth fire · ' + { both: 'Fire and music', fire: 'Fire only', music: 'Music only' }[FIRE] }[L.mode];
+    $('.tag', L.el).textContent = t;
+  };
+  L.paint = (song) => {
+    const t = M.cur();
+    $('.eb', L.el).textContent = t ? `${M.playing ? 'Now playing' : 'Paused'} · ${M.i + 1} of ${M.queue.length}` : 'Music';
+    $('.tt', L.el).textContent = t ? t.title : 'Nothing playing';
+    $('.sb', L.el).textContent = t ? t.artist + (t.album ? ' · ' + t.album : '') : 'Shuffle my music from the Music room';
+    const a = t ? `url("${img(t.thumb, 600, 600)}")` : '';
+    for (const s of ['.art6', '.cart']) $(s, L.el).style.backgroundImage = a;
+    $('.bgart', L.el).style.backgroundImage = a;
+    $('.unl', L.el).innerHTML = M.upNext(4).map(x => `<div><div class="a" style="background-image:url('${img(x.thumb, 120, 120)}')"></div><div><b>${esc(x.title)}</b><s>${esc(x.artist)} · ${mmss(x.dur)}</s></div></div>`).join('');
+    const none = !M.upNext(1).length; $('.unx', L.el).style.display = $('.unt', L.el).style.display = none ? 'none' : '';
+    L.row(); L.tag();
+    if (song) { LY.load(); if (L.mode === 'milk' && !/^\d+$/.test(VZ.choice)) L.setLook(VZ.pick(L.look)); }
+    if (L.mode === 'hearth') L.fireSound();
+  };
+  L.note = t => { const n = $('.note', L.el); n.style.display = t ? '' : 'none'; n.textContent = t || ''; };
+  L.setLook = async n => {
+    const have = await VZ.loops();
+    let shown = n;
+    if (have.size && !have.has(n)) { const p = VZ.pool(); shown = p.length ? p[Math.random() * p.length | 0] : null; L.say(`${lookName(n)} has no loop on the NAS yet, showing ${shown ? lookName(shown) : 'nothing'}`); }
+    L.look = shown; L.tag();
+    if (!shown) { v.style.display = 'none'; L.note('No visualizer loops on the NAS yet. The NucBox makes them; check back in a while.'); return; }
+    L.note(''); v.style.display = ''; v.src = '/api/viz/loopfile?n=' + shown; v.play().catch(() => {});
+  };
+  v.addEventListener('error', () => { if (L.mode === 'milk') L.note("This look's loop didn't load from the NAS. Press Right for another."); else if (L.mode === 'hearth') L.note("The fire clip didn't load from the NAS."); });
+  v.addEventListener('playing', () => L.note(''));
+  L.say = t => { const e = $('.toast2', L.el); e.textContent = t; clearTimeout(L.st); L.st = setTimeout(() => { e.textContent = ''; }, 4000); if (!L.ctlOn) toast(t); };
+  L.fireSound = () => {
+    if (L.mode === 'hearth' && FIRE !== 'music') fx.play().catch(() => {}); else fx.pause();
+    if (L.mode === 'hearth' && FIRE === 'fire') M.hold(); else M.release();
+  };
+  L.setMode = async m => {
+    L.mode = m; L.el.className = 'layer mview ' + m;
+    v.pause(); v.style.display = 'none'; L.note('');
+    if (m === 'milk') L.setLook(/^\d+$/.test(VZ.choice) ? VZ.choice : VZ.pick(L.look));
+    if (m === 'hearth') {
+      const c = (await clips()).hearth;
+      if (L.mode !== 'hearth') return;
+      if (c && c.clip) { v.style.display = ''; v.src = c.clip.url; v.play().catch(() => {}); } else L.note('No fire clip in the hearth folder on the NAS yet (a file whose name starts with "fire").');
+    }
+    L.fireSound(); L.paint(); LY.show();
+    L.showCtl(true);
+  };
+  L.key = e => {
+    const k = e.key;
+    if (!L.ctlOn) {
+      if (k === 'ArrowLeft' || k === 'ArrowRight') { if (L.mode === 'milk') { const p = VZ.pool(), i = Math.max(0, p.indexOf(L.look)); const n = p[(i + (k === 'ArrowRight' ? 1 : p.length - 1)) % p.length]; if (/^\d+$/.test(VZ.choice)) VZ.setChoice(n); L.setLook(n); toast(lookName(n)); } else L.showCtl(true); return true; }
+      if (k === 'ArrowUp') { LY.toggle(); return true; }
+      if (k === 'Enter' || k === ' ' || k === 'ArrowDown') { L.showCtl(true); return true; }
+      return false;
+    }
+    if (L.mode !== 'big') { clearTimeout(L.ct); L.ct = setTimeout(() => L.showCtl(false), 8000); }
+    if (k === 'ArrowUp' || k === 'ArrowDown') return true; // one row of buttons
+    return false;
+  };
+  L.onBack = () => { if (L.ctlOn && L.mode !== 'big') { L.showCtl(false); return true; } return false; };
+  L.onMouse = () => { if (!L.ctlOn) L.showCtl(true); };
+  L.hook = s => { if (document.contains(L.el)) L.paint(s); };
+  M.hooks.add(L.hook);
+  L.close = () => { M.hooks.delete(L.hook); clearTimeout(L.ct); fx.pause(); v.pause(); v.removeAttribute('src'); v.load(); LY.detach(); M.release(); };
+  // cname: the name of the focused button
+  L.onFocus = el => { const n = $('.cname', L.el); if (n) n.textContent = el && el.dataset.n ? el.dataset.n : ''; };
+  LY.attach(L.el);
+  L.setMode(mode);
+  return L;
+}
+function lookMenu(L) {
+  const n = L.look || '221';
+  const rows = [
+    { head: 'This look', label: 'Heart this look', sub: lookName(n), icon: MI('heart'), value: VZ.stars.has(n) ? 'On' : 'Off', keep: true, go: r => { VZ.setStar(n, !VZ.stars.has(n)); r.value = VZ.stars.has(n) ? 'On' : 'Off'; } },
+    { label: 'Keep this look', sub: 'Every song, until you pick another', icon: MI('check'), tick: VZ.choice === n, go: () => { VZ.setChoice(n); L.tag(); toast('Keeping ' + lookName(n)); } },
+    { head: 'Which looks play', label: 'Play hearted looks', sub: VZ.stars.size ? `${VZ.stars.size} hearted, a new one each song` : 'Heart a few first', icon: MI('heart'), tick: VZ.choice === 'hearted', dis: !VZ.stars.size, why: 'Heart a look first', go: () => { VZ.setChoice('hearted'); L.setLook(VZ.pick(L.look)); } },
+    { label: 'Play every look', sub: 'A new one each song', icon: MI('shuffle'), tick: VZ.choice === 'all', go: () => { VZ.setChoice('all'); L.setLook(VZ.pick(L.look)); } }];
+  LOOKS.forEach(([k, name], i) => rows.push({ head: i === 0 ? 'Every look' : '', label: name, pic: `img/viz/${k}.jpg`, kind: 'pic', four: true, hrt: VZ.stars.has(k), cur: k === n, go: () => { VZ.setChoice(k); L.setLook(k); } }));
+  dlg({ title: 'Visualizer', icon: MI('viz'), wide: true, now: { art: `img/viz/${n}.jpg`, kick: 'Showing now', title: lookName(n), sub: VZ.choice === 'all' ? 'Every look, a new one each song' : VZ.choice === 'hearted' ? 'Hearted looks, a new one each song' : 'Kept for every song' }, rows, pick: (i, r) => r.go(r) });
+}
+function fireMenu(L) {
+  const set = m => { FIRE = m; SETPREF0('fireMix', m); L.fireSound(); L.tag(); };
+  dlg({ title: 'Hearth fire', icon: MI('fire'), rows: [
+    { label: 'Fire and music', sub: 'The crackle under your songs', icon: MI('fire'), tick: FIRE === 'both', go: () => set('both') },
+    { label: 'Fire only', sub: 'The music waits', icon: MI('fire'), tick: FIRE === 'fire', go: () => set('fire') },
+    { label: 'Music only', sub: 'The fire stays quiet', icon: MI('disc'), tick: FIRE === 'music', go: () => set('music') }], pick: (i, r) => r.go() });
+}
+
+/* ---------- Ambiance: five tall columns (AmbianceRoom); your clips from the hearth folder on the NAS ---------- */
+const AMB = [['hearth', 'Hearth', 'A log fire, crackling'], ['rain', 'Rain', 'On the glass, after dark'], ['fireflies', 'Fireflies', 'A summer night outside'], ['lightsout', 'Lights out', 'Embers, then dark in 30 min'], ['window', 'The Window', 'Your photos']];
+const SOUND = { hearth: 'fire', rain: 'rain', fireflies: 'night', lightsout: 'fire' };
 let clipCache = null;
 function clipMood(name) {
   const n = (name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
   for (const [p, m] of [['firefl', 'fireflies'], ['lightsout', 'lightsout'], ['embers', 'lightsout'], ['hearth', 'hearth'], ['fireplace', 'hearth'], ['campfire', 'hearth'], ['fire', 'hearth'], ['rain', 'rain']]) if (n.startsWith(p)) return m;
   return '';
 }
+const niceName = n => { n = String(n || '').trim().replace(/-tv$/i, '').replace(/[_-]/g, ' ').trim(); return n ? n.charAt(0).toUpperCase() + n.slice(1) : ''; };
+function ownLine(n) {
+  n = n.toLowerCase();
+  for (const [ws, l] of [[['creek', 'river', 'stream', 'brook', 'falls'], 'Water over stones'], [['handpan', 'guitar', 'piano', 'harp', 'flute'], 'Played in the forest'], [['flower', 'meadow', 'bloom', 'garden'], 'In bloom'], [['snow', 'winter'], 'Snow falling'], [['ocean', 'sea', 'wave', 'lake', 'beach'], 'By the water']]) if (ws.some(w => n.includes(w))) return l;
+  return 'Your own footage';
+}
+// the moods in room order, with the folder's clips merged in (ambMerge): a clip that matches a mood plays there,
+// the rest become moods of their own before The Window, and Lights out borrows the fire when it has no embers
 async function clips() {
-  if (clipCache) return clipCache;
-  clipCache = {};
-  await libs();
-  if (!ambLib) return clipCache;
-  try {
-    const mc = await pj(`/library/sections/${ambLib.key}/all`, { 'X-Plex-Container-Size': 100 });
-    for (const md of (mc.Metadata || [])) {
-      const part = md.Media?.[0]?.Part?.[0]; if (!part) continue;
-      const base = (part.file || '').split('/').pop().replace(/\.[^.]+$/, '');
-      const m = clipMood(base) || clipMood(md.title); if (!m) continue;
-      const tv = /-tv$/i.test(base);
-      if (!clipCache[m] || (tv && !clipCache[m].tv)) clipCache[m] = { url: `${PX}${part.key}`, tv };
-    }
-  } catch (e) { /* no clips; stills are fine */ }
-  return clipCache;
+  if (clipCache && Date.now() - clipCache.at < 120000) return clipCache.v;
+  const items = AMB.map(([mood, title, sub]) => ({ mood, title, sub, still: `img/col-${mood}.jpg` }));
+  const v = {}; items.forEach(it => { v[it.mood] = it; });
+  let list = [];
+  try { const j = await (await fetch('/api/clips')).json(); list = (j.clips || []).filter(c => c.ready); } catch (e) { /* none: the drawn scenes stand in */ }
+  const path = u => { try { return new URL(u, location.href).pathname; } catch (e) { return u; } };
+  const extra = [];
+  for (const c of list) {
+    const clip = { url: path(c.url), thumb: c.thumb ? path(c.thumb) : '', name: niceName(c.name || c.file) };
+    const md = clipMood(c.file) || clipMood(c.name);
+    if (md && v[md] && !v[md].clip) {
+      v[md].clip = clip; if (clip.thumb) v[md].still = clip.thumb;
+      const same = clip.name.toLowerCase() === v[md].title.toLowerCase() || (clipMood(clip.name) === md && !clip.name.includes(' '));
+      if (!same) v[md].sub = clip.name;
+    } else if (!md) extra.push({ mood: 'own' + extra.length, title: clip.name, sub: ownLine(clip.name), still: clip.thumb || 'img/col-window.jpg', clip, own: true });
+  }
+  if (!v.lightsout.clip && v.hearth.clip) { v.lightsout.clip = v.hearth.clip; v.lightsout.still = v.hearth.still; }
+  const out = []; for (const it of items) { if (it.mood === 'window') out.push(...extra); out.push(it); }
+  out.forEach(it => { v[it.mood] = it; });
+  clipCache = { at: Date.now(), v: Object.assign(v, { list: out }) };
+  return clipCache.v;
+}
+const AG = { H: 930, RULE: 24, PEEK: 80, VIS: 5 }; AG.W = Math.floor((1920 - (AG.VIS + 1) * AG.RULE - 2 * AG.PEEK) / AG.VIS);
+const ambSoundOn = m => PREF0('ambSound_' + m) !== '0';
+async function roomAmbiance(room, tok) {
+  const v = await clips(); if (tok !== renderTok) return;
+  const items = v.list, n = items.length, px = i => i * (AG.W + AG.RULE);
+  let last = PREF0('ambLast'); let idx = Math.max(0, items.findIndex(it => it.mood === last));
+  room.innerHTML = `<div class="amb"><div class="strip" id="astrip">${items.map((it, i) => `<div class="fx ap" data-a="amood" data-i="${i}" ${i === idx ? 'data-first' : ''} style="left:${px(i)}px;width:${AG.W}px;background-image:url('${esc(it.still)}')"><div class="st"></div><div class="sb"></div><div class="n">${String(i + 1).padStart(2, '0')}</div><div class="t"><div class="w">${esc(it.title)}</div><div class="s">${esc(it.sub)}</div></div>
+    <div class="c"><div><img src="img/amb/icon-ok.png" alt="">${it.mood === 'window' ? 'Open' : 'Play'}</div>${it.mood === 'window' ? '' : `<div><img class="snd" src="img/amb/icon-sound-${ambSoundOn(it.mood) ? 'on' : 'off'}.png" alt="">Sound ${ambSoundOn(it.mood) ? 'on' : 'off'}</div>`}</div><div class="bar"></div></div>${i < n - 1 ? `<div class="dv" style="left:${px(i) + AG.W}px"></div>` : ''}`).join('')}</div>
+    <div class="dots">${items.map((_, i) => `<i data-i="${i}"></i>`).join('')}</div></div>`;
+  // long names step down until they fit (UX review item 5)
+  for (const t of $$('.amb .ap .t', room)) { const w = t.querySelector('.w'); for (const z of [60, 52, 46, 40]) { w.style.fontSize = z + 'px'; if (w.scrollWidth <= t.clientWidth + 1) break; } if (w.scrollWidth > t.clientWidth + 1) w.style.whiteSpace = 'normal'; }
+  const slide = i => {
+    const sx = n <= AG.VIS ? Math.floor((1920 - (n * AG.W + (n - 1) * AG.RULE)) / 2) : AG.PEEK + AG.RULE - px(Math.max(0, Math.min(n - AG.VIS, i - Math.floor(AG.VIS / 2))));
+    $('#astrip').style.transform = `translateX(${sx}px)`;
+    $$('.amb .ap').forEach((p, k) => p.classList.toggle('cur', k === i));
+    $$('.amb .dots i').forEach((d, k) => d.classList.toggle('on', k === i));
+  };
+  slide(idx);
+  FH.any = el => { if (cur === 'Ambiance' && el.classList.contains('ap')) slide(+el.dataset.i); };
+}
+// the sound line on each column follows what was set inside the mood
+function ambSoundLabels() {
+  const v = clipCache && clipCache.v; if (!v) return;
+  for (const p of $$('.amb .ap')) {
+    const it = v.list[+p.dataset.i], im = $('img.snd', p); if (!it || !im) continue;
+    const on = ambSoundOn(it.mood); im.src = `img/amb/icon-sound-${on ? 'on' : 'off'}.png`; im.nextSibling.textContent = 'Sound ' + (on ? 'on' : 'off');
+  }
 }
 async function openMood(mood) {
-  const info = AMB.find(a => a[0] === mood) || AMB[0];
-  const L = openLayer('mood ui', `<div class="bg" id="mbg" style="background-image:url(img/${BG[mood] || 'night-bg'}.jpg)"></div><canvas id="mcv" width="1280" height="720"></canvas><div class="fade" id="mfade"></div>
-    <div class="name">${info[1]}</div>
-    <div class="strip" id="mstrip"><div class="fx chip live" data-a="msound">Sound on</div><div class="fx chip" data-a="mmusic">Music</div><div class="fx chip" data-a="mnextsong">Next song</div><div class="fx chip" data-a="mtimer">Timer: ${mood === 'lightsout' ? '30 min' : 'off'}</div><div class="fx chip" data-a="mleave">Back</div><div class="hint">Any key shows these · Back leaves</div></div>`, {
-    onKey(e) {
-      if (!L.ui) { L.show(); if (e.key.startsWith('Arrow') || e.key === 'Enter' || e.key === ' ') return true; }
-      L.show(); return false;
-    }
+  const v = await clips(); const it = v[mood] || v.list.find(x => x.mood === mood) || v.hearth;
+  if (it.mood === 'window') { go('Photos'); return; }
+  SETPREF0('ambLast', it.mood);
+  const snd = it.own ? (/creek|river|water|stream|brook|rain|lake|ocean|wave|falls/i.test(it.title) ? 'rain' : /fire|camp|ember|hearth/i.test(it.title) ? 'fire' : 'night') : SOUND[it.mood];
+  const word = it.mood === 'lightsout' ? 'Embers' : snd === 'fire' ? 'Fire' : snd === 'rain' ? (it.mood === 'rain' ? 'Rain' : 'Water') : it.mood === 'fireflies' ? 'Night' : 'Nature';
+  const icn = snd === 'fire' ? 'fire' : snd === 'rain' ? 'wave' : 'moon';
+  const DIM = [0, .25, .5, .7], TIM = [0, 15, 30, 60, 90];
+  const L = openLayer('mood2 ui', `<div class="still" style="background-image:url('${esc(it.still)}')"></div>${it.clip ? '<video playsinline loop preload="auto"></video>' : '<canvas id="mcv" width="1280" height="720" style="position:absolute;inset:0;width:100%;height:100%"></canvas>'}
+    <div class="dim"></div><div class="fadeout"></div><div class="msg2" style="display:none"></div><div class="hint">OK shows these · Back leaves</div>
+    <div class="mbar"><div class="mi"><i class="ic" style="--m:url(${MI(icn)})"></i></div><div class="mt">${esc(it.title)}</div><div class="ms">${esc(it.sub)}</div><div class="sep"></div>
+      <div class="fx mb" data-a="msound" style="left:1148px;width:170px"><i class="ic" style="--m:url(${MI(icn)})"></i><span></span></div>
+      <div class="fx mb" data-a="mdim" style="left:1338px;width:150px"><i class="ic" style="--m:url(${MI('sun')})"></i><span></span></div>
+      <div class="fx mb" data-a="mtimer" style="left:1508px;width:194px"><i class="ic" style="--m:url(${MI('clock')})"></i><span></span></div></div>`, {
+    onKey(e) { if (!L.ui) { if (e.key === 'Escape' || e.key === 'Backspace') return false; L.show(); return true; } L.show(); if (e.key === 'ArrowUp') { L.hide(); return true; } return false; }
   });
-  L.mood = mood; L.timer = mood === 'lightsout' ? 30 : 0; L.soundOn = true; L.ui = true;
-  L.show = () => { L.el.classList.add('ui'); L.ui = true; clearTimeout(L.hideT); L.hideT = setTimeout(() => { L.el.classList.remove('ui'); L.ui = false; }, 5000); };
-  L.show();
-  L.onMouse = () => L.show();
+  L.mood = it.mood; L.soundOn = ambSoundOn(it.mood); L.dim = +PREF0('ambDim') || 0; L.timer = it.mood === 'lightsout' ? 2 : 0;
+  // a mood plays its own clip and sound: the music stops, and comes back when you leave (build 135)
+  M.hold();
+  const vid = $('video', L.el);
   L.sfx = null;
-  const sn = SOUND[mood];
-  if (sn) { L.sfx = new Audio(`sound/${sn}.mp3`); L.sfx.loop = true; L.sfx.volume = .7; L.sfx.play().catch(() => toast('Press a key to start the sound')); }
-  const stopFns = [];
-  if (mood === 'window') stopFns.push(await windowShow(L));
-  else {
-    stopFns.push(effect(mood, $('#mcv', L.el)));
-    const c = (await clips())[mood];
-    if (c) {
-      const v = document.createElement('video'); v.src = c.url; v.loop = true; v.muted = true; v.autoplay = true; v.playsInline = true;
-      v.addEventListener('playing', () => { $('#mbg', L.el).style.opacity = 0; });
-      v.addEventListener('error', () => { v.remove(); });
-      L.el.insertBefore(v, $('#mcv', L.el)); v.play().catch(() => {});
-      stopFns.push(() => { v.pause(); v.removeAttribute('src'); v.load(); });
-    }
+  if (vid) {
+    vid.src = it.clip.url; vid.muted = !L.soundOn;
+    vid.addEventListener('playing', () => { $('.still', L.el).style.opacity = 0; });
+    vid.addEventListener('error', () => { const m = $('.msg2', L.el); m.style.display = ''; m.textContent = "The clip didn't load from the NAS. The picture stays."; vid.remove(); });
+    vid.play().catch(() => { vid.muted = true; vid.play().catch(() => {}); toast('Press OK to start the sound'); });
   }
-  const setTimer = () => {
-    clearTimeout(L.tt);
-    if (L.timer) L.tt = setTimeout(() => { $('#mfade', L.el).style.opacity = 1; if (L.sfx) { let v = L.sfx.volume; const f = setInterval(() => { v -= .05; if (v <= 0) { clearInterval(f); L.sfx.pause(); } else L.sfx.volume = v; }, 400); } aud.pause(); M.playing = false; M.paint(); }, L.timer * 60000);
+  // no clip of your own: the drawn scene stands in, with the mood's sound
+  if (!vid && snd) { L.sfx = new Audio(`sound/${snd}.mp3`); L.sfx.loop = true; L.sfx.volume = .7; if (L.soundOn) L.sfx.play().catch(() => toast('Press OK to start the sound')); }
+  const stopFx = vid ? null : effect(it.mood === 'rain' ? 'rain' : it.mood === 'fireflies' ? 'fireflies' : 'hearth', $('#mcv', L.el));
+  L.paintBar = () => {
+    $('[data-a=msound] span', L.el).textContent = word + ' ' + (L.soundOn ? 'on' : 'off');
+    $('[data-a=mdim] span', L.el).textContent = L.dim ? Math.round(DIM[L.dim] * 100) + '%' : 'Bright';
+    $('[data-a=mtimer] span', L.el).textContent = 'Timer ' + (TIM[L.timer] ? TIM[L.timer] + ' min' : 'off');
+    $('.dim', L.el).style.opacity = DIM[L.dim];
   };
-  setTimer(); L.setTimer = setTimer;
-  L.close = () => { clearTimeout(L.tt); clearTimeout(L.hideT); if (L.sfx) { L.sfx.pause(); L.sfx = null; } stopFns.forEach(f => f && f()); };
-  setFocus($('.fx', L.el));
+  L.setSound = on => { L.soundOn = on; SETPREF0('ambSound_' + L.mood, on ? '1' : '0'); if (vid) { vid.muted = !on; if (on) vid.play().catch(() => {}); } if (L.sfx) on ? L.sfx.play().catch(() => {}) : L.sfx.pause(); L.paintBar(); };
+  L.cycleDim = () => { L.dim = (L.dim + 1) % DIM.length; SETPREF0('ambDim', L.dim); L.paintBar(); };
+  L.setTimer = () => {
+    clearTimeout(L.tt); $('.fadeout', L.el).style.opacity = 0;
+    if (TIM[L.timer]) L.tt = setTimeout(() => {
+      $('.fadeout', L.el).style.opacity = 1; L.hide();
+      let k = 1; const f = setInterval(() => { k -= .05; if (vid) vid.volume = Math.max(0, k); if (L.sfx) L.sfx.volume = Math.max(0, k * .7); if (k <= 0) { clearInterval(f); if (vid) vid.pause(); if (L.sfx) L.sfx.pause(); M.held = false; } }, 1000);
+    }, TIM[L.timer] * 60000);
+  };
+  L.cycleTimer = () => { L.timer = (L.timer + 1) % TIM.length; L.paintBar(); L.setTimer(); };
+  L.show = () => { L.el.classList.add('ui'); L.ui = true; clearTimeout(L.hideT); L.hideT = setTimeout(() => L.hide(), 6000); if (!focusEl || !L.el.contains(focusEl)) setFocus($('.mb', L.el)); };
+  L.hide = () => { L.el.classList.remove('ui'); L.ui = false; clearTimeout(L.hideT); setFocus(null); };
+  L.onBack = () => { if (L.ui) { L.hide(); return true; } return false; };
+  L.onMouse = () => L.show();
+  L.paintBar(); L.setTimer(); L.show();
+  L.close = () => { clearTimeout(L.tt); clearTimeout(L.hideT); if (L.sfx) { L.sfx.pause(); L.sfx = null; } if (vid) { vid.pause(); vid.removeAttribute('src'); vid.load(); } if (stopFx) stopFx(); M.release(); ambSoundLabels(); };
 }
 function effect(mood, cv) {
+  if (!cv) return () => {};
   const g = cv.getContext('2d'), W = cv.width, H = cv.height;
   const N = mood === 'rain' ? 110 : mood === 'fireflies' ? 34 : 46;
   const P = Array.from({ length: N }, () => ({ x: Math.random() * W, y: Math.random() * H, v: .4 + Math.random(), s: Math.random() * 6.28, r: 1 + Math.random() * 2 }));
@@ -610,23 +1118,6 @@ function effect(mood, cv) {
     }
   })(0);
   return () => { run = false; };
-}
-async function windowShow(L) {
-  await libs();
-  const bg = $('#mbg', L.el);
-  let urls = [];
-  try {
-    if (photoLib) {
-      const mc = await pj(`/library/sections/${photoLib.key}/all`, { type: 13, sort: 'addedAt:desc', 'X-Plex-Container-Size': 150 });
-      urls = (mc.Metadata || []).map(m => m.Media?.[0]?.Part?.[0]?.key).filter(Boolean).map(k => `${PX}/photo/:/transcode?width=1920&height=1080&minSize=1&url=${encodeURIComponent(k)}`);
-    }
-  } catch (e) { /* none */ }
-  if (!urls.length) { bg.innerHTML = '<div class="msg">No photos found in Plex yet.</div>'; return () => {}; }
-  for (let i = urls.length - 1; i > 0; i--) { const j = Math.random() * (i + 1) | 0;[urls[i], urls[j]] = [urls[j], urls[i]]; }
-  let n = 0; bg.style.opacity = 1; bg.style.backgroundSize = 'cover';
-  const next = () => { const im = new Image(); im.onload = () => { bg.style.backgroundImage = `url('${urls[n % urls.length]}')`; n++; }; im.src = urls[n % urls.length]; };
-  next(); const iv = setInterval(next, 15000);
-  return () => clearInterval(iv);
 }
 
 /* ---------- Player ---------- */
@@ -675,10 +1166,6 @@ function parseSubs(t) {
     if (txt) out.push({ s: tm(a), e: tm(c), t: txt });
   }
   return out.sort((x, y) => x.s - y.s);
-}
-function pickSheet(title, labels, cb, cur) {
-  const L = openLayer('sheet pick', `<div class="in" style="flex-direction:column"><h2>${esc(title)}</h2><div class="pgrid scroll" style="position:relative;flex:1;overflow:hidden;padding:20px 0 80px">${labels.map((l, i) => `<div class="fx chip ${i === cur ? 'live' : ''}" data-a="pickopt" data-i="${i}">${esc(l)}</div>`).join('')}</div></div>`);
-  L.cb = cb; return L;
 }
 async function playItem(rk, type, o) {
   o = o || {};
@@ -1317,7 +1804,8 @@ function roomRequests(room, tok) {
   const chipHTML = ch => ch && ch.text ? `<div class="rchip ${ch.tone}">${ricon(ch.icon)}<span>${esc(ch.text.toUpperCase())}</span></div>` : '';
   S.cardHTML = (c, i) => {
     const sq = c.square, mine = S.cur().key === 'mine' && !S.over;
-    return `<div class="fx rc ${mine ? 'mine' : ''}" data-a="rqcard" data-i="${i}"><div class="rim ${sq ? 'sq' : ''}" data-bg="${esc(c.image || '')}"></div><div class="rph ${sq ? 'sq' : ''}">${esc(c.title)}</div>${c.score && c.kind === 'media' ? `<div class="rscore">★ ${esc(c.score)}</div>` : ''}${chipHTML(c.chip)}${c.progress >= 0 ? `<div class="rbar"><i style="width:${Math.max(c.progress > 0 ? 8 : 0, Math.min(100, c.progress))}%"></i></div>` : ''}${c.caption ? `<div class="rcap"><b>${esc(c.title)}</b><span>${esc(c.caption)}</span></div>` : ''}</div>`;
+    const sk = c.kind === 'media' && c.data && c.data.id && (c.data.mediaType === 'movie' || c.data.mediaType === 'tv') ? c.data.mediaType + ':' + c.data.id : '';
+    return `<div class="fx rc ${mine ? 'mine' : ''}" data-a="rqcard" data-i="${i}" ${sk ? `data-sk="${sk}"` : ''}><div class="rim ${sq ? 'sq' : ''}" data-bg="${esc(c.image || '')}"></div><div class="rph ${sq ? 'sq' : ''}">${esc(c.title)}</div>${c.score && c.kind === 'media' ? `<div class="rscore">★ ${esc(c.score)}</div>` : ''}${chipHTML(c.chip)}${c.progress >= 0 ? `<div class="rbar"><i style="width:${Math.max(c.progress > 0 ? 8 : 0, Math.min(100, c.progress))}%"></i></div>` : ''}${c.caption ? `<div class="rcap"><b>${esc(c.title)}</b><span>${esc(c.caption)}</span></div>` : ''}</div>`;
   };
   S.show = () => {
     const l = S.cur(); S.paintRail();
@@ -1857,7 +2345,25 @@ function act(el) {
   else if (a === 'soptfav') { const L = layers[layers.length - 1]; const it = L.cur && L.cur[0]; if (!it) return; const want = it.fav ? -1 : 10; fetch(`${PX}/:/rate?key=${it.id}&identifier=com.plexapp.plugins.library&rating=${want}`).then(() => { it.fav = !it.fav; el.textContent = it.fav ? '★ Favourite (tap to remove)' : '☆ Make favourite'; el.classList.toggle('live', it.fav); $('#scs', L.el).textContent = it.fav ? '★ FAVOURITE' : ''; }).catch(() => toast('Plex did not answer')); }
   else if (a === 'soptclose') layers[layers.length - 1].closeOpt();
   else if (a === 'mood') openMood(d.m);
-  else if (a === 'album') openAlbum(d.k, d.t).catch(e => toast(e.message));
+  else if (a === 'album' || a === 'malb') albumMenu(d.k, d.t).catch(e => toast(e.message));
+  else if (a === 'dlg') dlgPick(el);
+  else if (a === 'mtab') { MR.tab = +d.i; SETPREF0('musicTab', MR.tab); $$('.mtabs .mword').forEach((w, i) => w.classList.toggle('cur', i === MR.tab)); mShowTab(renderTok); }
+  else if (a === 'mlet') { const t = $$('#mscroll .mt2')[+d.i]; if (t) setFocus(t); }
+  else if (a === 'mplayk' || a === 'mshufk') albumKids(d.k, 'album').then(k => M.playList(k, 0, a === 'mshufk')).catch(e => toast(e.message));
+  else if (a === 'mshuf') M.setShuffle(!M.shuffle);
+  else if (a === 'mmore') musicOptions();
+  else if (a === 'qjump') { const i = +d.i; closeThen(() => M.jump(i)); }
+  else if (a === 'amood') { const v = clipCache && clipCache.v; const it = v && v.list[+d.i]; if (it) openMood(it.mood); }
+  else if (a === 'mdim') layers[layers.length - 1].cycleDim();
+  else if (a === 'mvprev') M.prev();
+  else if (a === 'mvtoggle') M.toggle();
+  else if (a === 'mvnext') M.next();
+  else if (a === 'mvshuf') M.setShuffle(!M.shuffle);
+  else if (a === 'mvrep') M.cycleRepeat();
+  else if (a === 'mvmode') layers[layers.length - 1].setMode(d.m);
+  else if (a === 'mvlook') lookMenu(layers[layers.length - 1]);
+  else if (a === 'mvfire') fireMenu(layers[layers.length - 1]);
+  else if (a === 'mvlib') closeThen(() => { if (cur !== 'Music') go('Music'); });
   else if (a === 'mtoggle') M.toggle();
   else if (a === 'mnext') M.next();
   else if (a === 'mprev') M.prev();
@@ -1865,10 +2371,8 @@ function act(el) {
   else if (a === 'mtrack') { const L = layers[layers.length - 1]; M.playList(L.kids, +d.n, false); toast('Playing'); }
   else if (a === 'sheetplay') { const L = layers[layers.length - 1]; M.playList(L.kids, 0, false); toast('Playing'); }
   else if (a === 'sheetshuf') { const L = layers[layers.length - 1]; M.playList(L.kids, 0, true); toast('Shuffled'); }
-  else if (a === 'msound') { const L = layers[layers.length - 1]; if (L.sfx) { L.soundOn = !L.soundOn; L.soundOn ? L.sfx.play() : L.sfx.pause(); el.textContent = L.soundOn ? 'Sound on' : 'Sound off'; el.classList.toggle('live', L.soundOn); } else toast('This mood has no sound'); }
-  else if (a === 'mmusic') M.toggle();
-  else if (a === 'mnextsong') M.next();
-  else if (a === 'mtimer') { const L = layers[layers.length - 1]; const o = [0, 15, 30, 60]; L.timer = o[(o.indexOf(L.timer) + 1) % o.length]; el.textContent = 'Timer: ' + (L.timer ? L.timer + ' min' : 'off'); L.setTimer(); }
+  else if (a === 'msound') { const L = layers[layers.length - 1]; L.setSound(!L.soundOn); }
+  else if (a === 'mtimer') layers[layers.length - 1].cycleTimer();
   else if (a === 'mleave' || a === 'back') closeLayer();
   else if (a === 'pseek') { const L = layers[layers.length - 1]; L.seek(+d.d); }
   else if (a === 'ppp') layers[layers.length - 1].toggle();
