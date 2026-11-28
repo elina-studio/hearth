@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Full-screen music: mode "cover" (big album art), "milk" (MilkDrop, rendered for each song) or "hearth" (the fire, with
      fire + music / fire only / music only). The now-playing strip shows on any key and fades after a few seconds.
-     The Visualizer has the Big view's whole player over the picture instead of the strip (group "ctl"). -->
+     The Visualizer and the Hearth fire have the Big view's whole player over the picture instead of the strip (group "ctl"). -->
 <component name="MusicView" extends="Group">
   <children>
     <Rectangle width="1920" height="1080" color="0x0B0E09FF" />
@@ -29,10 +29,6 @@
       <Label id="vizNote" translation="[260, 420]" width="1400" horizAlign="center" wrap="true" lineSpacing="2" color="0xB5AF8CFF" />
       <!-- MilkDrop for this song, with the song in the same stream (MusicPlayer mixplay.brs) -->
       <Video id="vizVideo" width="1920" height="1080" enableUI="false" disableScreenSaver="true" />
-      <Group id="lookTag" opacity="0">
-        <Rectangle id="lookTagBg" translation="[80, 50]" width="560" height="64" color="0x0B0E09B3" />
-        <Label id="presetName" translation="[104, 62]" width="900" color="0xEDE6CAFF" />
-      </Group>
     </Group>
 
     <Group id="hearth" visible="false">
@@ -46,8 +42,13 @@
     </Group>
 
     <LyricsPanel id="lyrics" translation="[500, 270]" />
+    <!-- a few words at the top left for three seconds: the look's name, or a message from the player -->
+    <Group id="lookTag" opacity="0">
+      <Rectangle id="lookTagBg" translation="[80, 50]" width="560" height="64" color="0x0B0E09B3" />
+      <Label id="presetName" translation="[104, 62]" width="900" color="0xEDE6CAFF" />
+    </Group>
 
-    <!-- the Visualizer's controls: the Big view's player, drawn over the picture (mockups/visualizer/viz-controls.png).
+    <!-- the Visualizer's and the Hearth fire's controls: the Big view's player, drawn over the picture (mockups/visualizer/viz-controls.png).
          Shown on OK and on entry, gone after a few idle seconds or on Back. Keys go to the panel as in the Big view. -->
     <Group id="ctl" opacity="0" visible="false">
       <Rectangle width="1920" height="1080" color="0x0B0E0980" />

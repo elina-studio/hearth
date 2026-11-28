@@ -39,7 +39,7 @@
   <interface>
     <field id="layout" type="string" value="column" onChange="build" />
     <field id="active" type="boolean" value="false" onChange="paint" />
-    <!-- "milk": the big layout drawn over the Visualizer; the Visualizer button becomes a Look button -->
+    <!-- "milk" or "hearth": the big layout drawn over the Visualizer or the Hearth fire; that view's own button becomes a Look or Fire button -->
     <field id="over" type="string" value="" onChange="build" />
     <field id="castOpen" type="boolean" value="false" onChange="build" />
     <!-- the room's "played lately" items (Plex metadata), for the nothing-queued list -->

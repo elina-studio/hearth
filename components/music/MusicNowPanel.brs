@@ -23,7 +23,7 @@ sub init()
     m.idleSel = 0
     m.idleItems = []
     m.castTop = 0
-    m.names = { more: "More", prev: "Previous", toggle: "Play", next: "Next", shuffle: "Shuffle", repeat: "Repeat", cover: "Cover", milk: "Visualizer", hearth: "Hearth fire", big: "Big view", library: "Back to the library", cast: "Play in other rooms", like: "Like", dislike: "Dislike", queue: "Queue", look: "Heart this look, or pick another" }
+    m.names = { more: "More", prev: "Previous", toggle: "Play", next: "Next", shuffle: "Shuffle", repeat: "Repeat", cover: "Cover", milk: "Visualizer", hearth: "Hearth fire", big: "Big view", library: "Back to the library", cast: "Play in other rooms", like: "Like", dislike: "Dislike", queue: "Queue", look: "Heart this look, or pick another", fire: "Fire and music, fire only, or music only" }
     m.r = 0
     m.c = 1
     p = muPlayer()
@@ -95,6 +95,9 @@ sub build()
         if m.top.over = "milk"
             ' over the Visualizer: the same row, with a Look button (heart, hearted or all, every look) where the Visualizer button was
             addRow([x, 490], [["prev", "", "prev"], ["play", "", "toggle"], ["next", "", "next"], ["shuffle", "", "shuffle"], ["repeat", "", "repeat"], ["", "", "sep"], ["cover", "", "cover"], ["fire", "", "hearth"], ["", "", "sep"], ["viz", "Look", "look"]], 0)
+        else if m.top.over = "hearth"
+            ' over the Hearth fire: a Fire button (fire + music, fire only, music only) where the Hearth button was
+            addRow([x, 490], [["prev", "", "prev"], ["play", "", "toggle"], ["next", "", "next"], ["shuffle", "", "shuffle"], ["repeat", "", "repeat"], ["", "", "sep"], ["cover", "", "cover"], ["viz", "", "milk"], ["", "", "sep"], ["fire", "Fire", "fire"]], 0)
         else
             addRow([x, 490], [["prev", "", "prev"], ["play", "", "toggle"], ["next", "", "next"], ["shuffle", "", "shuffle"], ["repeat", "", "repeat"], ["", "", "sep"], ["cover", "", "cover"], ["viz", "", "milk"], ["fire", "", "hearth"]], 0)
         end if
@@ -544,7 +547,7 @@ function handleKey(key as string) as string
 end function
 
 sub act(a as string)
-    if not pxReady() and a <> "cover" and a <> "milk" and a <> "hearth" and a <> "library" and a <> "big" and a <> "more" and a <> "look" then return
+    if not pxReady() and a <> "cover" and a <> "milk" and a <> "hearth" and a <> "library" and a <> "big" and a <> "more" and a <> "look" and a <> "fire" then return
     if a = "cast"
         if m.top.castOpen
             closeCast()
@@ -562,8 +565,8 @@ sub act(a as string)
         m.top.request = { action: "musicView", mode: "big" }
     else if a = "library"
         m.top.request = { action: "back" }
-    else if a = "look"
-        m.top.request = { action: "look" }
+    else if a = "look" or a = "fire"
+        m.top.request = { action: a }
     else if a = "prev" or a = "next"
         muSend(a)
     else if a = "like" or a = "dislike"

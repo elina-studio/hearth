@@ -193,6 +193,7 @@ sub onMode()
     for each k in m.groups
         m.groups[k].visible = (k = mode)
     end for
+    if mode = "milk" or mode = "hearth" then m.panel.over = mode
     if mode = "milk"
         startViz()
     else if mode = "hearth"
@@ -209,7 +210,7 @@ sub onMode()
     ' music is the point of these views: start it if nothing is on
     p = muPlayer()
     if mode <> "hearth" and p.state <> "playing" and p.state <> "buffering" then muSend("play")
-    if mode = "milk" then showControls() else showStrip()
+    if mode = "milk" or mode = "hearth" then showControls() else showStrip()
 end sub
 
 ' ---------- now playing ----------
@@ -238,6 +239,8 @@ sub showNow()
     if mode = "hearth"
         names = { both: "FIRE + MUSIC", fire: "FIRE ONLY", music: "MUSIC ONLY" }
         m.sEyebrow.text = "HEARTH  ·  " + names[m.mix] + "  ·  " + n.eyebrow
+        ctlTagPaint()
+        muNextTiles(m.ctlNext)
         keys = keys + Chr(10) + "OK mutes the fire or the music"
     else if mode = "milk"
         p = muPlayer()
@@ -273,7 +276,7 @@ end sub
 
 sub onMessage()
     msg = muPlayer().message
-    if m.top.mode = "milk"
+    if m.top.mode = "milk" or m.top.mode = "hearth"
         ' with the controls up the words sit under the buttons; without them, in the small tag at the top
         m.ctlMsg = msg
         if m.ctlOn then ctlWords() else tagSay(msg)
@@ -285,7 +288,7 @@ end sub
 
 sub showStrip()
     ' the Visualizer has the whole player over the picture instead (showControls)
-    if m.top.mode = "milk" then return
+    if m.top.mode = "milk" or m.top.mode = "hearth" then return
     if m.strip.opacity < 1
         m.stripOut.control = "stop"
         m.top.findNode("stripInI").keyValue = [m.strip.opacity, 1.0]
@@ -865,7 +868,7 @@ function hKeyInner(key as string, press as boolean) as boolean
         m.picker.callFunc("handleKey", key)
         return true
     end if
-    if m.top.mode = "milk" then return vizKey(key)
+    if m.top.mode = "milk" or m.top.mode = "hearth" then return vizKey(key)
     if key = "back"
         leave()
         return true
@@ -876,11 +879,7 @@ function hKeyInner(key as string, press as boolean) as boolean
     end if
     ' OK as well as *: while a video plays the TV keeps * for its own picture menu
     if key = "options" or key = "OK"
-        if m.top.mode = "hearth"
-            mixMenu()
-        else
-            muOptions(false)
-        end if
+        muOptions(false)
         return true
     end if
     if key = "up" and m.top.mode <> "cover"
@@ -888,19 +887,14 @@ function hKeyInner(key as string, press as boolean) as boolean
         showStrip()
         return true
     end if
-    if m.top.mode = "hearth" and (key = "left" or key = "right") and muPlayer().lyricsFound
-        if key = "left" then muSend("lyricsNudge", { delta: -0.5 }) else muSend("lyricsNudge", { delta: 0.5 })
-        showStrip()
-        return true
-    end if
     showStrip()
     return true
 end function
 
-' ---------- the Visualizer's controls: the Big view's player over the picture ----------
+' ---------- the Visualizer's and the Hearth fire's controls: the Big view's player over the picture ----------
 ' Controls up: every key goes to the panel, as in the Big view (Left/Right along the buttons, OK presses one,
-' * opens Music options); Back puts them away. Controls away: Left/Right change the look, Up shows or hides
-' the lyrics, Back leaves, and OK (or anything else) brings the controls up.
+' * opens Music options); Back puts them away. Controls away: Left/Right change the look (over the fire they
+' nudge the lyrics' timing), Up shows or hides the lyrics, Back leaves, and OK (or anything else) brings the controls up.
 function vizKey(key as string) as boolean
     if muMediaKey(key)
         showControls()
@@ -915,11 +909,15 @@ function vizKey(key as string) as boolean
         end if
         return true
     end if
+    fire = (m.top.mode = "hearth")
     if key = "back"
         leave()
-    else if key = "left"
+    else if fire and (key = "left" or key = "right") and muPlayer().lyricsFound
+        ' the fire has no looks to step through: Left and Right nudge the lyrics' timing, as before
+        if key = "left" then muSend("lyricsNudge", { delta: -0.5 }) else muSend("lyricsNudge", { delta: 0.5 })
+    else if key = "left" and not fire
         stepLook(-1)
-    else if key = "right"
+    else if key = "right" and not fire
         stepLook(1)
     else if key = "up"
         muSend("lyricsToggle")
@@ -940,6 +938,9 @@ sub showControls()
     m.tagIn.control = "stop"
     m.tagOut.control = "stop"
     m.lookTag.opacity = 0
+    ' the fire's own notes sit where the controls go: they come back when the controls leave
+    m.fireNote.opacity = 0
+    m.noFire.opacity = 0
     ctlTagPaint()
     ctlWords()
     if m.ctl.opacity < 1
@@ -973,6 +974,8 @@ sub hideControls()
     m.ctlIn.control = "stop"
     m.ctlOut.control = "start"
     m.lyrics.opacity = 1
+    m.fireNote.opacity = 1
+    m.noFire.opacity = 1
     ctlWords()
 end sub
 
@@ -986,6 +989,11 @@ end sub
 ' the controls' top line: which look is on, and whether it is drawn live
 sub ctlTagPaint()
     p = muPlayer()
+    if m.top.mode = "hearth"
+        names = { both: "FIRE + MUSIC", fire: "FIRE ONLY", music: "MUSIC ONLY" }
+        m.ctlTag.text = "HEARTH FIRE  ·  " + names[m.mix]
+        return
+    end if
     look = p.vizLook
     if m.vizLoop = true then look = m.vizLoopLook
     if m.lookWant <> "" then look = m.lookWant
@@ -1014,7 +1022,13 @@ end sub
 sub ctlWords()
     m.vizNote.text = m.noteText
     m.vizNote.visible = (m.noteOn and not m.ctlOn)
-    if m.ctlMsg <> "" then m.ctlToast.text = m.ctlMsg else if m.noteOn then m.ctlToast.text = m.noteText else m.ctlToast.text = ""
+    if m.ctlMsg <> ""
+        m.ctlToast.text = m.ctlMsg
+    else if m.noteOn and m.top.mode = "milk"
+        m.ctlToast.text = m.noteText
+    else
+        m.ctlToast.text = ""
+    end if
 end sub
 
 sub onPanelRequest()
@@ -1027,10 +1041,12 @@ sub onPanelRequest()
         vizMenu()
     else if a = "back"
         leave()
-    else if a = "musicView" and r.mode = "milk"
+    else if a = "fire"
+        mixMenu()
+    else if a = "musicView" and r.mode = m.top.mode
         hideControls()
-    else if a = "musicView" and (r.mode = "cover" or r.mode = "hearth")
-        ' the other two pictures open here, in place of the Visualizer
+    else if a = "musicView" and (r.mode = "cover" or r.mode = "hearth" or r.mode = "milk")
+        ' the other pictures open here, in place of this one
         m.ctlOn = false
         m.ctlTimer.control = "stop"
         m.ctlIn.control = "stop"
@@ -1038,10 +1054,18 @@ sub onPanelRequest()
         m.ctl.opacity = 0
         m.ctl.visible = false
         m.lyrics.opacity = 1
-        m.lookTimer.control = "stop"
-        m.lookWant = ""
-        vizSay("")
-        stopViz()
+        m.fireNote.opacity = 1
+        m.noFire.opacity = 1
+        m.tagTimer.control = "stop"
+        m.lookTag.opacity = 0
+        if m.top.mode = "milk"
+            m.lookTimer.control = "stop"
+            m.lookWant = ""
+            vizSay("")
+            stopViz()
+        else
+            stopHearth()
+        end if
         m.top.mode = r.mode
     else
         m.top.request = r
@@ -1087,4 +1111,23 @@ sub muNowBox(d as object)
     p = muPlayer()
     if p.state <> "playing" and p.state <> "buffering" then k = "Paused"
     d.now = { art: pxImage(n.track.thumb, 208, 208), kicker: k, title: n.title, sub: n.sub }
+end sub
+
+' leaving the fire for another picture on this screen: stop its stream, its clip and its crackle, and clear the holder
+sub stopHearth()
+    fireMixStop()
+    stopFire()
+    if m.sound <> invalid
+        m.sound.on = false
+        m.sound.active = false
+    end if
+    m.sound = invalid
+    holder = m.top.findNode("moodHolder")
+    holder.removeChildrenIndex(holder.getChildCount(), 0)
+    m.fireMix = invalid
+    m.fireStill = invalid
+    m.fireClip = invalid
+    m.fireNote.visible = false
+    m.noFire.visible = false
+    m.mix = "both"
 end sub
